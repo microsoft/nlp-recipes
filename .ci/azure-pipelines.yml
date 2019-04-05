@@ -1,0 +1,37 @@
+
+# Pull request against these branches will trigger this build
+pr:
+- master
+- staging
+
+#Any commit to this branch will trigger the build.
+trigger:
+- staging
+- master
+
+pool:
+  vmImage: 'ubuntu-16.04'
+
+steps:
+
+- bash: |
+    echo "##vso[task.prependpath]/usr/share/miniconda/bin"
+  displayName: Add Conda to PATH
+
+- bash: |
+    conda remove -q -n nlp --all -y
+    conda env create -f environment.yml
+    conda env list  
+    source activate nlp
+  displayName: 'Build Configuration'
+
+- bash: |
+    source activate nlp
+    python -m ipykernel install --user --name nlp --display-name "nlp"
+  # pytest --junitxml=junit/test-unitttest.xml #not running any tests for now
+  displayName: 'Run Unit tests'
+
+- task: PublishTestResults@2
+  inputs:
+    testResultsFiles: '**/test-unitttest.xml'
+    testRunTitle: 'Test results for PyTest'
