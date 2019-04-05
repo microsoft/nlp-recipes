@@ -15,11 +15,10 @@ pool:
 steps:
 
 - bash: |
-    echo "##vso[task.prependpath]/data/anaconda/bin"
+    echo "##vso[task.prependpath]/usr/share/miniconda/bin"
   displayName: Add Conda to PATH
 
 - bash: |
-    source deactivate nlp
     conda remove -q -n nlp --all -y
     conda env create -f environment.yml
     conda env list  
@@ -29,7 +28,7 @@ steps:
 - bash: |
     source activate nlp
     python -m ipykernel install --user --name nlp --display-name "nlp"
-    pytest --junitxml=junit/test-unitttest.xml #not running any tests for now
+  # pytest --junitxml=junit/test-unitttest.xml #not running any tests for now
   displayName: 'Run Unit tests'
 
 - task: PublishTestResults@2
