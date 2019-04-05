@@ -19,17 +19,18 @@ steps:
   displayName: Add Conda to PATH
 
 - bash: |
-    source deactivate nlp
+    . /data/anaconda/etc/profile.d/conda.sh
     conda remove -q -n nlp --all -y
     conda env create -f environment.yml
     conda env list  
-    source activate nlp
+    conda activate nlp
   displayName: 'Build Configuration'
 
 - bash: |
-    source activate nlp
+    conda activate nlp
     python -m ipykernel install --user --name nlp --display-name "nlp"
     pytest --junitxml=junit/test-unitttest.xml #not running any tests for now
+    conda deactivate
   displayName: 'Run Unit tests'
 
 - task: PublishTestResults@2
