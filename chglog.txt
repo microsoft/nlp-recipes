@@ -1,4 +1,0 @@
-x.y or date or however we mark a release
---------------------------------------------
-Highlights
-
