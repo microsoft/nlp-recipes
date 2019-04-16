@@ -102,3 +102,22 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+##########################
+.DS_Store
+.~*
+Untitled*.ipynb
+*-Copy*.ipynb
+~$*
+output.ipynb
+.idea/
+*.npz
+*.data
+*.dat
+*.csv
+*.zip
+.vscode/
+tools/repo_metrics/config.py
+*.jar
+*.item
+*.pkl
