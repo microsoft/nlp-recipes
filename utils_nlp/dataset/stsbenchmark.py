@@ -34,7 +34,7 @@ def clean_sts(filenames, src_dir, target_dir):
 	filepaths = [os.path.join(src_dir, f) for f in filenames]
 	for i,fp in enumerate(filepaths):
 		dat = dp.auto_read_file(path=fp)
-		s = dat.keep_columns(['Column5', 'Column6', 'Column7']).rename_columns({'Column5': 'score', 'Column6': 's1', 'Column7': 's2'})
+		s = dat.keep_columns(['Column5', 'Column6', 'Column7']).rename_columns({'Column5': 'score', 'Column6': 'sentence1', 'Column7': 'sentence2'})
 		sdf = s.to_pandas_dataframe().to_csv(os.path.join(target_dir, filenames[i]), sep='\t')
 
 class STSBenchmark():
