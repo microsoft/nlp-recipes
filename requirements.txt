@@ -1,0 +1,7 @@
+azureml-dataprep >= 1.1.1
+gensim		 >= 3.7.1
+jupyter		 >= 1.0.0
+nltk		 >= 3.4
+pandas		 >= 0.24.2
+spacy		 >= 2.1.3
+
