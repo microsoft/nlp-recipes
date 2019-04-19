@@ -80,6 +80,21 @@ def extract_snli(zip_path, source_file_name, dest_path):
 def clean_snli(snli_df):
     snli_df = snli_df.drop(['sentence1_binary_parse', 'sentence2_binary_parse', 'sentence1_parse', 'sentence2_parse',
                               'captionID', 'pairID', 'label1', 'label2', 'label3', 'label4', 'label5'], axis=1)
-    snli_df = snli_df.rename(index=str, columns={"gold_label": "score", "sentence1":"sentence_1", "sentence2":"sentence_2"})
+    snli_df = snli_df.rename(index=str, columns={"gold_label": "score"})
+
+    save_df_to_csv_file(snli_df)
 
     return snli_df
+
+
+def save_df_to_csv_file(snli_df, file_name= SNLI_FILE_PREFIX):
+
+    data_dir_path = os.path.dirname(os.path.realpath(__file__))
+    clean_dir_path = os.path.join(data_dir_path, DIR_NAMES[1])
+
+    if not os.path.exists(clean_dir_path):
+        os.makedirs(clean_dir_path)
+
+    file_path = os.path.join(clean_dir_path)
+    snli_df.to_csv(os.path.join(clean_dir_path + "test.csv"), index=False)
+
