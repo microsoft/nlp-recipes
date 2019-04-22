@@ -28,7 +28,9 @@ class TqdmUpTo(tqdm):
         self.update(b * bsize - self.n)  # will also set self.n = b * bsize
 
 
-def maybe_download(url, filename=None, work_directory=".", expected_bytes=None):
+def maybe_download(
+    url, filename=None, work_directory=".", expected_bytes=None
+):
     """Download a file if it is not already downloaded.
     
     Args:
