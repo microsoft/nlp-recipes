@@ -24,7 +24,8 @@ def to_spacy_tokens(df):
         df (pandas dataframe): Dataframe with columns labeled 'sentence1' and 'sentence2' to tokenize.
 
     Returns:
-        pandas dataframe: Dataframe with new columns labeled 'sentence1_tokens' and 'sentence2_tokens', each containing a list of tokens for their respective sentences.
+        pandas dataframe: Dataframe with new columns labeled 'sentence1_tokens' and 'sentence2_tokens', each containing 
+                            a list of tokens for their respective sentences.
     """
     nlp = spacy.load("en_core_web_sm")
     text_df = df[["sentence1", "sentence2"]]
@@ -43,7 +44,8 @@ def rm_spacy_stopwords(df, custom_stopwords=[]):
         custom_stopwords (list of str, optional): List of custom stopwords to register with the spaCy model.
 
     Returns:
-        pandas dataframe: Dataframe with new columns labeled 'sentence1_tokens_stop' and 'sentence2_tokens_stop', each containing a list of tokens for their respective sentences.
+        pandas dataframe: Dataframe with new columns labeled 'sentence1_tokens_stop' and 'sentence2_tokens_stop', each 
+                            containing a list of tokens for their respective sentences.
     """
     nlp = spacy.load("en_core_web_sm")
     if len(custom_stopwords) > 0:
