@@ -6,10 +6,15 @@ import spacy
 
 
 def to_lowercase(df):
+    """ Transform all strings in the dataframe to lowercase """
     return df.applymap(lambda s: s.lower() if type(s) == str else s)
 
 
 def to_spacy_tokens(df):
+    """ 
+    Add two new columns, sentence1_tokens and sentence2_tokens, to the input dataframe,
+    each of which contains a list of tokens for their respective sentences using the spaCy tokenizer 
+    """
     nlp = spacy.load("en_core_web_sm")
     text_df = df[['sentence1', 'sentence2']]
     nlp_df = text_df.applymap(lambda x: nlp(x))
@@ -20,6 +25,10 @@ def to_spacy_tokens(df):
 
 
 def rm_spacy_stopwords(df, custom_stopwords=[]):
+    """ 
+    Add two new columns, sentence1_tokens_stop, sentence2_tokens_stop, to the input dataframe, 
+    each of which contains a list of tokens with stopwords removed for their respective sentences using the spaCy tokenizer
+    """
     nlp = spacy.load("en_core_web_sm")
     if len(custom_stopwords) > 0:
         for csw in custom_stopwords:

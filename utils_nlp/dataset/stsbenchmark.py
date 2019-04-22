@@ -59,7 +59,7 @@ class STSBenchmark():
         self._maybe_download_and_extract()
 
     def _maybe_download_and_extract(self):
-        """ Check if a clean dataframe for the specified split exists. If not, download the entire dataset and clean. """
+        """ Check if a clean dataframe for the specified split exists. If not, download the entire dataset and clean """
         if not os.path.exists(self.filepath):
             raw_path = os.path.join(self.base_data_path, "raw")
             if not os.path.exists(raw_path):
