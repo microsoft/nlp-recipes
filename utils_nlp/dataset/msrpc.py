@@ -10,9 +10,9 @@ import pandas as pd
 from utils_nlp.dataset.url_utils import maybe_download, download_path
 
 DATASET_DICT = {
-    'train': 'msr_paraphrase_train.txt',
-    'test': 'msr_paraphrase_test.txt',
-    'all': 'msr_paraphrase_data.txt'
+    "train": "msr_paraphrase_train.txt",
+    "test": "msr_paraphrase_test.txt",
+    "all": "msr_paraphrase_data.txt",
 }
 
 
@@ -29,13 +29,16 @@ def download_msrpc(download_dir):
     return maybe_download(url, work_directory=download_dir)
 
 
-def load_pandas_df(local_cache_path=None, dataset_type='train', data_directory=None):
+def load_pandas_df(
+    local_cache_path=None, dataset_type="train", data_directory=None
+):
     """Load pandas dataframe and clean the data from the downloaded dataset
 
     Args:
-        data_directory: Path to the directory containing the dataset. Only required if the dataset is already
-        downloaded.
-        dataset_type (str): Key to the DATASET_DICT item. Loads the dataset specified. Could be train or test.
+        data_directory: Path to the directory containing the dataset. Only required if
+        the dataset is already downloaded.
+        dataset_type (str): Key to the DATASET_DICT item. Loads the dataset specified.
+        Could be train or test.
         local_cache_path (str): Path to download the dataset installer.
 
     Returns:
@@ -51,14 +54,30 @@ def load_pandas_df(local_cache_path=None, dataset_type='train', data_directory=N
         installer_datapath = download_msrpc(path)
 
         if dataset_type is None:
-            print("The Windows Installer for Mircosoft Paraphrase Corpus has been downloaded at ", installer_datapath)
-            data_directory = input("Please install and provide the installed directory. Thanks! \n")
+            print(
+                "The Windows Installer for Mircosoft Paraphrase Corpus has been "
+                "downloaded at ",
+                installer_datapath,
+            )
+            data_directory = input(
+                "Please install and provide the installed directory. Thanks! \n"
+            )
 
         data_directory = pathlib.Path(data_directory)
         assert os.path.exists(data_directory)
 
         file_path = os.path.join(data_directory, DATASET_DICT[dataset_type])
-        df = pd.read_csv(file_path, delimiter='\t', error_bad_lines=False).drop(columns=['#1 ID', '#2 ID']) \
-            .dropna() \
-            .rename(index=str, columns={"Quality": "score", "#1 String": "sentence1", "#2 String": "sentence2"})
+        df = (
+            pd.read_csv(file_path, delimiter="\t", error_bad_lines=False)
+            .drop(columns=["#1 ID", "#2 ID"])
+            .dropna()
+            .rename(
+                index=str,
+                columns={
+                    "Quality": "score",
+                    "#1 String": "sentence1",
+                    "#2 String": "sentence2",
+                },
+            )
+        )
         return df
