@@ -7,7 +7,10 @@ import pathlib
 
 import pandas as pd
 
-from utils_nlp.dataset.url_utils import maybe_download, download_path
+from sentence_similarity.utils_ss.dataset.url_utils import (
+    maybe_download,
+    download_path,
+)
 
 DATASET_DICT = {
     "train": "msr_paraphrase_train.txt",
@@ -56,7 +59,8 @@ def load_pandas_df(local_cache_path=None, dataset_type="train"):
         print(
             "The Windows Installer for Mircosoft Paraphrase Corpus has been "
             "downloaded at ",
-            installer_datapath, "\n"
+            installer_datapath,
+            "\n",
         )
         data_directory = input(
             "Please install and provide the installed directory. Thanks! \n"
