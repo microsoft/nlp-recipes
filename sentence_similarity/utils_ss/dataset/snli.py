@@ -179,4 +179,4 @@ def load_azureml_df(
         # this does not correctly convert the .jsonl file.
         df = dprep.auto_read_file(snlipath)
 
-    return df.to_pandas_dataframe()
+    return df
