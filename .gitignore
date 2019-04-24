@@ -125,3 +125,4 @@ tools/repo_metrics/config.py
 
 # Data
 data/
+sentence-similarity/data/
