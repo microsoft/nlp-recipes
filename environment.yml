@@ -25,4 +25,7 @@ dependencies:
   - pre-commit>=1.14.4
   - azureml-dataprep
   - https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-2.1.0/en_core_web_sm-2.1.0.tar.gz
+  - gensim>=3.7.0
+  - nltk>=3.4
+
 
