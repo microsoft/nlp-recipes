@@ -7,7 +7,7 @@ import pathlib
 
 import pandas as pd
 
-from sentence_similarity.utils_ss.dataset.url_utils import (
+from utils_nlp.dataset.url_utils import (
     maybe_download,
     download_path,
 )
