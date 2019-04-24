@@ -147,6 +147,10 @@ def clean_snli(source_file_path, dest_file_path):
 
     snli_df = snli_df.rename(index=str, columns={"gold_label": "score"})
 
+    dirs, _ = os.path.split(dest_file_path)
+    if not os.path.exists(dirs):
+        os.makedirs(dirs)
+
     snli_df.to_csv(dest_file_path, sep="\t")
 
     return snli_df
