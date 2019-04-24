@@ -25,17 +25,17 @@ def download_msrpc(download_dir):
         file_path to the downloaded dataset.
     """
 
-    url = "https://download.microsoft.com/download/D/4/6/D46FF87A-F6B9-4252-AA8B-3604ED519838/MSRParaphraseCorpus.msi"
+    url = (
+        "https://download.microsoft.com/download/D/4/6/D46FF87A-F6B9-4252-AA8B"
+        "-3604ED519838/MSRParaphraseCorpus.msi "
+    )
     return maybe_download(url, work_directory=download_dir)
 
 
-def load_pandas_df(
-    local_cache_path=None, dataset_type="train", data_directory=None
-):
+def load_pandas_df(local_cache_path=None, dataset_type="train"):
     """Load pandas dataframe and clean the data from the downloaded dataset
 
     Args:
-        data_directory: Path to the directory containing the dataset. Only required if
         the dataset is already downloaded.
         dataset_type (str): Key to the DATASET_DICT item. Loads the dataset specified.
         Could be train or test.
@@ -53,15 +53,14 @@ def load_pandas_df(
         path = pathlib.Path(path)
         installer_datapath = download_msrpc(path)
 
-        if dataset_type is None:
-            print(
-                "The Windows Installer for Mircosoft Paraphrase Corpus has been "
-                "downloaded at ",
-                installer_datapath,
-            )
-            data_directory = input(
-                "Please install and provide the installed directory. Thanks! \n"
-            )
+        print(
+            "The Windows Installer for Mircosoft Paraphrase Corpus has been "
+            "downloaded at ",
+            installer_datapath, "\n"
+        )
+        data_directory = input(
+            "Please install and provide the installed directory. Thanks! \n"
+        )
 
         data_directory = pathlib.Path(data_directory)
         assert os.path.exists(data_directory)
