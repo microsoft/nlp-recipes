@@ -6,7 +6,7 @@ import tarfile
 import pandas as pd
 import azureml.dataprep as dp
 
-from utils_ss.dataset.url_utils import maybe_download
+from utils_nlp.dataset.url_utils import maybe_download
 
 
 def download_sts(dirpath):
