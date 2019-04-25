@@ -22,7 +22,7 @@ The datasets are provided under the original terms that Microsoft received such 
 > Original Source: https://code.google.com/archive/p/word2vec/
 
 ### GloVe embeddings
->This dataset is provided under the [Public Domain Dedication and License v1.0](http://www.opendatacommons.org/licenses/pddl/1.0/). Redistributing the dataset glove.840B.300d.zip with attribution: 
+>This dataset is provided under the [Public Domain Dedication and License v1.0](http://www.opendatacommons.org/licenses/pddl/1.0/). Redistributing the dataset glove.840B.300d.zip with attribution:   
 > Jeffrey Pennington, Richard Socher, and Christopher D. Manning. 2014. GloVe: Global Vectors for Word Representation.  
 >
 > Original Source: https://nlp.stanford.edu/projects/glove/
