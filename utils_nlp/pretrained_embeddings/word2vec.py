@@ -38,7 +38,9 @@ def extract_word2vec_corpus(
     assert os.path.exists(zip_path) and os.path.exists(zip_dest_path)
     zipped_file_path = os.path.join(zip_dest_path, zipped_file_name)
 
-    with open(zip_path, "rb") as f_in, gzip.open(zipped_file_path, "wb") as f_out:
+    with open(zip_path, "rb") as f_in, gzip.open(
+        zipped_file_path, "wb"
+    ) as f_out:
         f_out.writelines(f_in)
 
     os.remove(zip_path)
