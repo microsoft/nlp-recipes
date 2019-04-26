@@ -63,7 +63,7 @@ def rm_spacy_stopwords(df, custom_stopwords=[]):
     return tokenized
 
 
-def nltk_tokenizer(snli_df):
+def to_nltk_tokens(df):
     """
     This function converts a sentence to word tokens using nltk.
     It adds two new columns sentence1_tokens and sentence2_tokens to the input pandas dataframe
@@ -73,14 +73,14 @@ def nltk_tokenizer(snli_df):
     Returns:
         pandas dataframe with columns ['score','sentence1', 'sentence2', 'sentence1_tokens', 'sentence2_tokens']
     """
-    snli_df["sentence1_tokens"] = snli_df.apply(
+    df["sentence1_tokens"] = df.apply(
         lambda row: nltk.word_tokenize(row["sentence1"]), axis=1
     )
-    snli_df["sentence2_tokens"] = snli_df.apply(
+    df["sentence2_tokens"] = df.apply(
         lambda row: nltk.word_tokenize(row["sentence2"]), axis=1
     )
 
-    return snli_df
+    return df
 
 
 def nltk_remove_stop_words(snli_df):
