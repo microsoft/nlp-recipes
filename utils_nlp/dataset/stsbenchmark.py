@@ -8,8 +8,45 @@ import azureml.dataprep as dp
 
 from utils_nlp.dataset.url_utils import maybe_download
 
+STS_URL = "http://ixa2.si.ehu.es/stswiki/images/4/48/Stsbenchmark.tar.gz"
+DEFAULT_FILE_SPLIT = "train"
 
-def download_sts(dirpath):
+
+def load_pandas_df(data_path, file_split=DEFAULT_FILE_SPLIT):
+    """Load the STS Benchmark dataset as a pandas dataframe
+    
+    Args:
+        data_path (str): Path to data directory
+        file_split (str, optional): File split to load. One of (train, dev, test). Defaults to train.
+    
+    Returns:
+        pd.DataFrame: STS Benchmark dataset
+    """
+    clean_file_path = os.path.join(
+        data_path, "clean/stsbenchmark", "sts-{}.csv".format(file_split)
+    )
+    return (
+        dp.auto_read_file(clean_file_path)
+        .drop_columns("Column1")
+        .to_pandas_dataframe()
+    )
+
+
+def _maybe_download_and_extract(base_data_path, clean_file_path):
+    if not os.path.exists(clean_file_path):
+        raw_data_path = os.path.join(base_data_path, "raw")
+        if not os.path.exists(raw_data_path):
+            os.makedirs(raw_data_path)
+        sts_path = _download_sts(raw_data_path)
+        sts_files = [f for f in os.listdir(sts_path) if f.endswith(".csv")]
+        _clean_sts(
+            sts_files,
+            sts_path,
+            os.path.join(base_data_path, "clean", "stsbenchmark"),
+        )
+
+
+def _download_sts(dirpath):
     """Download and extract data from http://ixa2.si.ehu.es/stswiki/images/4/48/Stsbenchmark.tar.gz 
 
     Args:
@@ -18,16 +55,15 @@ def download_sts(dirpath):
     Returns:
         str: Path to extracted STS Benchmark data.
     """
-    sts_url = "http://ixa2.si.ehu.es/stswiki/images/4/48/Stsbenchmark.tar.gz"
-    filepath = maybe_download(sts_url, work_directory=dirpath)
-    extracted_path = extract_sts(
+    filepath = maybe_download(STS_URL, work_directory=dirpath)
+    extracted_path = _extract_sts(
         filepath, target_dirpath=dirpath, tmode="r:gz"
     )
     print("Data downloaded to {}".format(extracted_path))
     return extracted_path
 
 
-def extract_sts(tarpath, target_dirpath=".", tmode="r"):
+def _extract_sts(tarpath, target_dirpath=".", tmode="r"):
     """Extract data from the sts tar.gz archive
 
     Args:
@@ -45,7 +81,7 @@ def extract_sts(tarpath, target_dirpath=".", tmode="r"):
     return os.path.join(target_dirpath, extracted)
 
 
-def clean_sts(filenames, src_dir, target_dir):
+def _clean_sts(filenames, src_dir, target_dir):
     """Drop columns containing irrelevant metadata and save as new csv files in the target_dir
 
     Args:
@@ -72,49 +108,4 @@ def clean_sts(filenames, src_dir, target_dir):
         )
         sdf = s.to_pandas_dataframe().to_csv(
             os.path.join(target_dir, filenames[i]), sep="\t"
-        )
-
-
-class STSBenchmark:
-    def __init__(self, which_split, base_data_path="./data"):
-        """Download and extract the data if it does not already exist in the base data directory
-
-        Args:
-            which_split (str): Either "train", "test", or "dev". 
-            base_data_path (str, optional): Base data directory.
-        """
-        assert which_split in set(["train", "test", "dev"])
-        self.base_data_path = base_data_path
-        self.filepath = os.path.join(
-            self.base_data_path,
-            "clean",
-            "stsbenchmark",
-            "sts-{}.csv".format(which_split),
-        )
-        self._maybe_download_and_extract()
-
-    def _maybe_download_and_extract(self):
-        """ Check if a clean dataframe for the specified split exists. If not, download the entire dataset and clean """
-        if not os.path.exists(self.filepath):
-            raw_path = os.path.join(self.base_data_path, "raw")
-            if not os.path.exists(raw_path):
-                os.makedirs(raw_path)
-            sts_path = download_sts(raw_path)
-            sts_files = [f for f in os.listdir(sts_path) if f.endswith(".csv")]
-            clean_sts(
-                sts_files,
-                sts_path,
-                os.path.join(self.base_data_path, "clean", "stsbenchmark"),
-            )
-
-    def as_dataframe(self):
-        """Return the clean data as a pandas dataframe 
-
-        Returns:
-            pandas dataframe: Clean STS Benchmark data for the desired split.
-        """
-        return (
-            dp.auto_read_file(self.filepath)
-            .drop_columns("Column1")
-            .to_pandas_dataframe()
         )

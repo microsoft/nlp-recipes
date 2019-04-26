@@ -6,7 +6,7 @@ import shutil
 import azureml.dataprep as dprep
 import pandas as pd
 from zipfile import ZipFile
-from utils_nlp.dataset.url_utils import maybe_download,download_path
+from utils_nlp.dataset.url_utils import maybe_download, download_path
 
 
 # Constants
