@@ -67,7 +67,7 @@ def _maybe_download_and_extract(zip_path, file_split, file_type):
         os.makedirs(dirs)
 
     # store raw data here
-    dir_path = os.path.join(dirs, DIR_NAMES[0])
+    dir_path = os.path.join(dirs, DIR_NAMES[0], "snli_1.0")
 
     if not os.path.exists(dir_path):
         os.makedirs(dir_path)
