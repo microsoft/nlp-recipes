@@ -9,42 +9,26 @@ from gensim.models.keyedvectors import KeyedVectors
 from utils_nlp.dataset.url_utils import maybe_download
 
 
-def load_word2vec():
-    # Todo : Move to azure blob and get rid of this path.
-    file_path = (
-        "../../../Pretrained Vectors/GoogleNews-vectors-negative300.bin"
-    )
-    model = KeyedVectors.load_word2vec_format(file_path, binary=True)
-    print(type(model))
-
-
-def extract_word2vec_corpus(
-    zip_path,
-    zip_dest_path=".",
-    zipped_file_name="GoogleNews-vectors-negative300.bin",
-):
+def extract_word2vec_corpus(zip_path, zip_dest_file_path):
     """ Extracts word2vec embeddings from bin.gz archive
 
     Args:
-        zipped_file_name: File name for the extracted file.
         zip_path: Path to the downloaded compressed file.
-        zip_dest_path: Destination path to the extracted zip file. This will be the
-        current folder by default.
+        zip_dest_file_path: Final destination file path to the extracted zip file.
 
     Returns:
         Returns the absolute path to the extracted folder.
     """
 
-    assert os.path.exists(zip_path) and os.path.exists(zip_dest_path)
-    zipped_file_path = os.path.join(zip_dest_path, zipped_file_name)
-
-    with open(zip_path, "rb") as f_in, gzip.open(
-        zipped_file_path, "wb"
-    ) as f_out:
-        f_out.writelines(f_in)
+    if os.path.exists(zip_path):
+        with gzip.GzipFile(zip_path, "rb") as f_in, open(
+            zip_dest_file_path, "wb"
+        ) as f_out:
+            f_out.writelines(f_in)
+    else:
+        raise Exception("Zipped file not found!")
 
     os.remove(zip_path)
-    return zipped_file_path
 
 
 def download_word2vec_corpus(
@@ -69,7 +53,7 @@ def download_word2vec_corpus(
     return maybe_download(url, filename=file_name, work_directory=download_dir)
 
 
-def _maybe_download_and_extract(dest_path):
+def _maybe_download_and_extract(dest_path, file_name):
     """ Downloads and extracts Word2vec vectors if they don’t already exist
 
     Args:
@@ -77,18 +61,36 @@ def _maybe_download_and_extract(dest_path):
 
     """
 
-    word2vec_path = os.path.join(dest_path, "word2vec")
-    extracted_path = None
+    word2vec_dir_path = os.path.join(dest_path, "word2vec")
+    word2vec_file_path = os.path.join(word2vec_dir_path, file_name)
 
-    if not os.path.exists(word2vec_path):
-        os.makedirs(word2vec_path)
-        filepath = download_word2vec_corpus(word2vec_path)
-        extracted_path = extract_word2vec_corpus(filepath, word2vec_path)
+    if not os.path.exists(word2vec_file_path):
+        if not os.path.exists(word2vec_dir_path):
+            os.makedirs(word2vec_dir_path)
+        filepath = download_word2vec_corpus(word2vec_dir_path)
+        extract_word2vec_corpus(filepath, word2vec_file_path)
     else:
-        print("Word2vec already exists. No changes made.")
+        print("Vector file already exists. No changes made.")
 
-    return extracted_path
+    return word2vec_file_path
 
 
-if __name__ == "__main__":
-    print(_maybe_download_and_extract(r"C:\Projects\NLP-BP\NLP\data"))
+def load_pretrained_vectors(
+    dir_path, file_name="GoogleNews-vectors-negative300.bin"
+):
+    """ Method that loads word2vec vectors. Downloads if it doesn't exist.
+
+    Args:
+        file_name(str): Name of the word2vec file.
+        dir_path(str): Path to the directory where word2vec vectors exist or will be
+        downloaded.
+
+    Returns: Loaded word2vectors (gensim.models.keyedvectors.Word2VecKeyedVectors)
+
+    """
+    file_path = _maybe_download_and_extract(dir_path, file_name)
+    word2vec_vectors = KeyedVectors.load_word2vec_format(
+        file_path, binary=True
+    )
+    print(type(word2vec_vectors))
+    return word2vec_vectors
