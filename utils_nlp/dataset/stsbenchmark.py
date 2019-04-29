@@ -25,11 +25,8 @@ def load_pandas_df(data_path, file_split=DEFAULT_FILE_SPLIT):
     clean_file_path = os.path.join(
         data_path, "clean/stsbenchmark", "sts-{}.csv".format(file_split)
     )
-    return (
-        dp.auto_read_file(clean_file_path)
-        .drop_columns("Column1")
-        .to_pandas_dataframe()
-    )
+    dflow = _maybe_download_and_extract(data_path, clean_file_path)
+    return dflow.to_pandas_dataframe()
 
 
 def _maybe_download_and_extract(base_data_path, clean_file_path):
@@ -44,6 +41,7 @@ def _maybe_download_and_extract(base_data_path, clean_file_path):
             sts_path,
             os.path.join(base_data_path, "clean", "stsbenchmark"),
         )
+    return dp.auto_read_file(clean_file_path).drop_columns("Column1")
 
 
 def _download_sts(dirpath):
