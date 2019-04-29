@@ -10,7 +10,7 @@ from gensim.models.keyedvectors import Word2VecKeyedVectors
 from utils_nlp.pretrained_embeddings.word2vec import (
     load_pretrained_vectors,
     download_word2vec_corpus,
-    extract_word2vec_corpus
+    extract_word2vec_corpus,
 )
 
 
@@ -44,4 +44,3 @@ def test_extract_word2vec_corpus():
     assert file_path.is_file()
 
     shutil.rmtree(os.path.join(os.getcwd(), dir_path))
-
