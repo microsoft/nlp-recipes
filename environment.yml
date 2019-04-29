@@ -23,3 +23,4 @@ dependencies:
   - papermill>=0.15.0
   - ipywebrtc
   - pre-commit>=1.14.4
+  - sklearn
