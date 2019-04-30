@@ -3,6 +3,7 @@
 pr:
 - master
 - staging
+- maidap-sentence-similarity
 
 #Any commit to this branch will trigger the build.
 trigger:
