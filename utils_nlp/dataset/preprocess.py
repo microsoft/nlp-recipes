@@ -58,7 +58,7 @@ def rm_spacy_stopwords(df, custom_stopwords=[]):
     tok_df = nlp_df.applymap(
         lambda doc: [token.text for token in doc if not token.is_stop]
     )
-    tok_df.columns = ["sentence1_tokens_stop", "sentence2_tokens_stop"]
+    tok_df.columns = ["sentence1_tokens_rm_stopwords", "sentence2_tokens_rm_stopwords"]
     tokenized = pd.concat([df, tok_df], axis=1)
     return tokenized
 
@@ -86,8 +86,8 @@ def to_nltk_tokens(df):
 
 def rm_nltk_stopwords(df):
     """
-        This function removes stop words from a sentence using nltk.
-        It adds two new columns sentence1_tokens_stop and sentence2_tokens_stop to the input pandas dataframe
+    This function removes stop words from a sentence using nltk.
+    It adds two new columns sentence1_tokens_stop and sentence2_tokens_stop to the input pandas dataframe
     Args:
         df: pandas dataframe
 
@@ -99,11 +99,11 @@ def rm_nltk_stopwords(df):
 
     stop_words = tuple(stopwords.words("english"))
 
-    df["sentence1_tokens_stop"] = [
+    df["sentence1_tokens_rm_stopwords"] = [
         [word for word in row if word not in stop_words]
         for row in df["sentence1_tokens"]
     ]
-    df["sentence2_tokens_stop"] = [
+    df["sentence2_tokens_rm_stopwords"] = [
         [word for word in row if word not in stop_words]
         for row in df["sentence2_tokens"]
     ]
