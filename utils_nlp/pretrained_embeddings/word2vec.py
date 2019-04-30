@@ -9,15 +9,13 @@ from gensim.models.keyedvectors import KeyedVectors
 from utils_nlp.dataset.url_utils import maybe_download
 
 
-def extract_word2vec_corpus(zip_path, zip_dest_file_path):
+def _extract_word2vec_vectors(zip_path, zip_dest_file_path):
     """ Extracts word2vec embeddings from bin.gz archive
 
     Args:
         zip_path: Path to the downloaded compressed file.
         zip_dest_file_path: Final destination file path to the extracted zip file.
 
-    Returns:
-        Returns the absolute path to the extracted folder.
     """
 
     if os.path.exists(zip_path):
@@ -31,7 +29,7 @@ def extract_word2vec_corpus(zip_path, zip_dest_file_path):
     os.remove(zip_path)
 
 
-def download_word2vec_corpus(
+def _download_word2vec_vectors(
     download_dir, file_name="GoogleNews-vectors-negative300.bin.gz"
 ):
     """ Downloads pretrained word vectors trained on GoogleNews corpus. You can
@@ -57,8 +55,10 @@ def _maybe_download_and_extract(dest_path, file_name):
     """ Downloads and extracts Word2vec vectors if they don’t already exist
 
     Args:
-        dest_path: Final path where the vectors will be extracted.
+        dest_path: Path to the directory where the vectors will be extracted.
+        file_name: File name of the word2vec vector file.
 
+    Returns: File path to the word2vec vector file.
     """
 
     word2vec_dir_path = os.path.join(dest_path, "word2vec")
@@ -67,8 +67,8 @@ def _maybe_download_and_extract(dest_path, file_name):
     if not os.path.exists(word2vec_file_path):
         if not os.path.exists(word2vec_dir_path):
             os.makedirs(word2vec_dir_path)
-        filepath = download_word2vec_corpus(word2vec_dir_path)
-        extract_word2vec_corpus(filepath, word2vec_file_path)
+        filepath = _download_word2vec_vectors(word2vec_dir_path)
+        _extract_word2vec_vectors(filepath, word2vec_file_path)
     else:
         print("Vector file already exists. No changes made.")
 
@@ -92,5 +92,5 @@ def load_pretrained_vectors(
     word2vec_vectors = KeyedVectors.load_word2vec_format(
         file_path, binary=True
     )
-    print(type(word2vec_vectors))
+
     return word2vec_vectors
