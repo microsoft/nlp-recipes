@@ -14,7 +14,7 @@ import torch
 import logging
 
 import argparse
-from gensen import GenSen, GenSenSingle
+from gensen.gensen import GenSen, GenSenSingle
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--path_senteval', type=str, help='senteval data folder')

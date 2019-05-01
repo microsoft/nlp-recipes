@@ -2,7 +2,12 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="5269230a-1423-4b66-b865-64ef8b1dc1ab" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/../../../examples/02-model/gensen/train-gensen-with-distributed pytorch-on-AML.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/../../../examples/02-model/gensen/train-gensen-with-distributed pytorch-on-AML.ipynb" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../../examples/03-eval/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/../../../examples/03-eval/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../../examples/03-eval/gensen_senteval.ipynb" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../../examples/03-eval/senteval/examples/gensen_senteval.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/../../../examples/03-eval/senteval/examples/gensen_senteval.ipynb" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../../examples/03-eval/senteval/examples/gensen_senteval.py" beforeDir="false" afterPath="$PROJECT_DIR$/../../../examples/03-eval/senteval/examples/gensen_senteval.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../../examples/03-eval/senteval/examples/gensen_senteval_aml.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/../../../examples/03-eval/senteval/examples/gensen_senteval_aml.ipynb" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../../examples/04-model-select-and-optimize/gensen/tune-gensen-with-distributed pytorch-on-AML.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/../../../examples/04-model-select-and-optimize/gensen/tune-gensen-with-distributed pytorch-on-AML.ipynb" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/amlcode/train.py" beforeDir="false" afterPath="$PROJECT_DIR$/amlcode/train.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/localcode/data/mosesdecoder/scripts/training/clean-corpus-n-ratio.perl" beforeDir="false" afterPath="$PROJECT_DIR$/localcode/data/mosesdecoder/scripts/training/clean-corpus-n-ratio.perl" afterDir="false" />
@@ -43,12 +48,12 @@
       </usages-collector>
       <usages-collector id="statistics.file.extensions.edit">
         <counts>
-          <entry key="py" value="87" />
+          <entry key="py" value="93" />
         </counts>
       </usages-collector>
       <usages-collector id="statistics.file.types.edit">
         <counts>
-          <entry key="Python" value="87" />
+          <entry key="Python" value="93" />
         </counts>
       </usages-collector>
     </session>
@@ -58,8 +63,8 @@
       <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/amlcode/train.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="459">
-              <caret line="57" column="30" lean-forward="true" selection-start-line="57" selection-start-column="30" selection-end-line="57" selection-end-column="30" />
+            <state relative-caret-position="499">
+              <caret line="56" selection-start-line="56" selection-end-line="56" selection-end-column="26" />
             </state>
           </provider>
         </entry>
@@ -79,6 +84,7 @@
     <findStrings>
       <find>print</find>
       <find>lrate</find>
+      <find>loss</find>
     </findStrings>
     <replaceStrings>
       <replace>print(</replace>
@@ -102,7 +108,7 @@
     <detection-done>true</detection-done>
     <sorting>DEFINITION_ORDER</sorting>
   </component>
-  <component name="ProjectFrameBounds" extendedState="7">
+  <component name="ProjectFrameBounds" extendedState="6">
     <option name="x" value="-9" />
     <option name="y" value="-9" />
     <option name="width" value="1938" />
@@ -221,7 +227,8 @@
     <servers />
   </component>
   <component name="ToolWindowManager">
-    <frame x="-7" y="-7" width="1550" height="838" extended-state="7" />
+    <frame x="-7" y="-7" width="1550" height="838" extended-state="6" />
+    <editor active="true" />
     <layout>
       <window_info active="true" content_ui="combo" id="Project" order="0" visible="true" weight="0.3328859" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
@@ -306,8 +313,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/amlcode/train.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="459">
-          <caret line="57" column="30" lean-forward="true" selection-start-line="57" selection-start-column="30" selection-end-line="57" selection-end-column="30" />
+        <state relative-caret-position="499">
+          <caret line="56" selection-start-line="56" selection-end-line="56" selection-end-column="26" />
         </state>
       </provider>
     </entry>
