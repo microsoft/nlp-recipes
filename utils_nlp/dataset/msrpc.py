@@ -7,10 +7,7 @@ import pathlib
 
 import pandas as pd
 
-from utils_nlp.dataset.url_utils import (
-    maybe_download,
-    download_path,
-)
+from utils_nlp.dataset.url_utils import maybe_download, download_path
 
 DATASET_DICT = {
     "train": "msr_paraphrase_train.txt",
@@ -25,7 +22,7 @@ def download_msrpc(download_dir):
         download_dir (str): File path for the downloaded file
 
     Returns:
-        file_path to the downloaded dataset.
+        str: file_path to the downloaded dataset.
     """
 
     url = (
@@ -45,7 +42,8 @@ def load_pandas_df(local_cache_path=None, dataset_type="train"):
         local_cache_path (str): Path to download the dataset installer.
 
     Returns:
-        A pandas dataframe with 3 columns, Sentence 1, Sentence 2 and score.
+        pd.DataFrame: A pandas dataframe with 3 columns, Sentence 1, Sentence 2 and
+        score.
 
     """
 
@@ -69,10 +67,15 @@ def load_pandas_df(local_cache_path=None, dataset_type="train"):
         data_directory = pathlib.Path(data_directory)
         assert os.path.exists(data_directory)
 
+        fields = ["Quality", "#1 String", "#2 String"]
         file_path = os.path.join(data_directory, DATASET_DICT[dataset_type])
         df = (
-            pd.read_csv(file_path, delimiter="\t", error_bad_lines=False)
-            .drop(columns=["#1 ID", "#2 ID"])
+            pd.read_csv(
+                file_path,
+                delimiter="\t",
+                error_bad_lines=False,
+                usecols=fields,
+            )
             .dropna()
             .rename(
                 index=str,
