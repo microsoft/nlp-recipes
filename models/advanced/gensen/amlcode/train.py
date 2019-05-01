@@ -52,6 +52,8 @@ parser.add_argument(
     required=True
 )
 parser.add_argument('--data_folder', type=str, help='data folder')
+# Add learning rate to tune model.
+parser.add_argument('--learning_rate', type=float, default=0.0001, help='learning rate')
 args = parser.parse_args()
 data_folder = args.data_folder
 #os.chdir(data_folder)
@@ -196,7 +198,8 @@ elif load_dir and not load_dir == 'auto':
         open(load_dir, encoding='utf-8')
     ))
 
-lr = config['training']['lrate']
+lr = args.learning_rate
+# lr = config['training']['lrate']
 optimizer = optim.Adam(model.parameters(), lr=lr)
 
 task_losses = [[] for task in tasknames]
