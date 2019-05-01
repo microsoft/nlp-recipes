@@ -365,6 +365,8 @@ while True:
             logging.info('%s Validation Loss : %.3f' % (
                 task, validation_loss)
             )
+            # log the best val accuracy to AML run
+            run.log('best_val_loss', np.float(validation_loss))
         logging.info('Evaluating on NLI')
         n_correct = 0.
         n_wrong = 0.
