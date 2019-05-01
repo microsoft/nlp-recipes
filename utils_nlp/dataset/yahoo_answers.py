@@ -35,7 +35,7 @@ def get_labels(df):
     return list(df[0] - 1)
 
 
-def get_batch_rnd(X, y, input_mask, n, batch_size):
+def get_batch_rnd(X, input_mask, y, n, batch_size):
     i = int(random.random() * n)
     X_b = X[i : i + batch_size]
     y_b = y[i : i + batch_size]
@@ -43,14 +43,9 @@ def get_batch_rnd(X, y, input_mask, n, batch_size):
     return X_b, m_b, y_b
 
 
-def get_batch_by_idx(X, y, i, batch_size):
-    X = X[i : i + batch_size]
-    y = y[i : i + batch_size]
-    lens_batch = np.array([len(x) for x in X])
-    sorted_idx = np.argsort(lens_batch)[::-1]
-    X_batch = np.zeros((len(X), lens_batch.max()), dtype=int)
-    for i in range(len(X)):
-        X_batch[i, 0 : len(X[i])] = np.array(X[i])
-    y = np.array(y)
-    return X_batch[sorted_idx], lens_batch[sorted_idx], y[sorted_idx]
+def get_batch_by_idx(X, input_mask, y, i, batch_size):
+    X_b = X[i : i + batch_size]
+    y_b = y[i : i + batch_size]
+    m_b = input_mask[i : i + batch_size]    
+    return X_b, m_b, y_b
 

@@ -18,14 +18,20 @@ dependencies:
 - ipykernel>=4.6.1
 - jupyter>=1.0.0
 - pytest>=3.6.4
+- cudatoolkit>=10.0
 - pip:
   - black>=18.6b4
   - papermill>=0.15.0
   - ipywebrtc
   - pre-commit>=1.14.4
   - azureml-dataprep
+  - azureml-sdk>=1.0.33
   - https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-2.1.0/en_core_web_sm-2.1.0.tar.gz
   - gensim>=3.7.0
   - nltk>=3.4
-
+  - scikit-learn>=0.20
+  - pytorch-pretrained-bert>=0.6
+  - horovod>=0.16.1
+  - torch>=1.0
+  - urllib3>=1.24
 
