@@ -10,22 +10,11 @@
 	</thead>
 	<tbody>
 		<tr>
-			<td rowspan=2>
-				<a href="https://nlp.stanford.edu/projects/snli/">SNLI</a>
+			<td>
+				<a href="snli_preprocess.ipynb">SNLI</a>
 			</td>
 			<td>
-				<a href="snli_load.ipynb">snli_load.ipynb</a>
-			</td>
-			<td>
-				Download and clean the SNLI dataset.
-			</td>
-		</tr>
-		<tr>
-			<td>
-				<a href="snli_preprocess.ipynb">snli_preprocess.ipynb</a>
-			</td>
-			<td>
-				Lowercase, tokenize, and reshape the SNLI corpus for use in training the <a href="https://github.com/Maluuba/gensen">Gensen</a> model. Demonstrates use of the <a href="https://www.nltk.org/">NLTK</a> library for tokenization.
+				Download, clean, lowercase, tokenize, and reshape the SNLI corpus for use in training the <a href="https://github.com/Maluuba/gensen">Gensen</a> model. Demonstrates use of the <a href="https://www.nltk.org/">NLTK</a> library for tokenization.
 			</td>
 		</tr>
 		<tr>
