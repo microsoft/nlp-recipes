@@ -11,7 +11,7 @@ def to_lowercase(df):
     """Transform all strings in the dataframe to lowercase 
 
     Args:
-        df (pandas dataframe): Raw dataframe with some text columns.
+        df(pandas dataframe): Raw dataframe with some text columns.
 
     Returns:
         pandas dataframe: Dataframe with lowercase standardization.
@@ -23,7 +23,7 @@ def to_spacy_tokens(df):
     """Tokenize using spaCy, defaulting to the spaCy en_core_web_sm model
 
     Args:
-        df (pandas dataframe): Dataframe with columns labeled 'sentence1' and 'sentence2' to tokenize.
+        df(pd.DataFrame): Dataframe with columns labeled 'sentence1' and 'sentence2' to tokenize.
 
     Returns:
         pandas dataframe: Dataframe with new columns labeled 'sentence1_tokens' and 'sentence2_tokens', each containing 
@@ -42,7 +42,7 @@ def rm_spacy_stopwords(df, custom_stopwords=[]):
     """Tokenize using spaCy AND remove stopwords, defaulting to the spaCy en_core_web_sm model
 
     Args:
-        df (pandas dataframe): Dataframe with columns labeled 'sentence1' and 'sentence2' to tokenize.
+        df(pd.DataFrame): Dataframe with columns labeled 'sentence1' and 'sentence2' to tokenize.
         custom_stopwords (list of str, optional): List of custom stopwords to register with the spaCy model.
 
     Returns:
@@ -68,7 +68,7 @@ def to_nltk_tokens(df):
     This function converts a sentence to word tokens using nltk.
     It adds two new columns sentence1_tokens and sentence2_tokens to the input pandas dataframe
     Args:
-        df: pandas dataframe
+        df(pd.DataFrame): pandas dataframe
 
     Returns:
         pandas dataframe with columns ['score','sentence1', 'sentence2', 'sentence1_tokens', 'sentence2_tokens']
@@ -89,13 +89,13 @@ def rm_nltk_stopwords(df):
     This function removes stop words from a sentence using nltk.
     It adds two new columns sentence1_tokens_stop and sentence2_tokens_stop to the input pandas dataframe
     Args:
-        df: pandas dataframe
+        df(pd.DataFrame): pandas dataframe
 
     Returns:
         pandas dataframe with columns ['score','sentence1', 'sentence2', 'sentence1_tokens', 'sentence2_tokens']
     """
     if not {"sentence1_tokens", "sentence2_tokens"}.issubset(df.columns):
-        df = nltk_tokenizer(df)
+        df = to_nltk_tokens(df)
 
     stop_words = tuple(stopwords.words("english"))
 
