@@ -13,7 +13,7 @@ DEFAULT_FILE_SPLIT = "train"
 
 
 def load_pandas_df(data_path, file_split=DEFAULT_FILE_SPLIT):
-    """Load the STS Benchmark dataset as a pandas dataframe
+    """Load the STS Benchmark dataset as a pd.DataFrame
     
     Args:
         data_path (str): Path to data directory

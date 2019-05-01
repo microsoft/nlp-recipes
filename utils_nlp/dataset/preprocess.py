@@ -11,10 +11,10 @@ def to_lowercase(df):
     """Transform all strings in the dataframe to lowercase 
 
     Args:
-        df (pandas dataframe): Raw dataframe with some text columns.
+        df (pd.DataFrame): Raw dataframe with some text columns.
 
     Returns:
-        pandas dataframe: Dataframe with lowercase standardization.
+        pd.DataFrame: Dataframe with lowercase standardization.
     """
     return df.applymap(lambda s: s.lower() if type(s) == str else s)
 
@@ -23,10 +23,10 @@ def to_spacy_tokens(df):
     """Tokenize using spaCy, defaulting to the spaCy en_core_web_sm model
 
     Args:
-        df (pandas dataframe): Dataframe with columns labeled 'sentence1' and 'sentence2' to tokenize.
+        df (pd.DataFrame): Dataframe with columns labeled 'sentence1' and 'sentence2' to tokenize.
 
     Returns:
-        pandas dataframe: Dataframe with new columns labeled 'sentence1_tokens' and 'sentence2_tokens', each containing 
+        pd.DataFrame: Dataframe with new columns labeled 'sentence1_tokens' and 'sentence2_tokens', each containing 
                             a list of tokens for their respective sentences.
     """
     nlp = spacy.load("en_core_web_sm")
@@ -42,11 +42,11 @@ def rm_spacy_stopwords(df, custom_stopwords=[]):
     """Tokenize using spaCy AND remove stopwords, defaulting to the spaCy en_core_web_sm model
 
     Args:
-        df (pandas dataframe): Dataframe with columns labeled 'sentence1' and 'sentence2' to tokenize.
+        df (pd.DataFrame): Dataframe with columns labeled 'sentence1' and 'sentence2' to tokenize.
         custom_stopwords (list of str, optional): List of custom stopwords to register with the spaCy model.
 
     Returns:
-        pandas dataframe: Dataframe with new columns labeled 'sentence1_tokens_stop' and 'sentence2_tokens_stop', each 
+        pd.DataFrame: Dataframe with new columns labeled 'sentence1_tokens_stop' and 'sentence2_tokens_stop', each 
                             containing a list of tokens for their respective sentences.
     """
     nlp = spacy.load("en_core_web_sm")
@@ -66,12 +66,12 @@ def rm_spacy_stopwords(df, custom_stopwords=[]):
 def to_nltk_tokens(df):
     """
     This function converts a sentence to word tokens using nltk.
-    It adds two new columns sentence1_tokens and sentence2_tokens to the input pandas dataframe
+    It adds two new columns sentence1_tokens and sentence2_tokens to the input pd.DataFrame
     Args:
-        df: pandas dataframe
+        df: pd.DataFrame
 
     Returns:
-        pandas dataframe with columns ['score','sentence1', 'sentence2', 'sentence1_tokens', 'sentence2_tokens']
+        pd.DataFrame with columns ['score','sentence1', 'sentence2', 'sentence1_tokens', 'sentence2_tokens']
     """
     nltk.download("punkt")
     df["sentence1_tokens"] = df.apply(
@@ -87,12 +87,12 @@ def to_nltk_tokens(df):
 def rm_nltk_stopwords(df):
     """
     This function removes stop words from a sentence using nltk.
-    It adds two new columns sentence1_tokens_stop and sentence2_tokens_stop to the input pandas dataframe
+    It adds two new columns sentence1_tokens_stop and sentence2_tokens_stop to the input pd.DataFrame
     Args:
-        df: pandas dataframe
+        df: pd.DataFrame
 
     Returns:
-        pandas dataframe with columns ['score','sentence1', 'sentence2', 'sentence1_tokens', 'sentence2_tokens']
+        pd.DataFrame with columns ['score','sentence1', 'sentence2', 'sentence1_tokens', 'sentence2_tokens']
     """
     if not {"sentence1_tokens", "sentence2_tokens"}.issubset(df.columns):
         df = nltk_tokenizer(df)
