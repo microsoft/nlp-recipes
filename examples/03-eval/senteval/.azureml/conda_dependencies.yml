@@ -1,0 +1,30 @@
+# Conda environment specification. The dependencies defined in this file will
+
+# be automatically provisioned for runs with userManagedDependencies=False.
+
+
+# Details about the Conda environment file format:
+
+# https://conda.io/docs/user-guide/tasks/manage-environments.html#create-env-file-manually
+
+
+name: project_environment
+dependencies:
+  # The python interpreter version.
+
+  # Currently Azure ML only supports 3.5.2 and later.
+
+- python=3.6.2
+- numpy=1.15.1
+- numpy-base=1.15.1
+- pip=10.0.1
+- python=3.6.6
+- python-dateutil=2.7.3
+- scikit-learn=0.20.3
+
+- pip:
+    # Required packages for AzureML execution, history, and data preparation.
+
+  - azureml-defaults
+  - h5py
+  - nltk
