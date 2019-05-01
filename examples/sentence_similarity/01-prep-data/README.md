@@ -29,21 +29,13 @@
 			</td>
 		</tr>
 		<tr>
-			<td rowspan=2>
+			<td>
 				<a href="http://ixa2.si.ehu.es/stswiki/index.php/STSbenchmark">STS Benchmark</a>
 			</td>
 			<td>
-				<a href="sts_load.ipynb">sts_load.ipynb</a>
+				<a href="stsbenchmark.ipynb">sts_load.ipynb</a>
 			</td>
-			<td>Download and clean the STS Benchmark dataset.</td>
-		</tr>
-		<tr>
-			<td>
-				<a href="sts_preprocess.ipynb">sts_load.ipynb</a>
-			</td>
-			<td>
-				Lowercase and tokenize the STS Benchmark data using <a href="https://spacy.io/">spaCy</a>. Also shows how to remove stopwords from the tokens.
-			</td>
+			<td>Downloads and cleans the STS Benchmark dataset. Shows an example of tokenizing and removing stopwords using the popular <a href="https://spacy.io/">spaCy</a> library.</td>
 		</tr>
 		<tr>
 			<td>
