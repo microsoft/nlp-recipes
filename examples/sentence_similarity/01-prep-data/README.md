@@ -11,7 +11,10 @@
 	<tbody>
 		<tr>
 			<td>
-				<a href="snli_preprocess.ipynb">SNLI</a>
+				<a href="snli.ipynb">SNLI</a>
+			</td>
+			<td>
+				<a href="snli.ipynb">snli.ipynb</a>
 			</td>
 			<td>
 				Download, clean, lowercase, tokenize, and reshape the SNLI corpus for use in training the <a href="https://github.com/Maluuba/gensen">Gensen</a> model. Demonstrates use of the <a href="https://www.nltk.org/">NLTK</a> library for tokenization.
