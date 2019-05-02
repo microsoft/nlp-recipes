@@ -15,8 +15,7 @@ from torch.utils.data import (DataLoader, RandomSampler, SequentialSampler,
                               TensorDataset)
 from torch.utils.data.distributed import DistributedSampler
 from pytorch_pretrained_bert.tokenization import BertTokenizer
-from pytorch_pretrained_bert import WordpieceTokenizer
-
+from torch.optim import Adam
 
 import logging
 logger = logging.getLogger(__name__)
@@ -135,11 +134,11 @@ def configure_optimizer(optimizer_config, global_config, train_config,
         return optimizer, optimizer_config, warmup_linear
 
     else:
-        optimizer = BertAdam(optimizer_grouped_parameters,
-                             lr=optimizer_config.learning_rate,
-                             warmup=optimizer_config.warmup_proportion,
-                             t_total=num_train_optimization_steps)
-
+        # optimizer = BertAdam(optimizer_grouped_parameters,
+        #                      lr=optimizer_config.learning_rate,
+        #                      warmup=optimizer_config.warmup_proportion,
+        #                      t_total=num_train_optimization_steps)
+        optimizer = Adam(optimizer_grouped_parameters, lr=3e-5)
         return optimizer, optimizer_config, None
 
 
@@ -279,7 +278,6 @@ def convert_examples_to_token_features(examples,
             # print('splitting: ', word)
             sub_words = tokenizer.wordpiece_tokenizer.tokenize(word)
             for count, sub_word in enumerate(sub_words):
-                # print('subword: ',sub_word)
                 if count > 0:
                     tag = 'X'
                 new_labels.append(tag)
@@ -295,20 +293,16 @@ def convert_examples_to_token_features(examples,
 
         # The mask has 1 for real tokens and 0 for padding tokens. Only real
         # tokens are attended to.
-        input_mask = [1] * len(input_ids)
+        input_mask = [1.0] * len(input_ids)
 
         # Zero-pad up to the sequence length.
-        padding = [0] * (max_seq_length - len(input_ids))
+        padding = [0.0] * (max_seq_length - len(input_ids))
         label_padding = ['O'] * (max_seq_length - len(input_ids))
 
         input_ids += padding
         input_mask += padding
         segment_ids += padding
         new_labels += label_padding
-
-        if len(new_labels) != 75:
-            print(len(new_labels))
-            print(new_labels)
 
         assert len(input_ids) == max_seq_length
         assert len(input_mask) == max_seq_length
@@ -554,7 +548,7 @@ def train_token_model(model, train_dataloader, optimizer,
         for step, batch in enumerate(train_dataloader):
             # add batch to gpu
             batch = tuple(t.to(device_config.device) for t in batch)
-            b_input_ids, b_input_mask, b_labels = batch
+            b_input_ids, b_input_mask, b_segment_ids, b_labels = batch
             # forward pass
             loss = model(b_input_ids, token_type_ids=None,
                          attention_mask=b_input_mask, labels=b_labels)
@@ -566,7 +560,7 @@ def train_token_model(model, train_dataloader, optimizer,
             nb_tr_steps += 1
             # gradient clipping
             torch.nn.utils.clip_grad_norm_(parameters=model.parameters(),
-                                           max_norm=1)
+                                           max_norm=1.0)
             # update parameters performs a parameter update based on the current gradient (stored in .grad attribute of a parameter) and the update rule
             optimizer.step()
             model.zero_grad()#Zero the gradients before running the next batch.
@@ -587,7 +581,7 @@ def eval_token_model(model, eval_dataloader, model_config, device_config,
     nb_eval_steps, nb_eval_examples = 0, 0
     for batch in eval_dataloader:
         batch = tuple(t.to(device_config.device) for t in batch)
-        b_input_ids, b_input_mask, b_labels = batch
+        b_input_ids, b_input_mask, b_segment_ids, b_labels = batch
 
         with torch.no_grad():
             tmp_eval_loss = model(b_input_ids, token_type_ids=None,

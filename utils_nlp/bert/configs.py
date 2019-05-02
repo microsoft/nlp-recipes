@@ -1,4 +1,4 @@
-from .bert_utils import get_device
+from bert_utils import get_device
 
 
 class GlobalConfig:
@@ -22,9 +22,9 @@ class TrainConfig:
             self.train_batch_size = 32
 
         if "num_train_epochs" in config_dict:
-            self.num_train_epochs = float(config_dict["num_train_epochs"])
+            self.num_train_epochs = config_dict["num_train_epochs"]
         else:
-            self.num_train_epochs = 3.0
+            self.num_train_epochs = 3
 
         if "gradient_accumulation_steps" in config_dict:
             self.gradient_accumulation_steps = \
@@ -55,7 +55,7 @@ class ModelConfig:
         else:
             self.do_lower_case = True
 
-        if "output_mode"  in config_dict:
+        if "output_mode" in config_dict:
             self.output_mode = config_dict["output_mode"]
         else:
             self.output_mode = 'classification'
