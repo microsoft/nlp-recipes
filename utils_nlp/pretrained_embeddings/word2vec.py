@@ -8,6 +8,8 @@ from gensim.models.keyedvectors import KeyedVectors
 
 from utils_nlp.dataset.url_utils import maybe_download
 
+# ToDo: Fix return types
+
 
 def _extract_word2vec_vectors(zip_path, zip_dest_file_path):
     """ Extracts word2vec embeddings from bin.gz archive
