@@ -3,13 +3,9 @@
   <component name="ChangeListManager">
     <list default="true" id="5269230a-1423-4b66-b865-64ef8b1dc1ab" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/../../../examples/03-eval/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/../../../examples/03-eval/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../../examples/03-eval/gensen_senteval.ipynb" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../../examples/03-eval/senteval/examples/gensen_senteval.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/../../../examples/03-eval/senteval/examples/gensen_senteval.ipynb" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../../examples/03-eval/senteval/examples/gensen_senteval.py" beforeDir="false" afterPath="$PROJECT_DIR$/../../../examples/03-eval/senteval/examples/gensen_senteval.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../../examples/03-eval/senteval/examples/gensen_senteval_aml.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/../../../examples/03-eval/senteval/examples/gensen_senteval_aml.ipynb" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../../examples/04-model-select-and-optimize/gensen/tune-gensen-with-distributed pytorch-on-AML.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/../../../examples/04-model-select-and-optimize/gensen/tune-gensen-with-distributed pytorch-on-AML.ipynb" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../../examples/03-eval/amlcode/gensen/gensen_senteval.py" beforeDir="false" afterPath="$PROJECT_DIR$/../../../examples/03-eval/amlcode/gensen/gensen_senteval.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../../examples/03-eval/amlcode/gensen/gensen_senteval_aml.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/../../../examples/03-eval/amlcode/gensen/gensen_senteval_aml.ipynb" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/amlcode/train.py" beforeDir="false" afterPath="$PROJECT_DIR$/amlcode/train.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/localcode/data/mosesdecoder/scripts/training/clean-corpus-n-ratio.perl" beforeDir="false" afterPath="$PROJECT_DIR$/localcode/data/mosesdecoder/scripts/training/clean-corpus-n-ratio.perl" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
@@ -63,8 +59,8 @@
       <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/amlcode/train.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="499">
-              <caret line="56" selection-start-line="56" selection-end-line="56" selection-end-column="26" />
+            <state relative-caret-position="208">
+              <caret line="65" selection-start-line="65" selection-end-line="65" selection-end-column="21" />
             </state>
           </provider>
         </entry>
@@ -85,6 +81,7 @@
       <find>print</find>
       <find>lrate</find>
       <find>loss</find>
+      <find>data_folder</find>
     </findStrings>
     <replaceStrings>
       <replace>print(</replace>
@@ -313,8 +310,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/amlcode/train.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="499">
-          <caret line="56" selection-start-line="56" selection-end-line="56" selection-end-column="26" />
+        <state relative-caret-position="208">
+          <caret line="65" selection-start-line="65" selection-end-line="65" selection-end-column="21" />
         </state>
       </provider>
     </entry>

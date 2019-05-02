@@ -16,23 +16,23 @@ import logging
 import argparse
 from gensen.gensen import GenSen, GenSenSingle
 
-parser = argparse.ArgumentParser()
-parser.add_argument('--path_senteval', type=str, help='senteval data folder')
-parser.add_argument('--path_to_data', type=str, help='trained model folder')
+# parser = argparse.ArgumentParser()
+# parser.add_argument('--path_senteval', type=str, help='senteval data folder')
+# parser.add_argument('--path_to_data', type=str, help='trained model folder')
 # Set PATHs
 # PATH_SENTEVAL = '../'
 # PATH_TO_DATA = '../data/'
 
-args = parser.parse_args()
-PATH_SENTEVAL = args.path_senteval
-PATH_TO_DATA = args.path_to_data
-
+# args = parser.parse_args()
+# PATH_SENTEVAL = args.path_senteval
+# PATH_TO_DATA = args.path_to_data
+#
+# # import senteval
+# sys.path.insert(0, PATH_SENTEVAL)
 # import senteval
-sys.path.insert(0, PATH_SENTEVAL)
-import senteval
-
-# set gpu device
-torch.cuda.set_device(0)
+#
+# # set gpu device
+# torch.cuda.set_device(0)
 
 
 def prepare(params, samples):
@@ -76,15 +76,15 @@ def batcher(params, batch):
 Evaluation of trained model on Transfer Tasks (SentEval)
 """
 
-# define transfer tasks
-transfer_tasks = ['MR', 'CR', 'SUBJ', 'MPQA', 'SST2', 'SST5', 'TREC', 'SICKRelatedness',\
-                  'SICKEntailment', 'MRPC', 'STS14', 'STSBenchmark', 'STS12', 'STS13', 'STS15', 'STS16']
-params_senteval = {'task_path': PATH_TO_DATA, 'usepytorch': True, 'kfold': 10}
-params_senteval['classifier'] = {'nhid': 0, 'optim': 'adam', 'batch_size': 64,
-                                 'tenacity': 5, 'epoch_size': 4}
-
-# Set up logger
-logging.basicConfig(format='%(asctime)s : %(message)s', level=logging.INFO)
+# # define transfer tasks
+# transfer_tasks = ['MR', 'CR', 'SUBJ', 'MPQA', 'SST2', 'SST5', 'TREC', 'SICKRelatedness',\
+#                   'SICKEntailment', 'MRPC', 'STS14', 'STSBenchmark', 'STS12', 'STS13', 'STS15', 'STS16']
+# params_senteval = {'task_path': PATH_TO_DATA, 'usepytorch': True, 'kfold': 10}
+# params_senteval['classifier'] = {'nhid': 0, 'optim': 'adam', 'batch_size': 64,
+#                                  'tenacity': 5, 'epoch_size': 4}
+#
+# # Set up logger
+# logging.basicConfig(format='%(asctime)s : %(message)s', level=logging.INFO)
 
 if __name__ == "__main__":
     # Load model
@@ -119,7 +119,38 @@ if __name__ == "__main__":
         help="Use GPU to compute sentence representations",
         default=torch.cuda.is_available()
     )
+    parser.add_argument('--path_to_data', type=str, help='trained model folder')
+    parser.add_argument('--path_senteval', type=str, help='senteval data folder')
+
+    # parser.add_argument('--ds', type=str, help='ds data folder')
     args = parser.parse_args()
+
+    PATH_SENTEVAL = args.path_senteval
+    PATH_TO_DATA = args.path_to_data
+    print(PATH_SENTEVAL)
+    print(PATH_TO_DATA)
+
+    # import senteval
+    sys.path.insert(0, PATH_SENTEVAL)
+    import senteval
+
+    # set gpu device
+    torch.cuda.set_device(0)
+
+    """
+    Evaluation of trained model on Transfer Tasks (SentEval)
+    """
+
+    # define transfer tasks
+    transfer_tasks = ['MR', 'CR', 'SUBJ', 'MPQA', 'SST2', 'SST5', 'TREC', 'SICKRelatedness', \
+                      'SICKEntailment', 'MRPC', 'STS14', 'STSBenchmark', 'STS12', 'STS13', 'STS15',
+                      'STS16']
+    params_senteval = {'task_path': PATH_TO_DATA, 'usepytorch': True, 'kfold': 10}
+    params_senteval['classifier'] = {'nhid': 0, 'optim': 'adam', 'batch_size': 64,
+                                     'tenacity': 5, 'epoch_size': 4}
+
+    # Set up logger
+    logging.basicConfig(format='%(asctime)s : %(message)s', level=logging.INFO)
 
     print('#############################')
     print('####### Parameters ##########')
