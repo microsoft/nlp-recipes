@@ -11,6 +11,8 @@ from gensim.test.utils import get_tmpfile
 from utils_nlp.dataset.url_utils import maybe_download
 from utils_nlp.pretrained_embeddings import GLOVE_URL
 
+# ToDo: Fix return types
+
 
 def _extract_glove_vectors(zip_path, dest_path="."):
     """ Extracts gloVe embeddings from zip file.
