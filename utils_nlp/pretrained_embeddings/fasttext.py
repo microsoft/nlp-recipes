@@ -90,7 +90,3 @@ def load_pretrained_vectors(dest_path, file_name="wiki.simple.bin"):
     file_path = _maybe_download_and_extract(dest_path, file_name)
     model = load_facebook_model(file_path)
     return model
-
-
-if __name__ == '__main__':
-    load_pretrained_vectors("../../data/")
