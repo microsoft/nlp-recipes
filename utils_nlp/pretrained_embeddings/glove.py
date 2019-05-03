@@ -10,29 +10,27 @@ from gensim.test.utils import get_tmpfile
 
 from utils_nlp.dataset.url_utils import maybe_download
 
-# ToDo: Fix return types
 
-
-def _extract_glove_vectors(zip_path, zip_dest_dir="."):
+def _extract_glove_vectors(zip_path, dest_path="."):
     """ Extracts gloVe embeddings from zip file.
 
     Args:
         zip_path(str): Path to the downloaded compressed zip file.
-        zip_dest_dir(str): Final destination directory path to the extracted zip file.
+        dest_path(str): Final destination directory path to the extracted zip file.
         Picks the current working directory by default.
 
     Returns:
-        Returns the absolute path to the extracted folder.
+        str: Returns the absolute path to the extracted folder.
     """
 
     if os.path.exists(zip_path):
         with zipfile.ZipFile(zip_path, "r") as zip_ref:
-            zip_ref.extractall(path=zip_dest_dir)
+            zip_ref.extractall(path=dest_path)
     else:
         raise Exception("Zipped file not found!")
 
     os.remove(zip_path)
-    return zip_dest_dir
+    return dest_path
 
 
 def _download_glove_vectors(download_dir, file_name="glove.840B.300d.zip"):
@@ -45,7 +43,7 @@ def _download_glove_vectors(download_dir, file_name="glove.840B.300d.zip"):
         file_name (str) : File name given by default but can be changed by the user.
 
     Returns:
-        file_path to the downloaded vectors.
+        str: file_path to the downloaded vectors.
     """
 
     url = "http://nlp.stanford.edu/data/glove.840B.300d.zip"
@@ -59,21 +57,22 @@ def _maybe_download_and_extract(dest_path, file_name):
         dest_path(str): Final path where the vectors will be extracted.
         file_name(str): File name of the gloVe vector file.
 
-    Returns: File path to the gloVe vector file.
+    Returns:
+        str: File path to the gloVe vector file.
     """
 
-    glove_dir_path = os.path.join(dest_path, "gloVe")
-    glove_file_path = os.path.join(glove_dir_path, file_name)
+    dir_path = os.path.join(dest_path, "gloVe")
+    file_path = os.path.join(dir_path, file_name)
 
-    if not os.path.exists(glove_file_path):
-        if not os.path.exists(glove_dir_path):
-            os.makedirs(glove_dir_path)
-        filepath = _download_glove_vectors(glove_dir_path)
-        _extract_glove_vectors(filepath, glove_dir_path)
+    if not os.path.exists(file_path):
+        if not os.path.exists(dir_path):
+            os.makedirs(dir_path)
+        filepath = _download_glove_vectors(dir_path)
+        _extract_glove_vectors(filepath, dir_path)
     else:
         print("Vector file already exists. No changes made.")
 
-    return glove_file_path
+    return file_path
 
 
 def load_pretrained_vectors(dir_path, file_name="glove.840B.300d.txt"):
@@ -84,7 +83,8 @@ def load_pretrained_vectors(dir_path, file_name="glove.840B.300d.txt"):
         dir_path(str): Path to the directory where gloVe vectors exist or will be
         downloaded.
 
-    Returns: Loaded word2vectors (gensim.models.keyedvectors.Word2VecKeyedVectors)
+    Returns:
+        gensim.models.keyedvectors.Word2VecKeyedVectors: Loaded word2vectors
 
     """
 

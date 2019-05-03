@@ -8,21 +8,19 @@ from gensim.models.keyedvectors import KeyedVectors
 
 from utils_nlp.dataset.url_utils import maybe_download
 
-# ToDo: Fix return types
 
-
-def _extract_word2vec_vectors(zip_path, zip_dest_file_path):
+def _extract_word2vec_vectors(zip_path, dest_filepath):
     """ Extracts word2vec embeddings from bin.gz archive
 
     Args:
         zip_path: Path to the downloaded compressed file.
-        zip_dest_file_path: Final destination file path to the extracted zip file.
+        dest_filepath: Final destination file path to the extracted zip file.
 
     """
 
     if os.path.exists(zip_path):
         with gzip.GzipFile(zip_path, "rb") as f_in, open(
-            zip_dest_file_path, "wb"
+            dest_filepath, "wb"
         ) as f_out:
             f_out.writelines(f_in)
     else:
@@ -43,7 +41,7 @@ def _download_word2vec_vectors(
         file_name (str) : File name given by default but can be changed by the user.
 
     Returns:
-        file_path to the downloaded vectors.
+        str: file_path to the downloaded vectors.
     """
 
     url = (
@@ -60,21 +58,22 @@ def _maybe_download_and_extract(dest_path, file_name):
         dest_path: Path to the directory where the vectors will be extracted.
         file_name: File name of the word2vec vector file.
 
-    Returns: File path to the word2vec vector file.
+    Returns:
+         str: File path to the word2vec vector file.
     """
 
-    word2vec_dir_path = os.path.join(dest_path, "word2vec")
-    word2vec_file_path = os.path.join(word2vec_dir_path, file_name)
+    dir_path = os.path.join(dest_path, "word2vec")
+    file_path = os.path.join(dir_path, file_name)
 
-    if not os.path.exists(word2vec_file_path):
-        if not os.path.exists(word2vec_dir_path):
-            os.makedirs(word2vec_dir_path)
-        filepath = _download_word2vec_vectors(word2vec_dir_path)
-        _extract_word2vec_vectors(filepath, word2vec_file_path)
+    if not os.path.exists(file_path):
+        if not os.path.exists(dir_path):
+            os.makedirs(dir_path)
+        filepath = _download_word2vec_vectors(dir_path)
+        _extract_word2vec_vectors(filepath, file_path)
     else:
         print("Vector file already exists. No changes made.")
 
-    return word2vec_file_path
+    return file_path
 
 
 def load_pretrained_vectors(
@@ -87,7 +86,8 @@ def load_pretrained_vectors(
         dir_path(str): Path to the directory where word2vec vectors exist or will be
         downloaded.
 
-    Returns: Loaded word2vectors (gensim.models.keyedvectors.Word2VecKeyedVectors)
+    Returns:
+        gensim.models.keyedvectors.Word2VecKeyedVectors: Loaded word2vectors
 
     """
     file_path = _maybe_download_and_extract(dir_path, file_name)
