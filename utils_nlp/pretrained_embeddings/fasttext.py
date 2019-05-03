@@ -31,15 +31,10 @@ def _extract_fasttext_vectors(zip_path, dest_path="."):
     os.remove(zip_path)
     return dest_path
 
-
 def _download_fasttext_vectors(download_dir, file_name="wiki.simple.zip"):
     """ Downloads pre-trained word vectors for English, trained on Wikipedia using
     fastText. You can directly download the vectors from here:
     https://dl.fbaipublicfiles.com/fasttext/vectors-wiki/wiki.simple.zip
-
-    For the full version of pre-trained word vectors, change the url for
-    FASTTEXT_EN_URL to https://dl.fbaipublicfiles.com/fasttext/vectors-wiki/wiki.en.zip
-    in __init__.py
 
     Args:
         download_dir (str): File path to download the file
@@ -95,3 +90,7 @@ def load_pretrained_vectors(dest_path, file_name="wiki.simple.bin"):
     file_path = _maybe_download_and_extract(dest_path, file_name)
     model = load_facebook_model(file_path)
     return model
+
+
+if __name__ == '__main__':
+    load_pretrained_vectors("../../data/")
