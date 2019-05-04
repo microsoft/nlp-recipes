@@ -8,104 +8,146 @@ from nltk.corpus import stopwords
 
 
 def to_lowercase(df):
-    """Transform all strings in the dataframe to lowercase 
-
-    Args:
-        df (pandas dataframe): Raw dataframe with some text columns.
-
-    Returns:
-        pandas dataframe: Dataframe with lowercase standardization.
     """
+	This function transforms all strings in the dataframe to lowercase 
+
+	Args:
+		df (pd.DataFrame): Raw dataframe with some text columns.
+
+	Returns:
+		pd.DataFrame: Dataframe with lowercase standardization.
+	"""
     return df.applymap(lambda s: s.lower() if type(s) == str else s)
 
 
-def to_spacy_tokens(df):
-    """Tokenize using spaCy, defaulting to the spaCy en_core_web_sm model
-
-    Args:
-        df (pandas dataframe): Dataframe with columns labeled 'sentence1' and 'sentence2' to tokenize.
-
-    Returns:
-        pandas dataframe: Dataframe with new columns labeled 'sentence1_tokens' and 'sentence2_tokens', each containing 
-                            a list of tokens for their respective sentences.
+def to_spacy_tokens(
+    df,
+    sentence_cols=["sentence1", "sentence2"],
+    token_cols=["sentence1_tokens", "sentence2_tokens"],
+):
     """
+	This function tokenizes the sentence pairs using spaCy, defaulting to the 
+	spaCy en_core_web_sm model
+	
+	Args:
+		df (pd.DataFrame): Dataframe with columns sentence_cols to tokenize.
+		sentence_cols (list, optional): Column names of the raw sentence pairs.
+		token_cols (list, optional): Column names for the tokenized sentences.
+	
+	Returns:
+		pd.DataFrame: Dataframe with new columns token_cols, each containing 
+							a list of tokens for their respective sentences.
+	"""
     nlp = spacy.load("en_core_web_sm")
-    text_df = df[["sentence1", "sentence2"]]
+    text_df = df[sentence_cols]
     nlp_df = text_df.applymap(lambda x: nlp(x))
     tok_df = nlp_df.applymap(lambda doc: [token.text for token in doc])
-    tok_df.columns = ["sentence1_tokens", "sentence2_tokens"]
+    tok_df.columns = token_cols
     tokenized = pd.concat([df, tok_df], axis=1)
     return tokenized
 
 
-def rm_spacy_stopwords(df, custom_stopwords=[]):
-    """Tokenize using spaCy AND remove stopwords, defaulting to the spaCy en_core_web_sm model
-
-    Args:
-        df (pandas dataframe): Dataframe with columns labeled 'sentence1' and 'sentence2' to tokenize.
-        custom_stopwords (list of str, optional): List of custom stopwords to register with the spaCy model.
-
-    Returns:
-        pandas dataframe: Dataframe with new columns labeled 'sentence1_tokens_stop' and 'sentence2_tokens_stop', each 
-                            containing a list of tokens for their respective sentences.
+def rm_spacy_stopwords(
+    df,
+    sentence_cols=["sentence1", "sentence2"],
+    stop_cols=[
+        "sentence1_tokens_rm_stopwords",
+        "sentence2_tokens_rm_stopwords",
+    ],
+    custom_stopwords=[],
+):
     """
+	This function tokenizes the sentence pairs using spaCy and remove stopwords, 
+	defaulting to the spaCy en_core_web_sm model
+	
+	Args:
+		df (pd.DataFrame): Dataframe with columns sentence_cols to tokenize.
+		sentence_cols (list, optional): Column names for the raw sentence pairs.
+		stop_cols (list, optional): Column names for the tokenized sentences 
+			without stop words.
+		custom_stopwords (list of str, optional): List of custom stopwords to 
+			register with the spaCy model.
+	
+	Returns:
+		pd.DataFrame: Dataframe with new columns stop_cols, each containing a 
+			list of tokens for their respective sentences.
+	"""
     nlp = spacy.load("en_core_web_sm")
     if len(custom_stopwords) > 0:
         for csw in custom_stopwords:
             nlp.vocab[csw].is_stop = True
-    text_df = df[["sentence1", "sentence2"]]
+    text_df = df[sentence_cols]
     nlp_df = text_df.applymap(lambda x: nlp(x))
     tok_df = nlp_df.applymap(
         lambda doc: [token.text for token in doc if not token.is_stop]
     )
-    tok_df.columns = ["sentence1_tokens_stop", "sentence2_tokens_stop"]
+    tok_df.columns = token_cols
     tokenized = pd.concat([df, tok_df], axis=1)
     return tokenized
 
 
-def to_nltk_tokens(df):
+def to_nltk_tokens(
+    df,
+    sentence_cols=["sentence1", "sentence2"],
+    token_cols=["sentence1_tokens", "sentence2_tokens"],
+):
     """
-    This function converts a sentence to word tokens using nltk.
-    It adds two new columns sentence1_tokens and sentence2_tokens to the input pandas dataframe
-    Args:
-        df: pandas dataframe
-
-    Returns:
-        pandas dataframe with columns ['score','sentence1', 'sentence2', 'sentence1_tokens', 'sentence2_tokens']
-    """
+	This function converts a sentence to word tokens using nltk.
+	
+	Args:
+		df (pd.DataFrame): Dataframe with columns sentence_cols to tokenize.
+		sentence_cols (list, optional): Column names for the raw sentence pairs.
+		token_cols (list, optional): Column names for the tokenized sentences.
+	
+	Returns:
+		pd.DataFrame: Dataframe with new columns token_cols, each containing a 
+			list of tokens for their respective sentences.
+	"""
     nltk.download("punkt")
-    df["sentence1_tokens"] = df.apply(
-        lambda row: nltk.word_tokenize(row["sentence1"]), axis=1
+    df[token_cols[0]] = df.apply(
+        lambda row: nltk.word_tokenize(row[sentence_cols[0]]), axis=1
     )
-    df["sentence2_tokens"] = df.apply(
-        lambda row: nltk.word_tokenize(row["sentence2"]), axis=1
+    df[token_cols[1]] = df.apply(
+        lambda row: nltk.word_tokenize(row[sentence_cols[1]]), axis=1
     )
 
     return df
 
 
-def rm_nltk_stopwords(df):
+def rm_nltk_stopwords(
+    df,
+    token_cols=["sentence1_tokens", "sentence2_tokens"],
+    stop_cols=[
+        "sentence1_tokens_rm_stopwords",
+        "sentence2_tokens_rm_stopwords",
+    ],
+):
     """
-        This function removes stop words from a sentence using nltk.
-        It adds two new columns sentence1_tokens_stop and sentence2_tokens_stop to the input pandas dataframe
-    Args:
-        df: pandas dataframe
-
-    Returns:
-        pandas dataframe with columns ['score','sentence1', 'sentence2', 'sentence1_tokens', 'sentence2_tokens']
-    """
-    if not {"sentence1_tokens", "sentence2_tokens"}.issubset(df.columns):
-        df = nltk_tokenizer(df)
+	This function removes stop words from a sentence using nltk.
+	
+	Args:
+		df (pd.DataFrame): Dataframe with columns sentence_cols to tokenize.
+		token_cols (list, optional): Column names for the tokenized sentence 
+			pairs.
+		stop_cols (list, optional): Column names for the tokenized sentences 
+			without stop words.
+	
+	Returns:
+		pd.DataFrame: Dataframe with new columns stop_cols, each containing a 
+			list of tokens for their respective sentences.
+	"""
+    if not set(tok_cols).issubset(df.columns):
+        df = to_nltk_tokens(df)
 
     stop_words = tuple(stopwords.words("english"))
 
-    df["sentence1_tokens_stop"] = [
+    df[stop_cols[0]] = [
         [word for word in row if word not in stop_words]
-        for row in df["sentence1_tokens"]
+        for row in df[token_cols[0]]
     ]
-    df["sentence2_tokens_stop"] = [
+    df[stop_cols[1]] = [
         [word for word in row if word not in stop_words]
-        for row in df["sentence2_tokens"]
+        for row in df[token_cols[1]]
     ]
 
     return df
