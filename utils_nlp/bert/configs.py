@@ -32,6 +32,16 @@ class TrainConfig:
         else:
             self.gradient_accumulation_steps = 1
 
+        if "clip_gradient" in config_dict:
+            self.clip_gradient = config_dict["clip_gradient"]
+        else:
+            self.clip_gradient = False
+
+        if "max_gradient_norm" in config_dict:
+            self.clip_gradient = config_dict["max_gradient_norm"]
+        else:
+            self.max_gradient_norm = 1.0
+
 
 class EvalConfig:
     def __init__(self, config_dict={}):

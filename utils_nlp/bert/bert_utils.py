@@ -14,8 +14,7 @@ from pytorch_pretrained_bert.modeling import BertForSequenceClassification, \
 from torch.utils.data import (DataLoader, RandomSampler, SequentialSampler,
                               TensorDataset)
 from torch.utils.data.distributed import DistributedSampler
-from pytorch_pretrained_bert.tokenization import BertTokenizer
-from torch.optim import Adam
+
 
 import logging
 logger = logging.getLogger(__name__)
@@ -93,8 +92,9 @@ def load_model(model_config, path_config, device_config, global_config):
     return model
 
 
-def configure_optimizer(optimizer_config, global_config, train_config,
+def get_optimizer_params(optimizer_config, train_config,
                         device_config, model, num_train_examples):
+
     param_optimizer = list(model.named_parameters())
     no_decay = optimizer_config.no_decay_params
     optimizer_grouped_parameters = [
@@ -111,35 +111,33 @@ def configure_optimizer(optimizer_config, global_config, train_config,
     optimizer_config.num_train_optimization_steps \
         = num_train_optimization_steps
 
-    if global_config.fp16:
-        try:
-            from apex.optimizers import FP16_Optimizer
-            from apex.optimizers import FusedAdam
-        except ImportError:
-            raise ImportError("Please install apex from https://www.github.com/nvidia/apex to use distributed and fp16 training.")
+    optimizer_config.grouped_parameters = optimizer_grouped_parameters
 
-        optimizer = FusedAdam(optimizer_grouped_parameters,
-                              lr=optimizer_config.learning_rate,
-                              bias_correction=False,
-                              max_grad_norm=1.0)
-        if optimizer_config.loss_scale == 0:
-            optimizer = FP16_Optimizer(optimizer, dynamic_loss_scale=True)
-        else:
-            optimizer = FP16_Optimizer(optimizer,
-                                       static_loss_scale=optimizer_config.loss_scale)
-        warmup_linear = WarmupLinearSchedule(
-            warmup=optimizer_config.warmup_proportion,
-            t_total=num_train_optimization_steps)
+    return optimizer_config
 
-        return optimizer, optimizer_config, warmup_linear
 
+def create_fp16_optimizer(optimizer_config):
+    try:
+        from apex.optimizers import FP16_Optimizer
+        from apex.optimizers import FusedAdam
+    except ImportError:
+        raise ImportError(
+            "Please install apex from https://www.github.com/nvidia/apex to use distributed and fp16 training.")
+
+    optimizer = FusedAdam(optimizer_config.optimizer_grouped_parameters,
+                          lr=optimizer_config.learning_rate,
+                          bias_correction=False,
+                          max_grad_norm=1.0)
+    if optimizer_config.loss_scale == 0:
+        optimizer = FP16_Optimizer(optimizer, dynamic_loss_scale=True)
     else:
-        # optimizer = BertAdam(optimizer_grouped_parameters,
-        #                      lr=optimizer_config.learning_rate,
-        #                      warmup=optimizer_config.warmup_proportion,
-        #                      t_total=num_train_optimization_steps)
-        optimizer = Adam(optimizer_grouped_parameters, lr=3e-5)
-        return optimizer, optimizer_config, None
+        optimizer = FP16_Optimizer(optimizer,
+                                   static_loss_scale=optimizer_config.loss_scale)
+    warmup_linear = WarmupLinearSchedule(
+        warmup=optimizer_config.warmup_proportion,
+        t_total=optimizer_config.num_train_optimization_steps)
+
+    return optimizer, optimizer_config, warmup_linear
 
 
 def _truncate_seq_pair(tokens_a, tokens_b, max_length):
@@ -160,15 +158,13 @@ def _truncate_seq_pair(tokens_a, tokens_b, max_length):
 
 
 def convert_examples_to_sequence_features(examples,
+                                          tokenizer,
                                           label_list,
-                                          max_seq_length,
-                                          output_mode,
-                                          bert_model,
-                                          do_lower_case):
+                                          model_config):
     """Loads a data file into a list of `InputBatch`s."""
+    max_seq_length = model_config.max_seq_length
 
     label_map = {label : i for i, label in enumerate(label_list)}
-    tokenizer = BertTokenizer.from_pretrained(bert_model, do_lower_case=do_lower_case)
 
     features = []
     for (ex_index, example) in enumerate(examples):
@@ -230,12 +226,12 @@ def convert_examples_to_sequence_features(examples,
         assert len(input_mask) == max_seq_length
         assert len(segment_ids) == max_seq_length
 
-        if output_mode == "classification":
+        if model_config.output_mode == "classification":
             label_id = label_map[example.label]
-        elif output_mode == "regression":
+        elif model_config.output_mode == "regression":
             label_id = float(example.label)
         else:
-            raise KeyError(output_mode)
+            raise KeyError(model_config.output_mode)
 
         # if ex_index < 5:
         #     logger.info("*** Example ***")
@@ -257,13 +253,12 @@ def convert_examples_to_sequence_features(examples,
 
 
 def convert_examples_to_token_features(examples,
+                                       tokenizer,
                                        label_list,
-                                       max_seq_length,
-                                       bert_model,
-                                       do_lower_case):
+                                       model_config):
     """Loads a data file into a list of `InputBatch`s."""
-    tokenizer = BertTokenizer.from_pretrained(bert_model,
-                                              do_lower_case=do_lower_case)
+    max_seq_length = model_config.max_seq_length
+
     label_map = {label: i for i, label in enumerate(label_list)}
 
     features = []
@@ -332,23 +327,8 @@ def convert_examples_to_token_features(examples,
 
 ##train_examples and label list can be contained within one data
 # preprocessor object
-def create_train_dataloader(train_examples, model_config,
-                            train_config, label_list, device_config):
-    if model_config.model_type == 'sequence':
-        train_features = convert_examples_to_sequence_features(
-            examples=train_examples,
-            label_list=label_list,
-            bert_model=model_config.bert_model,
-            max_seq_length=model_config.max_seq_length,
-            output_mode=model_config.output_mode,
-            do_lower_case=model_config.do_lower_case)
-    elif model_config.model_type == 'token':
-        train_features = convert_examples_to_token_features(
-            examples=train_examples,
-            label_list=label_list,
-            bert_model=model_config.bert_model,
-            max_seq_length=model_config.max_seq_length,
-            do_lower_case=model_config.do_lower_case)
+def create_train_dataloader(train_features, model_config,
+                            train_config, device_config):
 
     all_input_ids = torch.tensor([f.input_ids for f in train_features], dtype=torch.long)
     all_input_mask = torch.tensor([f.input_mask for f in train_features], dtype=torch.long)
@@ -371,23 +351,8 @@ def create_train_dataloader(train_examples, model_config,
     return train_dataloader
 
 
-def create_eval_dataloader(eval_examples, model_config,
-                           eval_config, label_list):
-    if model_config.model_type == 'sequence':
-        eval_features = convert_examples_to_sequence_features(
-            examples=eval_examples,
-            label_list=label_list,
-            bert_model=model_config.bert_model,
-            max_seq_length=model_config.max_seq_length,
-            output_mode=model_config.output_mode,
-            do_lower_case=model_config.do_lower_case)
-    elif model_config.model_type == 'token':
-        eval_features = convert_examples_to_token_features(
-            examples=eval_examples,
-            label_list=label_list,
-            bert_model=model_config.bert_model,
-            max_seq_length=model_config.max_seq_length,
-            do_lower_case=model_config.do_lower_case)
+def create_eval_dataloader(eval_features, model_config, eval_config):
+
     all_input_ids = torch.tensor([f.input_ids for f in eval_features], dtype=torch.long)
     all_input_mask = torch.tensor([f.input_mask for f in eval_features], dtype=torch.long)
     all_segment_ids = torch.tensor([f.segment_ids for f in eval_features], dtype=torch.long)
@@ -403,15 +368,15 @@ def create_eval_dataloader(eval_examples, model_config,
     eval_dataloader = DataLoader(eval_data, sampler=eval_sampler,
                                  batch_size=eval_config.eval_batch_size)
 
-    return eval_dataloader, all_label_ids
+    return eval_dataloader
 
 
 def train_model(model, train_dataloader, optimizer,
                 train_config, model_config, optimizer_config,
                 device_config, global_config, warmup_linear=None):
     global_step = 0
-    nb_tr_steps = 0
-    tr_loss = 0
+    # nb_tr_steps = 0
+    # tr_loss = 0
     model.train()
     for _ in trange(int(train_config.num_train_epochs), desc="Epoch"):
         tr_loss = 0
@@ -421,7 +386,10 @@ def train_model(model, train_dataloader, optimizer,
             input_ids, input_mask, segment_ids, label_ids = batch
 
             # define a new function to compute loss values for both output_modes
-            logits = model(input_ids, segment_ids, input_mask, labels=None)
+            logits = model(input_ids=input_ids,
+                           token_type_ids=segment_ids,
+                           attention_mask=input_mask,
+                           labels=None)
 
             if model_config.output_mode == "classification":
                 loss_fct = CrossEntropyLoss()
@@ -444,6 +412,11 @@ def train_model(model, train_dataloader, optimizer,
             tr_loss += loss.item()
             nb_tr_examples += input_ids.size(0)
             nb_tr_steps += 1
+
+            if train_config.clip_gradient:
+                torch.nn.utils.clip_grad_norm_(parameters=model.parameters(),
+                                               max_norm=train_config.max_gradient_norm)
+
             if (step + 1) % train_config.gradient_accumulation_steps == 0:
                 if global_config.fp16:
                     # modify learning rate with special warm up BERT uses
@@ -458,7 +431,8 @@ def train_model(model, train_dataloader, optimizer,
                 optimizer.zero_grad()
                 global_step += 1
 
-    loss = tr_loss/nb_tr_steps
+        train_loss = tr_loss/nb_tr_steps
+        print("Train loss: {}".format(train_loss))
 
     return model, loss
 
@@ -482,15 +456,15 @@ def eval_model(model, eval_dataloader, model_config, device_config,
     eval_loss = 0
     nb_eval_steps = 0
     preds = []
-
-    for input_ids, input_mask, segment_ids, label_ids in tqdm(eval_dataloader, desc="Evaluating"):
-        input_ids = input_ids.to(device_config.device)
-        input_mask = input_mask.to(device_config.device)
-        segment_ids = segment_ids.to(device_config.device)
-        label_ids = label_ids.to(device_config.device)
+    for step, batch in enumerate(tqdm(eval_dataloader, desc="Evaluating")):
+        batch = tuple(t.to(device_config.device) for t in batch)
+        input_ids, input_mask, segment_ids, label_ids = batch
 
         with torch.no_grad():
-            logits = model(input_ids, segment_ids, input_mask, labels=None)
+            logits = model(input_ids=input_ids,
+                           token_type_ids=segment_ids,
+                           attention_mask=input_mask,
+                           labels=None)
 
         # create eval loss and other metric required by the task
         if model_config.output_mode == "classification":
@@ -511,6 +485,7 @@ def eval_model(model, eval_dataloader, model_config, device_config,
 
     eval_loss = eval_loss / nb_eval_steps
     preds = preds[0]
+
     if model_config.output_mode == "classification":
         preds = np.argmax(preds, axis=1)
     elif model_config.output_mode == "regression":
@@ -561,14 +536,16 @@ def train_token_model(model, train_dataloader, optimizer,
             # gradient clipping
             torch.nn.utils.clip_grad_norm_(parameters=model.parameters(),
                                            max_norm=1.0)
-            # update parameters performs a parameter update based on the current gradient (stored in .grad attribute of a parameter) and the update rule
+            # update parameters performs a parameter update based on the
+            # current gradient (stored in .grad attribute of a parameter)
+            # and the update rule
             optimizer.step()
             model.zero_grad()#Zero the gradients before running the next batch.
         # print train loss per epoch
         train_loss = tr_loss/nb_tr_steps
         print("Train loss: {}".format(train_loss))
-    return model, train_loss
 
+    return model, train_loss
 
 def eval_token_model(model, eval_dataloader, model_config, device_config,
                      label_list, eval_func=None):
