@@ -9,6 +9,7 @@ from gensim.scripts.glove2word2vec import glove2word2vec
 from gensim.test.utils import get_tmpfile
 
 from utils_nlp.dataset.url_utils import maybe_download
+from utils_nlp.pretrained_embeddings import GLOVE_URL
 
 
 def _extract_glove_vectors(zip_path, dest_path="."):
@@ -46,8 +47,7 @@ def _download_glove_vectors(download_dir, file_name="glove.840B.300d.zip"):
         str: file_path to the downloaded vectors.
     """
 
-    url = "http://nlp.stanford.edu/data/glove.840B.300d.zip"
-    return maybe_download(url, filename=file_name, work_directory=download_dir)
+    return maybe_download(GLOVE_URL, filename=file_name, work_directory=download_dir)
 
 
 def _maybe_download_and_extract(dest_path, file_name):
