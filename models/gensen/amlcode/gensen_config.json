@@ -1,0 +1,45 @@
+{
+  "training": {
+    "optimizer": "adam",
+    "clip_c": 1,
+    "lrate": 0.0001,
+    "batch_size": 24,
+    "n_gpus": 1
+  },
+  "management": {
+    "monitor_loss": 9600,
+    "print_samples": 12800,
+    "checkpoint_freq": 640000,
+    "eval_freq": 4800000
+  },
+  "data": {"paths": [
+        {
+            "train_src": "data/snli_1.0_train.txt.s1.tok",
+            "train_trg": "data/snli_1.0_train.txt.s2.tok",
+            "val_src": "data/snli_1.0_dev.txt.s1.tok",
+            "val_trg": "data/snli_1.0_dev.txt.s2.tok",
+            "taskname": "sent-sim"
+        }
+    ],
+        "max_src_length": 90,
+        "max_trg_length": 90,
+        "task": "multi-seq2seq-nli",
+        "save_dir": "data/models/example",
+        "load_dir": "auto",
+        "nli_train": "data/snli_1.0_train.txt.clean",
+        "nli_dev": "data/snli_1.0_dev.txt.clean",
+        "nli_test": "data/snli_1.0_test.txt.clean"
+	},
+    "model": {
+    	"dim_src": 2048,
+    	"dim_trg": 2048,
+    	"dim_word_src": 512,
+    	"dim_word_trg": 512,
+    	"n_words_src": 80000,
+    	"n_words_trg": 30000,
+    	"n_layers_src": 1,
+    	"bidirectional": true,
+        "layernorm": false,
+        "dropout": 0.3
+    }
+}
