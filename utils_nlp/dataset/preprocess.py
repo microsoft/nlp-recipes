@@ -116,7 +116,7 @@ def to_nltk_tokens(
 
     Args:
         df (pd.DataFrame): Dataframe with columns sentence_cols to tokenize.
-        sentence_cols (list, optional): Column names for the raw sentence pairs.
+        sentence_cols (list, optional): Column names for the raw sentences.
         token_cols (list, optional): Column names for the tokenized sentences.
 
     Returns:
@@ -134,7 +134,7 @@ def to_nltk_tokens(
 
 def rm_nltk_stopwords(
     df,
-    token_cols=["sentence1_tokens", "sentence2_tokens"],
+    sentence_cols=["sentence1", "sentence2"],
     stop_cols=[
         "sentence1_tokens_rm_stopwords",
         "sentence2_tokens_rm_stopwords",
@@ -145,8 +145,7 @@ def rm_nltk_stopwords(
 
     Args:
         df (pd.DataFrame): Dataframe with columns sentence_cols to tokenize.
-        token_cols (list, optional): Column names for the tokenized sentence
-            pairs.
+        sentence_cols (list, optional): Column names for the raw entences.
         stop_cols (list, optional): Column names for the tokenized sentences
             without stop words.
 
@@ -155,13 +154,12 @@ def rm_nltk_stopwords(
         list of tokens for their respective sentences.
     """
 
-    if not set(token_cols).issubset(df.columns):
-        df = to_nltk_tokens(df)
-
     stop_words = tuple(stopwords.words("english"))
 
-    df[stop_cols] = df[token_cols].applymap(
-        lambda l: [word for word in l if word not in stop_words]
+    df[stop_cols] = (
+        df[sentence_cols]
+        .applymap(lambda sentence: nltk.word_tokenize(sentence))
+        .applymap(lambda l: [word for word in l if word not in stop_words])
     )
 
     return df
