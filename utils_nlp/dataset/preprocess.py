@@ -34,7 +34,9 @@ def to_lowercase(df, column_names=[]):
     if not column_names:
         to_lowercase_all(df)
     else:
-        df[column_names] = df[column_names].applymap(lambda s: s.lower() if type(s) == str else s)
+        df[column_names] = df[column_names].applymap(
+            lambda s: s.lower() if type(s) == str else s
+        )
         return df
 
 
@@ -123,12 +125,10 @@ def to_nltk_tokens(
     """
 
     nltk.download("punkt")
-    df[token_cols] = df[sentence_cols].applymap(lambda sentence: nltk.word_tokenize(sentence))
-    pd.concat(
-        [
-        df[sentence_cols],
-        df[token_cols]
-        ], axis=1)
+    df[token_cols] = df[sentence_cols].applymap(
+        lambda sentence: nltk.word_tokenize(sentence)
+    )
+    pd.concat([df[sentence_cols], df[token_cols]], axis=1)
     return df
 
 
@@ -141,14 +141,14 @@ def rm_nltk_stopwords(
     ],
 ):
     """
-	This function removes stop words from a sentence using nltk.
-	
-	Args:
-		df (pd.DataFrame): Dataframe with columns sentence_cols to tokenize.
-		token_cols (list, optional): Column names for the tokenized sentence 
-			pairs.
-		stop_cols (list, optional): Column names for the tokenized sentences
-			without stop words.
+    This function removes stop words from a sentence using nltk.
+
+    Args:
+        df (pd.DataFrame): Dataframe with columns sentence_cols to tokenize.
+        token_cols (list, optional): Column names for the tokenized sentence
+            pairs.
+        stop_cols (list, optional): Column names for the tokenized sentences
+            without stop words.
 
     Returns:
         pd.DataFrame: Dataframe with new columns stop_cols, each containing a
@@ -160,13 +160,8 @@ def rm_nltk_stopwords(
 
     stop_words = tuple(stopwords.words("english"))
 
-    df[stop_cols[0]] = [
-        [word for word in row if word not in stop_words]
-        for row in df[token_cols[0]]
-    ]
-    df[stop_cols[1]] = [
-        [word for word in row if word not in stop_words]
-        for row in df[token_cols[1]]
-    ]
+    df[stop_cols] = df[token_cols].applymap(
+        lambda l: [word for word in l if word not in stop_words]
+    )
 
     return df
