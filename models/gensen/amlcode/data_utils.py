@@ -36,11 +36,10 @@ def _preprocess(data_path):
             header=False,
             index=False,
         )
-        df["score"].to_csv(
-            "{}.lab".format(base_txt_path), sep=" ", header=False, index=False
-        )
-        df[["s1.tok", "s2.tok", "score"]].to_csv(
-            "{}.clean".format(base_txt_path),
+        df_clean = df[["s1.tok", "s2.tok", "score"]]
+        df_noblank = df_clean.loc[df_clean["score"] == "-"].copy()
+        df_noblank.to_csv(
+            "{}.clean.noblank".format(base_txt_path),
             sep="\t",
             header=False,
             index=False,
@@ -68,13 +67,13 @@ def _split_and_cleanup(data_path):
             "clean/snli_1.0/snli_1.0_{}.txt.s2.tok".format(file_split),
         )
         with open(s1_tok_path, "r") as fin, open(
-                "{}.tmp".format(s1_tok_path), "w"
+            "{}.tmp".format(s1_tok_path), "w"
         ) as tmp:
             for line in fin:
                 s = line.replace('"', "")
                 tmp.write(s)
         with open(s2_tok_path, "r") as fin, open(
-                "{}.tmp".format(s2_tok_path), "w"
+            "{}.tmp".format(s2_tok_path), "w"
         ) as tmp:
             for line in fin:
                 s = line.replace('"', "")
