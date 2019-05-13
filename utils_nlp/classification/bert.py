@@ -173,6 +173,14 @@ class BERTSequenceClassifier:
         self._is_trained = True
 
     def predict(self, text, device="gpu", batch_size=32):
+        """Scores the given dataset and returns the predicted classes.        
+        Args:
+            text (list): List of text documents to score.
+            device (str, optional): Device used for scoring ("cpu" or "gpu"). Defaults to "gpu".
+            batch_size (int, optional): Scoring batch size. Defaults to 32.      
+        Returns:
+            [ndarray]: Predicted classes.
+        """
 
         if not self._is_trained:
             raise Exception("Please train model before scoring")
