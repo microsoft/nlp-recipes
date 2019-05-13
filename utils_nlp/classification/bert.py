@@ -3,6 +3,7 @@
 
 
 from enum import Enum, auto
+import random
 import numpy as np
 import torch.nn as nn
 import torch
@@ -10,10 +11,11 @@ from pytorch_pretrained_bert.modeling import BertForSequenceClassification
 from pytorch_pretrained_bert.optimization import BertAdam
 from pytorch_pretrained_bert.tokenization import BertTokenizer
 from utils_nlp.pytorch.device import get_device
-from utils_nlp.dataset.batch_utils import get_batch_rnd
 
 
 class Language(Enum):
+    """An enumeration of the supported languages."""
+
     ENGLISH = "bert-base-uncased"
     CHINESE = "bert-base-chinese"
     SPANISH = auto()
@@ -22,24 +24,29 @@ class Language(Enum):
 
 
 class BERTSequenceClassifier:
+    """BERT-based sequence classifier"""
 
     BERT_MAX_LEN = 512
 
-    def __init__(
-        self, pretrained_model=Language.ENGLISH, num_labels=2, cache_dir="."
-    ):
-
-        self.pretrained_model = pretrained_model
+    def __init__(self, language=Language.ENGLISH, num_labels=2, cache_dir="."):
+        """Initializes the classifier and the underlying pretrained model and tokenizer.
+        
+        Args:
+            language (Language, optional): The pretrained model's language. Defaults to Language.ENGLISH.
+            num_labels (int, optional): The number of unique labels in the training data. Defaults to 2.
+            cache_dir (str, optional): Location of BERT's cache directory. Defaults to ".".
+        """
+        self.language = language
         self.num_labels = num_labels
         self._max_len = BERTSequenceClassifier.BERT_MAX_LEN
         self.cache_dir = cache_dir
         # create tokenizer
         self.tokenizer = BertTokenizer.from_pretrained(
-            pretrained_model.value, do_lower_case=False, cache_dir=cache_dir
+            language.value, do_lower_case=False, cache_dir=cache_dir
         )
         # create classifier
         self.model = BertForSequenceClassification.from_pretrained(
-            pretrained_model.value, cache_dir=cache_dir, num_labels=num_labels
+            language.value, cache_dir=cache_dir, num_labels=num_labels
         )
         self._is_trained = False
 
@@ -64,6 +71,21 @@ class BERTSequenceClassifier:
         batch_size=32,
         verbose=True,
     ):
+        """Fine-tunes the BERT classifier using the given training data.
+        
+        Args:
+            text (list): List of training text documents.
+            labels (list): List of training labels.
+            max_len (int, optional): Maximum number of tokens (documents will be truncated or padded).  Defaults to 512.
+            device (str, optional): Device used for training ("cpu" or "gpu"). Defaults to "gpu".
+            use_multiple_gpus (bool, optional): Whether multiple GPUs will be used for training. Defaults to True.
+            num_epochs (int, optional): Number of training epochs. Defaults to 1.
+            batch_size (int, optional): Training batch size. Defaults to 32.
+            verbose (bool, optional): If True, shows the training progress and loss values. Defaults to True.
+        """
+        device = get_device(device)
+        self.model.to(device)
+
         if max_len > BERTSequenceClassifier.BERT_MAX_LEN:
             print(
                 "setting max_len to max allowed tokens: {}".format(
@@ -76,9 +98,6 @@ class BERTSequenceClassifier:
 
         # tokenize, truncate, and pad
         tokens, input_mask = self._get_tokens(text=text)
-
-        device = get_device(device)
-        self.model.to(device)
 
         # define loss function
         loss_func = nn.CrossEntropyLoss().to(device)
@@ -141,7 +160,7 @@ class BERTSequenceClassifier:
                 opt.step()
 
                 if verbose:
-                    if i % (5 * num_batches) == 0:
+                    if i % (3 * batch_size) == 0:
                         print(
                             "epoch:{}/{}; batch:{}/{}; loss:{}".format(
                                 epoch + 1,
