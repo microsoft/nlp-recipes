@@ -32,7 +32,7 @@ def to_lowercase(df, column_names=[]):
         pd.DataFrame: Dataframe with columns with lowercase standardization.
     """
     if not column_names:
-        to_lowercase_all(df)
+        return to_lowercase_all(df)
     else:
         df[column_names] = df[column_names].applymap(
             lambda s: s.lower() if type(s) == str else s
