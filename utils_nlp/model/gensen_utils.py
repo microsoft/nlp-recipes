@@ -36,8 +36,18 @@ def _preprocess(data_path):
             header=False,
             index=False,
         )
+        df["score"].to_csv(
+            "{}.lab".format(base_txt_path), sep=" ", header=False, index=False
+        )
         df_clean = df[["s1.tok", "s2.tok", "score"]]
-        df_noblank = df_clean.loc[df_clean["score"] == "-"].copy()
+        df_clean.to_csv(
+            "{}.clean".format(base_txt_path),
+            sep="\t",
+            header=False,
+            index=False,
+        )
+        # remove rows with blank scores
+        df_noblank = df_clean.loc[df_clean["score"] != "-"].copy()
         df_noblank.to_csv(
             "{}.clean.noblank".format(base_txt_path),
             sep="\t",
@@ -95,6 +105,14 @@ def gensen_preprocess(train_tok, dev_tok, test_tok, data_path):
 
     """
     global SPLIT_MAP
-    SPLIT_MAP = {"train": train_tok, "dev": dev_tok, "test": test_tok}
+    SPLIT_MAP = {}
+
+    if train_tok is not None:
+        SPLIT_MAP["train"] = train_tok
+    if dev_tok is not None:
+        SPLIT_MAP["dev"] = dev_tok
+    if test_tok is not None:
+        SPLIT_MAP["test"] = test_tok
+
     _preprocess(data_path)
     _split_and_cleanup(data_path)
