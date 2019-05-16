@@ -75,13 +75,15 @@ def _maybe_download_and_extract(dest_path, file_name):
     return file_path
 
 
-def load_pretrained_vectors(dir_path, file_name="glove.840B.300d.txt"):
+def load_pretrained_vectors(dir_path, file_name="glove.840B.300d.txt", limit=None):
     """ Method that loads gloVe vectors. Downloads if it doesn't exist.
 
     Args:
         file_name(str): Name of the gloVe file.
         dir_path(str): Path to the directory where gloVe vectors exist or will be
         downloaded.
+        limit(int): Number of word vectors that is loaded from gensim. This option
+        allows us to save RAM space and avoid memory errors.
 
     Returns:
         gensim.models.keyedvectors.Word2VecKeyedVectors: Loaded word2vectors
@@ -91,6 +93,6 @@ def load_pretrained_vectors(dir_path, file_name="glove.840B.300d.txt"):
     file_path = _maybe_download_and_extract(dir_path, file_name)
     tmp_file = get_tmpfile("test_word2vec.txt")
     _ = glove2word2vec(file_path, tmp_file)
-    model = KeyedVectors.load_word2vec_format(tmp_file)
+    model = KeyedVectors.load_word2vec_format(tmp_file, limit=limit)
 
     return model
