@@ -1,123 +1,140 @@
-from bert_utils import get_device
+class BERTFineTuneConfig:
+    """
+    Configurations for fine tuning pre-trained bert model.
+    """
+    def __init__(self, config_dict):
+        """
+        Initializes a BERTFineTuneConfig object.
 
+        Args:
+            config_dict (dict): A nested dictionary containing three key,
+                value pairs.
+                "ModelConfig": model configuration dictionary
+                    "bert_model": str, name of the bert pretrained model.
+                        Accepted values are
+                    "max_seq_length": int, optional. Maximum length of token
+                        sequence. Default value is 512.
+                    "do_lower_case": bool, optional. Whether to convert
+                        capital letters to lower case during tokenization.
+                        Default value is True.
+                "TrainConfig" (optional): training configuration dictionary
+                    "batch_size": int, optional. Default value is 32.
+                    "num_train_epochs": int, optional. Default value is 3.
+                "OptimizerConfig" (optional): optimizer configuration
+                    dictionary
+                    "optimizer_name": str, optional. Name of the optimizer
+                        to use. Accepted values are "BertAdam", "Adam".
+                        Default value is "BertAdam"
+                    "learning_rate": float, optional, default value is 35e-05,
+                    "no_decay_params": list of strings, optional. Names of
+                        parameters to apply weight decay on. Default value
+                        is [].
+                    "params_weight_decay": float, optional. Parameter weight
+                        decay rate. Default value is 0.01.
+                    "clip_gradient": bool, optional. Whether to perform
+                        gradient clipping. Default value is False.
+                    "max_gradient_norm": float, optional. Maximum gradient
+                        norm to apply gradient clipping on. Default value is
+                        1.0.
+        """
 
-class GlobalConfig:
-    def __init__(self, config_dict={}):
-        if "seed" in config_dict:
-            self.seed = config_dict["seed"]
+        train_config_dict = {}
+        optimizer_config_dict = {}
+
+        if "TrainConfig" in config_dict:
+            train_config_dict = config_dict["TrainConfig"]
+
+        if "OptimizerConfig" in config_dict:
+            optimizer_config_dict = config_dict["OptimizerConfig"]
+
+        if "ModelConfig" in config_dict:
+            model_config_dict = config_dict["ModelConfig"]
         else:
-            self.seed = 42
+            raise Exception("The 'ModelConfig' field can not be empty.")
 
-        if "fp16" in config_dict:
-            self.fp16 = config_dict["fp16"]
+        self._configure_train_settings(train_config_dict)
+        self._configure_model_settings(model_config_dict)
+        self._configure_optimizer_settings(optimizer_config_dict)
+
+    def _configure_train_settings(self, config_dict):
+        if "batch_size" in config_dict:
+            self.batch_size = config_dict["batch_size"]
         else:
-            self.fp16 = True
-
-
-class TrainConfig:
-    def __init__(self, config_dict={}):
-        if 'train_batch_size' in config_dict:
-            self.train_batch_size = config_dict['train_batch_size']
-        else:
-            self.train_batch_size = 32
+            self.batch_size = 32
+            print("batch_size is set to default value: {}.".format(
+                self.batch_size))
 
         if "num_train_epochs" in config_dict:
             self.num_train_epochs = config_dict["num_train_epochs"]
         else:
             self.num_train_epochs = 3
+            print("num_train_epochs is set to default value: {}.".format(
+                self.num_train_epochs))
 
-        if "gradient_accumulation_steps" in config_dict:
-            self.gradient_accumulation_steps = \
-                config_dict["gradient_accumulation_steps"]
+    def _configure_model_settings(self, config_dict):
+        self.bert_model = config_dict["bert_model"]
+
+        if "max_seq_length" in config_dict:
+            self.max_seq_length = config_dict["max_seq_length"]
         else:
-            self.gradient_accumulation_steps = 1
+            self.max_seq_length = 512
+            print("max_seq_length is set to default value: {}.".format(
+                self.max_seq_length))
+
+        if 'do_lower_case' in config_dict:
+            self.do_lower_case = config_dict['do_lower_case']
+        else:
+            self.do_lower_case = True
+            print("do_lower_case is set to default value: {}.".format(
+                self.do_lower_case))
+
+    def _configure_optimizer_settings(self, config_dict):
+        if "optimizer_name" in config_dict:
+            self.optimizer_name = config_dict["optimizer_name"]
+        else:
+            self.optimizer_name = "BertAdam"
+            print("optimizer_name is set to default value: {}.".format(
+                self.optimizer_name))
+
+        if 'learning_rate' in config_dict:
+            self.learning_rate = config_dict['learning_rate']
+        else:
+            self.learning_rate = 5e-5
+            print("learning_rate is set to default value: {}.".format(
+                self.learning_rate))
+
+        if "no_decay_params" in config_dict:
+            self.no_decay_params = config_dict["no_decay_params"]
+        else:
+            self.no_decay_params = []
+            print("no_decay_params is set to default value: {}.".format(
+                self.no_decay_params))
+
+        if "params_weight_decay" in config_dict:
+            self.params_weight_decay = config_dict["params_weight_decay"]
+        else:
+            self.params_weight_decay = 0.01
+            print("Default params_weight_decay, {}, is used".format(
+                self.params_weight_decay))
 
         if "clip_gradient" in config_dict:
             self.clip_gradient = config_dict["clip_gradient"]
         else:
             self.clip_gradient = False
+            print("clip_gradient is set to default value: {}.".format(
+                self.clip_gradient))
 
         if "max_gradient_norm" in config_dict:
-            self.clip_gradient = config_dict["max_gradient_norm"]
+            self.max_gradient_norm = config_dict["max_gradient_norm"]
         else:
             self.max_gradient_norm = 1.0
+            print("max_gradient_norm is set to default value: {}.".format(
+                self.max_gradient_norm))
 
+    def __str__(self):
+        sb = []
+        for key in self.__dict__:
+            sb.append(
+                "{key}={value}".format(key=key, value=self.__dict__[key]))
 
-class EvalConfig:
-    def __init__(self, config_dict={}):
-        if 'eval_batch_size' in config_dict:
-            self.eval_batch_size = config_dict['eval_batch_size']
-        else:
-            self.eval_batch_size = 8
-
-
-class ModelConfig:
-    def __init__(self, config_dict={}):
-        self.bert_model = config_dict['bert_model']
-        self.max_seq_length = config_dict['max_seq_length']
-        self.num_labels = config_dict["num_labels"]
-        if "model_type" in config_dict:
-            self.model_type = config_dict['model_type']
-        else:
-            self.model_type = 'sequence'
-        if 'do_lower_case' in config_dict:
-            self.do_lower_case = config_dict['do_lower_case']
-        else:
-            self.do_lower_case = True
-
-        if "output_mode" in config_dict:
-            self.output_mode = config_dict["output_mode"]
-        else:
-            self.output_mode = 'classification'
-
-
-class OptimizerConfig:
-    def __init__(self, config_dict={}):
-        if 'learning_rate' in config_dict:
-            self.learning_rate = config_dict['learning_rate']
-        else:
-            self.learning_rate = 5e-5
-
-        if "warmup_proportion" in config_dict:
-            self.warmup_proportion = config_dict["warmup_proportion"]
-        else:
-            self.warmup_proportion = 0.1
-
-        if "no_decay_params" in config_dict:
-            self.no_decay_params = config_dict["no_decay_params"]
-        else:
-            # This may depend on the model, so maybe we shouldn't set
-            # default values
-            self.no_decay_params = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
-
-        if "loss_scale" in config_dict:
-            self.loss_scale = float(config_dict["loss_scale"])
-        else:
-            self.loss_scale = 0
-
-        self.num_train_optimization_steps = 1e6
-
-
-class DeviceConfig:
-    def __init__(self, config_dict={}):
-        if "no_cuda" in config_dict:
-            self.no_cuda = config_dict["no_cuda"]
-        else:
-            self.no_cuda = True
-
-        if "local_rank" in config_dict:
-            self.local_rank = config_dict['local_rank']
-        else:
-            self.local_rank = -1
-
-        self.device, self.n_gpu = get_device(self.local_rank, self.no_cuda)
-
-
-class PathConfig:
-    def __init__(self, config_dict={}):
-        self.data_dir = config_dict['data_dir']
-        self.output_dir = config_dict['output_dir']
-        if 'cache_dir' in config_dict:
-            self.cache_dir = config_dict['cache_dir']
-        else:
-            self.cache_dir = None
+        return '\n'.join(sb)
