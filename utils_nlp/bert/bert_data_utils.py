@@ -1,20 +1,25 @@
+"""This script reuses some code from
+https://github.com/huggingface/pytorch-pretrained-BERT/blob/master/examples/run_classifier.py"""
+
 import pandas as pd
-import csv, sys, unicode, random
+import csv, sys, random
 
 
 class InputExample(object):
     """A single training/test example."""
 
     def __init__(self, guid, text_a, text_b=None, label=None):
-        """Constructs a InputExample.
+        """
+        Constructs an InputExample object.
+
         Args:
-            guid: Unique id for the example.
-            text_a: string. The untokenized text of the first sequence. For
-            single sequence tasks, only this sequence must be specified.
-            text_b: (Optional) string. The untokenized text of the second
-            sequence.
-            Only must be specified for sequence pair tasks.
-            label: (Optional) string. The label of the example. This should be
+            guid (str): Unique id for the example.
+            text_a (str): The untokenized text of the first sequence.
+                For single sequence tasks, only this sequence must be
+                specified.
+            text_b (str, optional): The untokenized text of the second
+                sequence. Only must be specified for sequence pair tasks.
+            label (str, optional): The label of the example. This should be
             specified for train and dev examples, but not for test examples.
         """
         self.guid = guid
@@ -23,8 +28,32 @@ class InputExample(object):
         self.label = label
 
 
+class InputTokenFeatures(object):
+    """A single set of token features of data."""
+
+    def __init__(self, input_ids, input_mask, segment_ids, label_id=None):
+        """
+        Constructs an InputFeatures object.
+
+        Args:
+            input_ids (list): List of integer token ids.
+            input_mask (list): Attention mask. Positions corresponding to
+                actual tokens have value 1 and those corresponding to padded
+                tokens have value 0.
+            segment_ids (list):  positions corresponding to the first sentence
+                have value 0 and those corresponding to the second sentence
+                have value 1. For token classification task, since there is
+                only one sentence, all values are 0.
+            label_id (list): numerical values representing token labels.
+        """
+        self.input_ids = input_ids
+        self.input_mask = input_mask
+        self.segment_ids = segment_ids
+        self.label_id = label_id
+
+
 class DataProcessor(object):
-    """Base class for data converters for sequence classification data sets."""
+    """Base class for data converters for classification data sets."""
 
     def get_train_examples(self, data_dir):
         """Gets a collection of `InputExample`s for the train set."""
@@ -53,11 +82,20 @@ class DataProcessor(object):
 
 class KaggleNERProcessor(DataProcessor):
     """
-        Data processor for the Kaggle NER dataset:
-        https://www.kaggle.com/abhinavwalia95/entity-annotated-corpus
+    Data processor for the Kaggle NER dataset:
+    https://www.kaggle.com/abhinavwalia95/entity-annotated-corpus
     """
     def __init__(self, data_dir, dev_percentage):
+        """
+        Initializes the data processor.
+
+        Args:
+            data_dir (str): Directory to read the dataset from.
+            dev_percentage (float): Percentage of data used as dev/validation
+                data.
+        """
         super().__init__()
+        self.data_dir = data_dir
         data = self._read_data(data_dir)
 
         unique_sentence_nums = data["Sentence #"].unique()
@@ -72,30 +110,37 @@ class KaggleNERProcessor(DataProcessor):
         self.tag_vals = list(set(data["Tag"].values))
         self.tag_vals.append("X")
 
-    def get_train_examples(self, data_dir):
-        data = self._read_data(data_dir)
+    def get_train_examples(self):
+        """
+        Gets the training examples.
+        """
+        data = self._read_data(self.data_dir)
         train_data = data.loc[
             data["Sentence #"].isin(self.train_sentence_nums)].copy()
 
         return self._create_examples(train_data, "train")
 
-    def get_dev_examples(self, data_dir):
-        data = self._read_data(data_dir)
+    def get_dev_examples(self):
+        """
+        Gets the dev/validation examples.
+        """
+        data = self._read_data(self.data_dir)
         dev_data = data.loc[
             data["Sentence #"].isin(self.dev_sentence_nums)].copy()
 
         return self._create_examples(dev_data, "dev")
 
     def get_labels(self):
-        """Gets the list of labels for this data set."""
+        """Gets the list of labels for this dataset."""
         return self.tag_vals
 
-    @staticmethod
-    def _read_data(data_dir):
+    def _read_data(self, data_dir):
         return pd.read_csv(data_dir, encoding="latin1").fillna(method="ffill")
 
-    @staticmethod
-    def _create_examples(data, set_type):
+    def _create_examples(self, data, set_type):
+        """
+        Converts input data into InputExample type.
+        """
         agg_func = lambda s: [(w, p, t) for w, p, t in
                               zip(s["Word"].values.tolist(),
                                   s["POS"].values.tolist(),
