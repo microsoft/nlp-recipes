@@ -4,24 +4,24 @@
 import logging
 import os
 import sys
-
-import numpy as np
-
-sys.path.append(".")  # Required to run on the MILA machines with SLURM
-
-import json
 import time
 
+import numpy as np
 import torch
-import torch.nn as nn
-import torch.optim as optim
 import torch.backends.cudnn as cudnn
+import torch.nn as nn
 import torch.nn.functional as F
-
-from utils import BufferedDataIterator, NLIIterator, compute_validation_loss
-from models import MultitaskModel
-
+import torch.optim as optim
 from azureml.core.run import Run
+
+from models.gensen.localcode.models import MultitaskModel
+from models.gensen.localcode.utils import (
+    BufferedDataIterator,
+    NLIIterator,
+    compute_validation_loss,
+)
+
+sys.path.append(".")  # Required to run on the MILA machines with SLURM
 
 # parser = argparse.ArgumentParser()
 # parser.add_argument('--data_folder', type=str, help='data folder')
@@ -38,7 +38,7 @@ run = Run.get_context()
 
 cudnn.benchmark = True
 
-'''
+"""
 parser = argparse.ArgumentParser()
 parser.add_argument("--config", help="path to json config", required=True)
 parser.add_argument("--data_folder", type=str, help="data folder")
@@ -46,27 +46,20 @@ parser.add_argument("--data_folder", type=str, help="data folder")
 parser.add_argument(
     "--learning_rate", type=float, default=0.0001, help="learning rate"
 )
-'''
+"""
 
 
-def read_config(json_file):
-    """Read JSON config."""
-    json_object = json.load(open(json_file, "r", encoding="utf-8"))
-    return json_object
-
-
-def train(config_file_path, data_folder, learning_rate=0.0001):
+def train(config, data_folder, learning_rate=0.0001):
     """ Train the Gensen model.
 
     Args:
-        config_file_path(str): Path to the config json file.
+        config(dict): Loaded json file as a python object.
         data_folder(str): Path to the folder containing the data.
         learning_rate(float): Learning rate for the model.
 
     """
     # os.chdir(data_folder)
 
-    config = read_config(config_file_path)
     save_dir = config["data"]["save_dir"]
     load_dir = config["data"]["load_dir"]
 
