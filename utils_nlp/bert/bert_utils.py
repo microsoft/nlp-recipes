@@ -1,270 +1,76 @@
-import os
+"""This script reuses some code from
+https://github.com/huggingface/pytorch-pretrained-BERT/blob/master/examples/run_classifier.py"""
+from enum import Enum, auto
 
 import numpy as np
 from tqdm import tqdm, trange
 
 import torch
-from torch.nn import CrossEntropyLoss, MSELoss
+from torch.utils.data import (DataLoader, RandomSampler, SequentialSampler,
+                              TensorDataset)
+from torch.optim import Adam
 
-from pytorch_pretrained_bert.file_utils import PYTORCH_PRETRAINED_BERT_CACHE,\
-    WEIGHTS_NAME, CONFIG_NAME
 from pytorch_pretrained_bert.optimization import BertAdam, WarmupLinearSchedule
 from pytorch_pretrained_bert.modeling import BertForSequenceClassification, \
     BertForTokenClassification, BertConfig
-from torch.utils.data import (DataLoader, RandomSampler, SequentialSampler,
-                              TensorDataset)
-from torch.utils.data.distributed import DistributedSampler
+
+from bert_data_utils import InputExample, InputTokenFeatures
 
 
-import logging
-logger = logging.getLogger(__name__)
+def get_device():
+    """
+    Helper function for detecting devices and number of gpus.
 
-
-class InputExample(object):
-    """A single training/test example for simple sequence classification."""
-
-    def __init__(self, guid, text_a, text_b=None, label=None):
-        """Constructs a InputExample.
-        Args:
-            guid: Unique id for the example.
-            text_a: string. The untokenized text of the first sequence. For single
-            sequence tasks, only this sequence must be specified.
-            text_b: (Optional) string. The untokenized text of the second sequence.
-            Only must be specified for sequence pair tasks.
-            label: (Optional) string. The label of the example. This should be
-            specified for train and dev examples, but not for test examples.
-        """
-        self.guid = guid
-        self.text_a = text_a
-        self.text_b = text_b
-        self.label = label
-
-
-class InputFeatures(object):
-    """A single set of features of data."""
-
-    def __init__(self, input_ids, input_mask, segment_ids, label_id):
-        self.input_ids = input_ids
-        self.input_mask = input_mask
-        self.segment_ids = segment_ids
-        self.label_id = label_id
-
-
-def get_device(local_rank, no_cuda):
-    if local_rank == -1 or no_cuda:
-        device = torch.device("cuda" if torch.cuda.is_available() and not no_cuda else "cpu")
-        n_gpu = torch.cuda.device_count()
-    else:
-        torch.cuda.set_device(local_rank)
-        device = torch.device("cuda", local_rank)
-        n_gpu = 1
-        # Initializes the distributed backend which will take care of sychronizing nodes/GPUs
-        torch.distributed.init_process_group(backend='nccl')
+    Returns:
+        (str, int): tuple of device and number of gpus
+    """
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    n_gpu = torch.cuda.device_count()
 
     return device, n_gpu
 
 
-def load_model(model_config, path_config, device_config, global_config):
-    cache_dir = path_config.cache_dir if path_config.cache_dir else \
-        os.path.join(str(PYTORCH_PRETRAINED_BERT_CACHE),
-                     'distributed_{}'.format(device_config.local_rank))
-    if model_config.model_type == 'sequence':
-        model = BertForSequenceClassification.from_pretrained(
-            model_config.bert_model, cache_dir=cache_dir,
-            num_labels=model_config.num_labels)
-    elif model_config.model_type == 'token':
-        model = BertForTokenClassification.from_pretrained(
-            model_config.bert_model, cache_dir=cache_dir,
-            num_labels=model_config.num_labels)
-    if global_config.fp16:
-        model.half()
-    model.to(device_config.device)
-    if device_config.local_rank != -1:
-        try:
-            from apex.parallel import DistributedDataParallel as DDP
-        except ImportError:
-            raise ImportError("Please install apex from https://www.github.com/nvidia/apex to use distributed and fp16 training.")
-
-        model = DDP(model)
-    elif device_config.n_gpu > 1:
-        model = torch.nn.DataParallel(model)
-
-    return model
-
-
-def get_optimizer_params(optimizer_config, train_config,
-                        device_config, model, num_train_examples):
-
-    param_optimizer = list(model.named_parameters())
-    no_decay = optimizer_config.no_decay_params
-    optimizer_grouped_parameters = [
-        {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
-        {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
-        ]
-
-    num_train_optimization_steps = int(num_train_examples /
-                                       train_config.train_batch_size /
-                                       train_config.gradient_accumulation_steps) * train_config.num_train_epochs
-    if device_config.local_rank != -1:
-        num_train_optimization_steps = num_train_optimization_steps // torch.distributed.get_world_size()
-
-    optimizer_config.num_train_optimization_steps \
-        = num_train_optimization_steps
-
-    optimizer_config.grouped_parameters = optimizer_grouped_parameters
-
-    return optimizer_config
-
-
-def create_fp16_optimizer(optimizer_config):
-    try:
-        from apex.optimizers import FP16_Optimizer
-        from apex.optimizers import FusedAdam
-    except ImportError:
-        raise ImportError(
-            "Please install apex from https://www.github.com/nvidia/apex to use distributed and fp16 training.")
-
-    optimizer = FusedAdam(optimizer_config.optimizer_grouped_parameters,
-                          lr=optimizer_config.learning_rate,
-                          bias_correction=False,
-                          max_grad_norm=1.0)
-    if optimizer_config.loss_scale == 0:
-        optimizer = FP16_Optimizer(optimizer, dynamic_loss_scale=True)
-    else:
-        optimizer = FP16_Optimizer(optimizer,
-                                   static_loss_scale=optimizer_config.loss_scale)
-    warmup_linear = WarmupLinearSchedule(
-        warmup=optimizer_config.warmup_proportion,
-        t_total=optimizer_config.num_train_optimization_steps)
-
-    return optimizer, optimizer_config, warmup_linear
-
-
-def _truncate_seq_pair(tokens_a, tokens_b, max_length):
-    """Truncates a sequence pair in place to the maximum length."""
-
-    # This is a simple heuristic which will always truncate the longer sequence
-    # one token at a time. This makes more sense than truncating an equal percent
-    # of tokens from each, since if one sequence is very short then each token
-    # that's truncated likely contains more information than a longer sequence.
-    while True:
-        total_length = len(tokens_a) + len(tokens_b)
-        if total_length <= max_length:
-            break
-        if len(tokens_a) > len(tokens_b):
-            tokens_a.pop()
-        else:
-            tokens_b.pop()
-
-
-def convert_examples_to_sequence_features(examples,
-                                          tokenizer,
-                                          label_list,
-                                          model_config):
-    """Loads a data file into a list of `InputBatch`s."""
-    max_seq_length = model_config.max_seq_length
-
-    label_map = {label : i for i, label in enumerate(label_list)}
-
-    features = []
-    for (ex_index, example) in enumerate(examples):
-        # if ex_index % 10000 == 0:
-        #     logger.info("Writing example %d of %d" % (ex_index, len(examples)))
-
-        tokens_a = tokenizer.tokenize(example.text_a)
-
-        tokens_b = None
-        if example.text_b:
-            tokens_b = tokenizer.tokenize(example.text_b)
-            # Modifies `tokens_a` and `tokens_b` in place so that the total
-            # length is less than the specified length.
-            # Account for [CLS], [SEP], [SEP] with "- 3"
-            _truncate_seq_pair(tokens_a, tokens_b, max_seq_length - 3)
-        else:
-            # Account for [CLS] and [SEP] with "- 2"
-            if len(tokens_a) > max_seq_length - 2:
-                tokens_a = tokens_a[:(max_seq_length - 2)]
-
-        # The convention in BERT is:
-        # (a) For sequence pairs:
-        #  tokens:   [CLS] is this jack ##son ##ville ? [SEP] no it is not . [SEP]
-        #  type_ids: 0   0  0    0    0     0       0 0    1  1  1  1   1 1
-        # (b) For single sequences:
-        #  tokens:   [CLS] the dog is hairy . [SEP]
-        #  type_ids: 0   0   0   0  0     0 0
-        #
-        # Where "type_ids" are used to indicate whether this is the first
-        # sequence or the second sequence. The embedding vectors for `type=0` and
-        # `type=1` were learned during pre-training and are added to the wordpiece
-        # embedding vector (and position vector). This is not *strictly* necessary
-        # since the [SEP] token unambiguously separates the sequences, but it makes
-        # it easier for the model to learn the concept of sequences.
-        #
-        # For classification tasks, the first vector (corresponding to [CLS]) is
-        # used as as the "sentence vector". Note that this only makes sense because
-        # the entire model is fine-tuned.
-        tokens = ["[CLS]"] + tokens_a + ["[SEP]"]
-        segment_ids = [0] * len(tokens)
-
-        if tokens_b:
-            tokens += tokens_b + ["[SEP]"]
-            segment_ids += [1] * (len(tokens_b) + 1)
-
-        input_ids = tokenizer.convert_tokens_to_ids(tokens)
-
-        # The mask has 1 for real tokens and 0 for padding tokens. Only real
-        # tokens are attended to.
-        input_mask = [1] * len(input_ids)
-
-        # Zero-pad up to the sequence length.
-        padding = [0] * (max_seq_length - len(input_ids))
-        input_ids += padding
-        input_mask += padding
-        segment_ids += padding
-
-        assert len(input_ids) == max_seq_length
-        assert len(input_mask) == max_seq_length
-        assert len(segment_ids) == max_seq_length
-
-        if model_config.output_mode == "classification":
-            label_id = label_map[example.label]
-        elif model_config.output_mode == "regression":
-            label_id = float(example.label)
-        else:
-            raise KeyError(model_config.output_mode)
-
-        # if ex_index < 5:
-        #     logger.info("*** Example ***")
-        #     logger.info("guid: %s" % (example.guid))
-        #     logger.info("tokens: %s" % " ".join(
-        #             [str(x) for x in tokens]))
-        #     logger.info("input_ids: %s" % " ".join([str(x) for x in input_ids]))
-        #     logger.info("input_mask: %s" % " ".join([str(x) for x in input_mask]))
-        #     logger.info(
-        #             "segment_ids: %s" % " ".join([str(x) for x in segment_ids]))
-        #     logger.info("label: %s (id = %d)" % (example.label, label_id))
-
-        features.append(
-                InputFeatures(input_ids=input_ids,
-                              input_mask=input_mask,
-                              segment_ids=segment_ids,
-                              label_id=label_id))
-    return features
-
-
 def convert_examples_to_token_features(examples,
                                        tokenizer,
-                                       label_list,
-                                       model_config):
-    """Loads a data file into a list of `InputBatch`s."""
-    max_seq_length = model_config.max_seq_length
+                                       label_map,
+                                       max_seq_length,
+                                       trailing_piece_tag="X"):
+    """
+    Converts data from text to numerical features.
 
-    label_map = {label: i for i, label in enumerate(label_list)}
+    Args:
+        examples (list): List of Data in InputExample type, each contains
+            four fields:
+                unique example id
+                text of the first sentence,
+                text of the second sentence(optional)
+                abel (optional)
+        tokenizer (BertTokenizer): Tokenizer for splitting sentence into
+            word pieces.
+        label_map (dict): Dictionary for mapping token labels to integers.
+        max_seq_length (int): Maximum length of the list of tokens. Lists
+            longer than this are truncated and shorter ones are padded with
+            zeros.
+        trailing_piece_tag (str): Tags used to label trailing word pieces.
+            For example, "playing" is broken down into "play" and "##ing",
+            "play" preserves its original label and "##ing" is labeled as "X".
+
+    Returns:
+        list: List of features in InputTokenFeatures type, each contains four
+        fields:
+            list of token ids
+            attention mask: positions corresponding to actual tokens have
+                value 1 and those corresponding to padded tokens have value 0.
+            segment ids:  positions corresponding to the first sentence have
+                value 0 and those corresponding to the second sentence have
+                value 1. For token classification task, since there is only
+                one sentence, all values are 0.
+            label ids: numerical values representing token labels, generated
+                by mapping token labels to integers using label_map.
+    """
 
     features = []
     for (ex_index, example) in enumerate(examples):
-        #         if ex_index % 10000 == 0:
-        #             logger.info("Writing example %d of %d" % (ex_index, len(examples)))
 
         text_lower = example.text_a.lower()
         new_labels = []
@@ -273,8 +79,8 @@ def convert_examples_to_token_features(examples,
             # print('splitting: ', word)
             sub_words = tokenizer.wordpiece_tokenizer.tokenize(word)
             for count, sub_word in enumerate(sub_words):
-                if count > 0:
-                    tag = 'X'
+                if tag is not None and count > 0:
+                    tag = trailing_piece_tag
                 new_labels.append(tag)
                 tokens.append(sub_word)
 
@@ -292,7 +98,7 @@ def convert_examples_to_token_features(examples,
 
         # Zero-pad up to the sequence length.
         padding = [0.0] * (max_seq_length - len(input_ids))
-        label_padding = ['O'] * (max_seq_length - len(input_ids))
+        label_padding = ["O"] * (max_seq_length - len(input_ids))
 
         input_ids += padding
         input_mask += padding
@@ -304,289 +110,268 @@ def convert_examples_to_token_features(examples,
         assert len(segment_ids) == max_seq_length
         assert len(new_labels) == max_seq_length
 
-        label_id = [label_map[label] for label in new_labels]
-
-        #         if ex_index < 5:
-        #             logger.info("*** Example ***")
-        #             logger.info("guid: %s" % (example.guid))
-        #             logger.info("tokens: %s" % " ".join(
-        #                     [str(x) for x in tokens]))
-        #             logger.info("input_ids: %s" % " ".join([str(x) for x in input_ids]))
-        #             logger.info("input_mask: %s" % " ".join([str(x) for x in input_mask]))
-        #             logger.info(
-        #                     "segment_ids: %s" % " ".join([str(x) for x in segment_ids]))
-        #             logger.info("label: %s (id = %d)" % (example.label, label_id))
+        label_ids = [label_map[label] for label in new_labels]
 
         features.append(
-            InputFeatures(input_ids=input_ids,
+            InputTokenFeatures(input_ids=input_ids,
                           input_mask=input_mask,
                           segment_ids=segment_ids,
-                          label_id=label_id))
+                          label_id=label_ids))
     return features
 
 
-##train_examples and label list can be contained within one data
-# preprocessor object
-def create_train_dataloader(train_features, model_config,
-                            train_config, device_config):
+def convert_features_to_tensors(features):
+    """
+    Helper function for converting sentence features to TensorDataset.
 
-    all_input_ids = torch.tensor([f.input_ids for f in train_features], dtype=torch.long)
-    all_input_mask = torch.tensor([f.input_mask for f in train_features], dtype=torch.long)
-    all_segment_ids = torch.tensor([f.segment_ids for f in train_features], dtype=torch.long)
+    Args:
+        features (list): List of features in InputTokenFeatures type.
 
-    if model_config.output_mode == "classification":
-        all_label_ids = torch.tensor([f.label_id for f in train_features], dtype=torch.long)
-    elif model_config.output_mode == "regression":
-        all_label_ids = torch.tensor([f.label_id for f in train_features], dtype=torch.float)
+    Returns:
+        TensorDataset: A TensorDataset consists of tensors of each field in
+            InputTokenFeatures. If the label_id field of InputTokenFeatures is
+            None, the TensorDataset only contains the tensors of input_ids,
+            input_mask, and segment_ids.
+    """
+    all_input_ids = torch.tensor([f.input_ids for f in features],
+                                 dtype=torch.long)
+    all_input_mask = torch.tensor([f.input_mask for f in features],
+                                  dtype=torch.long)
+    all_segment_ids = torch.tensor([f.segment_ids for f in features],
+                                   dtype=torch.long)
 
-    ## Create train data loader
-    train_data = TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_label_ids)
-    if device_config.local_rank == -1:
-        train_sampler = RandomSampler(train_data)
+    all_label_ids = torch.tensor([f.label_id for f in features],
+                                 dtype=torch.long)
+    if all(all(all_label_ids[0])):
+        tensor_data = TensorDataset(all_input_ids, all_input_mask,
+                                    all_segment_ids, all_label_ids)
     else:
-        train_sampler = DistributedSampler(train_data)
-    train_dataloader = DataLoader(train_data, sampler=train_sampler,
-                                  batch_size=train_config.train_batch_size)
+        tensor_data = TensorDataset(all_input_ids, all_input_mask,
+                                    all_segment_ids)
 
-    return train_dataloader
-
-
-def create_eval_dataloader(eval_features, model_config, eval_config):
-
-    all_input_ids = torch.tensor([f.input_ids for f in eval_features], dtype=torch.long)
-    all_input_mask = torch.tensor([f.input_mask for f in eval_features], dtype=torch.long)
-    all_segment_ids = torch.tensor([f.segment_ids for f in eval_features], dtype=torch.long)
-
-    if model_config.output_mode == "classification":
-        all_label_ids = torch.tensor([f.label_id for f in eval_features], dtype=torch.long)
-    elif model_config.output_mode == "regression":
-        all_label_ids = torch.tensor([f.label_id for f in eval_features], dtype=torch.float)
-
-    eval_data = TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_label_ids)
-    # Run prediction for full data
-    eval_sampler = SequentialSampler(eval_data)
-    eval_dataloader = DataLoader(eval_data, sampler=eval_sampler,
-                                 batch_size=eval_config.eval_batch_size)
-
-    return eval_dataloader
+    return tensor_data
 
 
-def train_model(model, train_dataloader, optimizer,
-                train_config, model_config, optimizer_config,
-                device_config, global_config, warmup_linear=None):
-    global_step = 0
-    # nb_tr_steps = 0
-    # tr_loss = 0
-    model.train()
-    for _ in trange(int(train_config.num_train_epochs), desc="Epoch"):
-        tr_loss = 0
-        nb_tr_examples, nb_tr_steps = 0, 0
-        for step, batch in enumerate(tqdm(train_dataloader, desc="Iteration")):
-            batch = tuple(t.to(device_config.device) for t in batch)
-            input_ids, input_mask, segment_ids, label_ids = batch
+class Language(Enum):
+    """An enumeration of the supported languages."""
 
-            # define a new function to compute loss values for both output_modes
-            logits = model(input_ids=input_ids,
-                           token_type_ids=segment_ids,
-                           attention_mask=input_mask,
-                           labels=None)
+    ENGLISH = "bert-base-uncased"
+    CHINESE = "bert-base-chinese"
+    SPANISH = auto()
+    HINDI = auto()
+    FRENCH = auto()
 
-            if model_config.output_mode == "classification":
-                loss_fct = CrossEntropyLoss()
-                loss = loss_fct(logits.view(-1, model_config.num_labels),
-                                label_ids.view(-1))
-            elif model_config.output_mode == "regression":
-                loss_fct = MSELoss()
-                loss = loss_fct(logits.view(-1), label_ids.view(-1))
 
-            if device_config.n_gpu > 1:
-                loss = loss.mean() # mean() to average on multi-gpu.
-            if train_config.gradient_accumulation_steps > 1:
-                loss = loss / train_config.gradient_accumulation_steps
+class BertTokenClassifier:
+    """BERT-based token classifier."""
 
-            if global_config.fp16:
-                optimizer.backward(loss)
-            else:
+    def __init__(self, config, label_map, device, n_gpu,
+                 language=Language.ENGLISH, cache_dir="."):
+
+        """
+        Initializes the classifier and the underlying pretrained model and
+        optimizer.
+
+        Args:
+            config (BERTFineTuneConfig): A configuration object contains
+                settings of model, training, and optimizer.
+            label_map (dict): Dictionary used to map token labels to
+                integers during data preprocessing.
+            device (str): "cuda" or "cpu". Can be obtained by calling
+                get_device.
+            n_gpu (int): Number of GPUs available.Can be obtained by calling
+                get_device.
+            language (Language, optinal): The pretrained model's language.
+                Defaults to Language.ENGLISH.
+            cache_dir (str, optional): Location of BERT's cache directory.
+                Defaults to ".".
+        """
+
+        print("BERT fine tune configurations:")
+        print(config)
+
+        self.language = language
+        self.device = device
+        self.n_gpu = n_gpu
+        self.num_labels = len(label_map)
+        self.cache_dir = cache_dir
+        self.label_map = label_map
+
+        self.bert_model = config.bert_model
+
+        self.optimizer_name = config.optimizer_name
+        self.no_decay_params = config.no_decay_params
+        self.params_weight_decay = config.params_weight_decay
+        self.learning_rate = config.learning_rate
+        self.clip_gradient = config.clip_gradient
+        self.max_gradient_norm = config.max_gradient_norm
+
+        self.num_train_epochs = config.num_train_epochs
+        self.batch_size = config.batch_size
+
+        # This step needs to be done before creating optimizer
+        self.model = self._load_model()
+        self.optimizer = self._get_optimizer()
+
+        self._is_trained = False
+
+    def _load_model(self):
+        """Loads the pretrained BERT model."""
+        model = BertForTokenClassification.from_pretrained(
+            self.bert_model, cache_dir=self.cache_dir,
+            num_labels=self.num_labels)
+
+        model.to(self.device)
+
+        if self.n_gpu > 1:
+            model = torch.nn.DataParallel(model)
+
+        return model
+
+    def _get_optimizer(self):
+        """
+        Initializes the optimizer and configure parameters to apply weight
+        decay on.
+        """
+        param_optimizer = list(self.model.named_parameters())
+        optimizer_grouped_parameters = [
+            {'params': [p for n, p in param_optimizer if
+                        not any(nd in n for nd in self.no_decay_params)],
+             'weight_decay': self.params_weight_decay},
+            {'params': [p for n, p in param_optimizer if
+                        any(nd in n for nd in self.no_decay_params)],
+             'weight_decay': 0.0}
+        ]
+
+        if self.optimizer_name == 'BertAdam':
+            optimizer = BertAdam(optimizer_grouped_parameters,
+                                 lr=self.learning_rate)
+        elif self.optimizer_name == 'Adam':
+            optimizer = Adam(optimizer_grouped_parameters,
+                            lr=self.learning_rate)
+
+        return optimizer
+
+    def fit(self, train_features):
+        """
+        Fine-tunes the BERT classifier using the given training data.
+
+        Args:
+            train_features (list): List of training features of
+                InputTokenFeatures type.
+        """
+        train_dataset = convert_features_to_tensors(train_features)
+        train_sampler = RandomSampler(train_dataset)
+        train_dataloader = DataLoader(train_dataset, sampler=train_sampler,
+                                      batch_size=self.batch_size)
+
+        global_step = 0
+        self.model.train()
+        for _ in trange(int(self.num_train_epochs), desc="Epoch"):
+            tr_loss = 0
+            nb_tr_steps = 0
+            for step, batch in enumerate(tqdm(train_dataloader, desc="Iteration")):
+                batch = tuple(t.to(self.device) for t in batch)
+                input_ids, input_mask, segment_ids, label_ids = batch
+
+                loss = self.model(input_ids=input_ids,
+                                  token_type_ids=segment_ids,
+                                  attention_mask=input_mask,
+                                  labels=label_ids)
+
+                if self.n_gpu > 1:
+                    # mean() to average on multi-gpu.
+                    loss = loss.mean()
+
                 loss.backward()
 
-            tr_loss += loss.item()
-            nb_tr_examples += input_ids.size(0)
-            nb_tr_steps += 1
+                tr_loss += loss.item()
+                nb_tr_steps += 1
 
-            if train_config.clip_gradient:
-                torch.nn.utils.clip_grad_norm_(parameters=model.parameters(),
-                                               max_norm=train_config.max_gradient_norm)
+                if self.clip_gradient:
+                    torch.nn.utils.clip_grad_norm_(
+                        parameters=self.model.parameters(),
+                        max_norm=self.max_gradient_norm)
 
-            if (step + 1) % train_config.gradient_accumulation_steps == 0:
-                if global_config.fp16:
-                    # modify learning rate with special warm up BERT uses
-                    # if args.fp16 is False, BertAdam is used that handles this automatically
-                    lr_this_step = optimizer_config.learning_rate * \
-                                   warmup_linear.get_lr(
-                                       global_step/optimizer_config.num_train_optimization_steps,
-                                                                             optimizer_config.args.warmup_proportion)
-                    for param_group in optimizer.param_groups:
-                        param_group['lr'] = lr_this_step
-                optimizer.step()
-                optimizer.zero_grad()
+                self.optimizer.step()
+                self.optimizer.zero_grad()
                 global_step += 1
 
-        train_loss = tr_loss/nb_tr_steps
-        print("Train loss: {}".format(train_loss))
+            train_loss = tr_loss/nb_tr_steps
+            print("Train loss: {}".format(train_loss))
 
-    return model, loss
+        self._is_trained = True
 
+    def predict(self, test_features):
+        """
+        Predict token labels on the testing data.
 
-def save_model(model, tokenizer, path_config):
-    model_to_save = model.module if hasattr(model,
-                                            'module') else model  # Only save the model it-self
+        Args:
+            test_features (list): List of test features of
+                InputTokenFeatures type.
 
-    # If we save using the predefined names, we can load using `from_pretrained`
-    output_model_file = os.path.join(path_config.output_dir, WEIGHTS_NAME)
-    output_config_file = os.path.join(path_config.output_dir, CONFIG_NAME)
+        Returns:
+            tuple: The first element of the tuple is the predicted token
+                labels. If the testing features contain label ids, the second
+                element of the tuple is the true token labels.
+        """
+        test_dataset = convert_features_to_tensors(test_features)
+        test_sampler = SequentialSampler(test_dataset)
+        test_dataloader = DataLoader(test_dataset, sampler=test_sampler,
+                                     batch_size=self.batch_size)
 
-    torch.save(model_to_save.state_dict(), output_model_file)
-    model_to_save.config.to_json_file(output_config_file)
-    tokenizer.save_vocabulary(path_config.output_dir)
+        if not self._is_trained:
+            raise Exception("Model is not trained. Please train model before "
+                            "predict.")
 
+        self.model.eval()
+        predictions = []
+        true_labels = []
+        eval_loss, eval_accuracy = 0, 0
+        nb_eval_steps = 0
+        for batch in test_dataloader:
+            batch = tuple(t.to(self.device) for t in batch)
+            true_label_available = False
+            if len(batch) == 3:
+                b_input_ids, b_input_mask, b_segment_ids = batch
+            elif len(batch) == 4:
+                b_input_ids, b_input_mask, b_segment_ids, b_labels = batch
+                true_label_available = True
 
-def eval_model(model, eval_dataloader, model_config, device_config,
-               eval_label_ids=None, eval_func=None):
-    model.eval()
-    eval_loss = 0
-    nb_eval_steps = 0
-    preds = []
-    for step, batch in enumerate(tqdm(eval_dataloader, desc="Evaluating")):
-        batch = tuple(t.to(device_config.device) for t in batch)
-        input_ids, input_mask, segment_ids, label_ids = batch
+            with torch.no_grad():
+                if true_label_available:
+                    tmp_eval_loss = self.model(b_input_ids,
+                                               token_type_ids=None,
+                                               attention_mask=b_input_mask,
+                                               labels=b_labels)
+                logits = self.model(b_input_ids,
+                                    token_type_ids=None,
+                                    attention_mask=b_input_mask)
 
-        with torch.no_grad():
-            logits = model(input_ids=input_ids,
-                           token_type_ids=segment_ids,
-                           attention_mask=input_mask,
-                           labels=None)
+            logits = logits.detach().cpu().numpy()
+            predictions.extend([list(p) for p in np.argmax(logits, axis=2)])
 
-        # create eval loss and other metric required by the task
-        if model_config.output_mode == "classification":
-            loss_fct = CrossEntropyLoss()
-            tmp_eval_loss = loss_fct(logits.view(-1, model_config.num_labels),
-                                     label_ids.view(-1))
-        elif model_config.output_mode == "regression":
-            loss_fct = MSELoss()
-            tmp_eval_loss = loss_fct(logits.view(-1), label_ids.view(-1))
+            if true_label_available:
+                label_ids = b_labels.to('cpu').numpy()
+                true_labels.append(label_ids)
+                eval_loss += tmp_eval_loss.mean().item()
 
-        eval_loss += tmp_eval_loss.mean().item()
-        nb_eval_steps += 1
-        if len(preds) == 0:
-            preds.append(logits.detach().cpu().numpy())
+            nb_eval_steps += 1
+
+        validation_loss = eval_loss / nb_eval_steps
+        print("Validation loss: {}".format(validation_loss))
+
+        reversed_label_map = {v: k for k, v in self.label_map.items()}
+        pred_tags = [[reversed_label_map[p_i] for p_i in p] for p in
+                     predictions]
+
+        if true_label_available:
+            valid_tags = [[reversed_label_map[l_ii] for l_ii in l_i] for
+                          l in true_labels for l_i in l]
+
+            return pred_tags, valid_tags
         else:
-            preds[0] = np.append(
-                preds[0], logits.detach().cpu().numpy(), axis=0)
-
-    eval_loss = eval_loss / nb_eval_steps
-    preds = preds[0]
-
-    if model_config.output_mode == "classification":
-        preds = np.argmax(preds, axis=1)
-    elif model_config.output_mode == "regression":
-        preds = np.squeeze(preds)
-
-    eval_result = {}
-    if eval_label_ids and eval_func:
-        eval_result['eval_metric'] = eval_func(preds, eval_label_ids.numpy())
-
-        eval_result['eval_loss'] = eval_loss
-
-        return preds, eval_result
-    else:
-        return preds, None
-
-    # result['global_step'] = global_step
-    # result['loss'] = loss
-    #
-    # output_eval_file = os.path.join(path_config.output_dir, "eval_results.txt")
-    # with open(output_eval_file, "w") as writer:
-    #     logger.info("***** Eval results *****")
-    #     for key in sorted(result.keys()):
-    #         logger.info("  %s = %s", key, str(result[key]))
-    #         writer.write("%s = %s\n" % (key, str(result[key])))
+            return pred_tags,
 
 
-def train_token_model(model, train_dataloader, optimizer,
-                      train_config, model_config, optimizer_config,
-                      device_config, global_config, warmup_linear=None):
-    for _ in trange(train_config.num_train_epochs, desc="Epoch"):
-        # TRAIN loop
-        model.train()
-        tr_loss = 0
-        nb_tr_examples, nb_tr_steps = 0, 0
-        for step, batch in enumerate(train_dataloader):
-            # add batch to gpu
-            batch = tuple(t.to(device_config.device) for t in batch)
-            b_input_ids, b_input_mask, b_segment_ids, b_labels = batch
-            # forward pass
-            loss = model(b_input_ids, token_type_ids=None,
-                         attention_mask=b_input_mask, labels=b_labels)
-            # backward pass
-            loss.backward()
-            # track train loss
-            tr_loss += loss.item()
-            nb_tr_examples += b_input_ids.size(0)
-            nb_tr_steps += 1
-            # gradient clipping
-            torch.nn.utils.clip_grad_norm_(parameters=model.parameters(),
-                                           max_norm=1.0)
-            # update parameters performs a parameter update based on the
-            # current gradient (stored in .grad attribute of a parameter)
-            # and the update rule
-            optimizer.step()
-            model.zero_grad()#Zero the gradients before running the next batch.
-        # print train loss per epoch
-        train_loss = tr_loss/nb_tr_steps
-        print("Train loss: {}".format(train_loss))
-
-    return model, train_loss
-
-def eval_token_model(model, eval_dataloader, model_config, device_config,
-                     label_list, eval_func=None):
-    from seqeval.metrics import f1_score
-
-    model.eval()
-    predictions = []
-    true_labels = []
-    eval_loss, eval_accuracy = 0, 0
-    nb_eval_steps, nb_eval_examples = 0, 0
-    for batch in eval_dataloader:
-        batch = tuple(t.to(device_config.device) for t in batch)
-        b_input_ids, b_input_mask, b_segment_ids, b_labels = batch
-
-        with torch.no_grad():
-            tmp_eval_loss = model(b_input_ids, token_type_ids=None,
-                                  attention_mask=b_input_mask, labels=b_labels)
-            logits = model(b_input_ids, token_type_ids=None,
-                           attention_mask=b_input_mask)
-
-        logits = logits.detach().cpu().numpy()
-        predictions.extend([list(p) for p in np.argmax(logits, axis=2)])
-        label_ids = b_labels.to('cpu').numpy()
-        true_labels.append(label_ids)
-        tmp_eval_accuracy = eval_func(logits, label_ids)
-
-        eval_loss += tmp_eval_loss.mean().item()
-        eval_accuracy += tmp_eval_accuracy
-
-        nb_eval_examples += b_input_ids.size(0)
-        nb_eval_steps += 1
-
-    pred_tags = [[label_list[p_i] for p_i in p] for p in predictions]
-    valid_tags = [[label_list[l_ii] for l_ii in l_i] for l in true_labels for
-                  l_i in l]
-
-    validation_loss = eval_loss / nb_eval_steps
-    eval_accuracy = eval_accuracy / nb_eval_steps
-    print("Validation loss: {}".format(validation_loss))
-    print("Validation Accuracy: {}".format(eval_accuracy))
-    print("Validation F1-Score: {}".format(f1_score(pred_tags, valid_tags)))
-
-    return pred_tags, validation_loss, eval_accuracy
 
