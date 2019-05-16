@@ -1,0 +1,20 @@
+TrainConfig:
+  batch_size: 32
+  num_train_epochs: 3
+
+ModelConfig:
+  bert_model: "bert-base-uncased"
+  max_seq_length: 75
+  do_lower_case: True
+
+OptimizerConfig:
+  optimizer_name: "BertAdam"
+  learning_rate: 0.00003
+  no_decay_params:
+    - "bias"
+    - "gamma"
+    - "beta"
+  params_weight_decay: 0.01
+  clip_gradient: True
+  max_gradient_norm: 1.0
+
