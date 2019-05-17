@@ -1,8 +1,6 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
-
-from enum import Enum, auto
 import random
 import numpy as np
 import torch.nn as nn
@@ -11,16 +9,7 @@ from pytorch_pretrained_bert.modeling import BertForSequenceClassification
 from pytorch_pretrained_bert.optimization import BertAdam
 from pytorch_pretrained_bert.tokenization import BertTokenizer
 from utils_nlp.pytorch.device import get_device
-
-
-class Language(Enum):
-    """An enumeration of the supported languages."""
-
-    ENGLISH = "bert-base-uncased"
-    CHINESE = "bert-base-chinese"
-    SPANISH = auto()
-    HINDI = auto()
-    FRENCH = auto()
+from utils_nlp.bert.common import Language
 
 
 class BERTSequenceClassifier:
@@ -30,12 +19,16 @@ class BERTSequenceClassifier:
 
     def __init__(self, language=Language.ENGLISH, num_labels=2, cache_dir="."):
         """Initializes the classifier and the underlying pretrained model and tokenizer.
-        
         Args:
-            language (Language, optional): The pretrained model's language. Defaults to Language.ENGLISH.
-            num_labels (int, optional): The number of unique labels in the training data. Defaults to 2.
+            language (Language, optional): The pretrained model's language.
+                                           Defaults to Language.ENGLISH.
+            num_labels (int, optional): The number of unique labels in the training data.
+                                        Defaults to 2.
             cache_dir (str, optional): Location of BERT's cache directory. Defaults to ".".
         """
+        if num_labels < 2:
+            raise Exception("Number of labels should be at least 2.")
+
         self.language = language
         self.num_labels = num_labels
         self._max_len = BERTSequenceClassifier.BERT_MAX_LEN
@@ -60,6 +53,11 @@ class BERTSequenceClassifier:
         input_mask = [[min(1, x) for x in y] for y in tokens]
         return tokens, input_mask
 
+    def get_model(self):
+        """Returns the underlying PyTorch model
+             BertForSequenceClassification or DataParallel (when multiple GPUs are used)."""
+        return self.model
+
     def fit(
         self,
         text,
@@ -72,16 +70,20 @@ class BERTSequenceClassifier:
         verbose=True,
     ):
         """Fine-tunes the BERT classifier using the given training data.
-        
         Args:
             text (list): List of training text documents.
             labels (list): List of training labels.
-            max_len (int, optional): Maximum number of tokens (documents will be truncated or padded).  Defaults to 512.
-            device (str, optional): Device used for training ("cpu" or "gpu"). Defaults to "gpu".
-            use_multiple_gpus (bool, optional): Whether multiple GPUs will be used for training. Defaults to True.
+            max_len (int, optional): Maximum number of tokens
+                                     (documents will be truncated or padded).
+                                     Defaults to 512.
+            device (str, optional): Device used for training ("cpu" or "gpu").
+                                    Defaults to "gpu".
+            use_multiple_gpus (bool, optional): Whether multiple GPUs will be used for training.
+                                                Defaults to True.
             num_epochs (int, optional): Number of training epochs. Defaults to 1.
             batch_size (int, optional): Training batch size. Defaults to 32.
-            verbose (bool, optional): If True, shows the training progress and loss values. Defaults to True.
+            verbose (bool, optional): If True, shows the training progress and loss values.
+                                      Defaults to True.
         """
         device = get_device(device)
         self.model.to(device)
@@ -155,12 +157,13 @@ class BERTSequenceClassifier:
                     attention_mask=mask_batch,
                     labels=None,
                 )
+
                 loss = loss_func(y_h, y_batch)
                 loss.backward()
                 opt.step()
 
                 if verbose:
-                    if i % (3 * batch_size) == 0:
+                    if i % (2 * batch_size) == 0:
                         print(
                             "epoch:{}/{}; batch:{}/{}; loss:{}".format(
                                 epoch + 1,
@@ -173,11 +176,11 @@ class BERTSequenceClassifier:
         self._is_trained = True
 
     def predict(self, text, device="gpu", batch_size=32):
-        """Scores the given dataset and returns the predicted classes.        
+        """Scores the given dataset and returns the predicted classes.
         Args:
             text (list): List of text documents to score.
             device (str, optional): Device used for scoring ("cpu" or "gpu"). Defaults to "gpu".
-            batch_size (int, optional): Scoring batch size. Defaults to 32.      
+            batch_size (int, optional): Scoring batch size. Defaults to 32.
         Returns:
             [ndarray]: Predicted classes.
         """

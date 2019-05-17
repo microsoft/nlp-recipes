@@ -32,6 +32,6 @@ dependencies:
   - scikit-learn>=0.20
   - pytorch-pretrained-bert>=0.6
   - horovod>=0.16.1
-  - torch>=1.0
+  - torch<1.1
   - urllib3>=1.24
 
