@@ -1,7 +1,6 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 import json
-import os.path
 
 from models.gensen.localcode import train
 from utils_nlp.model.gensen_utils import gensen_preprocess
@@ -28,14 +27,17 @@ class GenSenClassifier:
         """Validate input params."""
 
         if not isinstance(self.learning_rate, float) or (
-            self.learning_rate <= 0.0
+                self.learning_rate <= 0.0
         ):
             raise ValueError(
                 "Learning rate must be of type float and greater than 0"
             )
 
-        if not os.path.isfile(os.path.join(os.getcwd(), self.config_file)):
-            raise FileNotFoundError("Provided config file does not exist!")
+        try:
+            f = open(self.config_file)
+            f.close()
+        except FileNotFoundError:
+            print("Provided config file does not exist!")
 
     def _get_gensen_tokens(self, train_df=None, dev_df=None, test_df=None):
         """
@@ -78,8 +80,8 @@ class GenSenClassifier:
 
         self._validate_params()
         config = self._read_config(self.config_file)
-        self._get_gensen_tokens(train_df, dev_df)
-
+        self.cache_dir = self._get_gensen_tokens(train_df, dev_df)
+        print(self.cache_dir)
         train.train(
             data_folder=self.cache_dir,
             config=config,
