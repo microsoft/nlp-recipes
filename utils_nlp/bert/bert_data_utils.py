@@ -1,8 +1,11 @@
 """This script reuses some code from
-https://github.com/huggingface/pytorch-pretrained-BERT/blob/master/examples/run_classifier.py"""
+https://github.com/huggingface/pytorch-pretrained-BERT/blob/master/examples
+/run_classifier.py"""
 
 import pandas as pd
-import csv, sys, random
+import csv
+import sys
+import random
 from collections import namedtuple
 
 
@@ -29,26 +32,27 @@ from collections import namedtuple
 #         self.label = label
 
 ## New version of BERTInputData using namedtuple
-""" 
+"""
 A single BERT input data containing three fields:
     1. text_a: text of the first sentence,
-    2. text_b: text of the second sentence, optional, required for 
-        two-sentence tasks. 
+    2. text_b: text of the second sentence, optional, required for
+        two-sentence tasks.
     3. label: label, optional, required for training and validation data
 """
-BertInputData = namedtuple('BertInputData', ['text_a', 'text_b', 'label'],
-                           defaults=[None, None])
+BertInputData = namedtuple(
+    "BertInputData", ["text_a", "text_b", "label"], defaults=[None, None]
+)
 
 
 class DataProcessor(object):
     """Base class for data converters for classification data sets."""
 
     def get_train_examples(self, data_dir):
-        """Gets a collection of `InputExample`s for the train set."""
+        """Gets a collection of `BertInputData`s for the train set."""
         raise NotImplementedError()
 
     def get_dev_examples(self, data_dir):
-        """Gets a collection of `InputExample`s for the dev set."""
+        """Gets a collection of `BertInputData`s for the dev set."""
         raise NotImplementedError()
 
     def get_labels(self):
@@ -63,7 +67,7 @@ class DataProcessor(object):
             lines = []
             for line in reader:
                 if sys.version_info[0] == 2:
-                    line = list(unicode(cell, 'utf-8') for cell in line)
+                    line = list(unicode(cell, "utf-8") for cell in line)
                 lines.append(line)
             return lines
 
@@ -73,6 +77,7 @@ class KaggleNERProcessor(DataProcessor):
     Data processor for the Kaggle NER dataset:
     https://www.kaggle.com/abhinavwalia95/entity-annotated-corpus
     """
+
     def __init__(self, data_dir, dev_percentage):
         """
         Initializes the data processor.
@@ -100,21 +105,23 @@ class KaggleNERProcessor(DataProcessor):
 
     def get_train_examples(self):
         """
-        Gets the training examples.
+        Gets the training data.
         """
         data = self._read_data(self.data_dir)
         train_data = data.loc[
-            data["Sentence #"].isin(self.train_sentence_nums)].copy()
+            data["Sentence #"].isin(self.train_sentence_nums)
+        ].copy()
 
         return self._create_examples(train_data)
 
     def get_dev_examples(self):
         """
-        Gets the dev/validation examples.
+        Gets the dev/validation data.
         """
         data = self._read_data(self.data_dir)
         dev_data = data.loc[
-            data["Sentence #"].isin(self.dev_sentence_nums)].copy()
+            data["Sentence #"].isin(self.dev_sentence_nums)
+        ].copy()
 
         return self._create_examples(dev_data)
 
@@ -133,10 +140,14 @@ class KaggleNERProcessor(DataProcessor):
         """
         Converts input data into BertInputData type.
         """
-        agg_func = lambda s: [(w, p, t) for w, p, t in
-                              zip(s["Word"].values.tolist(),
-                                  s["POS"].values.tolist(),
-                                  s["Tag"].values.tolist())]
+        agg_func = lambda s: [
+            (w, p, t)
+            for w, p, t in zip(
+                s["Word"].values.tolist(),
+                s["POS"].values.tolist(),
+                s["Tag"].values.tolist(),
+            )
+        ]
         data_grouped = data.groupby("Sentence #").apply(agg_func)
         sentences = [s for s in data_grouped]
         examples = []
@@ -144,6 +155,7 @@ class KaggleNERProcessor(DataProcessor):
             text_a = " ".join([s[0] for s in sent])
             label = [s[2] for s in sent]
             examples.append(
-                BertInputData(text_a=text_a, text_b=None, label=label))
+                BertInputData(text_a=text_a, text_b=None, label=label)
+            )
 
         return examples
