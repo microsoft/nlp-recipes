@@ -4,6 +4,8 @@
 import os
 import shutil
 
+from utils_nlp.dataset.snli import clean_snli
+
 SPLIT_MAP = {}
 
 
@@ -36,18 +38,9 @@ def _preprocess(data_path):
             header=False,
             index=False,
         )
-        df["score"].to_csv(
-            "{}.lab".format(base_txt_path), sep=" ", header=False, index=False
-        )
+
         df_clean = df[["s1.tok", "s2.tok", "score"]]
-        df_clean.to_csv(
-            "{}.clean".format(base_txt_path),
-            sep="\t",
-            header=False,
-            index=False,
-        )
-        # remove rows with blank scores
-        df_noblank = df_clean.loc[df_clean["score"] != "-"].copy()
+        df_noblank = df_clean.loc[df_clean["score"] == "-"].copy()
         df_noblank.to_csv(
             "{}.clean.noblank".format(base_txt_path),
             sep="\t",
@@ -116,3 +109,21 @@ def gensen_preprocess(train_tok, dev_tok, test_tok, data_path):
 
     _preprocess(data_path)
     _split_and_cleanup(data_path)
+    _clean(data_path)
+
+    return os.path.join(data_path, "clean/snli_1.0")
+
+
+def _clean(data_path):
+    for file_split in SPLIT_MAP.keys():
+        src_file_path = os.path.join(
+            data_path, "raw/snli_1.0/snli_1.0_{}.txt".format(file_split)
+        )
+        dest_file_path = os.path.join(
+            data_path,
+            "clean/snli_1.0/snli_1.0_clean_{}.txt".format(file_split),
+        )
+        clean_df = clean_snli(
+            src_file_path
+        ).dropna()  # drop rows with any NaN vals
+        clean_df.to_csv(dest_file_path)

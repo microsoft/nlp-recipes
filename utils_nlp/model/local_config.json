@@ -24,11 +24,11 @@
         "max_src_length": 90,
         "max_trg_length": 90,
         "task": "multi-seq2seq-nli",
-        "save_dir": ".",
+        "save_dir": "model/gensen",
         "load_dir": "auto",
-        "nli_train": "snli_1.0_train.txt.clean",
-        "nli_dev": "snli_1.0_dev.txt.clean",
-        "nli_test": "snli_1.0_test.txt.clean"
+        "nli_train": "snli_1.0_dev.txt.clean.noblank",
+        "nli_dev": "snli_1.0_dev.txt.clean.noblank",
+        "nli_test": "snli_1.0_test.txt.clean.noblank"
 	},
     "model": {
     	"dim_src": 2048,
