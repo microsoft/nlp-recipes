@@ -10,11 +10,8 @@ from torch.utils.data import (DataLoader, RandomSampler, SequentialSampler,
                               TensorDataset)
 from torch.optim import Adam
 
-from pytorch_pretrained_bert.optimization import BertAdam, WarmupLinearSchedule
-from pytorch_pretrained_bert.modeling import BertForSequenceClassification, \
-    BertForTokenClassification, BertConfig
-
-from bert_data_utils import InputExample, InputTokenFeatures
+from pytorch_pretrained_bert.optimization import BertAdam
+from pytorch_pretrained_bert.modeling import BertForTokenClassification
 
 
 def get_device():
@@ -30,47 +27,43 @@ def get_device():
     return device, n_gpu
 
 
-def convert_examples_to_token_features(examples,
-                                       tokenizer,
-                                       label_map,
-                                       max_seq_length,
-                                       trailing_piece_tag="X"):
+def create_token_feature_dataset(data,
+                                 tokenizer,
+                                 label_map,
+                                 max_seq_length,
+                                 true_label_available,
+                                 trailing_piece_tag="X"):
     """
-    Converts data from text to numerical features.
+    Converts data from text to TensorDataset containing numerical features.
 
     Args:
-        examples (list): List of Data in InputExample type, each contains
-            four fields:
-                unique example id
-                text of the first sentence,
-                text of the second sentence(optional)
-                abel (optional)
+        data (list): List of input data in BertInputData type, each contains
+            three fields:
+                text_a: text of the first sentence,
+                text_b: text of the second sentence(optional)
+                label: label (optional)
         tokenizer (BertTokenizer): Tokenizer for splitting sentence into
             word pieces.
         label_map (dict): Dictionary for mapping token labels to integers.
         max_seq_length (int): Maximum length of the list of tokens. Lists
             longer than this are truncated and shorter ones are padded with
             zeros.
+        true_label_available (bool): Whether data labels are available.
         trailing_piece_tag (str): Tags used to label trailing word pieces.
             For example, "playing" is broken down into "play" and "##ing",
             "play" preserves its original label and "##ing" is labeled as "X".
 
     Returns:
-        list: List of features in InputTokenFeatures type, each contains four
-        fields:
-            list of token ids
-            attention mask: positions corresponding to actual tokens have
-                value 1 and those corresponding to padded tokens have value 0.
-            segment ids:  positions corresponding to the first sentence have
-                value 0 and those corresponding to the second sentence have
-                value 1. For token classification task, since there is only
-                one sentence, all values are 0.
-            label ids: numerical values representing token labels, generated
-                by mapping token labels to integers using label_map.
+        TensorDataset: A TensorDataset consisted of the following numerical
+            feature tensors:
+            1. token ids
+            2. attention mask
+            3. segment ids
+            4. label ids, if true_label_available is True
     """
 
     features = []
-    for (ex_index, example) in enumerate(examples):
+    for ex_index, example in enumerate(data):
 
         text_lower = example.text_a.lower()
         new_labels = []
@@ -112,37 +105,18 @@ def convert_examples_to_token_features(examples,
 
         label_ids = [label_map[label] for label in new_labels]
 
-        features.append(
-            InputTokenFeatures(input_ids=input_ids,
-                          input_mask=input_mask,
-                          segment_ids=segment_ids,
-                          label_id=label_ids))
-    return features
+        features.append((input_ids, input_mask, segment_ids, label_ids))
 
-
-def convert_features_to_tensors(features):
-    """
-    Helper function for converting sentence features to TensorDataset.
-
-    Args:
-        features (list): List of features in InputTokenFeatures type.
-
-    Returns:
-        TensorDataset: A TensorDataset consists of tensors of each field in
-            InputTokenFeatures. If the label_id field of InputTokenFeatures is
-            None, the TensorDataset only contains the tensors of input_ids,
-            input_mask, and segment_ids.
-    """
-    all_input_ids = torch.tensor([f.input_ids for f in features],
+    all_input_ids = torch.tensor([f[0] for f in features],
                                  dtype=torch.long)
-    all_input_mask = torch.tensor([f.input_mask for f in features],
+    all_input_mask = torch.tensor([f[1] for f in features],
                                   dtype=torch.long)
-    all_segment_ids = torch.tensor([f.segment_ids for f in features],
+    all_segment_ids = torch.tensor([f[2] for f in features],
                                    dtype=torch.long)
 
-    all_label_ids = torch.tensor([f.label_id for f in features],
-                                 dtype=torch.long)
-    if all(all(all_label_ids[0])):
+    if true_label_available:
+        all_label_ids = torch.tensor([f[3] for f in features],
+                                     dtype=torch.long)
         tensor_data = TensorDataset(all_input_ids, all_input_mask,
                                     all_segment_ids, all_label_ids)
     else:
@@ -252,15 +226,18 @@ class BertTokenClassifier:
 
         return optimizer
 
-    def fit(self, train_features):
+    def fit(self, train_dataset):
         """
         Fine-tunes the BERT classifier using the given training data.
 
         Args:
-            train_features (list): List of training features of
-                InputTokenFeatures type.
+            train_dataset (TensorDataset): TensorDataset consisted of the
+                following numerical feature tensors.
+                1. token ids
+                2. attention mask
+                3. segment ids
+                4. label ids
         """
-        train_dataset = convert_features_to_tensors(train_features)
         train_sampler = RandomSampler(train_dataset)
         train_dataloader = DataLoader(train_dataset, sampler=train_sampler,
                                       batch_size=self.batch_size)
@@ -270,7 +247,9 @@ class BertTokenClassifier:
         for _ in trange(int(self.num_train_epochs), desc="Epoch"):
             tr_loss = 0
             nb_tr_steps = 0
-            for step, batch in enumerate(tqdm(train_dataloader, desc="Iteration")):
+            for step, batch in enumerate(tqdm(train_dataloader,
+                                              desc="Iteration",
+                                              mininterval=30)):
                 batch = tuple(t.to(self.device) for t in batch)
                 input_ids, input_mask, segment_ids, label_ids = batch
 
@@ -302,20 +281,23 @@ class BertTokenClassifier:
 
         self._is_trained = True
 
-    def predict(self, test_features):
+    def predict(self, test_dataset):
         """
         Predict token labels on the testing data.
 
         Args:
-            test_features (list): List of test features of
-                InputTokenFeatures type.
+            test_dataset (TensorDataset): TensorDataset consisted of the
+                following numerical feature tensors.
+                1. token ids
+                2. attention mask
+                3. segment ids
+                4. label ids, optional
 
         Returns:
             tuple: The first element of the tuple is the predicted token
-                labels. If the testing features contain label ids, the second
+                labels. If the testing dataset contain label ids, the second
                 element of the tuple is the true token labels.
         """
-        test_dataset = convert_features_to_tensors(test_features)
         test_sampler = SequentialSampler(test_dataset)
         test_dataloader = DataLoader(test_dataset, sampler=test_sampler,
                                      batch_size=self.batch_size)
@@ -329,7 +311,9 @@ class BertTokenClassifier:
         true_labels = []
         eval_loss, eval_accuracy = 0, 0
         nb_eval_steps = 0
-        for batch in test_dataloader:
+        for step, batch in enumerate(tqdm(test_dataloader,
+                                          desc="Iteration",
+                                          mininterval=10)):
             batch = tuple(t.to(self.device) for t in batch)
             true_label_available = False
             if len(batch) == 3:
