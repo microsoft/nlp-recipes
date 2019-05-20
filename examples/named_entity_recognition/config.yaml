@@ -1,6 +1,6 @@
 TrainConfig:
   batch_size: 32
-  num_train_epochs: 3
+  num_train_epochs: 2
 
 ModelConfig:
   bert_model: "bert-base-uncased"
@@ -8,7 +8,7 @@ ModelConfig:
   do_lower_case: True
 
 OptimizerConfig:
-  optimizer_name: "BertAdam"
+  optimizer_name: "Adam"
   learning_rate: 0.00003
   no_decay_params:
     - "bias"
