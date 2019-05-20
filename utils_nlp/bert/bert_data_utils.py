@@ -3,53 +3,41 @@ https://github.com/huggingface/pytorch-pretrained-BERT/blob/master/examples/run_
 
 import pandas as pd
 import csv, sys, random
+from collections import namedtuple
 
 
-class InputExample(object):
-    """A single training/test example."""
+## Previous version of BERTInputData using class
+# class BERTInputData(object):
+#     """A single training/test example."""
+#
+#     def __init__(self, guid, text_a, text_b=None, label=None):
+#         """
+#         Constructs an InputExample object.
+#
+#         Args:
+#             guid (str): Unique id for the example.
+#             text_a (str): The untokenized text of the first sequence.
+#                 For single sequence tasks, only this sequence must be
+#                 specified.
+#             text_b (str, optional): The untokenized text of the second
+#                 sequence. Only must be specified for sequence pair tasks.
+#             label (str, optional): The label of the example. This should be
+#             specified for train and dev examples, but not for test examples.
+#         """
+#         self.text_a = text_a
+#         self.text_b = text_b
+#         self.label = label
 
-    def __init__(self, guid, text_a, text_b=None, label=None):
-        """
-        Constructs an InputExample object.
-
-        Args:
-            guid (str): Unique id for the example.
-            text_a (str): The untokenized text of the first sequence.
-                For single sequence tasks, only this sequence must be
-                specified.
-            text_b (str, optional): The untokenized text of the second
-                sequence. Only must be specified for sequence pair tasks.
-            label (str, optional): The label of the example. This should be
-            specified for train and dev examples, but not for test examples.
-        """
-        self.guid = guid
-        self.text_a = text_a
-        self.text_b = text_b
-        self.label = label
-
-
-class InputTokenFeatures(object):
-    """A single set of token features of data."""
-
-    def __init__(self, input_ids, input_mask, segment_ids, label_id=None):
-        """
-        Constructs an InputFeatures object.
-
-        Args:
-            input_ids (list): List of integer token ids.
-            input_mask (list): Attention mask. Positions corresponding to
-                actual tokens have value 1 and those corresponding to padded
-                tokens have value 0.
-            segment_ids (list):  positions corresponding to the first sentence
-                have value 0 and those corresponding to the second sentence
-                have value 1. For token classification task, since there is
-                only one sentence, all values are 0.
-            label_id (list): numerical values representing token labels.
-        """
-        self.input_ids = input_ids
-        self.input_mask = input_mask
-        self.segment_ids = segment_ids
-        self.label_id = label_id
+## New version of BERTInputData using namedtuple
+""" 
+A single BERT input data containing three fields:
+    1. text_a: text of the first sentence,
+    2. text_b: text of the second sentence, optional, required for 
+        two-sentence tasks. 
+    3. label: label, optional, required for training and validation data
+"""
+BertInputData = namedtuple('BertInputData', ['text_a', 'text_b', 'label'],
+                           defaults=[None, None])
 
 
 class DataProcessor(object):
@@ -118,7 +106,7 @@ class KaggleNERProcessor(DataProcessor):
         train_data = data.loc[
             data["Sentence #"].isin(self.train_sentence_nums)].copy()
 
-        return self._create_examples(train_data, "train")
+        return self._create_examples(train_data)
 
     def get_dev_examples(self):
         """
@@ -128,18 +116,22 @@ class KaggleNERProcessor(DataProcessor):
         dev_data = data.loc[
             data["Sentence #"].isin(self.dev_sentence_nums)].copy()
 
-        return self._create_examples(dev_data, "dev")
+        return self._create_examples(dev_data)
 
     def get_labels(self):
-        """Gets the list of labels for this dataset."""
+        """Gets a list of unique labels in this dataset.
+
+        Returns:
+            list: A list of unique labels in the dataset.
+        """
         return self.tag_vals
 
     def _read_data(self, data_dir):
         return pd.read_csv(data_dir, encoding="latin1").fillna(method="ffill")
 
-    def _create_examples(self, data, set_type):
+    def _create_examples(self, data):
         """
-        Converts input data into InputExample type.
+        Converts input data into BertInputData type.
         """
         agg_func = lambda s: [(w, p, t) for w, p, t in
                               zip(s["Word"].values.tolist(),
@@ -149,10 +141,9 @@ class KaggleNERProcessor(DataProcessor):
         sentences = [s for s in data_grouped]
         examples = []
         for (i, sent) in enumerate(sentences):
-            guid = "%s-%s" % (set_type, i)
             text_a = " ".join([s[0] for s in sent])
             label = [s[2] for s in sent]
             examples.append(
-                InputExample(guid=guid, text_a=text_a, text_b=None,
-                             label=label))
+                BertInputData(text_a=text_a, text_b=None, label=label))
+
         return examples
