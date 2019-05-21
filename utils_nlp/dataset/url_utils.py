@@ -3,6 +3,7 @@
 
 import os
 from urllib.request import urlretrieve
+import tarfile
 import logging
 from contextlib import contextmanager
 from tempfile import TemporaryDirectory
@@ -57,6 +58,21 @@ def maybe_download(
             raise IOError("Failed to verify {}".format(filepath))
 
     return filepath
+
+
+def extract_tar(file_path, extract_to="."):
+    """Extracts all contents of a tar archive file.
+    Args:
+        file_path (str): Path of file to extract.
+        extract_to (str, optional): Destination directory. Defaults to ".".
+    """
+    if not os.path.exists(file_path):
+        raise IOError("File doesn't exist")
+    if not os.path.exists(extract_to):
+        raise IOError("Destination directory doesn't exist")
+    tar = tarfile.open(file_path)
+    tar.extractall(path=extract_to)
+    tar.close()
 
 
 @contextmanager
