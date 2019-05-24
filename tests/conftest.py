@@ -8,6 +8,7 @@
 # automatically gets discovered by pytest."
 
 import pytest
+import os
 from tests.notebooks_common import path_notebooks
 
 
@@ -26,6 +27,11 @@ def notebooks():
         "stsbenchmark": os.path.join(
             folder_notebooks,"sentence_similarity", "01-prep-data", "stsbenchmark.ipynb"
         ),
-
+        "similarity_embeddings_baseline": os.path.join(
+            folder_notebooks,"sentence_similarity", "02-model-deep-dive", "baseline_deep_dive.ipynb"
+        ),
+        "embedding_trainer": os.path.join(
+            folder_notebooks,"embeddings", "embedding_trainer.ipynb"
+        ),
     }
     return paths

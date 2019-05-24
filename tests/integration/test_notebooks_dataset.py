@@ -14,7 +14,6 @@ def test_msrpc_runs(notebooks):
     pm.execute_notebook(
         notebook_path,
         OUTPUT_NOTEBOOK,
-        parameters=dict(PM_VERSION=pm.__version__),
         kernel_name=KERNEL_NAME,
     )
 
@@ -24,7 +23,6 @@ def test_snli_runs(notebooks):
     pm.execute_notebook(
         notebook_path,
         OUTPUT_NOTEBOOK,
-        parameters=dict(PM_VERSION=pm.__version__),
         kernel_name=KERNEL_NAME,
     )
 
@@ -34,6 +32,5 @@ def test_stsbenchmark_runs(notebooks):
     pm.execute_notebook(
         notebook_path,
         OUTPUT_NOTEBOOK,
-        parameters=dict(PM_VERSION=pm.__version__),
         kernel_name=KERNEL_NAME,
     )
