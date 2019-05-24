@@ -13,27 +13,19 @@ Unit tests ensure that each class or function behaves as it should. Every time a
 
 For executing the Python unit tests for the utilities:
 
-    pytest tests/unit -m "not notebooks and not spark and not gpu"
+    pytest tests/unit -m "not notebooks and not gpu"
 
 For executing the Python unit tests for the notebooks:
 
-    pytest tests/unit -m "notebooks and not spark and not gpu"
+    pytest tests/unit -m "notebooks and not gpu"
 
 For executing the Python GPU unit tests for the utilities:
 
-    pytest tests/unit -m "not notebooks and not spark and gpu"
+    pytest tests/unit -m "not notebooks and gpu"
 
 For executing the Python GPU unit tests for the notebooks:
 
-    pytest tests/unit -m "notebooks and not spark and gpu"
-
-For executing the PySpark unit tests for the utilities:
-
-    pytest tests/unit -m "not notebooks and spark and not gpu"
-
-For executing the PySpark unit tests for the notebooks:
-
-    pytest tests/unit -m "notebooks and spark and not gpu"
+    pytest tests/unit -m "notebooks and gpu"
 
 </details>
 
@@ -45,15 +37,11 @@ Smoke tests make sure that the system works and are executed just before the int
 
 For executing the Python smoke tests:
 
-    pytest tests/smoke -m "smoke and not spark and not gpu"
+    pytest tests/smoke -m "smoke and not gpu"
 
 For executing the Python GPU smoke tests:
 
-    pytest tests/smoke -m "smoke and not spark and gpu"
-
-For executing the PySpark smoke tests:
-
-    pytest tests/smoke -m "smoke and spark and not gpu"
+    pytest tests/smoke -m "smoke and gpu"
 
 </details>
 
@@ -64,15 +52,11 @@ Integration tests make sure that the program results are acceptable
 
 For executing the Python integration tests:
 
-    pytest tests/integration -m "integration and not spark and not gpu"
+    pytest tests/integration -m "integration and not gpu"
 
 For executing the Python GPU integration tests:
 
-    pytest tests/integration -m "integration and not spark and gpu"
-
-For executing the PySpark integration tests:
-
-    pytest tests/integration -m "integration and spark and not gpu"
+    pytest tests/integration -m "integration and gpu"
 
 </details>
 
