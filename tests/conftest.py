@@ -16,5 +16,16 @@ def notebooks():
     folder_notebooks = path_notebooks()
 
     # Path for the notebooks
-    paths = {}
+    paths = {
+        "msrpc": os.path.join(
+            folder_notebooks,"sentence_similarity", "01-prep-data", "msrpc.ipynb"
+        ),
+        "snli": os.path.join(
+            folder_notebooks,"sentence_similarity", "01-prep-data", "snli.ipynb"
+        ),
+        "stsbenchmark": os.path.join(
+            folder_notebooks,"sentence_similarity", "01-prep-data", "stsbenchmark.ipynb"
+        ),
+
+    }
     return paths
