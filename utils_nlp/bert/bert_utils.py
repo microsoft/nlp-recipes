@@ -1,143 +1,16 @@
 """This script reuses some code from
 https://github.com/huggingface/pytorch-pretrained-BERT/blob/master/examples
 /run_classifier.py"""
-from enum import Enum, auto
 
 import numpy as np
 from tqdm import tqdm, trange
 
 import torch
-from torch.utils.data import (
-    DataLoader,
-    RandomSampler,
-    SequentialSampler,
-    TensorDataset,
-)
-from torch.optim import Adam
 
 from pytorch_pretrained_bert.optimization import BertAdam
 from pytorch_pretrained_bert.modeling import BertForTokenClassification
 
-
-def get_device():
-    """
-    Helper function for detecting devices and number of GPUs.
-
-    Returns:
-        (str, int): tuple of device and number of GPUs
-    """
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    n_gpu = torch.cuda.device_count()
-
-    return device, n_gpu
-
-
-def create_token_feature_dataset(
-    data,
-    tokenizer,
-    label_map,
-    max_seq_length,
-    true_label_available,
-    trailing_piece_tag="X",
-):
-    """
-    Converts data from text to TensorDataset containing numerical features.
-
-    Args:
-        data (list): List of input data in BertInputData type, each contains
-            three fields:
-                text_a: text of the first sentence,
-                text_b: text of the second sentence(optional)
-                label: label (optional)
-        tokenizer (BertTokenizer): Tokenizer for splitting sentence into
-            word piece tokens.
-        label_map (dict): Dictionary for mapping token labels to integers.
-        max_seq_length (int): Maximum length of the list of tokens. Lists
-            longer than this are truncated and shorter ones are padded with
-            "O"s.
-        true_label_available (bool): Whether data labels are available.
-        trailing_piece_tag (str): Tags used to label trailing word pieces.
-            For example, "playing" is broken down into "play" and "##ing",
-            "play" preserves its original label and "##ing" is labeled as "X".
-
-    Returns:
-        TensorDataset: A TensorDataset consisted of the following numerical
-            feature tensors:
-            1. token ids: numerical values each corresponds to a token.
-            2. attention mask: 1 for input tokens and 0 for padded tokens,
-                so that padded tokens are not attended to.
-            3. segment ids: 0 for the first sentence and 1 for the second
-                sentence, only used in two sentence tasks.
-            4. label ids: numerical values each corresponds to a token
-                label, if true_label_available is True
-    """
-
-    features = []
-    for ex_index, example in enumerate(data):
-
-        text_lower = example.text_a.lower()
-        new_labels = []
-        tokens = []
-        for word, tag in zip(text_lower.split(), example.label):
-            sub_words = tokenizer.wordpiece_tokenizer.tokenize(word)
-            for count, sub_word in enumerate(sub_words):
-                if tag is not None and count > 0:
-                    tag = trailing_piece_tag
-                new_labels.append(tag)
-                tokens.append(sub_word)
-
-        if len(tokens) > max_seq_length:
-            tokens = tokens[:max_seq_length]
-            new_labels = new_labels[:max_seq_length]
-
-        segment_ids = [0] * len(tokens)
-
-        input_ids = tokenizer.convert_tokens_to_ids(tokens)
-
-        # The mask has 1 for real tokens and 0 for padding tokens. Only real
-        # tokens are attended to.
-        input_mask = [1.0] * len(input_ids)
-
-        # Zero-pad up to the sequence length.
-        padding = [0.0] * (max_seq_length - len(input_ids))
-        label_padding = ["O"] * (max_seq_length - len(input_ids))
-
-        input_ids += padding
-        input_mask += padding
-        segment_ids += padding
-        new_labels += label_padding
-
-        label_ids = [label_map[label] for label in new_labels]
-
-        features.append((input_ids, input_mask, segment_ids, label_ids))
-
-    all_input_ids = torch.tensor([f[0] for f in features], dtype=torch.long)
-    all_input_mask = torch.tensor([f[1] for f in features], dtype=torch.long)
-    all_segment_ids = torch.tensor([f[2] for f in features], dtype=torch.long)
-
-    if true_label_available:
-        all_label_ids = torch.tensor(
-            [f[3] for f in features], dtype=torch.long
-        )
-        tensor_data = TensorDataset(
-            all_input_ids, all_input_mask, all_segment_ids, all_label_ids
-        )
-    else:
-        tensor_data = TensorDataset(
-            all_input_ids, all_input_mask, all_segment_ids
-        )
-
-    return tensor_data
-
-
-class Language(Enum):
-    """An enumeration of the supported languages."""
-
-    ENGLISH = "bert-base-uncased"
-    CHINESE = "bert-base-chinese"
-    SPANISH = auto()
-    HINDI = auto()
-    FRENCH = auto()
+from common_ner import Language, create_data_loader, get_device
 
 
 class BertTokenClassifier:
@@ -145,153 +18,144 @@ class BertTokenClassifier:
 
     def __init__(
         self,
-        config,
-        label_map,
-        device,
-        n_gpu,
         language=Language.ENGLISH,
+        num_labels=2,
         cache_dir=".",
     ):
 
         """
-        Initializes the classifier and the underlying pre-trained model and
-        optimizer.
+        Initializes the classifier and the underlying pre-trained model.
 
         Args:
-            config (BERTFineTuneConfig): A configuration object contains
-                settings of model, training, and optimizer.
-            label_map (dict): Dictionary used to map token labels to
-                integers during data pre-processing. This is used to
-                convert token ids back to original token labels during
-                prediction.
-            device (str): "cuda" or "cpu". Can be obtained by calling
-                get_device.
-            n_gpu (int): Number of GPUs available.m,Can be obtained by calling
-                get_device.
             language (Language, optional): The pre-trained model's language.
+                The value of this argument determines which BERT model is
+                used:
+                    Language.ENGLISH: "bert-base-uncased"
+                    Language.ENGLISHCASED: "bert-base-cased"
+                    Language.ENGLISHLARGE: "bert-large-uncased"
+                    Language.ENGLISHLARGECASED: "bert-large-cased"
+                    Language.CHINESE: "bert-base-chinese"
+                    Language.MULTILINGUAL: "bert-base-multilingual-cased"
                 Defaults to Language.ENGLISH.
+            num_labels (int, optional): The number of unique labels in the
+                data. Defaults to 2.
             cache_dir (str, optional): Location of BERT's cache directory.
                 Defaults to ".".
         """
 
-        print("BERT fine tune configurations:")
-        print(config)
+        if num_labels < 2:
+            raise Exception("Number of labels should be at least 2.")
 
         self.language = language
-        self.device = device
-        self.n_gpu = n_gpu
-        self.num_labels = len(label_map)
+        self.num_labels = num_labels
         self.cache_dir = cache_dir
-        self.label_map = label_map
 
-        self.bert_model = config.bert_model
-
-        self.optimizer_name = config.optimizer_name
-        self.no_decay_params = config.no_decay_params
-        self.params_weight_decay = config.params_weight_decay
-        self.learning_rate = config.learning_rate
-        self.clip_gradient = config.clip_gradient
-        self.max_gradient_norm = config.max_gradient_norm
-
-        self.num_train_epochs = config.num_train_epochs
-        self.batch_size = config.batch_size
-
-        # This step needs to be done before creating optimizer
-        self.model = self._load_model()
-        self.optimizer = self._get_optimizer()
-
-        self._is_trained = False
-
-    def _load_model(self):
-        """Loads the pre-trained BERT model."""
-        model = BertForTokenClassification.from_pretrained(
-            self.bert_model,
-            cache_dir=self.cache_dir,
-            num_labels=self.num_labels,
+        self._model = BertForTokenClassification.from_pretrained(
+            language.value,
+            cache_dir=cache_dir,
+            num_labels=num_labels,
         )
 
-        model.to(self.device)
+    @property
+    def model(self):
+        return self._model
 
-        if self.n_gpu > 1:
-            model = torch.nn.DataParallel(model)
-
-        return model
-
-    def _get_optimizer(self):
+    def _get_optimizer(self, learning_rate):
         """
         Initializes the optimizer and configure parameters to apply weight
         decay on.
         """
         param_optimizer = list(self.model.named_parameters())
+        no_decay_params = ["bias", "LayerNorm.bias", "LayerNorm.weight"]
+        params_weight_decay = 0.01
         optimizer_grouped_parameters = [
             {
                 "params": [
                     p
                     for n, p in param_optimizer
-                    if not any(nd in n for nd in self.no_decay_params)
+                    if not any(nd in n for nd in no_decay_params)
                 ],
-                "weight_decay": self.params_weight_decay,
+                "weight_decay": params_weight_decay,
             },
             {
                 "params": [
                     p
                     for n, p in param_optimizer
-                    if any(nd in n for nd in self.no_decay_params)
+                    if any(nd in n for nd in no_decay_params)
                 ],
                 "weight_decay": 0.0,
             },
         ]
 
-        if self.optimizer_name == "BertAdam":
-            optimizer = BertAdam(
-                optimizer_grouped_parameters, lr=self.learning_rate
-            )
-        elif self.optimizer_name == "Adam":
-            optimizer = Adam(
-                optimizer_grouped_parameters, lr=self.learning_rate
-            )
+        optimizer = BertAdam(
+            optimizer_grouped_parameters, lr=learning_rate
+        )
 
         return optimizer
 
-    def fit(self, train_dataset):
+    def fit(self, token_ids, input_mask, labels,
+            device="gpu", use_multiple_gpus=True,
+            num_epochs=2, batch_size=32, learning_rate=5e-5,
+            clip_gradient=False,
+            max_gradient_norm=1.0):
         """
         Fine-tunes the BERT classifier using the given training data.
 
         Args:
-            train_dataset (TensorDataset): TensorDataset consisted of the
-                following numerical feature tensors.
-                1. token ids: numerical values each corresponds to a token.
-                2. attention mask: 1 for input tokens and 0 for padded tokens,
-                    so that padded tokens are not attended to.
-                3. segment ids: 0 for the first sentence and 1 for the second
-                    sentence, only used in two sentence tasks.
-                4. label ids: numerical values each corresponds to a token
-                    label
+            token_ids (list): List of lists. Each sublist contains
+                numerical token ids corresponding tokens in the input text
+                data.
+            input_mask (list): List of lists. Each sublist contains attention
+                masks of the input token id lists. 1 for input tokens and 0
+                for padded tokens, so that padded tokens are not attended to.
+            labels (list): List of lists, each sublist contains numerical
+                token labels of a input sentence/paragraph.
+            device (str, optional): Device used for training, "cpu" or
+                "gpu". Default value is "gpu".
+            use_multiple_gpus (bool, optional): Whether to use multiple GPUs
+                if available. Default value is True.
+            num_epochs (int, optional): Number of training epochs.
+                Defaults to 1.
+            batch_size (int, optional): Training batch size. Defaults to 32.
+            learning_rate (float, optional): learning rate of the BertAdam
+                optimizer.
+            clip_gradient (bool, optional): Whether to perform gradient
+                clipping. Default value is False.
+            max_gradient_norm (float, optional): Maximum gradient norm to
+                apply gradient clipping on. Default value is 1.0.
         """
-        train_sampler = RandomSampler(train_dataset)
-        train_dataloader = DataLoader(
-            train_dataset, sampler=train_sampler, batch_size=self.batch_size
-        )
+        train_dataloader = create_data_loader(input_ids=token_ids,
+                                              input_mask=input_mask,
+                                              label_ids=labels,
+                                              sample_method='random',
+                                              batch_size=batch_size)
 
-        global_step = 0
+        device = get_device(device)
+        self.model.to(device)
+
+        n_gpus = torch.cuda.device_count()
+        if use_multiple_gpus and n_gpus > 1:
+            self._model = torch.nn.DataParallel(self.model)
+
+        optimizer = self._get_optimizer(learning_rate=learning_rate)
+
         self.model.train()
-        for _ in trange(int(self.num_train_epochs), desc="Epoch"):
+        for _ in trange(int(num_epochs), desc="Epoch"):
             tr_loss = 0
             nb_tr_steps = 0
             for step, batch in enumerate(
                 tqdm(train_dataloader, desc="Iteration", mininterval=30)
             ):
-                batch = tuple(t.to(self.device) for t in batch)
-                input_ids, input_mask, segment_ids, label_ids = batch
+                batch = tuple(t.to(device) for t in batch)
+                b_token_ids, b_input_mask, b_label_ids = batch
 
                 loss = self.model(
-                    input_ids=input_ids,
-                    token_type_ids=segment_ids,
-                    attention_mask=input_mask,
-                    labels=label_ids,
+                    input_ids=b_token_ids,
+                    attention_mask=b_input_mask,
+                    labels=b_label_ids,
                 )
 
-                if self.n_gpu > 1:
+                if n_gpus > 1:
                     # mean() to average on multi-gpu.
                     loss = loss.mean()
 
@@ -300,51 +164,51 @@ class BertTokenClassifier:
                 tr_loss += loss.item()
                 nb_tr_steps += 1
 
-                if self.clip_gradient:
+                ## TODO: compare with and without clip gradient
+                if clip_gradient:
                     torch.nn.utils.clip_grad_norm_(
                         parameters=self.model.parameters(),
-                        max_norm=self.max_gradient_norm,
+                        max_norm=max_gradient_norm,
                     )
 
-                self.optimizer.step()
-                self.optimizer.zero_grad()
-                global_step += 1
+                optimizer.step()
+                optimizer.zero_grad()
 
             train_loss = tr_loss / nb_tr_steps
             print("Train loss: {}".format(train_loss))
 
-        self._is_trained = True
-
-    def predict(self, test_dataset):
+    def predict(self, token_ids, input_mask,
+                labels=None, batch_size=32,
+                device="gpu"):
         """
         Predict token labels on the testing data.
 
         Args:
-            test_dataset (TensorDataset): TensorDataset consisted of the
-                following numerical feature tensors.
-                1. token ids: numerical values each corresponds to a token.
-                2. attention mask: 1 for input tokens and 0 for padded tokens,
-                    so that padded tokens are not attended to.
-                3. segment ids: 0 for the first sentence and 1 for the second
-                    sentence, only used in two sentence tasks.
-                4. label ids: numerical values each corresponds to a token
-                    label, optional
+            token_ids (list): List of lists. Each sublist contains
+                numerical token ids corresponding tokens in the input text
+                data.
+            input_mask (list): List of lists. Each sublist contains attention
+                masks of the input token id lists. 1 for input tokens and 0
+                for padded tokens, so that padded tokens are not attended to.
+            labels (list, optional): List of lists, each sublist contains
+                numerical token labels of a input sentence/paragraph.
+                If provided, it's used to compute the evaluation loss.
+                Default value is None.
+            batch_size (int, optional): Training batch size. Defaults to 32.
+            device (str, optional): Device used for training, "cpu" or
+                "gpu". Default value is "gpu".
 
         Returns:
-            tuple: The first element of the tuple is the predicted token
-                labels. If the testing dataset contains label ids, the second
-                element of the tuple is the true token labels, otherwise
-                it's None.
+            list: List of lists of predicted token labels.
         """
-        test_sampler = SequentialSampler(test_dataset)
-        test_dataloader = DataLoader(
-            test_dataset, sampler=test_sampler, batch_size=self.batch_size
-        )
+        test_dataloader = create_data_loader(input_ids=token_ids,
+                                             input_mask=input_mask,
+                                             label_ids=labels,
+                                             batch_size=batch_size,
+                                             sample_method="sequential")
 
-        if not self._is_trained:
-            raise Exception(
-                "Model is not trained. Please train model before " "predict."
-            )
+        device = get_device(device)
+        self.model.to(device)
 
         self.model.eval()
         predictions = []
@@ -354,25 +218,23 @@ class BertTokenClassifier:
         for step, batch in enumerate(
             tqdm(test_dataloader, desc="Iteration", mininterval=10)
         ):
-            batch = tuple(t.to(self.device) for t in batch)
+            batch = tuple(t.to(device) for t in batch)
             true_label_available = False
-            if len(batch) == 3:
-                b_input_ids, b_input_mask, b_segment_ids = batch
-            elif len(batch) == 4:
-                b_input_ids, b_input_mask, b_segment_ids, b_labels = batch
+            if labels:
+                b_input_ids, b_input_mask, b_labels = batch
                 true_label_available = True
+            else:
+                b_input_ids, b_input_mask = batch
 
             with torch.no_grad():
                 if true_label_available:
                     tmp_eval_loss = self.model(
                         b_input_ids,
-                        token_type_ids=b_segment_ids,
                         attention_mask=b_input_mask,
                         labels=b_labels,
                     )
                 logits = self.model(
                     b_input_ids,
-                    token_type_ids=b_segment_ids,
                     attention_mask=b_input_mask,
                 )
 
@@ -387,20 +249,42 @@ class BertTokenClassifier:
             nb_eval_steps += 1
 
         validation_loss = eval_loss / nb_eval_steps
-        print("Validation loss: {}".format(validation_loss))
+        print("Evaluation loss: {}".format(validation_loss))
 
-        reversed_label_map = {v: k for k, v in self.label_map.items()}
-        pred_tags = [
-            [reversed_label_map[p_i] for p_i in p] for p in predictions
+        return predictions
+
+
+def postprocess_token_labels(labels, input_mask, label_map=None):
+    """
+    Removes predictions on padded tokens and maps predicted numerical labels
+    back to original labels if label_map is provided.
+
+    Args:
+        labels (list): List of lists of predicted token labels.
+        input_mask (list): List of lists. Each sublist contains attention
+            masks of the input token id lists. 1 for input tokens and 0
+            for padded tokens.
+        label_map (dict, optional): A dictionary mapping original labels
+            (which may be string type) to numerical label ids. If
+            provided, it's used to map predicted numerical labels back to
+            original labels. Default value is None.
+    """
+    if label_map:
+        reversed_label_map = {v: k for k, v in label_map.items()}
+        labels_org = [
+            [reversed_label_map[l_i] for l_i in l]
+            for l in labels
         ]
 
-        if true_label_available:
-            valid_tags = [
-                [reversed_label_map[l_ii] for l_ii in l_i]
-                for l in true_labels
-                for l_i in l
-            ]
+    else:
+        labels_org = labels
 
-            return pred_tags, valid_tags
-        else:
-            return (pred_tags,)
+    labels_org_no_padding = []
+    for l, m in zip(labels_org, input_mask):
+        l_np = np.array(l)
+        m_np = np.array(m)
+        l_no_padding = list(l_np[np.where(m_np == 1)])
+
+        labels_org_no_padding.append(l_no_padding)
+
+    return labels_org_no_padding

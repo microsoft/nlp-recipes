@@ -6,42 +6,6 @@ import pandas as pd
 import csv
 import sys
 import random
-from collections import namedtuple
-
-
-## Previous version of BERTInputData using class
-# class BERTInputData(object):
-#     """A single training/test example."""
-#
-#     def __init__(self, guid, text_a, text_b=None, label=None):
-#         """
-#         Constructs an InputExample object.
-#
-#         Args:
-#             guid (str): Unique id for the example.
-#             text_a (str): The untokenized text of the first sequence.
-#                 For single sequence tasks, only this sequence must be
-#                 specified.
-#             text_b (str, optional): The untokenized text of the second
-#                 sequence. Only must be specified for sequence pair tasks.
-#             label (str, optional): The label of the example. This should be
-#             specified for train and dev examples, but not for test examples.
-#         """
-#         self.text_a = text_a
-#         self.text_b = text_b
-#         self.label = label
-
-## New version of BERTInputData using namedtuple
-"""
-A single BERT input data containing three fields:
-    1. text_a: text of the first sentence,
-    2. text_b: text of the second sentence, optional, required for
-        two-sentence tasks.
-    3. label: label, optional, required for training and validation data
-"""
-BertInputData = namedtuple(
-    "BertInputData", ["text_a", "text_b", "label"], defaults=[None, None]
-)
 
 
 class DataProcessor(object):
@@ -138,7 +102,7 @@ class KaggleNERProcessor(DataProcessor):
 
     def _create_examples(self, data):
         """
-        Converts input data into BertInputData type.
+        Converts input data into sentences and labels
         """
         agg_func = lambda s: [
             (w, p, t)
@@ -150,12 +114,13 @@ class KaggleNERProcessor(DataProcessor):
         ]
         data_grouped = data.groupby("Sentence #").apply(agg_func)
         sentences = [s for s in data_grouped]
-        examples = []
+        text_all = []
+        labels_all = []
         for (i, sent) in enumerate(sentences):
             text_a = " ".join([s[0] for s in sent])
             label = [s[2] for s in sent]
-            examples.append(
-                BertInputData(text_a=text_a, text_b=None, label=label)
-            )
 
-        return examples
+            text_all.append(text_a)
+            labels_all.append(label)
+
+        return text_all, labels_all
