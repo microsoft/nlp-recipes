@@ -19,16 +19,16 @@ def notebooks():
     # Path for the notebooks
     paths = {
         "msrpc": os.path.join(
-            folder_notebooks,"sentence_similarity", "01-prep-data", "msrpc.ipynb"
+            folder_notebooks,"data_prep", "msrpc.ipynb"
         ),
         "snli": os.path.join(
-            folder_notebooks,"sentence_similarity", "01-prep-data", "snli.ipynb"
+            folder_notebooks,"data_prep", "snli.ipynb"
         ),
         "stsbenchmark": os.path.join(
-            folder_notebooks,"sentence_similarity", "01-prep-data", "stsbenchmark.ipynb"
+            folder_notebooks,"data_prep",  "stsbenchmark.ipynb"
         ),
         "similarity_embeddings_baseline": os.path.join(
-            folder_notebooks,"sentence_similarity", "02-model-deep-dive", "baseline_deep_dive.ipynb"
+            folder_notebooks,"sentence_similarity", "baseline_deep_dive.ipynb"
         ),
         "embedding_trainer": os.path.join(
             folder_notebooks,"embeddings", "embedding_trainer.ipynb"
