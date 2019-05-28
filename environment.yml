@@ -19,6 +19,7 @@ dependencies:
 - jupyter>=1.0.0
 - pytest>=3.6.4
 - cudatoolkit>=10.0
+- pandas
 - pip:
   - black>=18.6b4
   - papermill>=0.15.0
