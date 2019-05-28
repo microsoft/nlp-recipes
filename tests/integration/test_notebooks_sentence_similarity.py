@@ -7,7 +7,7 @@ import papermill as pm
 from tests.notebooks_common import OUTPUT_NOTEBOOK, KERNEL_NAME
 
 
-ABS_TOL = 0.01
+ABS_TOL = 0.1
 
 
 @pytest.fixture(scope="module")
