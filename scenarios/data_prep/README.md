@@ -11,7 +11,7 @@
 	<tbody>
 		<tr>
 			<td>
-				<a href="snli.ipynb">SNLI</a>
+				<a href="https://nlp.stanford.edu/projects/snli/">SNLI</a>
 			</td>
 			<td>
 				<a href="snli.ipynb">snli.ipynb</a>
@@ -34,7 +34,7 @@
 				<a href="https://www.microsoft.com/en-us/download/details.aspx?id=52398">MSR Paraphrase Corpus</a>
 			</td>
 			<td>
-				<a href="msrpc_load.ipynb">msrpc_load.ipynb</a>
+				<a href="msrpc.ipynb">msrpc_load.ipynb</a>
 			</td>
 			<td>Download and clean the MSR Paraphrase corpus.</td>
 		</tr>
