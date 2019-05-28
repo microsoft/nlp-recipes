@@ -68,20 +68,19 @@ class GenSenClassifier:
         json_object = json.load(open(config_file, "r", encoding="utf-8"))
         return json_object
 
-    def fit(self, train_df, dev_df):
+    def fit(self, train_df, dev_df, test_df):
 
         """ Method to train the Gensen model.
 
         Args:
             train_df: A dataframe containing tokenized sentences from the training set.
             dev_df: A dataframe containing tokenized sentences from the validation set.
-
+            test_df: A dataframe containing tokenized sentences from the test set.
         """
 
         self._validate_params()
         config = self._read_config(self.config_file)
-        self.cache_dir = self._get_gensen_tokens(train_df, dev_df)
-        print(self.cache_dir)
+        self.cache_dir = self._get_gensen_tokens(train_df, dev_df, test_df)
         train.train(
             data_folder=self.cache_dir,
             config=config,
