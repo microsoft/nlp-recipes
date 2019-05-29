@@ -1,9 +1,15 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 import json
+import os
 
-from models.gensen.localcode import train
-from utils_nlp.model.gensen_utils import gensen_preprocess
+from utils_nlp.model.gensen import train
+from utils_nlp.model.gensen.gensen import GenSenSingle
+from utils_nlp.model.gensen.gensen_utils import gensen_preprocess
+from utils_nlp.model.gensen.create_gensen_model import (
+    create_multiseq2seq_model,
+)
+from sklearn.metrics.pairwise import cosine_similarity
 
 
 class GenSenClassifier:
@@ -18,23 +24,34 @@ class GenSenClassifier:
 
     """
 
-    def __init__(self, config_file, learning_rate=0.0001, cache_dir="."):
+    def __init__(
+        self,
+        config_file,
+        pretrained_embedding_path,
+        learning_rate=0.0001,
+        cache_dir=".",
+    ):
         self.learning_rate = learning_rate
         self.config_file = config_file
         self.cache_dir = cache_dir
+        self.pretrained_embedding_path = pretrained_embedding_path
+        self.model_name = "gensen_multiseq2seq"
 
     def _validate_params(self):
         """Validate input params."""
 
         if not isinstance(self.learning_rate, float) or (
-                self.learning_rate <= 0.0
+            self.learning_rate <= 0.0
         ):
             raise ValueError(
                 "Learning rate must be of type float and greater than 0"
             )
 
+        assert os.path.isfile(self.pretrained_embedding_path)
+
         try:
             f = open(self.config_file)
+            self.config = self._read_config(self.config_file)
             f.close()
         except FileNotFoundError:
             print("Provided config file does not exist!")
@@ -68,6 +85,19 @@ class GenSenClassifier:
         json_object = json.load(open(config_file, "r", encoding="utf-8"))
         return json_object
 
+    def _create_multiseq2seq_model(self):
+        """ Method that creates a GenSen model from a MultiSeq2Seq model."""
+
+        create_multiseq2seq_model(
+            save_folder=os.path.join(
+                self.cache_dir, self.config["data"]["save_dir"]
+            ),
+            save_name=self.model_name,
+            trained_model_folder=os.path.join(
+                self.cache_dir, self.config["data"]["save_dir"]
+            ),
+        )
+
     def fit(self, train_df, dev_df, test_df):
 
         """ Method to train the Gensen model.
@@ -79,21 +109,46 @@ class GenSenClassifier:
         """
 
         self._validate_params()
-        config = self._read_config(self.config_file)
         self.cache_dir = self._get_gensen_tokens(train_df, dev_df, test_df)
+
         train.train(
             data_folder=self.cache_dir,
-            config=config,
+            config=self.config,
             learning_rate=self.learning_rate,
         )
 
-    def predict(self, test_df):
+        self._create_multiseq2seq_model()
+
+    def predict(self, sentences):
 
         """
 
         Method to predict the model on the test dataset. This uses SentEval utils.
-        Returns: None
+
+        Args:
+            sentences(list) : List of sentences.
+
+        Returns(array): A pairwise cosine similarity for the sentences provided based
+        on their gensen vector representations.
 
         """
 
-        pass
+        self._validate_params()
+
+        # Use only if you have the model trained and saved.
+        # self.cache_dir = os.path.join(self.cache_dir, "clean/snli_1.0")
+        self._create_multiseq2seq_model()
+
+        gensen_model = GenSenSingle(
+            model_folder=os.path.join(
+                self.cache_dir, self.config["data"]["save_dir"]
+            ),
+            filename_prefix=self.model_name,
+            pretrained_emb=self.pretrained_embedding_path,
+        )
+
+        reps_h, reps_h_t = gensen_model.get_representation(
+            sentences, pool="last", return_numpy=True
+        )
+
+        return cosine_similarity(reps_h_t)

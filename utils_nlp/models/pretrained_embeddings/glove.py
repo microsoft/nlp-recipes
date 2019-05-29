@@ -77,6 +77,20 @@ def _maybe_download_and_extract(dest_path, file_name):
     return file_path
 
 
+def download_and_extract(dir_path, file_name="glove.840B.300d.txt"):
+    """ Downloads and extracts gloVe vectors if they don’t already exist
+
+    Args:
+        dir_path(str): Final path where the vectors will be extracted.
+        file_name(str): File name of the gloVe vector file.
+
+    Returns:
+        str: File path to the gloVe vector file.
+    """
+
+    return _maybe_download_and_extract(dir_path, file_name)
+
+
 def load_pretrained_vectors(
     dir_path, file_name="glove.840B.300d.txt", limit=None
 ):
@@ -97,7 +111,7 @@ def load_pretrained_vectors(
     tmp_file = get_tmpfile("test_word2vec.txt")
 
     # Convert GloVe format to word2vec
-    _ = glove2word2vec(file_path, tmp_file) 
+    _ = glove2word2vec(file_path, tmp_file)
 
     model = KeyedVectors.load_word2vec_format(tmp_file, limit=limit)
     os.remove(tmp_file)

@@ -3,13 +3,13 @@
     "optimizer": "adam",
     "clip_c": 1,
     "lrate": 0.0001,
-    "batch_size": 16,
+    "batch_size": 48,
     "n_gpus": 1
   },
   "management": {
     "monitor_loss": 9600,
     "print_samples": 12800,
-    "checkpoint_freq": 640000,
+    "checkpoint_freq": 480000,
     "eval_freq": 4800000
   },
   "data": {"paths": [
@@ -18,15 +18,15 @@
             "train_trg": "snli_1.0_train.txt.s2.tok",
             "val_src": "snli_1.0_dev.txt.s1.tok",
             "val_trg": "snli_1.0_dev.txt.s2.tok",
-            "taskname": "sent-sim"
+            "taskname": "snli"
         }
     ],
         "max_src_length": 90,
         "max_trg_length": 90,
         "task": "multi-seq2seq-nli",
-        "save_dir": "model/gensen",
+        "save_dir": "model",
         "load_dir": "auto",
-        "nli_train": "snli_1.0_dev.txt.clean.noblank",
+        "nli_train": "snli_1.0_train.txt.clean.noblank",
         "nli_dev": "snli_1.0_dev.txt.clean.noblank",
         "nli_test": "snli_1.0_test.txt.clean.noblank"
 	},
