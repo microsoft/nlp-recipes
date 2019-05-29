@@ -1,1 +1,0 @@
-BERT_MAX_LEN = 512
