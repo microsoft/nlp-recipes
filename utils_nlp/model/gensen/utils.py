@@ -1,18 +1,19 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """Minibatching utilities."""
-import operator
-import numpy as np
-import torch
-from torch.autograd import Variable
-from sklearn.utils import shuffle
 import itertools
+import operator
 import os
 import pickle
+
+import numpy as np
+import torch
+from azureml.core.run import Run
+from sklearn.utils import shuffle
+from torch.autograd import Variable
+
 # Change to python3+.
 # from itertools import zip
-
-from azureml.core.run import Run
 # get the Azure ML run object
 run = Run.get_context()
 
@@ -193,6 +194,7 @@ class BufferedDataIterator(DataIterator):
             )
 
         # Check if a cached vocab file exists.
+        print(os.path.join(self.save_dir, 'src_vocab.pkl'))
         if os.path.exists(os.path.join(self.save_dir, 'src_vocab.pkl')):
             print('Found existing vocab file. Reloading ...')
             vocab = pickle.load(open(

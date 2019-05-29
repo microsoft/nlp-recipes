@@ -267,7 +267,7 @@ class MultitaskModel(nn.Module):
             h_t = h_t.unsqueeze(0)
             h_t = self.enc_drp(h_t)
 
-            # print("INSIDE FORWARD:", h_t.shape)
+            print("INSIDE FORWARD:", h_t.shape)
             # Debug with squeeze on error.
             trg_h, _ = self.decoders[task_idx](
                 trg_emb, h_t.view(-1, self.trg_hidden_dim), h_t.view(-1, self.trg_hidden_dim)
