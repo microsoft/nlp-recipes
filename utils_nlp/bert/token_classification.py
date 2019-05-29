@@ -6,22 +6,23 @@ import numpy as np
 from tqdm import tqdm, trange
 
 import torch
+import torch.nn as nn
 
 from pytorch_pretrained_bert.optimization import BertAdam
 from pytorch_pretrained_bert.modeling import BertForTokenClassification
 
-from common_ner import Language, create_data_loader, get_device
+from common_ner import (
+    Language,
+    create_data_loader,
+    get_device,
+    parallelize_model,
+)
 
 
 class BertTokenClassifier:
     """BERT-based token classifier."""
 
-    def __init__(
-        self,
-        language=Language.ENGLISH,
-        num_labels=2,
-        cache_dir=".",
-    ):
+    def __init__(self, language=Language.ENGLISH, num_labels=2, cache_dir="."):
 
         """
         Initializes the classifier and the underlying pre-trained model.
@@ -51,9 +52,7 @@ class BertTokenClassifier:
         self.cache_dir = cache_dir
 
         self._model = BertForTokenClassification.from_pretrained(
-            language.value,
-            cache_dir=cache_dir,
-            num_labels=num_labels,
+            language.value, cache_dir=cache_dir, num_labels=num_labels
         )
 
     @property
@@ -87,55 +86,71 @@ class BertTokenClassifier:
             },
         ]
 
-        optimizer = BertAdam(
-            optimizer_grouped_parameters, lr=learning_rate
-        )
+        optimizer = BertAdam(optimizer_grouped_parameters, lr=learning_rate)
 
         return optimizer
 
-    def fit(self, token_ids, input_mask, labels,
-            device="gpu", use_multiple_gpus=True,
-            num_epochs=2, batch_size=32, learning_rate=5e-5,
-            clip_gradient=False,
-            max_gradient_norm=1.0):
+    def fit(
+        self,
+        token_ids,
+        input_mask,
+        labels,
+        use_gpu=True,
+        num_gpus=None,
+        num_epochs=1,
+        batch_size=32,
+        learning_rate=2e-5,
+        clip_gradient=False,
+        max_gradient_norm=1.0,
+    ):
         """
         Fine-tunes the BERT classifier using the given training data.
 
         Args:
             token_ids (list): List of lists. Each sublist contains
-                numerical token ids corresponding tokens in the input text
-                data.
-            input_mask (list): List of lists. Each sublist contains attention
-                masks of the input token id lists. 1 for input tokens and 0
-                for padded tokens, so that padded tokens are not attended to.
+                numerical token ids corresponding to the tokens in the input
+                text data.
+            input_mask (list): List of lists. Each sublist contains
+                the attention mask of the input token id list. 1 for input
+                tokens and 0 for padded tokens, so that padded tokens are
+                not attended to.
             labels (list): List of lists, each sublist contains numerical
-                token labels of a input sentence/paragraph.
-            device (str, optional): Device used for training, "cpu" or
-                "gpu". Default value is "gpu".
-            use_multiple_gpus (bool, optional): Whether to use multiple GPUs
-                if available. Default value is True.
+                token labels of an input sentence/paragraph.
+            use_gpu (bool, optional): Whether to use GPU. Default value is
+                True.
+            num_gpus (int, optional): The number of gpus to use.
+                If None is specified, all available GPUs will be used.
+                Defaults to None.
             num_epochs (int, optional): Number of training epochs.
                 Defaults to 1.
             batch_size (int, optional): Training batch size. Defaults to 32.
             learning_rate (float, optional): learning rate of the BertAdam
-                optimizer.
+                optimizer. Defaults to 5e-5.
             clip_gradient (bool, optional): Whether to perform gradient
                 clipping. Default value is False.
             max_gradient_norm (float, optional): Maximum gradient norm to
                 apply gradient clipping on. Default value is 1.0.
         """
-        train_dataloader = create_data_loader(input_ids=token_ids,
-                                              input_mask=input_mask,
-                                              label_ids=labels,
-                                              sample_method='random',
-                                              batch_size=batch_size)
+        train_dataloader = create_data_loader(
+            input_ids=token_ids,
+            input_mask=input_mask,
+            label_ids=labels,
+            sample_method="random",
+            batch_size=batch_size,
+        )
 
-        device = get_device(device)
+        device, num_gpus_used = get_device(
+            "gpu" if use_gpu else "cpu", num_gpus
+        )
         self.model.to(device)
 
-        n_gpus = torch.cuda.device_count()
-        if use_multiple_gpus and n_gpus > 1:
-            self._model = torch.nn.DataParallel(self.model)
+        if use_gpu:
+            parallelize_model(self.model, num_gpus_used)
+        else:
+            # unwrap module in case it was wrapped with DataParalle in
+            # previous calls
+            if isinstance(self._model, nn.DataParallel):
+                self._model = self.model.module
 
         optimizer = self._get_optimizer(learning_rate=learning_rate)
 
@@ -155,10 +170,10 @@ class BertTokenClassifier:
                     labels=b_label_ids,
                 )
 
-                if n_gpus > 1:
+                if num_gpus_used > 1:
                     # mean() to average on multi-gpu.
                     loss = loss.mean()
-
+                # Accumulate parameter gradients
                 loss.backward()
 
                 tr_loss += loss.item()
@@ -170,49 +185,57 @@ class BertTokenClassifier:
                         parameters=self.model.parameters(),
                         max_norm=max_gradient_norm,
                     )
-
+                # Update paramters based on the current gradient
                 optimizer.step()
+                # Reset parameter gradients to zero
                 optimizer.zero_grad()
 
             train_loss = tr_loss / nb_tr_steps
             print("Train loss: {}".format(train_loss))
 
-    def predict(self, token_ids, input_mask,
-                labels=None, batch_size=32,
-                device="gpu"):
+    def predict(
+        self, token_ids, input_mask, labels=None, batch_size=32, use_gpu=True
+    ):
         """
         Predict token labels on the testing data.
 
         Args:
             token_ids (list): List of lists. Each sublist contains
-                numerical token ids corresponding tokens in the input text
-                data.
-            input_mask (list): List of lists. Each sublist contains attention
-                masks of the input token id lists. 1 for input tokens and 0
-                for padded tokens, so that padded tokens are not attended to.
+                numerical token ids corresponding to the tokens in the input
+                text data.
+            input_mask (list): List of lists. Each sublist contains
+                the attention mask of the input token list, 1 for input
+                tokens and 0 for padded tokens, so that padded tokens are
+                not attended to.
             labels (list, optional): List of lists, each sublist contains
-                numerical token labels of a input sentence/paragraph.
+                numerical token labels of an input sentence/paragraph.
                 If provided, it's used to compute the evaluation loss.
                 Default value is None.
             batch_size (int, optional): Training batch size. Defaults to 32.
-            device (str, optional): Device used for training, "cpu" or
-                "gpu". Default value is "gpu".
+            use_gpu (bool, optional): Whether to use GPU. Default value is
+                True.
 
         Returns:
             list: List of lists of predicted token labels.
         """
-        test_dataloader = create_data_loader(input_ids=token_ids,
-                                             input_mask=input_mask,
-                                             label_ids=labels,
-                                             batch_size=batch_size,
-                                             sample_method="sequential")
+        test_dataloader = create_data_loader(
+            input_ids=token_ids,
+            input_mask=input_mask,
+            label_ids=labels,
+            batch_size=batch_size,
+            sample_method="sequential",
+        )
+        if use_gpu:
+            device, _ = get_device("gpu")
+        else:
+            device, _ = get_device("cpu")
+            if isinstance(self.model, nn.DataParallel):
+                self._model = self.model.module
 
-        device = get_device(device)
         self.model.to(device)
 
         self.model.eval()
         predictions = []
-        true_labels = []
         eval_loss = 0
         nb_eval_steps = 0
         for step, batch in enumerate(
@@ -227,64 +250,92 @@ class BertTokenClassifier:
                 b_input_ids, b_input_mask = batch
 
             with torch.no_grad():
+                logits = self.model(b_input_ids, attention_mask=b_input_mask)
                 if true_label_available:
-                    tmp_eval_loss = self.model(
-                        b_input_ids,
-                        attention_mask=b_input_mask,
-                        labels=b_labels,
-                    )
-                logits = self.model(
-                    b_input_ids,
-                    attention_mask=b_input_mask,
-                )
+                    active_loss = b_input_mask.view(-1) == 1
+                    active_logits = logits.view(-1, self.num_labels)[
+                        active_loss
+                    ]
+                    active_labels = b_labels.view(-1)[active_loss]
+                    loss_fct = nn.CrossEntropyLoss()
+                    tmp_eval_loss = loss_fct(active_logits, active_labels)
+
+                    eval_loss += tmp_eval_loss.mean().item()
 
             logits = logits.detach().cpu().numpy()
             predictions.extend([list(p) for p in np.argmax(logits, axis=2)])
 
-            if true_label_available:
-                label_ids = b_labels.to("cpu").numpy()
-                true_labels.append(label_ids)
-                eval_loss += tmp_eval_loss.mean().item()
-
             nb_eval_steps += 1
 
-        validation_loss = eval_loss / nb_eval_steps
-        print("Evaluation loss: {}".format(validation_loss))
+        if true_label_available:
+            validation_loss = eval_loss / nb_eval_steps
+            print("Evaluation loss: {}".format(validation_loss))
 
         return predictions
 
 
-def postprocess_token_labels(labels, input_mask, label_map=None):
+def postprocess_token_labels(
+    labels,
+    input_mask,
+    label_map=None,
+    remove_trailing_word_pieces=False,
+    trailing_token_mask=None,
+):
     """
-    Removes predictions on padded tokens and maps predicted numerical labels
-    back to original labels if label_map is provided.
+    Postprocesses token classification output:
+        1) Removes predictions on padded tokens.
+        2) If label_map is provided, maps predicted numerical labels
+            back to original labels.
+        3) If remove_trailing_word_pieces is True and trailing_token_mask
+            is provided, remove the predicted labels on trailing word pieces
+            generated by WordPiece tokenizer.
 
     Args:
         labels (list): List of lists of predicted token labels.
-        input_mask (list): List of lists. Each sublist contains attention
-            masks of the input token id lists. 1 for input tokens and 0
+        input_mask (list): List of lists. Each sublist contains the attention
+            mask of the input token list, 1 for input tokens and 0
             for padded tokens.
         label_map (dict, optional): A dictionary mapping original labels
             (which may be string type) to numerical label ids. If
             provided, it's used to map predicted numerical labels back to
             original labels. Default value is None.
+        remove_trailing_word_pieces (bool, optional): Whether to remove
+            predicted labels of trailing word pieces generated by WordPiece
+            tokenizer. For example, "playing" is broken into "play" and
+            "##ing". After removing predicted label for "##ing",
+            the predicted label for "play" is assigned to the original word
+            "playing". Default value is False.
+        trailing_token_mask (list, optional): list of boolean values, True for
+            the first word piece of each original word, False for trailing
+            word pieces, e.g. ##ing. If remove_trailing_word_pieces is
+            True, this mask is used to remove the predicted labels on
+            trailing word pieces, so that each original word in the input
+            text has a unique predicted label.
     """
     if label_map:
         reversed_label_map = {v: k for k, v in label_map.items()}
-        labels_org = [
-            [reversed_label_map[l_i] for l_i in l]
-            for l in labels
-        ]
-
+        labels_org = [[reversed_label_map[l_i] for l_i in l] for l in labels]
     else:
         labels_org = labels
 
-    labels_org_no_padding = []
-    for l, m in zip(labels_org, input_mask):
-        l_np = np.array(l)
-        m_np = np.array(m)
-        l_no_padding = list(l_np[np.where(m_np == 1)])
+    labels_org_no_padding = [
+        [label for label, mask in zip(label_list, mask_list) if mask == 1]
+        for label_list, mask_list in zip(labels_org, input_mask)
+    ]
 
-        labels_org_no_padding.append(l_no_padding)
+    if remove_trailing_word_pieces and trailing_token_mask:
+        # Remove hte padded values in trailing_token_mask first
+        token_mask_no_padding = [
+            [token for token, padding in zip(t_mask, p_mask) if padding == 1]
+            for t_mask, p_mask in zip(trailing_token_mask, input_mask)
+        ]
 
-    return labels_org_no_padding
+        labels_no_trailing_pieces = [
+            [label for label, mask in zip(label_list, mask_list) if mask]
+            for label_list, mask_list in zip(
+                labels_org_no_padding, token_mask_no_padding
+            )
+        ]
+        return labels_no_trailing_pieces
+    else:
+        return labels_org_no_padding
