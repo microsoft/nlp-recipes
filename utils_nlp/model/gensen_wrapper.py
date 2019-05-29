@@ -5,7 +5,7 @@ import os
 
 from sklearn.metrics.pairwise import cosine_similarity
 
-from utils_nlp.model.gensen import train_mlflow
+from utils_nlp.model.gensen import train
 from utils_nlp.model.gensen.create_gensen_model import (
     create_multiseq2seq_model,
 )
@@ -112,7 +112,7 @@ class GenSenClassifier:
         self._validate_params()
         self.cache_dir = self._get_gensen_tokens(train_df, dev_df, test_df)
 
-        train_mlflow.train(
+        train.train(
             data_folder=self.cache_dir,
             config=self.config,
             learning_rate=self.learning_rate,
@@ -133,8 +133,6 @@ class GenSenClassifier:
         on their gensen vector representations.
 
         """
-
-        self._validate_params()
 
         # Use only if you have the model trained and saved.
         # self.cache_dir = os.path.join(self.cache_dir, "clean/snli_1.0")
