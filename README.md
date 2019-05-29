@@ -6,7 +6,7 @@
 
 # NLP Best Practices
 
-This repository will provide examples and best practices for building NLP systems, provided as Jupyter notebooks.
+This repository will provide examples and best practices for building NLP systems, provided as Jupyter notebooks and utility functions.
 
 
 ## Scenarios

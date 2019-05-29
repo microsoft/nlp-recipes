@@ -3,13 +3,13 @@
 
 import random
 import numpy as np
-from tqdm import tqdm
-import torch.nn as nn
 import torch
+import torch.nn as nn
 from pytorch_pretrained_bert.modeling import BertForSequenceClassification
 from pytorch_pretrained_bert.optimization import BertAdam
-from utils_nlp.pytorch.device import get_device
-from utils_nlp.bert.common import Language, BERT_MAX_LEN
+from tqdm import tqdm
+from utils_nlp.bert.common import BERT_MAX_LEN, Language
+from utils_nlp.pytorch.device_utils import get_device, parallelize_model
 
 
 class SequenceClassifier:
@@ -28,50 +28,50 @@ class SequenceClassifier:
             raise Exception("Number of labels should be at least 2.")
 
         self.language = language
-        self.num_labels = num_labels       
+        self.num_labels = num_labels
         self.cache_dir = cache_dir
-        
+
         # create classifier
         self._model = BertForSequenceClassification.from_pretrained(
             language.value, cache_dir=cache_dir, num_labels=num_labels
         )
-        
 
-    def get_model(self):
+    @property
+    def model(self):
         """Returns the underlying PyTorch model
              BertForSequenceClassification or DataParallel (when multiple GPUs are used)."""
         return self._model
 
-
     def fit(
         self,
-        tokens,
+        token_ids,
         input_mask,
-        labels,        
-        device="gpu",
-        use_multiple_gpus=True,
+        labels,
+        use_gpu=True,
+        num_gpus=None,
         num_epochs=1,
         batch_size=32,
+        lr=2e-5,
         verbose=True,
     ):
         """Fine-tunes the BERT classifier using the given training data.
         Args:
-            tokens (list): List of training token lists.
+            token_ids (list): List of training token id lists.
             input_mask (list): List of input mask lists.
             labels (list): List of training labels.
-            max_len (int, optional): Maximum number of tokens
-                                     (documents will be truncated or padded).
-                                     Defaults to 512.
             device (str, optional): Device used for training ("cpu" or "gpu").
                                     Defaults to "gpu".
-            use_multiple_gpus (bool, optional): Whether multiple GPUs will be used for training.
-                                                Defaults to True.
+            num_gpus (int, optional): The number of gpus to use. 
+                                      If None is specified, all available GPUs will be used.
+                                      Defaults to None.
             num_epochs (int, optional): Number of training epochs. Defaults to 1.
             batch_size (int, optional): Training batch size. Defaults to 32.
+            lr (float): Learning rate of the Adam optimizer. Defaults to 2e-5.
             verbose (bool, optional): If True, shows the training progress and loss values.
                                       Defaults to True.
         """
-        device = get_device(device)
+
+        device = get_device("gpu" if use_gpu else "cpu")
         self._model.to(device)
 
         # define loss function
@@ -94,71 +94,68 @@ class SequenceClassifier:
                     p
                     for n, p in param_optimizer
                     if any(nd in n for nd in no_decay)
-                ],
-                "weight_decay": 0.0,
+                ]
             },
         ]
-        opt = BertAdam(optimizer_grouped_parameters, lr=2e-5)
 
-        n_gpus = 0
-        if use_multiple_gpus:
-            n_gpus = torch.cuda.device_count()
-            if n_gpus > 1:
-                if isinstance(self._model, nn.DataParallel):
-                    self._model = nn.DataParallel(self._model)
+        opt = BertAdam(optimizer_grouped_parameters, lr=lr)
+
+        if use_gpu:
+            parallelize_model(self._model, num_gpus)            
+        else:
+            # unwrap module in case it was wrapped with DataParalle in previous calls
+            if isinstance(self._model, nn.DataParallel):
+                self._model = self._model.module
 
         # train
         self._model.train()  # training mode
-        num_examples = len(tokens)
+        num_examples = len(token_ids)
         num_batches = int(num_examples / batch_size)
 
-        with tqdm(total=num_epochs * num_batches) as pbar:
-            for epoch in range(num_epochs):
-                for i in range(num_batches):
-                    # get random batch
-                    start = int(random.random() * num_examples)
-                    end = start + batch_size
-                    x_batch = torch.tensor(
-                        tokens[start:end], dtype=torch.long, device=device
-                    )
-                    y_batch = torch.tensor(
-                        labels[start:end], dtype=torch.long, device=device
-                    )
-                    mask_batch = torch.tensor(
-                        input_mask[start:end], dtype=torch.long, device=device
-                    )
+        for epoch in range(num_epochs):
+            for i in range(num_batches):
 
-                    opt.zero_grad()
-                    y_h = self._model(
-                        input_ids=x_batch,
-                        token_type_ids=None,
-                        attention_mask=mask_batch,
-                        labels=None,
-                    )
+                # get random batch
+                start = int(random.random() * num_examples)
+                end = start + batch_size
+                x_batch = torch.tensor(
+                    token_ids[start:end], dtype=torch.long, device=device
+                )
+                y_batch = torch.tensor(
+                    labels[start:end], dtype=torch.long, device=device
+                )
+                mask_batch = torch.tensor(
+                    input_mask[start:end], dtype=torch.long, device=device
+                )
 
-                    loss = loss_func(y_h, y_batch)
-                    if n_gpus > 1:
-                        loss = loss.mean()
+                opt.zero_grad()
+                y_h = self._model(
+                    input_ids=x_batch,
+                    token_type_ids=None,
+                    attention_mask=mask_batch,
+                    labels=None,
+                )
 
-                    loss.backward()
-                    opt.step(tqdm)
-                    pbar.update()
-                    if verbose:
-                        if i % (batch_size) == 0:
-                            print(
-                                "epoch:{}/{}; batch:{}/{}; loss:{}".format(
-                                    epoch + 1,
-                                    num_epochs,
-                                    i + 1,
-                                    num_batches,
-                                    loss.data,
-                                )
+                loss = loss_func(y_h, y_batch).mean()
+                loss.backward()
+                opt.step()
+                if verbose:
+                    if i % ((num_batches // 10) + 1) == 0:
+                        print(
+                            "epoch:{}/{}; batch:{}->{}/{}; loss:{}".format(
+                                epoch + 1,
+                                num_epochs,
+                                i + 1,
+                                i + 1 + (num_batches // 10),
+                                num_batches,
+                                loss.data,
                             )
+                        )
 
-    def predict(self, tokens, input_mask, device="gpu", batch_size=32):
+    def predict(self, token_ids, input_mask, use_gpu=True, batch_size=32):
         """Scores the given dataset and returns the predicted classes.
         Args:
-            tokens (list): List of training token lists.
+            token_ids (list): List of training token lists.
             input_mask (list): List of input mask lists.
             device (str, optional): Device used for scoring ("cpu" or "gpu"). Defaults to "gpu".
             batch_size (int, optional): Scoring batch size. Defaults to 32.
@@ -166,27 +163,38 @@ class SequenceClassifier:
             [ndarray]: Predicted classes.
         """
 
-        device = get_device(device)
+        if use_gpu:
+            device = get_device("gpu")
+        else:
+            device = get_device("cpu")
+            if isinstance(self._model, nn.DataParallel):
+                self._model = self._model.module
+
         self._model.to(device)
 
         # score
         self._model.eval()
         preds = []
-        for i in tqdm(range(0, len(tokens), batch_size)):
-            x_batch = tokens[i : i + batch_size]
-            mask_batch = input_mask[i : i + batch_size]
-            x_batch = torch.tensor(x_batch, dtype=torch.long, device=device)
-            mask_batch = torch.tensor(
-                mask_batch, dtype=torch.long, device=device
-            )
-            with torch.no_grad():
-                p_batch = self._model(
-                    input_ids=x_batch,
-                    token_type_ids=None,
-                    attention_mask=mask_batch,
-                    labels=None,
+        with tqdm(total=len(token_ids)) as pbar:
+            for i in range(0, len(token_ids), batch_size):
+                x_batch = token_ids[i : i + batch_size]
+                mask_batch = input_mask[i : i + batch_size]
+                x_batch = torch.tensor(
+                    x_batch, dtype=torch.long, device=device
                 )
-            preds.append(p_batch.cpu().data.numpy())
+                mask_batch = torch.tensor(
+                    mask_batch, dtype=torch.long, device=device
+                )
+                with torch.no_grad():
+                    p_batch = self._model(
+                        input_ids=x_batch,
+                        token_type_ids=None,
+                        attention_mask=mask_batch,
+                        labels=None,
+                    )
+                preds.append(p_batch.cpu().data.numpy())
+                if i % batch_size == 0:
+                    pbar.update(batch_size)
         preds = [x.argmax(1) for x in preds]
         preds = np.concatenate(preds)
         return preds

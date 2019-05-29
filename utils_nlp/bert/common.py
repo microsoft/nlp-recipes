@@ -23,7 +23,7 @@ class Tokenizer:
     def __init__(
         self, language=Language.ENGLISH, to_lower=False, cache_dir="."
     ):
-        """Initializes the tokenizer and the underlying pretrained tokenizer.
+        """Initializes the underlying pretrained BERT tokenizer.
         Args:
             language (Language, optional): The pretrained model's language.
                                            Defaults to Language.ENGLISH.
@@ -35,18 +35,28 @@ class Tokenizer:
         self.language = language
 
     def tokenize(self, text):
+        """Uses a BERT tokenizer 
+        
+        Args:
+            text (list): [description]
+        
+        Returns:
+            [list]: [description]
+        """
         tokens = [self.tokenizer.tokenize(x) for x in text]
         return tokens
 
-    def preprocess_classification_tokens(self, tokens, max_len):
+    def preprocess_classification_tokens(self, tokens, max_len=BERT_MAX_LEN):
         """Preprocessing of input tokens:
             - add BERT sentence markers ([CLS] and [SEP])
             - map tokens to indices
-            - pad and truncate sequences 
+            - pad and truncate sequences
             - create an input_mask    
         Args:
-            tokens ([type]): List of tokens to preprocess.
-            max_len ([type]): Maximum length of sequence.        
+            tokens (list): List of tokens to preprocess.
+            max_len (int, optional): Maximum number of tokens
+                            (documents will be truncated or padded).
+                            Defaults to 512.
         Returns:
             list of preprocesssed token lists
             list of input mask lists
