@@ -3,13 +3,14 @@
 import json
 import os
 
+from sklearn.metrics.pairwise import cosine_similarity
+
 from utils_nlp.model.gensen import train
-from utils_nlp.model.gensen.gensen import GenSenSingle
-from utils_nlp.model.gensen.gensen_utils import gensen_preprocess
 from utils_nlp.model.gensen.create_gensen_model import (
     create_multiseq2seq_model,
 )
-from sklearn.metrics.pairwise import cosine_similarity
+from utils_nlp.model.gensen.gensen import GenSenSingle
+from utils_nlp.model.gensen.gensen_utils import gensen_preprocess
 
 
 class GenSenClassifier:
@@ -25,11 +26,11 @@ class GenSenClassifier:
     """
 
     def __init__(
-        self,
-        config_file,
-        pretrained_embedding_path,
-        learning_rate=0.0001,
-        cache_dir=".",
+            self,
+            config_file,
+            pretrained_embedding_path,
+            learning_rate=0.0001,
+            cache_dir=".",
     ):
         self.learning_rate = learning_rate
         self.config_file = config_file
@@ -41,7 +42,7 @@ class GenSenClassifier:
         """Validate input params."""
 
         if not isinstance(self.learning_rate, float) or (
-            self.learning_rate <= 0.0
+                self.learning_rate <= 0.0
         ):
             raise ValueError(
                 "Learning rate must be of type float and greater than 0"
@@ -132,8 +133,6 @@ class GenSenClassifier:
         on their gensen vector representations.
 
         """
-
-        self._validate_params()
 
         # Use only if you have the model trained and saved.
         # self.cache_dir = os.path.join(self.cache_dir, "clean/snli_1.0")
