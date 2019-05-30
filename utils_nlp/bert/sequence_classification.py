@@ -101,7 +101,7 @@ class SequenceClassifier:
         opt = BertAdam(optimizer_grouped_parameters, lr=lr)
 
         if use_gpu:
-            parallelize_model(self._model, num_gpus)            
+            self._model = parallelize_model(self._model, num_gpus)            
         else:
             # unwrap module in case it was wrapped with DataParalle in previous calls
             if isinstance(self._model, nn.DataParallel):
