@@ -267,7 +267,6 @@ class MultitaskModel(nn.Module):
             h_t = h_t.unsqueeze(0)
             h_t = self.enc_drp(h_t)
 
-            print("INSIDE FORWARD:", h_t.shape)
             # Debug with squeeze on error.
             trg_h, _ = self.decoders[task_idx](
                 trg_emb, h_t.view(-1, self.trg_hidden_dim), h_t.view(-1, self.trg_hidden_dim)
@@ -336,7 +335,6 @@ class MultitaskModel(nn.Module):
                 h_t = src_h_t[-1]
         else:
             src_h, _ = pad_packed_sequence(src_h, batch_first=True)
-            print("INSIDE GET HIDDEN",torch.max(src_h, 1)[0].shape)
             h_t = torch.max(src_h, 1)[0].squeeze()
 
         return src_h, h_t
