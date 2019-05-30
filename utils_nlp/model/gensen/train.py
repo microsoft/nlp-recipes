@@ -2,8 +2,10 @@
 # -*- coding: utf-8 -*-
 """Run script."""
 import logging
+import argparse
 import os
 import sys
+import json
 import time
 
 import numpy as np
@@ -13,9 +15,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from azureml.core.run import Run
+import horovod.torch as hvd
 
-from utils_nlp.model.gensen.models import MultitaskModel
-from utils_nlp.model.gensen.utils import (
+from models import MultitaskModel
+from utils import (
     BufferedDataIterator,
     NLIIterator,
     compute_validation_loss,
@@ -23,20 +26,15 @@ from utils_nlp.model.gensen.utils import (
 
 sys.path.append(".")  # Required to run on the MILA machines with SLURM
 
-# parser = argparse.ArgumentParser()
-# parser.add_argument('--data_folder', type=str, help='data folder')
-#
-# args = parser.parse_args()
-#
-# input_data = args.input_data
-# import os
-# os.chdir(input_data)
-# print("the input data is at %s" % input_data)
-#
 # get the Azure ML run object
 run = Run.get_context()
 
 cudnn.benchmark = True
+
+hvd.init()
+if torch.cuda.is_available():
+    # Horovod: pin GPU to local rank.
+    torch.cuda.set_device(hvd.local_rank())
 
 """
 parser = argparse.ArgumentParser()
@@ -186,9 +184,25 @@ def train(config, data_folder, learning_rate=0.0001):
         ).cuda()
 
         logging.info(model)
+        """Using Horovod"""
+        # Horovod: scale learning rate by the number of GPUs.
+        optimizer = optim.SGD(model.parameters(), lr=learning_rate * hvd.size(),
+                              momentum=args.momentum)
+
+        # Horovod: broadcast parameters & optimizer state.
+        hvd.broadcast_parameters(model.state_dict(), root_rank=0)
+        hvd.broadcast_optimizer_state(optimizer, root_rank=0)
+
+        # Horovod: (optional) compression algorithm.
+        compression = hvd.Compression.fp16 if args.fp16_allreduce else hvd.Compression.none
+
+        # Horovod: wrap optimizer with DistributedOptimizer.
+        optimizer = hvd.DistributedOptimizer(optimizer,
+                                             named_parameters=model.named_parameters(),
+                                             compression=compression)
 
         n_gpus = config["training"]["n_gpus"]
-        model = torch.nn.DataParallel(model, device_ids=range(n_gpus))
+        # model = torch.nn.DataParallel(model, device_ids=range(n_gpus))
 
         if load_dir == "auto":
             ckpt = os.path.join(save_dir, "best_model.model")
@@ -203,9 +217,9 @@ def train(config, data_folder, learning_rate=0.0001):
             logging.info("Loading model from specified checkpoint %s " % load_dir)
             model.load_state_dict(torch.load(open(load_dir, encoding="utf-8")))
 
-        lr = learning_rate
+        # lr = learning_rate
         # lr = config['training']['lrate']
-        optimizer = optim.Adam(model.parameters(), lr=lr)
+        # optimizer = optim.Adam(model.parameters(), lr=lr)
 
         task_losses = [[] for task in tasknames]
         task_idxs = [0 for task in tasknames]
@@ -217,6 +231,9 @@ def train(config, data_folder, learning_rate=0.0001):
         mbatch_times = []
         logging.info("Commencing Training ...")
         rng_num_tasks = len(tasknames) - 1 if paired_tasks else len(tasknames)
+
+        min_val_loss = 10000000
+        min_val_loss_epoch = -1
 
         while True:
             start = time.time()
@@ -320,6 +337,8 @@ def train(config, data_folder, learning_rate=0.0001):
                 torch.nn.utils.clip_grad_norm(model.parameters(), 1.0)
                 optimizer.step()
 
+
+
             end = time.time()
             mbatch_times.append(end - start)
 
@@ -363,18 +382,18 @@ def train(config, data_folder, learning_rate=0.0001):
                 mbatch_times = []
                 nli_losses = []
 
-            if (
-                    updates % config["management"]["checkpoint_freq"] == 0
-                    and updates != 0
-            ):
-                logging.info("Saving model ...")
-
-                torch.save(
-                    model.state_dict(),
-                    open(os.path.join(save_dir, "best_model.model"), "wb"),
-                )
-                # Let the training end.
-                break
+            # if (
+            #         updates % config["management"]["checkpoint_freq"] == 0
+            #         and updates != 0
+            # ):
+            #     logging.info("Saving model ...")
+            #
+            #     torch.save(
+            #         model.state_dict(),
+            #         open(os.path.join(save_dir, "best_model.model"), "wb"),
+            #     )
+            #     # Let the training end.
+            #     break
 
             if updates % config["management"]["eval_freq"] == 0:
                 logging.info("############################")
@@ -446,8 +465,53 @@ def train(config, data_folder, learning_rate=0.0001):
                 logging.info(
                     "******************************************************"
                 )
+            # If the validation loss is small enough, and it starts to go up. Should stop training.
+            # Small is defined by the number of epochs it lasts.
+            if validation_loss < min_val_loss:
+                min_val_loss = validation_loss
+                min_val_loss_epoch = updates
+
+            if updates - min_val_loss_epoch > config['training']['stop_patience']:
+                logging.info("Saving model ...")
+
+                torch.save(
+                    model.state_dict(),
+                    open(os.path.join(save_dir, "best_model.model"), "wb"),
+                )
+                # Let the training end.
+                break
 
             updates += batch_size * n_gpus
             nli_ctr += 1
     finally:
         os.chdir(owd)
+
+
+def read_config(json_file):
+    """Read JSON config."""
+    json_object = json.load(open(json_file, 'r', encoding='utf-8'))
+    return json_object
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--config",
+        help="path to json config",
+        required=True
+    )
+    parser.add_argument('--data_folder', type=str, help='data folder')
+    # Add learning rate to tune model.
+    parser.add_argument('--learning_rate', type=float, default=0.0001, help='learning rate')
+    parser.add_argument('--momentum', type=float, default=0.5, metavar='M',
+                        help='SGD momentum (default: 0.5)')
+    parser.add_argument('--fp16-allreduce', action='store_true', default=False,
+                        help='use fp16 compression during allreduce')
+    args = parser.parse_args()
+    data_folder = args.data_folder
+    learning_rate = args.learning_rate
+    # os.chdir(data_folder)
+
+    config_file_path = args.config
+    config = read_config(config_file_path)
+    train(config, data_folder, learning_rate)
