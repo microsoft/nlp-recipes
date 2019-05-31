@@ -26,7 +26,6 @@
         "max_trg_length": 90,
         "task": "multi-seq2seq-nli",
         "save_dir": "data/models/example",
-        "load_dir": "auto",
         "nli_train": "data/processed/snli_1.0_train.txt.clean.noblank",
         "nli_dev": "data/processed/snli_1.0_dev.txt.clean.noblank",
         "nli_test": "data/processed/snli_1.0_test.txt.clean.noblank"
@@ -41,6 +40,6 @@
     	"n_layers_src": 1,
     	"bidirectional": true,
         "layernorm": false,
-        "dropout": 0.3
+        "dropout": 0.8
     }
 }

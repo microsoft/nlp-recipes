@@ -62,7 +62,6 @@ def train(config, data_folder, learning_rate=0.0001):
 
     try:
         save_dir = config["data"]["save_dir"]
-        load_dir = config["data"]["load_dir"]
 
         os.chdir(data_folder)
 
@@ -204,19 +203,6 @@ def train(config, data_folder, learning_rate=0.0001):
         n_gpus = config["training"]["n_gpus"]
         # model = torch.nn.DataParallel(model, device_ids=range(n_gpus))
 
-        if load_dir == "auto":
-            ckpt = os.path.join(save_dir, "best_model.model")
-            if os.path.exists(ckpt):
-                logging.info("Loading last saved model : %s " % ckpt)
-                # Read file should be 'rb' cause it saves in 'wb'.
-                model.load_state_dict(torch.load(open(ckpt, "rb")))
-            else:
-                logging.info("Could not find model checkpoint, starting afresh")
-
-        elif load_dir and not load_dir == "auto":
-            logging.info("Loading model from specified checkpoint %s " % load_dir)
-            model.load_state_dict(torch.load(open(load_dir, encoding="utf-8")))
-
         # Use Adam optimizer.
         # optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
@@ -233,6 +219,7 @@ def train(config, data_folder, learning_rate=0.0001):
 
         min_val_loss = 10000000
         min_val_loss_epoch = -1
+        model_state = {}
 
         while True:
             start = time.time()
@@ -408,14 +395,16 @@ def train(config, data_folder, learning_rate=0.0001):
                     if validation_loss < min_val_loss:
                         min_val_loss = validation_loss
                         min_val_loss_epoch = nli_epoch
+                        model_state = model.state_dict()
 
                     if nli_epoch - min_val_loss_epoch > config['training']['stop_patience']:
                         print(nli_epoch, min_val_loss_epoch, min_val_loss)
                         logging.info("Saving model ...")
-
+                        # Save the name with validation loss.
                         torch.save(
-                            model.state_dict(),
-                            open(os.path.join(save_dir, "best_model.model"), "wb"),
+                            model_state,
+                            open(os.path.join(save_dir, "val_" + min_val_loss + "best_model.model"),
+                                 "wb"),
                         )
                         # Let the training end.
                         break
