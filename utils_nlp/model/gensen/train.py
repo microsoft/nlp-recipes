@@ -186,8 +186,8 @@ def train(config, data_folder, learning_rate=0.0001):
         logging.info(model)
         """Using Horovod"""
         # Horovod: scale learning rate by the number of GPUs.
-        optimizer = optim.SGD(model.parameters(), lr=learning_rate * hvd.size(),
-                              momentum=args.momentum)
+        optimizer = optim.Adam(model.parameters(), lr=learning_rate * hvd.size())
+        # optimizer = optim.SGD(model.parameters(), lr=args.lr * hvd.size(), momentum=args.momentum)
 
         # Horovod: broadcast parameters & optimizer state.
         hvd.broadcast_parameters(model.state_dict(), root_rank=0)
@@ -471,6 +471,7 @@ def train(config, data_folder, learning_rate=0.0001):
                 min_val_loss_epoch = updates
 
             if updates - min_val_loss_epoch > config['training']['stop_patience']:
+                print(updates, min_val_loss_epoch, min_val_loss)
                 logging.info("Saving model ...")
 
                 torch.save(
