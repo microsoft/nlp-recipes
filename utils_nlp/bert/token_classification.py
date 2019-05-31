@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License.
+
 """This script reuses some code from
 https://github.com/huggingface/pytorch-pretrained-BERT/blob/master/examples
 /run_classifier.py"""
@@ -11,12 +14,9 @@ import torch.nn as nn
 from pytorch_pretrained_bert.optimization import BertAdam
 from pytorch_pretrained_bert.modeling import BertForTokenClassification
 
-from common_ner import (
-    Language,
-    create_data_loader,
-    get_device,
-    parallelize_model,
-)
+from .common_ner import Language, create_data_loader
+
+from utils_nlp.pytorch.device_utils import get_device, move_to_device
 
 
 class BertTokenClassifier:
@@ -51,15 +51,13 @@ class BertTokenClassifier:
         self.num_labels = num_labels
         self.cache_dir = cache_dir
 
-        self._model = BertForTokenClassification.from_pretrained(
+        self.model = BertForTokenClassification.from_pretrained(
             language.value, cache_dir=cache_dir, num_labels=num_labels
         )
 
-    @property
-    def model(self):
-        return self._model
-
-    def _get_optimizer(self, learning_rate):
+    def _get_optimizer(
+        self, learning_rate, num_train_optimization_steps, warmup_proportion
+    ):
         """
         Initializes the optimizer and configure parameters to apply weight
         decay on.
@@ -86,7 +84,17 @@ class BertTokenClassifier:
             },
         ]
 
-        optimizer = BertAdam(optimizer_grouped_parameters, lr=learning_rate)
+        if warmup_proportion is None:
+            optimizer = BertAdam(
+                optimizer_grouped_parameters, lr=learning_rate
+            )
+        else:
+            optimizer = BertAdam(
+                optimizer_grouped_parameters,
+                lr=learning_rate,
+                t_total=num_train_optimization_steps,
+                warmup=warmup_proportion,
+            )
 
         return optimizer
 
@@ -95,13 +103,11 @@ class BertTokenClassifier:
         token_ids,
         input_mask,
         labels,
-        use_gpu=True,
         num_gpus=None,
         num_epochs=1,
         batch_size=32,
         learning_rate=2e-5,
-        clip_gradient=False,
-        max_gradient_norm=1.0,
+        warmup_proportion=None,
     ):
         """
         Fine-tunes the BERT classifier using the given training data.
@@ -116,21 +122,18 @@ class BertTokenClassifier:
                 not attended to.
             labels (list): List of lists, each sublist contains numerical
                 token labels of an input sentence/paragraph.
-            use_gpu (bool, optional): Whether to use GPU. Default value is
-                True.
-            num_gpus (int, optional): The number of gpus to use.
-                If None is specified, all available GPUs will be used.
-                Defaults to None.
+            num_gpus (int, optional): The number of GPUs to use.
+                If None, all available GPUs will be used. Defaults to 1.
             num_epochs (int, optional): Number of training epochs.
                 Defaults to 1.
             batch_size (int, optional): Training batch size. Defaults to 32.
             learning_rate (float, optional): learning rate of the BertAdam
                 optimizer. Defaults to 5e-5.
-            clip_gradient (bool, optional): Whether to perform gradient
-                clipping. Default value is False.
-            max_gradient_norm (float, optional): Maximum gradient norm to
-                apply gradient clipping on. Default value is 1.0.
+            warmup_proportion (float, optional): Proportion of training to
+                perform linear learning rate warmup for. E.g., 0.1 = 10% of
+                training. Defaults to None.
         """
+
         train_dataloader = create_data_loader(
             input_ids=token_ids,
             input_mask=input_mask,
@@ -139,20 +142,22 @@ class BertTokenClassifier:
             batch_size=batch_size,
         )
 
-        device, num_gpus_used = get_device(
-            "gpu" if use_gpu else "cpu", num_gpus
-        )
-        self.model.to(device)
+        device = get_device("cpu" if num_gpus == 0 else "gpu")
+        self.model = move_to_device(self.model, device, num_gpus)
 
-        if use_gpu:
-            parallelize_model(self.model, num_gpus_used)
+        if num_gpus is None:
+            num_gpus_used = torch.cuda.device_count()
         else:
-            # unwrap module in case it was wrapped with DataParalle in
-            # previous calls
-            if isinstance(self._model, nn.DataParallel):
-                self._model = self.model.module
+            num_gpus_used = min(num_gpus, torch.cuda.device_count())
 
-        optimizer = self._get_optimizer(learning_rate=learning_rate)
+        num_train_optimization_steps = (
+            int(len(token_ids) / batch_size) * num_epochs
+        )
+        optimizer = self._get_optimizer(
+            learning_rate=learning_rate,
+            num_train_optimization_steps=num_train_optimization_steps,
+            warmup_proportion=warmup_proportion,
+        )
 
         self.model.train()
         for _ in trange(int(num_epochs), desc="Epoch"):
@@ -179,12 +184,6 @@ class BertTokenClassifier:
                 tr_loss += loss.item()
                 nb_tr_steps += 1
 
-                ## TODO: compare with and without clip gradient
-                if clip_gradient:
-                    torch.nn.utils.clip_grad_norm_(
-                        parameters=self.model.parameters(),
-                        max_norm=max_gradient_norm,
-                    )
                 # Update paramters based on the current gradient
                 optimizer.step()
                 # Reset parameter gradients to zero
@@ -194,7 +193,7 @@ class BertTokenClassifier:
             print("Train loss: {}".format(train_loss))
 
     def predict(
-        self, token_ids, input_mask, labels=None, batch_size=32, use_gpu=True
+        self, token_ids, input_mask, labels=None, batch_size=32, num_gpus=1
     ):
         """
         Predict token labels on the testing data.
@@ -212,8 +211,8 @@ class BertTokenClassifier:
                 If provided, it's used to compute the evaluation loss.
                 Default value is None.
             batch_size (int, optional): Training batch size. Defaults to 32.
-            use_gpu (bool, optional): Whether to use GPU. Default value is
-                True.
+            num_gpus (int, optional): The number of GPUs to use.
+                If None, all available GPUs will be used. Defaults to 1.
 
         Returns:
             list: List of lists of predicted token labels.
@@ -225,14 +224,8 @@ class BertTokenClassifier:
             batch_size=batch_size,
             sample_method="sequential",
         )
-        if use_gpu:
-            device, _ = get_device("gpu")
-        else:
-            device, _ = get_device("cpu")
-            if isinstance(self.model, nn.DataParallel):
-                self._model = self.model.module
-
-        self.model.to(device)
+        device = get_device("cpu" if num_gpus == 0 else "gpu")
+        self.model = move_to_device(self.model, device, num_gpus)
 
         self.model.eval()
         predictions = []

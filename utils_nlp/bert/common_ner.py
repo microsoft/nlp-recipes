@@ -5,7 +5,6 @@ import warnings
 
 import torch
 from pytorch_pretrained_bert.tokenization import BertTokenizer
-import torch.nn as nn
 from enum import Enum
 
 from torch.utils.data import (
@@ -29,59 +28,6 @@ class Language(Enum):
     ENGLISHLARGECASED = "bert-large-cased"
     CHINESE = "bert-base-chinese"
     MULTILINGUAL = "bert-base-multilingual-cased"
-
-
-def get_device(device="gpu", num_devices=None):
-    """Gets a PyTorch device.
-    Args:
-        device (str, optional): Device string: "cpu" or "gpu". Defaults to
-        "gpu".
-        num_devices (int, optional): Number of GPUs to be used. If None,
-        all available GPUs are used. Default value is None
-    Returns:
-        tuple: A PyTorch device: cpu or gpu, number of GPUs to use
-    """
-    if device == "gpu":
-        if torch.cuda.is_available():
-            num_cuda_devices = torch.cuda.device_count()
-
-            if num_devices is None:
-                num_devices = num_cuda_devices
-            else:
-                if num_devices > num_cuda_devices:
-                    num_devices = num_cuda_devices
-                    warnings.warn(
-                        "Only {} devices are available. Setting the number "
-                        "of devices to {}".format(
-                            num_cuda_devices, num_cuda_devices
-                        )
-                    )
-            return torch.device("cuda:0"), num_devices
-        raise Exception("CUDA device not available")
-    elif device == "cpu":
-        return torch.device("cpu"), 0
-    else:
-        raise Exception("Only 'cpu' and 'gpu' devices are supported.")
-
-
-def parallelize_model(model, num_devices):
-    """Implements model data parallelism on multiple GPUs.
-    Args:
-        model (PyTorch Module): A PyTorch model.
-        num_devices (int): Number of GPUs to be used.
-    Returns:
-        [DataParallel, Module]: A PyTorch DataParallel module wrapper
-                                or a PyTorch Module (if multiple CUDA
-                                devices are not available).
-    """
-
-    if num_devices < 2:
-        return model
-
-    if not isinstance(model, nn.DataParallel):
-        return nn.DataParallel(model, device_ids=list(range(num_devices)))
-    else:
-        return model
 
 
 class Tokenizer:
@@ -208,12 +154,10 @@ class Tokenizer:
         label_ids_all = []
         trailing_token_mask_all = []
         for t, t_labels in zip(text, labels):
-            text_lower = t.lower()
-
             new_labels = []
             tokens = []
-            for word, tag in zip(text_lower.split(), t_labels):
-                sub_words = self.tokenizer.wordpiece_tokenizer.tokenize(word)
+            for word, tag in zip(t.split(), t_labels):
+                sub_words = self.tokenizer.tokenize(word)
                 for count, sub_word in enumerate(sub_words):
                     if count > 0:
                         tag = trailing_piece_tag
