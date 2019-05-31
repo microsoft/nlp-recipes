@@ -9,7 +9,7 @@ from pytorch_pretrained_bert.modeling import BertForSequenceClassification
 from pytorch_pretrained_bert.optimization import BertAdam
 from tqdm import tqdm
 from utils_nlp.bert.common import BERT_MAX_LEN, Language
-from utils_nlp.pytorch.device_utils import get_device, parallelize_model
+from utils_nlp.pytorch.device_utils import get_device, move_to_device
 
 
 class SequenceClassifier:
@@ -32,22 +32,15 @@ class SequenceClassifier:
         self.cache_dir = cache_dir
 
         # create classifier
-        self._model = BertForSequenceClassification.from_pretrained(
+        self.model = BertForSequenceClassification.from_pretrained(
             language.value, cache_dir=cache_dir, num_labels=num_labels
         )
-
-    @property
-    def model(self):
-        """Returns the underlying PyTorch model
-             BertForSequenceClassification or DataParallel (when multiple GPUs are used)."""
-        return self._model
 
     def fit(
         self,
         token_ids,
         input_mask,
         labels,
-        use_gpu=True,
         num_gpus=None,
         num_epochs=1,
         batch_size=32,
@@ -71,14 +64,11 @@ class SequenceClassifier:
                                       Defaults to True.
         """
 
-        device = get_device("gpu" if use_gpu else "cpu")
-        self._model.to(device)
-
-        # define loss function
-        loss_func = nn.CrossEntropyLoss().to(device)
+        device = get_device("cpu" if num_gpus == 0 else "gpu")
+        self.model = move_to_device(self.model, device, num_gpus)
 
         # define optimizer and model parameters
-        param_optimizer = list(self._model.named_parameters())
+        param_optimizer = list(self.model.named_parameters())
         no_decay = ["bias", "LayerNorm.bias", "LayerNorm.weight"]
         optimizer_grouped_parameters = [
             {
@@ -100,15 +90,11 @@ class SequenceClassifier:
 
         opt = BertAdam(optimizer_grouped_parameters, lr=lr)
 
-        if use_gpu:
-            self._model = parallelize_model(self._model, num_gpus)            
-        else:
-            # unwrap module in case it was wrapped with DataParalle in previous calls
-            if isinstance(self._model, nn.DataParallel):
-                self._model = self._model.module
+        # define loss function
+        loss_func = nn.CrossEntropyLoss().to(device)
 
         # train
-        self._model.train()  # training mode
+        self.model.train()  # training mode
         num_examples = len(token_ids)
         num_batches = int(num_examples / batch_size)
 
@@ -129,7 +115,7 @@ class SequenceClassifier:
                 )
 
                 opt.zero_grad()
-                y_h = self._model(
+                y_h = self.model(
                     input_ids=x_batch,
                     token_type_ids=None,
                     attention_mask=mask_batch,
@@ -152,28 +138,24 @@ class SequenceClassifier:
                             )
                         )
 
-    def predict(self, token_ids, input_mask, use_gpu=True, batch_size=32):
+    def predict(self, token_ids, input_mask, num_gpus=1, batch_size=32):
         """Scores the given dataset and returns the predicted classes.
         Args:
             token_ids (list): List of training token lists.
             input_mask (list): List of input mask lists.
-            device (str, optional): Device used for scoring ("cpu" or "gpu"). Defaults to "gpu".
+            num_gpus (int, optional): The number of gpus to use. 
+                                      If None is specified, all available GPUs will be used.
+                                      Defaults to 1.
             batch_size (int, optional): Scoring batch size. Defaults to 32.
         Returns:
             [ndarray]: Predicted classes.
         """
 
-        if use_gpu:
-            device = get_device("gpu")
-        else:
-            device = get_device("cpu")
-            if isinstance(self._model, nn.DataParallel):
-                self._model = self._model.module
-
-        self._model.to(device)
+        device = get_device("cpu" if num_gpus == 0 else "gpu")
+        self.model = move_to_device(self.model, device, num_gpus)
 
         # score
-        self._model.eval()
+        self.model.eval()
         preds = []
         with tqdm(total=len(token_ids)) as pbar:
             for i in range(0, len(token_ids), batch_size):
@@ -186,7 +168,7 @@ class SequenceClassifier:
                     mask_batch, dtype=torch.long, device=device
                 )
                 with torch.no_grad():
-                    p_batch = self._model(
+                    p_batch = self.model(
                         input_ids=x_batch,
                         token_type_ids=None,
                         attention_mask=mask_batch,
