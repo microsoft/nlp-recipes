@@ -11,7 +11,7 @@ def get_device(device="gpu"):
     Args:
         device (str, optional): Device string: "cpu" or "gpu". Defaults to "gpu".
     Returns:
-        torch.device: A PyTorch device: cpu or gpu.
+        torch.device: A PyTorch device (cpu or gpu).
     """
     if device == "gpu":
         if torch.cuda.is_available():

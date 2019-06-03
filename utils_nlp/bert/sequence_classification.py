@@ -115,6 +115,7 @@ class SequenceClassifier:
                 )
 
                 opt.zero_grad()
+
                 y_h = self.model(
                     input_ids=x_batch,
                     token_type_ids=None,
@@ -128,7 +129,7 @@ class SequenceClassifier:
                 if verbose:
                     if i % ((num_batches // 10) + 1) == 0:
                         print(
-                            "epoch:{}/{}; batch:{}->{}/{}; loss:{}".format(
+                            "epoch:{}/{}; batch:{}->{}/{}; loss:{:.6f}".format(
                                 epoch + 1,
                                 num_epochs,
                                 i + 1,
@@ -137,6 +138,9 @@ class SequenceClassifier:
                                 loss.data,
                             )
                         )
+        # empty cache
+        del [x_batch, y_batch, mask_batch]
+        torch.cuda.empty_cache()
 
     def predict(self, token_ids, input_mask, num_gpus=1, batch_size=32):
         """Scores the given dataset and returns the predicted classes.
