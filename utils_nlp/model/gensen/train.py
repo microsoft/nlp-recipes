@@ -403,14 +403,14 @@ def train(config, data_folder, learning_rate=0.0001):
                         torch.save(
                             model_state,
                             open(os.path.join(save_dir,
-                                              "val_" + str(min_val_loss) + "best_model.model"),
+                                              "best_model.model"),
                                  "wb"),
                         )
                         # Let the training end.
                         break_flag = 1
                         break
                 if break_flag == 1:
-                    logging.info("##### Training stopped #####")
+                    logging.info("##### Training stopped at ##### %f" % min_val_loss)
                     break
                 logging.info("Evaluating on NLI")
                 n_correct = 0.0
