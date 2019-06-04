@@ -53,15 +53,20 @@ CONDA_GPU = {
 }
 
 PIP_BASE = {
-    "azureml-sdk[notebooks,tensorboard]": "azureml-sdk[notebooks,tensorboard]==1.0.18",
-    "azure-storage": "azure-storage>=0.36.0",
+    "azureml-sdk[notebooks,tensorboard]": "azureml-sdk[notebooks,tensorboard]==1.0.33",
+    "azureml-dataprep": "azureml-dataprep==1.1.4",
     "black": "black>=18.6b4",
     "papermill": "papermill==0.18.2",
     "pydocumentdb": "pydocumentdb>=2.3.3",
     "tqdm": "tqdm==4.31.1",
     "pyemd": "pyemd==0.5.1",
-    "ipywebrtc": "ipywebrtc==0.4.3"
-    "pre-commit": "pre-commit>=1.14.4"
+    "ipywebrtc": "ipywebrtc==0.4.3",
+    "pre-commit": "pre-commit>=1.14.4",
+    "spacy-models": "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-2.1.0/en_core_web_sm-2.1.0.tar.gz",
+    "gensim": "gensim>=3.7.0",
+    "nltk": "nltk>=3.4",
+    "pytorch-pretrained-bert": "pytorch-pretrained-bert>=0.6",
+    "horovod": "horovod>=0.16.1",
 }
 
 PIP_GPU = {}
