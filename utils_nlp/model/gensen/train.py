@@ -56,8 +56,6 @@ def train(config, data_folder, learning_rate=0.0001):
         learning_rate(float): Learning rate for the model.
 
     """
-    # os.chdir(data_folder)
-
     owd = os.getcwd()
 
     try:
@@ -68,8 +66,7 @@ def train(config, data_folder, learning_rate=0.0001):
         if not os.path.exists("./log"):
             os.makedirs("./log")
 
-        if not os.path.exists(save_dir):
-            os.makedirs(save_dir)
+        os.makedirs(save_dir, exist_ok=True)
 
         logging.basicConfig(
             level=logging.INFO,
@@ -212,6 +209,7 @@ def train(config, data_folder, learning_rate=0.0001):
         updates = 0
         nli_ctr = 0
         nli_epoch = 0
+        monitor_epoch = 0
         nli_mbatch_ctr = 0
         mbatch_times = []
         logging.info("Commencing Training ...")
@@ -332,6 +330,7 @@ def train(config, data_folder, learning_rate=0.0001):
                     updates % config["management"]["monitor_loss"] == 0
                     and updates != 0
             ):
+                monitor_epoch += 1
                 for idx, task in enumerate(tasknames):
                     logging.info(
                         "Seq2Seq Examples Processed : %d %s Loss : %.5f Num %s "
@@ -368,7 +367,7 @@ def train(config, data_folder, learning_rate=0.0001):
                 mbatch_times = []
                 nli_losses = []
 
-            if updates % (len(nli_iterator.train_lines)/(batch_size*n_gpus)) == 0:
+                # For validation
                 logging.info("############################")
                 logging.info("##### Evaluating model #####")
                 logging.info("############################")
@@ -394,16 +393,16 @@ def train(config, data_folder, learning_rate=0.0001):
                     # Small is defined by the number of epochs it lasts.
                     if validation_loss < min_val_loss:
                         min_val_loss = validation_loss
-                        min_val_loss_epoch = nli_epoch
+                        min_val_loss_epoch = monitor_epoch
                         model_state = model.state_dict()
-
-                    if nli_epoch - min_val_loss_epoch > config['training']['stop_patience']:
-                        print(nli_epoch, min_val_loss_epoch, min_val_loss)
+                    print(monitor_epoch, min_val_loss_epoch, min_val_loss)
+                    if monitor_epoch - min_val_loss_epoch > config['training']['stop_patience']:
                         logging.info("Saving model ...")
                         # Save the name with validation loss.
                         torch.save(
                             model_state,
-                            open(os.path.join(save_dir, "val_" + min_val_loss + "best_model.model"),
+                            open(os.path.join(save_dir,
+                                              "val_" + str(min_val_loss) + "best_model.model"),
                                  "wb"),
                         )
                         # Let the training end.
@@ -461,6 +460,7 @@ def train(config, data_folder, learning_rate=0.0001):
 
             updates += batch_size * n_gpus
             nli_ctr += 1
+            logging.info("Updates: %d" % updates)
     finally:
         os.chdir(owd)
 

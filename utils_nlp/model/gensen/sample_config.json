@@ -5,13 +5,13 @@
     "lrate": 0.0001,
     "batch_size": 48,
     "n_gpus": 1,
-    "stop_patience": 5
+    "stop_patience": 2
   },
   "management": {
-    "monitor_loss": 9600,
+    "monitor_loss": 480,
     "print_samples": 12800,
     "checkpoint_freq": 480000,
-    "eval_freq": 4800000
+    "eval_freq": 9600
   },
   "data": {"paths": [
         {
