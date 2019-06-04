@@ -4,8 +4,6 @@
 import os
 import shutil
 
-from utils_nlp.dataset.snli import clean_snli
-
 SPLIT_MAP = {}
 
 

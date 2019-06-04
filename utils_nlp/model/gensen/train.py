@@ -17,7 +17,7 @@ import torch.optim as optim
 from azureml.core.run import Run
 import horovod.torch as hvd
 
-from models import MultitaskModel
+from multi_task_model import MultitaskModel
 from utils import (
     BufferedDataIterator,
     NLIIterator,
