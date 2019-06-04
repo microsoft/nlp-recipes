@@ -2,7 +2,7 @@
 # Licensed under the MIT License.
 
 import os
-from urllib.request import urlretrieve
+import requests
 import logging
 from contextlib import contextmanager
 from tempfile import TemporaryDirectory
@@ -46,8 +46,9 @@ def maybe_download(
         filename = url.split("/")[-1]
     filepath = os.path.join(work_directory, filename)
     if not os.path.exists(filepath):
-        with TqdmUpTo(unit="B", unit_scale=True) as t:
-            filepath, _ = urlretrieve(url, filepath, reporthook=t.update_to)
+        r = requests.get(url)
+        with open(filepath, "wb") as file:
+            file.write(r.content)
     else:
         log.debug("File {} already downloaded".format(filepath))
     if expected_bytes is not None:
