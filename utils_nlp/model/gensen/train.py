@@ -218,6 +218,7 @@ def train(config, data_folder, learning_rate=0.0001):
         min_val_loss = 10000000
         min_val_loss_epoch = -1
         model_state = {}
+        break_flag = 0
 
         while True:
             start = time.time()
@@ -406,7 +407,11 @@ def train(config, data_folder, learning_rate=0.0001):
                                  "wb"),
                         )
                         # Let the training end.
+                        break_flag = 1
                         break
+                if break_flag == 1:
+                    logging.info("##### Training stopped #####")
+                    break
                 logging.info("Evaluating on NLI")
                 n_correct = 0.0
                 n_wrong = 0.0
