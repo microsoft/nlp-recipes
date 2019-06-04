@@ -397,6 +397,10 @@ def train(config, data_folder, learning_rate=0.0001):
                         min_val_loss_epoch = monitor_epoch
                         model_state = model.state_dict()
                     print(monitor_epoch, min_val_loss_epoch, min_val_loss)
+                    logging.info(
+                        "Monitor epoch: %d Min Validation Epoch: %d Loss : %.3f" % (
+                            monitor_epoch, min_val_loss_epoch, min_val_loss)
+                    )
                     if monitor_epoch - min_val_loss_epoch > config['training']['stop_patience']:
                         logging.info("Saving model ...")
                         # Save the name with validation loss.
