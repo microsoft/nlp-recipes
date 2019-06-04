@@ -18,40 +18,32 @@ For training at scale, operationalization or hyperparameter tuning, it is recomm
 
 ## Compute environments
 
-Depending on the type of NLP system and the notebook that needs to be run, there are different computational requirements.
-
-Currently, this repository supports the following environments:
-
-* Python CPU
-* Python GPU
+Depending on the type of NLP system and the notebook that needs to be run, there are different computational requirements. Currently, this repository supports **Python CPU** and **Python GPU**.
 
 
 ## Setup guide for Local or DSVM
 
-### Setup Requirements
+### Requirements
 
-* Anaconda with Python version >= 3.6. [Miniconda](https://conda.io/miniconda.html) is the fastest way to get started.
-* The Python library dependencies can be found in this [script](tools/generate_conda_file.sh).
+* A machine running Linux, MacOS or Windows.
+* Anaconda with Python version >= 3.6. 
+    * This is pre-installed on Azure DSVM such that one can run the following steps directly. To setup on your local machine, [Miniconda](https://docs.conda.io/en/latest/miniconda.html) is a quick way to get started.
 
 ### Dependencies setup
 
 
-We provide a script to [generate a conda file](tools/generate_conda_file.sh), depending of the environment we want to use. This will create the environment using the Python version 3.6 with all the correct dependencies.
+We provide a script, [generate_conda_file.py](tools/generate_conda_file.py), to generate a conda-environment yaml file
+which you can use to create the target environment using the Python version 3.6 with all the correct dependencies.
 
-To install each environment, first we need to generate a conda yaml file and then install the environment. We can specify the environment name with the input `-n`.
+Assuming the repo is cloned as `nlp` in the system, to install **a default (Python CPU) environment**:
 
-Click on the following menus to see more details:
+    cd nlp
+    python tools/generate_conda_file.py
+    conda env create -f nlp_cpu.yaml 
 
-<details>
-<summary><strong><em>Python CPU environment</em></strong></summary>
+You can specify the environment name as well with the flag `-n`.
 
-Assuming the repo is cloned as `NLP` in the system, to install the Python CPU environment:
-
-    cd NLP
-    ./tools/generate_conda_file.sh
-    conda env create -n nlp_cpu -f nlp_cpu.yaml 
-
-</details>
+Click on the following menus to see how to install the Python GPU environment:
 
 <details>
 <summary><strong><em>Python GPU environment</em></strong></summary>
@@ -65,13 +57,11 @@ Assuming that you have a GPU machine, to install the Python GPU environment, whi
 </details>
 
 
-
 ### Register the conda environment in the DSVM JupyterHub
 
-DSVM comes with a preinstalled JupyterHub, which is accessible through port 8000. To access it just type in your browser `https://your-vm-ip:8000`. See more details [in this tutorial](https://docs.microsoft.com/en-us/azure/machine-learning/data-science-virtual-machine/dsvm-ubuntu-intro#jupyterhub-and-jupyterlab).
-
-When using the DSVM, we can register our created conda environment to appear as a kernel in JupyterHub. 
+We can register our created conda environment to appear as a kernel in the Jupyter notebooks.
 
     conda activate my_env_name
     python -m ipykernel install --user --name my_env_name --display-name "Python (my_env_name)"
-
+    
+If you are using the DSVM, you can [connect to JupyterHub](https://docs.microsoft.com/en-us/azure/machine-learning/data-science-virtual-machine/dsvm-ubuntu-intro#jupyterhub-and-jupyterlab) by browsing to `https://your-vm-ip:8000`.
