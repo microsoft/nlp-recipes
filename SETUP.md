@@ -50,7 +50,7 @@ Click on the following menus to see how to install the Python GPU environment:
 
 Assuming that you have a GPU machine, to install the Python GPU environment, which by default installs the CPU environment:
 
-    cd NLP
+    cd nlp
     ./tools/generate_conda_file.sh --gpu
     conda env create -n nlp_gpu -f nlp_gpu.yaml 
 
