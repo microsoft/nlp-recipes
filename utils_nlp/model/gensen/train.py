@@ -198,7 +198,7 @@ def train(config, data_folder, learning_rate=0.0001):
                                              compression=compression)
 
         n_gpus = config["training"]["n_gpus"]
-        # model = torch.nn.DataParallel(model, device_ids=range(n_gpus))
+        model = torch.nn.DataParallel(model, device_ids=range(n_gpus))
 
         # Use Adam optimizer.
         # optimizer = optim.Adam(model.parameters(), lr=learning_rate)
@@ -219,7 +219,7 @@ def train(config, data_folder, learning_rate=0.0001):
         min_val_loss_epoch = -1
         model_state = {}
         break_flag = 0
-
+        start_training = time.time()
         while True:
             start = time.time()
             # Train NLI once every 10 minibatches of other tasks
@@ -398,8 +398,8 @@ def train(config, data_folder, learning_rate=0.0001):
                         model_state = model.state_dict()
                     print(monitor_epoch, min_val_loss_epoch, min_val_loss)
                     logging.info(
-                        "Monitor epoch: %d Min Validation Epoch: %d Loss : %.3f" % (
-                            monitor_epoch, min_val_loss_epoch, min_val_loss)
+                        "Monitor epoch: %d Validation Loss:  %.3f Min Validation Epoch: %d Loss : %.3f" % (
+                            monitor_epoch, validation_loss, min_val_loss_epoch, min_val_loss)
                     )
                     if monitor_epoch - min_val_loss_epoch > config['training']['stop_patience']:
                         logging.info("Saving model ...")
@@ -414,7 +414,9 @@ def train(config, data_folder, learning_rate=0.0001):
                         break_flag = 1
                         break
                 if break_flag == 1:
+                    end_training = time.time()
                     logging.info("##### Training stopped at ##### %f" % min_val_loss)
+                    logging.info("##### Training Time ##### %f seconds" % (end_training-start_training))
                     break
                 logging.info("Evaluating on NLI")
                 n_correct = 0.0
