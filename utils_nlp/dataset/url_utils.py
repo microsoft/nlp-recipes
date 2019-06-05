@@ -4,28 +4,13 @@
 import os
 import requests
 import logging
+import math
 from contextlib import contextmanager
 from tempfile import TemporaryDirectory
 from tqdm import tqdm
 
 
 log = logging.getLogger(__name__)
-
-
-class TqdmUpTo(tqdm):
-    """Wrapper class for the progress bar tqdm to get `update_to(n)` functionality"""
-
-    def update_to(self, b=1, bsize=1, tsize=None):
-        """A progress bar showing how much is left to finish the opperation
-        
-        Args:
-            b (int): Number of blocks transferred so far.
-            bsize (int): Size of each block (in tqdm units).
-            tsize (int): Total size (in tqdm units). 
-        """
-        if tsize is not None:
-            self.total = tsize
-        self.update(b * bsize - self.n)  # will also set self.n = b * bsize
 
 
 def maybe_download(
@@ -46,9 +31,20 @@ def maybe_download(
         filename = url.split("/")[-1]
     filepath = os.path.join(work_directory, filename)
     if not os.path.exists(filepath):
-        r = requests.get(url)
+
+        r = requests.get(url, stream=True)
+        total_size = int(r.headers.get("content-length", 0))
+        block_size = 1024
+        num_iterables = math.ceil(total_size // block_size)
+
         with open(filepath, "wb") as file:
-            file.write(r.content)
+            for data in tqdm(
+                r.iter_content(block_size),
+                total=num_iterables,
+                unit="KB",
+                unit_scale=True,
+            ):
+                file.write(data)
     else:
         log.debug("File {} already downloaded".format(filepath))
     if expected_bytes is not None:
