@@ -134,6 +134,8 @@ class GenSenClassifier:
 
         """
 
+        self._validate_params()
+
         # Use only if you have the model trained and saved.
         # self.cache_dir = os.path.join(self.cache_dir, "clean/snli_1.0")
         self._create_multiseq2seq_model()
