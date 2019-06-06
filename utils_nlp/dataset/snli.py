@@ -93,9 +93,8 @@ def download_snli(dest_path):
         file_path: file path where SNLI dataset is downloaded
 
     """
-    url = SNLI_URL
     dirs, file = os.path.split(dest_path)
-    maybe_download(url, file, work_directory=dirs)
+    maybe_download(SNLI_URL, file, work_directory=dirs)
 
 
 def extract_snli(zip_path, source_file_name, dest_path):
@@ -112,7 +111,7 @@ def extract_snli(zip_path, source_file_name, dest_path):
             shutil.copyfileobj(zf, f)
 
 
-def clean_snli(source_file_path, dest_file_path):
+def clean_snli(source_file_path):
     """
         Remove the extra columns from the input dataframe
     Args:
@@ -146,12 +145,6 @@ def clean_snli(source_file_path, dest_file_path):
     )
 
     snli_df = snli_df.rename(index=str, columns={"gold_label": "score"})
-
-    dirs, _ = os.path.split(dest_file_path)
-    if not os.path.exists(dirs):
-        os.makedirs(dirs)
-
-    snli_df.to_csv(dest_file_path, sep="\t")
 
     return snli_df
 
