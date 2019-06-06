@@ -217,9 +217,8 @@ def train(config, data_folder, learning_rate=0.0001):
             logging.info("Loading model from specified checkpoint %s " % load_dir)
             model.load_state_dict(torch.load(open(load_dir, encoding="utf-8")))
 
-        # lr = learning_rate
-        # lr = config['training']['lrate']
-        # optimizer = optim.Adam(model.parameters(), lr=lr)
+        # Use Adam optimizer.
+        # optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
         task_losses = [[] for task in tasknames]
         task_idxs = [0 for task in tasknames]
