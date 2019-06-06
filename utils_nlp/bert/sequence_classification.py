@@ -47,7 +47,8 @@ class SequenceClassifier:
         self,
         tokens,
         input_mask,
-        labels,        
+        labels,    
+        token_type_ids=None,    
         device="gpu",
         use_multiple_gpus=True,
         num_epochs=1,
@@ -127,11 +128,16 @@ class SequenceClassifier:
                     mask_batch = torch.tensor(
                         input_mask[start:end], dtype=torch.long, device=device
                     )
+                    token_type_ids_batch = None
+                    if token_type_ids is not None:
+                        token_type_ids_batch = torch.tensor(
+                            token_type_ids[start:end], dtype=torch.long, device=device
+                        )
 
                     opt.zero_grad()
                     y_h = self._model(
                         input_ids=x_batch,
-                        token_type_ids=None,
+                        token_type_ids=token_type_ids_batch,
                         attention_mask=mask_batch,
                         labels=None,
                     )

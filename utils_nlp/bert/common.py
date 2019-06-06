@@ -35,7 +35,12 @@ class Tokenizer:
         self.language = language
 
     def tokenize(self, text):
-        tokens = [self.tokenizer.tokenize(x) for x in text]
+        # TODO: reload module
+        # TODO: check for text not to be string... 
+        try:
+            tokens = [[self.tokenizer.tokenize(x) for x in sentences] for sentences in text]
+        except TypeError:
+            tokens = [self.tokenizer.tokenize(x) for x in text]
         return tokens
 
     def preprocess_classification_tokens(self, tokens, max_len):
@@ -60,11 +65,26 @@ class Tokenizer:
             max_len = BERT_MAX_LEN
 
         # truncate and add BERT sentence markers
-        tokens = [["[CLS]"] + x[0 : max_len - 2] + ["[SEP]"] for x in tokens]
+        def truncate_and_add_sentence_marker(t):
+            return [x[0 : max_len - 2] + ["[SEP]"] for x in t]
+
+        # duck-typing... https://stackoverflow.com/questions/1952464/in-python-how-do-i-determine-if-an-object-is-iterable
+        try:
+            # get tokens for each sentence [[t00, t01, ...] [t10, t11,... ]] 
+            tokens = [truncate_and_add_sentence_marker(sentence) for sentence in tokens]
+            # construct token_type_ids [0, 0, 0, 0, ... 0, 1, 1, 1, ... 1]
+            token_type_ids = [id for id, sentence in enumerate(tokens) for _ in range(len(sentence))]
+            # flatten the tokens
+            tokens = [t for sentence in tokens for t in sentence]
+        except TypeError:
+            tokens = truncate_and_add_sentence_marker(tokens)
+            token_type_ids = None
+
+        tokens = ["[CLS]"] + tokens
         # convert tokens to indices
         tokens = [self.tokenizer.convert_tokens_to_ids(x) for x in tokens]
         # pad sequence
         tokens = [x + [0] * (max_len - len(x)) for x in tokens]
         # create input mask
         input_mask = [[min(1, x) for x in y] for y in tokens]
-        return tokens, input_mask
+        return tokens, input_mask, token_type_ids
