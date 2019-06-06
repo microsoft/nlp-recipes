@@ -15,7 +15,7 @@ def download(dir_path):
     """Downloads and extracts the dataset files"""
     file_name = URL.split("/")[-1]
     maybe_download(URL, file_name, dir_path)
-    extract_tar(os.path.join(dir_path, file_name))
+    extract_tar(os.path.join(dir_path, file_name), dir_path)
 
 
 def read_data(data_file, nrows=None):

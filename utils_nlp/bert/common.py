@@ -23,7 +23,7 @@ class Tokenizer:
     def __init__(
         self, language=Language.ENGLISH, to_lower=False, cache_dir="."
     ):
-        """Initializes the tokenizer and the underlying pretrained tokenizer.
+        """Initializes the underlying pretrained BERT tokenizer.
         Args:
             language (Language, optional): The pretrained model's language.
                                            Defaults to Language.ENGLISH.
@@ -35,23 +35,34 @@ class Tokenizer:
         self.language = language
 
     def tokenize(self, text):
+        """Uses a BERT tokenizer 
+
+        Args:
+            text (list): [description]
+
+        Returns:
+            [list]: [description]
+        """
         # TODO: reload module
-        # TODO: check for text not to be string... 
+        # TODO: check for text not to be string...
         try:
-            tokens = [[self.tokenizer.tokenize(x) for x in sentences] for sentences in text]
+            tokens = [[self.tokenizer.tokenize(
+                x) for x in sentences] for sentences in text]
         except TypeError:
             tokens = [self.tokenizer.tokenize(x) for x in text]
         return tokens
 
-    def preprocess_classification_tokens(self, tokens, max_len):
+    def preprocess_classification_tokens(self, tokens, max_len=BERT_MAX_LEN):
         """Preprocessing of input tokens:
             - add BERT sentence markers ([CLS] and [SEP])
             - map tokens to indices
-            - pad and truncate sequences 
+            - pad and truncate sequences
             - create an input_mask    
         Args:
-            tokens ([type]): List of tokens to preprocess.
-            max_len ([type]): Maximum length of sequence.        
+            tokens (list): List of tokens to preprocess.
+            max_len (int, optional): Maximum number of tokens
+                            (documents will be truncated or padded).
+                            Defaults to 512.
         Returns:
             list of preprocesssed token lists
             list of input mask lists
@@ -70,10 +81,12 @@ class Tokenizer:
 
         # duck-typing... https://stackoverflow.com/questions/1952464/in-python-how-do-i-determine-if-an-object-is-iterable
         try:
-            # get tokens for each sentence [[t00, t01, ...] [t10, t11,... ]] 
-            tokens = [truncate_and_add_sentence_marker(sentence) for sentence in tokens]
+            # get tokens for each sentence [[t00, t01, ...] [t10, t11,... ]]
+            tokens = [truncate_and_add_sentence_marker(
+                sentence) for sentence in tokens]
             # construct token_type_ids [0, 0, 0, 0, ... 0, 1, 1, 1, ... 1]
-            token_type_ids = [id for id, sentence in enumerate(tokens) for _ in range(len(sentence))]
+            token_type_ids = [id for id, sentence in enumerate(
+                tokens) for _ in range(len(sentence))]
             # flatten the tokens
             tokens = [t for sentence in tokens for t in sentence]
         except TypeError:
