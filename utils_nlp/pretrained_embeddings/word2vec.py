@@ -74,7 +74,7 @@ def _maybe_download_and_extract(dest_path, file_name):
 
 
 def load_pretrained_vectors(
-    dir_path, file_name="GoogleNews-vectors-negative300.bin"
+    dir_path, file_name="GoogleNews-vectors-negative300.bin", limit=None
 ):
     """ Method that loads word2vec vectors. Downloads if it doesn't exist.
 
@@ -82,6 +82,8 @@ def load_pretrained_vectors(
         file_name(str): Name of the word2vec file.
         dir_path(str): Path to the directory where word2vec vectors exist or will be
         downloaded.
+        limit(int): Number of word vectors that is loaded from gensim. This option
+        allows us to save RAM space and avoid memory errors.
 
     Returns:
         gensim.models.keyedvectors.Word2VecKeyedVectors: Loaded word2vectors
@@ -89,7 +91,7 @@ def load_pretrained_vectors(
     """
     file_path = _maybe_download_and_extract(dir_path, file_name)
     word2vec_vectors = KeyedVectors.load_word2vec_format(
-        file_path, binary=True
+        file_path, binary=True, limit=limit
     )
 
     return word2vec_vectors

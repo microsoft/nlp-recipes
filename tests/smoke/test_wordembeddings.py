@@ -35,8 +35,8 @@ def test_load_pretrained_vectors_glove(tmp_path):
 
 @pytest.mark.smoke
 def test_load_pretrained_vectors_fasttext(tmp_path):
-    filename = "wiki.en.bin"
+    filename = "wiki.simple.bin"
     load_fasttext(tmp_path)
     filepath = os.path.join(os.path.join(tmp_path, "fastText"), filename)
     statinfo = os.stat(filepath)
-    assert statinfo.st_size == 8493673445
+    assert statinfo.st_size == 2668450750

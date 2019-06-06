@@ -32,7 +32,7 @@ def to_lowercase(df, column_names=[]):
         pd.DataFrame: Dataframe with columns with lowercase standardization.
     """
     if not column_names:
-        to_lowercase_all(df)
+        return to_lowercase_all(df)
     else:
         df[column_names] = df[column_names].applymap(
             lambda s: s.lower() if type(s) == str else s
@@ -98,12 +98,11 @@ def rm_spacy_stopwords(
             nlp.vocab[csw].is_stop = True
     text_df = df[sentence_cols]
     nlp_df = text_df.applymap(lambda x: nlp(x))
-    tok_df = nlp_df.applymap(
+    stop_df = nlp_df.applymap(
         lambda doc: [token.text for token in doc if not token.is_stop]
     )
-    tok_df.columns = stop_cols
-    tokenized = pd.concat([df, tok_df], axis=1)
-    return tokenized
+    stop_df.columns = stop_cols
+    return pd.concat([df, stop_df], axis=1)
 
 
 def to_nltk_tokens(
@@ -125,11 +124,13 @@ def to_nltk_tokens(
     """
 
     nltk.download("punkt")
-    df[token_cols] = df[sentence_cols].applymap(
+    text_df = df[sentence_cols]
+    tok_df = text_df.applymap(
         lambda sentence: nltk.word_tokenize(sentence)
     )
-    pd.concat([df[sentence_cols], df[token_cols]], axis=1)
-    return df
+    tok_df.columns = token_cols
+    tokenized = pd.concat([df, tok_df], axis=1)
+    return tokenized
 
 
 def rm_nltk_stopwords(
@@ -154,12 +155,14 @@ def rm_nltk_stopwords(
         list of tokens for their respective sentences.
     """
 
+    nltk.download("stopwords")
     stop_words = tuple(stopwords.words("english"))
-
-    df[stop_cols] = (
-        df[sentence_cols]
+    text_df = df[sentence_cols]
+    stop_df = (
+        text_df
         .applymap(lambda sentence: nltk.word_tokenize(sentence))
         .applymap(lambda l: [word for word in l if word not in stop_words])
     )
 
-    return df
+    stop_df.columns = stop_cols
+    return pd.concat([df, stop_df], axis=1)
