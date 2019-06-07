@@ -1,18 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# Copyright (c) Microsoft Corporation. All rights reserved.
-# Licensed under the MIT License.
-
-"""
-The GenSen training process follows the steps:
-1. Create or load the dataset vocabulary
-2. Train on the training dataset for each batch epoch (batch size = 48 updates)
-3. Evaluate on the validation dataset for every 10 epoches
-4. Find the local minimum point on validation loss
-5. Save the best model and stop the training process
-
-AzureML provides AI Compute to train the model and track the performance.
-"""
+"""Run script."""
 import logging
 import argparse
 import os
@@ -22,15 +10,15 @@ import time
 
 import numpy as np
 import torch
+import horovod.torch as hvd
 import torch.backends.cudnn as cudnn
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from azureml.core.run import Run
-import horovod.torch as hvd
 
-from multi_task_model import MultitaskModel
-from utils import (
+from utils_nlp.model.gensen.models import MultitaskModel
+from utils_nlp.model.gensen.utils import (
     BufferedDataIterator,
     NLIIterator,
     compute_validation_loss,
@@ -44,19 +32,10 @@ run = Run.get_context()
 cudnn.benchmark = True
 
 hvd.init()
+
 if torch.cuda.is_available():
     # Horovod: pin GPU to local rank.
     torch.cuda.set_device(hvd.local_rank())
-
-"""
-parser = argparse.ArgumentParser()
-parser.add_argument("--config", help="path to json config", required=True)
-parser.add_argument("--data_folder", type=str, help="data folder")
-# Add learning rate to tune model.
-parser.add_argument(
-    "--learning_rate", type=float, default=0.0001, help="learning rate"
-)
-"""
 
 
 def train(config, data_folder, learning_rate=0.0001):
@@ -89,7 +68,9 @@ def train(config, data_folder, learning_rate=0.0001):
 
         console = logging.StreamHandler()
         console.setLevel(logging.INFO)
-        formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+        formatter = logging.Formatter(
+            "%(asctime)s - %(levelname)s - %(message)s"
+        )
         console.setFormatter(formatter)
         logging.getLogger("").addHandler(console)
 
@@ -106,7 +87,10 @@ def train(config, data_folder, learning_rate=0.0001):
         tasknames = [item["taskname"] for item in config["data"]["paths"]]
 
         # Keep track of indicies to train forward and backward jointly
-        if "skipthought_next" in tasknames and "skipthought_previous" in tasknames:
+        if (
+            "skipthought_next" in tasknames
+            and "skipthought_previous" in tasknames
+        ):
             skipthought_idx = tasknames.index("skipthought_next")
             skipthought_backward_idx = tasknames.index("skipthought_previous")
             paired_tasks = {
@@ -142,7 +126,8 @@ def train(config, data_folder, learning_rate=0.0001):
 
         logging.info("Finished creating iterator ...")
         logging.info(
-            "Found %d words in source : " % (len(train_iterator.src[0]["id2word"]))
+            "Found %d words in source : "
+            % (len(train_iterator.src[0]["id2word"]))
         )
         for idx, taskname in enumerate(tasknames):
             logging.info(
@@ -153,15 +138,22 @@ def train(config, data_folder, learning_rate=0.0001):
         logging.info("Model Parameters : ")
         logging.info("Task : %s " % (config["data"]["task"]))
         logging.info(
-            "Source Word Embedding Dim  : %s" % (config["model"]["dim_word_src"])
+            "Source Word Embedding Dim  : %s"
+            % (config["model"]["dim_word_src"])
         )
         logging.info(
-            "Target Word Embedding Dim  : %s" % (config["model"]["dim_word_trg"])
+            "Target Word Embedding Dim  : %s"
+            % (config["model"]["dim_word_trg"])
         )
-        logging.info("Source RNN Hidden Dim  : %s" % (config["model"]["dim_src"]))
-        logging.info("Target RNN Hidden Dim  : %s" % (config["model"]["dim_trg"]))
         logging.info(
-            "Source RNN Bidirectional  : %s" % (config["model"]["bidirectional"])
+            "Source RNN Hidden Dim  : %s" % (config["model"]["dim_src"])
+        )
+        logging.info(
+            "Target RNN Hidden Dim  : %s" % (config["model"]["dim_trg"])
+        )
+        logging.info(
+            "Source RNN Bidirectional  : %s"
+            % (config["model"]["bidirectional"])
         )
         logging.info("Batch Size : %d " % (config["training"]["batch_size"]))
         logging.info("Optimizer : %s " % (config["training"]["optimizer"]))
@@ -192,9 +184,14 @@ def train(config, data_folder, learning_rate=0.0001):
         ).cuda()
 
         logging.info(model)
+
         """Using Horovod"""
         # Horovod: scale learning rate by the number of GPUs.
-        optimizer = optim.Adam(model.parameters(), lr=learning_rate * hvd.size())
+        optimizer = optim.Adam(
+            model.parameters(), lr=learning_rate * hvd.size()
+        )
+        # optimizer = optim.SGD(model.parameters(), lr=args.lr * hvd.size(),
+        # momentum=args.momentum)
 
         # Horovod: broadcast parameters & optimizer state.
         hvd.broadcast_parameters(model.state_dict(), root_rank=0)
@@ -204,9 +201,11 @@ def train(config, data_folder, learning_rate=0.0001):
         compression = hvd.Compression.fp16
 
         # Horovod: wrap optimizer with DistributedOptimizer.
-        optimizer = hvd.DistributedOptimizer(optimizer,
-                                             named_parameters=model.named_parameters(),
-                                             compression=compression)
+        optimizer = hvd.DistributedOptimizer(
+            optimizer,
+            named_parameters=model.named_parameters(),
+            compression=compression,
+        )
 
         n_gpus = config["training"]["n_gpus"]
         model = torch.nn.DataParallel(model, device_ids=range(n_gpus))
@@ -222,15 +221,15 @@ def train(config, data_folder, learning_rate=0.0001):
         nli_epoch = 0
         monitor_epoch = 0
         nli_mbatch_ctr = 0
+        model_state = {}
         mbatch_times = []
         logging.info("Commencing Training ...")
         rng_num_tasks = len(tasknames) - 1 if paired_tasks else len(tasknames)
 
         min_val_loss = 10000000
         min_val_loss_epoch = -1
-        model_state = {}
         break_flag = 0
-        start_training = time.time()
+
         while True:
             start = time.time()
             # Train NLI once every 10 minibatches of other tasks
@@ -291,19 +290,23 @@ def train(config, data_folder, learning_rate=0.0001):
                     )
                     task_idxs[skipthought_backward_idx] += batch_size * n_gpus
                     if (
-                            task_idxs[skipthought_backward_idx]
-                            >= train_iterator.buffer_size
+                        task_idxs[skipthought_backward_idx]
+                        >= train_iterator.buffer_size
                     ):
                         train_iterator.fetch_buffer(skipthought_backward_idx)
                         task_idxs[skipthought_backward_idx] = 0
 
                     optimizer.zero_grad()
                     decoder_logit, decoder_logit_2 = model(
-                        minibatch, task_idx, paired_trg=minibatch_back["input_trg"]
+                        minibatch,
+                        task_idx,
+                        paired_trg=minibatch_back["input_trg"],
                     )
 
                     loss_f = loss_criterion(
-                        decoder_logit.contiguous().view(-1, decoder_logit.size(2)),
+                        decoder_logit.contiguous().view(
+                            -1, decoder_logit.size(2)
+                        ),
                         minibatch["output_trg"].contiguous().view(-1),
                     )
 
@@ -315,7 +318,9 @@ def train(config, data_folder, learning_rate=0.0001):
                     )
 
                     task_losses[task_idx].append(loss_f.data[0])
-                    task_losses[skipthought_backward_idx].append(loss_b.data[0])
+                    task_losses[skipthought_backward_idx].append(
+                        loss_b.data[0]
+                    )
                     loss = loss_f + loss_b
 
                 else:
@@ -323,7 +328,9 @@ def train(config, data_folder, learning_rate=0.0001):
                     decoder_logit = model(minibatch, task_idx)
 
                     loss = loss_criterion(
-                        decoder_logit.contiguous().view(-1, decoder_logit.size(2)),
+                        decoder_logit.contiguous().view(
+                            -1, decoder_logit.size(2)
+                        ),
                         minibatch["output_trg"].contiguous().view(-1),
                     )
 
@@ -337,8 +344,8 @@ def train(config, data_folder, learning_rate=0.0001):
             mbatch_times.append(end - start)
 
             if (
-                    updates % config["management"]["monitor_loss"] == 0
-                    and updates != 0
+                updates % config["management"]["monitor_loss"] == 0
+                and updates != 0
             ):
                 monitor_epoch += 1
                 for idx, task in enumerate(tasknames):
@@ -366,9 +373,12 @@ def train(config, data_folder, learning_rate=0.0001):
                 run.log("NLI Examples Processed :", nli_mbatch_ctr)
                 run.log("NLI Loss : ", np.mean(nli_losses))
                 logging.info(
-                    "Average time per mininbatch : %.5f" % (np.mean(mbatch_times))
+                    "Average time per mininbatch : %.5f"
+                    % (np.mean(mbatch_times))
                 )
-                run.log("Average time per mininbatch : ", np.mean(mbatch_times))
+                run.log(
+                    "Average time per mininbatch : ", np.mean(mbatch_times)
+                )
 
                 logging.info(
                     "******************************************************"
@@ -406,33 +416,41 @@ def train(config, data_folder, learning_rate=0.0001):
                         min_val_loss_epoch = monitor_epoch
                         model_state = model.state_dict()
                     print(monitor_epoch, min_val_loss_epoch, min_val_loss)
-                    logging.info(
-                        "Monitor epoch: %d Validation Loss:  %.3f Min Validation Epoch: %d Loss : %.3f" % (
-                            monitor_epoch, validation_loss, min_val_loss_epoch, min_val_loss)
-                    )
-                    if monitor_epoch - min_val_loss_epoch > config['training']['stop_patience']:
+                    if (
+                        monitor_epoch - min_val_loss_epoch
+                        > config["training"]["stop_patience"]
+                    ):
                         logging.info("Saving model ...")
                         # Save the name with validation loss.
                         torch.save(
                             model_state,
-                            open(os.path.join(save_dir,
-                                              "best_model.model"),
-                                 "wb"),
+                            open(
+                                os.path.join(save_dir, "best_model.model"),
+                                "wb",
+                            ),
                         )
+
+                        torch.save(
+                            model.state_dict(),
+                            open(
+                                os.path.join(save_dir, "best_model.model"),
+                                "wb",
+                            ),
+                        )
+
                         # Let the training end.
                         break_flag = 1
                         break
                 if break_flag == 1:
-                    end_training = time.time()
-                    logging.info("##### Training stopped at ##### %f" % min_val_loss)
                     logging.info(
-                        "##### Training Time ##### %f seconds" % (end_training - start_training))
+                        "##### Training stopped at ##### %f" % min_val_loss
+                    )
                     break
                 logging.info("Evaluating on NLI")
                 n_correct = 0.0
                 n_wrong = 0.0
                 for j in range(
-                        0, len(nli_iterator.dev_lines), batch_size * n_gpus
+                    0, len(nli_iterator.dev_lines), batch_size * n_gpus
                 ):
                     minibatch = nli_iterator.get_parallel_minibatch(
                         j, batch_size * n_gpus, "dev"
@@ -441,7 +459,10 @@ def train(config, data_folder, learning_rate=0.0001):
                         minibatch, -1, return_hidden=False, paired_trg=None
                     )
                     class_preds = (
-                        F.softmax(class_logits).data.cpu().numpy().argmax(axis=-1)
+                        F.softmax(class_logits)
+                        .data.cpu()
+                        .numpy()
+                        .argmax(axis=-1)
                     )
                     labels = minibatch["labels"].data.cpu().numpy()
                     for pred, label in zip(class_preds, labels):
@@ -455,7 +476,7 @@ def train(config, data_folder, learning_rate=0.0001):
                 n_correct = 0.0
                 n_wrong = 0.0
                 for j in range(
-                        0, len(nli_iterator.test_lines), batch_size * n_gpus
+                    0, len(nli_iterator.test_lines), batch_size * n_gpus
                 ):
                     minibatch = nli_iterator.get_parallel_minibatch(
                         j, batch_size * n_gpus, "test"
@@ -464,7 +485,10 @@ def train(config, data_folder, learning_rate=0.0001):
                         minibatch, -1, return_hidden=False, paired_trg=None
                     )
                     class_preds = (
-                        F.softmax(class_logits).data.cpu().numpy().argmax(axis=-1)
+                        F.softmax(class_logits)
+                        .data.cpu()
+                        .numpy()
+                        .argmax(axis=-1)
                     )
                     labels = minibatch["labels"].data.cpu().numpy()
                     for pred, label in zip(class_preds, labels):
@@ -488,20 +512,18 @@ def train(config, data_folder, learning_rate=0.0001):
 
 def read_config(json_file):
     """Read JSON config."""
-    json_object = json.load(open(json_file, 'r', encoding='utf-8'))
+    json_object = json.load(open(json_file, "r", encoding="utf-8"))
     return json_object
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--config",
-        help="path to json config",
-        required=True
-    )
-    parser.add_argument('--data_folder', type=str, help='data folder')
+    parser.add_argument("--config", help="path to json config", required=True)
+    parser.add_argument("--data_folder", type=str, help="data folder")
     # Add learning rate to tune model.
-    parser.add_argument('--learning_rate', type=float, default=0.0001, help='learning rate')
+    parser.add_argument(
+        "--learning_rate", type=float, default=0.0001, help="learning rate"
+    )
 
     args = parser.parse_args()
     data_folder = args.data_folder
