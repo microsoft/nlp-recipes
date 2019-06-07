@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License.
+
 """Parent model for Multitask Training."""
 import torch
 import torch.nn as nn
@@ -7,7 +10,7 @@ from conditional_gru import ConditionalGRU
 
 
 class MultitaskModel(nn.Module):
-    r"""A Multi Task Sequence to Sequence (Seq2Seq) model with GRUs.
+    """A Multi Task Sequence to Sequence (Seq2Seq) model with GRUs.
 
     Auxiliary NLI task trained jointly as well.
     Ref: Multi-Task Sequence to Sequence Learning
