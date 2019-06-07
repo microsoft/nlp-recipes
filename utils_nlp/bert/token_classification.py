@@ -1,9 +1,9 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
-"""This script reuses some code from
-https://github.com/huggingface/pytorch-pretrained-BERT/blob/master/examples
-/run_classifier.py"""
+# This script reuses some code from
+# https://github.com/huggingface/pytorch-pretrained-BERT/blob/master/examples
+# /run_classifier.py
 
 import numpy as np
 from tqdm import tqdm, trange
@@ -14,7 +14,7 @@ import torch.nn as nn
 from pytorch_pretrained_bert.optimization import BertAdam
 from pytorch_pretrained_bert.modeling import BertForTokenClassification
 
-from .common_ner import Language, create_data_loader
+from .common import Language, create_data_loader
 
 from utils_nlp.pytorch.device_utils import get_device, move_to_device
 
