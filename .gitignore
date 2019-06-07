@@ -103,6 +103,7 @@ venv.bak/
 # mypy
 .mypy_cache/
 
+
 ##########################
 .DS_Store
 .~*
@@ -121,3 +122,9 @@ tools/repo_metrics/config.py
 *.jar
 *.item
 *.pkl
+nlp_*.yaml
+
+# Data
+data/
+sentence-similarity/data/
+
