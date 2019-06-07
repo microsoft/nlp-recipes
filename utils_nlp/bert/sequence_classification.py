@@ -92,69 +92,81 @@ class SequenceClassifier:
         opt = BertAdam(optimizer_grouped_parameters, lr=lr)
 
         # define loss function
-        loss_func = nn.CrossEntropyLoss().to(device)
+        # loss_func = nn.CrossEntropyLoss().to(device)
+
+        class WeightedLogLoss(torch.nn.Module):
+            def __init__(self):
+                super(WeightedLogLoss, self).__init__()
+
+            def forward(self, outputs, labels):
+                logits = torch.nn.functional.log_softmax(outputs, dim=-1)
+                # labels = torch.transpose(labels, 0, 1)
+
+                weighted_logits = labels.float() * logits
+
+                # print("labels:   {}".format(labels.size()))
+                # print("logits:   {}".format(logits.size()))
+                # print("weighted: {}".format(weighted_logits.size()))
+
+                return -torch.sum(weighted_logits)
+
+        loss_func = WeightedLogLoss().to(device)
 
         # train
         self.model.train()  # training mode
         num_examples = len(token_ids)
         num_batches = int(num_examples / batch_size)
 
-        for epoch in range(num_epochs):
-            for i in range(num_batches):
+        x_batch = y_batch = mask_batch = token_type_ids_batch = None
 
-                # get random batch
-                start = int(random.random() * num_examples)
-                end = start + batch_size
-                x_batch = torch.tensor(
-                    token_ids[start:end], dtype=torch.long, device=device
-                )
-                y_batch = torch.tensor(
-                    labels[start:end], dtype=torch.long, device=device
-                )
-                mask_batch = torch.tensor(
-                    input_mask[start:end], dtype=torch.long, device=device
-                )
+        with tqdm(total=num_epochs * num_examples) as pbar:
+            for epoch in range(num_epochs):
+                for i in range(num_batches):
+                    # data is assumed to be shuffled
+                    start = i * batch_size
+                    end = start + batch_size
+                    x_batch = torch.tensor(
+                        token_ids[start:end], dtype=torch.long, device=device
+                    )
+                    y_batch = torch.tensor(
+                        labels[start:end], dtype=torch.long, device=device
+                    )
+                    mask_batch = torch.tensor(
+                        input_mask[start:end], dtype=torch.long, device=device
+                    )
+                    if token_type_ids is not None:
+                        token_type_ids_batch = torch.tensor(
+                            token_type_ids[start:end], dtype=torch.long, device=device
+                        )
 
-                token_type_ids_batch = None
-                if token_type_ids is not None:
-                    token_type_ids_batch = torch.tensor(
-                        token_type_ids[start:end], dtype=torch.long, device=device
+                    opt.zero_grad()
+
+                    y_h = self.model(
+                        input_ids=x_batch,
+                        token_type_ids=token_type_ids_batch,
+                        attention_mask=mask_batch,
+                        labels=None,
                     )
 
-                opt.zero_grad()
+                    loss = loss_func(y_h, y_batch).mean()
+                    loss.backward()
+                    opt.step()
 
-                y_h = self.model(
-                    input_ids=x_batch,
-                    token_type_ids=None,
-                    attention_mask=mask_batch,
-                    labels=None,
-                )
+                    pbar.update(batch_size)
+                    if i % 10 == 0:
+                        pbar.set_description(
+                            "epoch:{}/{}; loss:{:.6f}".format(epoch, num_epochs, loss.data))
 
-                loss = loss_func(y_h, y_batch).mean()
-                loss.backward()
-                opt.step()
-                if verbose:
-                    if i % ((num_batches // 10) + 1) == 0:
-                        print(
-                            "epoch:{}/{}; batch:{}->{}/{}; loss:{:.6f}".format(
-                                epoch + 1,
-                                num_epochs,
-                                i + 1,
-                                i + 1 + (num_batches // 10),
-                                num_batches,
-                                loss.data,
-                            )
-                        )
         # empty cache
-        del [x_batch, y_batch, mask_batch]
+        del [x_batch, y_batch, mask_batch, token_type_ids_batch]
         torch.cuda.empty_cache()
 
-    def predict(self, token_ids, input_mask, num_gpus=1, batch_size=32):
+    def predict(self, token_ids, input_mask, token_type_ids=None, num_gpus=1, batch_size=32):
         """Scores the given dataset and returns the predicted classes.
         Args:
             token_ids (list): List of training token lists.
             input_mask (list): List of input mask lists.
-            num_gpus (int, optional): The number of gpus to use. 
+            num_gpus (int, optional): The number of gpus to use.
                                       If None is specified, all available GPUs will be used.
                                       Defaults to 1.
             batch_size (int, optional): Scoring batch size. Defaults to 32.
@@ -163,6 +175,9 @@ class SequenceClassifier:
         """
 
         device = get_device("cpu" if num_gpus == 0 else "gpu")
+
+        # print(self.model)
+
         self.model = move_to_device(self.model, device, num_gpus)
 
         # score
@@ -172,22 +187,35 @@ class SequenceClassifier:
             for i in range(0, len(token_ids), batch_size):
                 x_batch = token_ids[i : i + batch_size]
                 mask_batch = input_mask[i : i + batch_size]
+
                 x_batch = torch.tensor(
                     x_batch, dtype=torch.long, device=device
                 )
                 mask_batch = torch.tensor(
                     mask_batch, dtype=torch.long, device=device
                 )
+                token_type_ids_batch = None
+                if token_type_ids is not None:
+                    token_type_ids_batch = torch.tensor(
+                        token_type_ids[i : i +
+                                       batch_size], dtype=torch.long, device=device
+                    )
+
                 with torch.no_grad():
                     p_batch = self.model(
                         input_ids=x_batch,
-                        token_type_ids=None,
+                        token_type_ids=token_type_ids_batch,
                         attention_mask=mask_batch,
                         labels=None,
                     )
-                preds.append(p_batch.cpu().data.numpy())
+
+                    # final softmax
+                    p_batch = torch.nn.functional.softmax(p_batch, -1)
+
+                # only take prob for 1-class
+                preds.append(p_batch.cpu().data.numpy()[:, 0])
                 if i % batch_size == 0:
                     pbar.update(batch_size)
-        preds = [x.argmax(1) for x in preds]
+
         preds = np.concatenate(preds)
         return preds

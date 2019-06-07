@@ -3,6 +3,7 @@
 
 from pytorch_pretrained_bert.tokenization import BertTokenizer
 from enum import Enum
+from tqdm import tqdm
 
 # Max supported sequence length
 BERT_MAX_LEN = 512
@@ -35,7 +36,7 @@ class Tokenizer:
         self.language = language
 
     def tokenize(self, text):
-        """Uses a BERT tokenizer 
+        """Uses a BERT tokenizer
 
         Args:
             text (list): [description]
@@ -43,21 +44,18 @@ class Tokenizer:
         Returns:
             [list]: [description]
         """
-        # TODO: reload module
-        # TODO: check for text not to be string...
-        try:
-            tokens = [[self.tokenizer.tokenize(
-                x) for x in sentences] for sentences in text]
-        except TypeError:
-            tokens = [self.tokenizer.tokenize(x) for x in text]
-        return tokens
+
+        if isinstance(text[0], str):
+            return [self.tokenizer.tokenize(x) for x in tqdm(text)]
+        else:
+            return [[self.tokenizer.tokenize(x) for x in sentences] for sentences in tqdm(text)]
 
     def preprocess_classification_tokens(self, tokens, max_len=BERT_MAX_LEN):
         """Preprocessing of input tokens:
             - add BERT sentence markers ([CLS] and [SEP])
             - map tokens to indices
             - pad and truncate sequences
-            - create an input_mask    
+            - create an input_mask
         Args:
             tokens (list): List of tokens to preprocess.
             max_len (int, optional): Maximum number of tokens
@@ -77,23 +75,54 @@ class Tokenizer:
 
         # truncate and add BERT sentence markers
         def truncate_and_add_sentence_marker(t):
-            return [x[0 : max_len - 2] + ["[SEP]"] for x in t]
+            return
 
-        # duck-typing... https://stackoverflow.com/questions/1952464/in-python-how-do-i-determine-if-an-object-is-iterable
-        try:
-            # get tokens for each sentence [[t00, t01, ...] [t10, t11,... ]]
-            tokens = [truncate_and_add_sentence_marker(
-                sentence) for sentence in tokens]
-            # construct token_type_ids [0, 0, 0, 0, ... 0, 1, 1, 1, ... 1]
-            token_type_ids = [id for id, sentence in enumerate(
-                tokens) for _ in range(len(sentence))]
-            # flatten the tokens
-            tokens = [t for sentence in tokens for t in sentence]
-        except TypeError:
-            tokens = truncate_and_add_sentence_marker(tokens)
+        if isinstance(tokens[0], str):
+            tokens = [x[0 : max_len - 2] + ["[SEP]"] for x in tokens]
             token_type_ids = None
+        else:
 
-        tokens = ["[CLS]"] + tokens
+            def truncate_seq_pair(tokens_a, tokens_b, max_length):
+                """Truncates a sequence pair in place to the maximum length."""
+                # This is a simple heuristic which will always truncate the longer sequence
+                # one token at a time. This makes more sense than truncating an equal percent
+                # of tokens from each, since if one sequence is very short then each token
+                # that's truncated likely contains more information than a longer sequence.
+                while True:
+                    total_length = len(tokens_a) + len(tokens_b)
+                    if total_length <= max_length:
+                        break
+                    if len(tokens_a) > len(tokens_b):
+                        tokens_a.pop()
+                    else:
+                        tokens_b.pop()
+
+                tokens_a.append("[SEP]")
+                tokens_b.append("[SEP]")
+
+                return [tokens_a, tokens_b]
+
+            # print(tokens[:2])
+            # get tokens for each sentence [[t00, t01, ...] [t10, t11,... ]]
+            tokens = [truncate_seq_pair(sentence[0], sentence[1], max_len - 3)  # [CLS] + 2x [SEP]
+                      for sentence in tokens]
+
+            # construct token_type_ids [[0, 0, 0, 0, ... 0, 1, 1, 1, ... 1], [0, 0, 0, ..., 1, 1, ]
+            token_type_ids = [
+                [[i] * len(sentence) for i, sentence in enumerate(example)]
+                for example in tokens
+            ]
+            # merge sentences
+            tokens = [[token for sentence in example for token in sentence]
+                      for example in tokens]
+            # prefix with [0] for [CLS]
+            token_type_ids = [[0] + [i for sentence in example for i in sentence]
+                              for example in token_type_ids]
+            # pad sequence
+            token_type_ids = [x + [0] * (max_len - len(x))
+                              for x in token_type_ids]
+
+        tokens = [["[CLS]"] + x for x in tokens]
         # convert tokens to indices
         tokens = [self.tokenizer.convert_tokens_to_ids(x) for x in tokens]
         # pad sequence
