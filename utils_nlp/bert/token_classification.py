@@ -19,7 +19,7 @@ from .common import Language, create_data_loader
 from utils_nlp.pytorch.device_utils import get_device, move_to_device
 
 
-class BertTokenClassifier:
+class BERTTokenClassifier:
     """BERT-based token classifier."""
 
     def __init__(self, language=Language.ENGLISH, num_labels=2, cache_dir="."):
@@ -123,12 +123,12 @@ class BertTokenClassifier:
             labels (list): List of lists, each sublist contains numerical
                 token labels of an input sentence/paragraph.
             num_gpus (int, optional): The number of GPUs to use.
-                If None, all available GPUs will be used. Defaults to 1.
+                If None, all available GPUs will be used. Defaults to None.
             num_epochs (int, optional): Number of training epochs.
                 Defaults to 1.
             batch_size (int, optional): Training batch size. Defaults to 32.
             learning_rate (float, optional): learning rate of the BertAdam
-                optimizer. Defaults to 5e-5.
+                optimizer. Defaults to 2e-5.
             warmup_proportion (float, optional): Proportion of training to
                 perform linear learning rate warmup for. E.g., 0.1 = 10% of
                 training. Defaults to None.
@@ -184,7 +184,7 @@ class BertTokenClassifier:
                 tr_loss += loss.item()
                 nb_tr_steps += 1
 
-                # Update paramters based on the current gradient
+                # Update parameters based on current gradients
                 optimizer.step()
                 # Reset parameter gradients to zero
                 optimizer.zero_grad()
@@ -193,7 +193,7 @@ class BertTokenClassifier:
             print("Train loss: {}".format(train_loss))
 
     def predict(
-        self, token_ids, input_mask, labels=None, batch_size=32, num_gpus=1
+        self, token_ids, input_mask, labels=None, batch_size=32, num_gpus=None
     ):
         """
         Predict token labels on the testing data.
@@ -206,13 +206,13 @@ class BertTokenClassifier:
                 the attention mask of the input token list, 1 for input
                 tokens and 0 for padded tokens, so that padded tokens are
                 not attended to.
-            labels (list, optional): List of lists, each sublist contains
+            labels (list, optional): List of lists. Each sublist contains
                 numerical token labels of an input sentence/paragraph.
                 If provided, it's used to compute the evaluation loss.
                 Default value is None.
-            batch_size (int, optional): Training batch size. Defaults to 32.
+            batch_size (int, optional): Testing batch size. Defaults to 32.
             num_gpus (int, optional): The number of GPUs to use.
-                If None, all available GPUs will be used. Defaults to 1.
+                If None, all available GPUs will be used. Defaults to None.
 
         Returns:
             list: List of lists of predicted token labels.
@@ -317,7 +317,7 @@ def postprocess_token_labels(
     ]
 
     if remove_trailing_word_pieces and trailing_token_mask:
-        # Remove hte padded values in trailing_token_mask first
+        # Remove the padded values in trailing_token_mask first
         token_mask_no_padding = [
             [token for token, padding in zip(t_mask, p_mask) if padding == 1]
             for t_mask, p_mask in zip(trailing_token_mask, input_mask)

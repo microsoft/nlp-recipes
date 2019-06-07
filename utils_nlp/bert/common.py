@@ -93,14 +93,15 @@ class Tokenizer:
     def preprocess_ner_tokens(
         self,
         text,
-        max_seq_length=BERT_MAX_LEN,
+        max_len=BERT_MAX_LEN,
         labels=None,
         label_map=None,
         trailing_piece_tag="X",
     ):
         """
-        Preprocesses input tokens, involving the following steps
-            1. Convert input token to token ids
+        Preprocesses input text, involving the following steps
+            0. Tokenize input text.
+            1. Convert string tokens to token ids.
             2. Convert input labels to label ids, if labels and label_map are
                 provided.
             3. If a word is tokenized into multiple pieces of tokens by the
@@ -111,7 +112,7 @@ class Tokenizer:
 
         Args:
             text (list): List of input sentences/paragraphs.
-            max_seq_length (int, optional): Maximum length of the list of
+            max_len (int, optional): Maximum length of the list of
                 tokens. Lists longer than this are truncated and shorter
                 ones are padded with "O"s. Default value is BERT_MAX_LEN=512.
             labels (list, optional): List of token label lists. Default
@@ -119,7 +120,7 @@ class Tokenizer:
             label_map (dict, optional): Dictionary for mapping original token
                 labels (which may be string type) to integers. Default value
                 is None.
-            trailing_piece_tag (str, optional): Tags used to label trailing
+            trailing_piece_tag (str, optional): Tag used to label trailing
                 word pieces. For example, "playing" is broken into "play"
                 and "##ing", "play" preserves its original label and "##ing"
                 is labeled as trailing_piece_tag. Default value is "X".
@@ -144,13 +145,13 @@ class Tokenizer:
                     each sublist contains token labels of a input
                     sentence/paragraph, if labels is provided.
         """
-        if max_seq_length > BERT_MAX_LEN:
+        if max_len > BERT_MAX_LEN:
             warnings.warn(
                 "setting max_len to max allowed tokens: {}".format(
                     BERT_MAX_LEN
                 )
             )
-            max_seq_length = BERT_MAX_LEN
+            max_len = BERT_MAX_LEN
 
         label_available = True
         if labels is None:
@@ -173,9 +174,9 @@ class Tokenizer:
                     new_labels.append(tag)
                     tokens.append(sub_word)
 
-            if len(tokens) > max_seq_length:
-                tokens = tokens[:max_seq_length]
-                new_labels = new_labels[:max_seq_length]
+            if len(tokens) > max_len:
+                tokens = tokens[:max_len]
+                new_labels = new_labels[:max_len]
 
             input_ids = self.tokenizer.convert_tokens_to_ids(tokens)
 
@@ -184,8 +185,8 @@ class Tokenizer:
             input_mask = [1.0] * len(input_ids)
 
             # Zero-pad up to the max sequence length.
-            padding = [0.0] * (max_seq_length - len(input_ids))
-            label_padding = ["O"] * (max_seq_length - len(input_ids))
+            padding = [0.0] * (max_len - len(input_ids))
+            label_padding = ["O"] * (max_len - len(input_ids))
 
             input_ids += padding
             input_mask += padding

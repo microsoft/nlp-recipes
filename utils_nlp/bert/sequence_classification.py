@@ -8,11 +8,11 @@ import torch.nn as nn
 from pytorch_pretrained_bert.modeling import BertForSequenceClassification
 from pytorch_pretrained_bert.optimization import BertAdam
 from tqdm import tqdm
-from utils_nlp.bert.common import BERT_MAX_LEN, Language
+from utils_nlp.bert.common import Language
 from utils_nlp.pytorch.device_utils import get_device, move_to_device
 
 
-class SequenceClassifier:
+class BERTSequenceClassifier:
     """BERT-based sequence classifier"""
 
     def __init__(self, language=Language.ENGLISH, num_labels=2, cache_dir="."):
@@ -20,9 +20,10 @@ class SequenceClassifier:
         Args:
             language (Language, optional): The pretrained model's language.
                                            Defaults to Language.ENGLISH.
-            num_labels (int, optional): The number of unique labels in the training data.
-                                        Defaults to 2.
-            cache_dir (str, optional): Location of BERT's cache directory. Defaults to ".".
+            num_labels (int, optional): The number of unique labels in the
+                training data. Defaults to 2.
+            cache_dir (str, optional): Location of BERT's cache directory.
+                Defaults to ".".
         """
         if num_labels < 2:
             raise Exception("Number of labels should be at least 2.")
@@ -54,14 +55,15 @@ class SequenceClassifier:
             labels (list): List of training labels.
             device (str, optional): Device used for training ("cpu" or "gpu").
                                     Defaults to "gpu".
-            num_gpus (int, optional): The number of gpus to use. 
-                                      If None is specified, all available GPUs will be used.
-                                      Defaults to None.
-            num_epochs (int, optional): Number of training epochs. Defaults to 1.
+            num_gpus (int, optional): The number of gpus to use.
+                                      If None is specified, all available GPUs
+                                      will be used. Defaults to None.
+            num_epochs (int, optional): Number of training epochs.
+                Defaults to 1.
             batch_size (int, optional): Training batch size. Defaults to 32.
             lr (float): Learning rate of the Adam optimizer. Defaults to 2e-5.
-            verbose (bool, optional): If True, shows the training progress and loss values.
-                                      Defaults to True.
+            verbose (bool, optional): If True, shows the training progress and
+                loss values. Defaults to True.
         """
 
         device = get_device("cpu" if num_gpus == 0 else "gpu")
@@ -142,14 +144,14 @@ class SequenceClassifier:
         del [x_batch, y_batch, mask_batch]
         torch.cuda.empty_cache()
 
-    def predict(self, token_ids, input_mask, num_gpus=1, batch_size=32):
+    def predict(self, token_ids, input_mask, num_gpus=None, batch_size=32):
         """Scores the given dataset and returns the predicted classes.
         Args:
             token_ids (list): List of training token lists.
             input_mask (list): List of input mask lists.
-            num_gpus (int, optional): The number of gpus to use. 
-                                      If None is specified, all available GPUs will be used.
-                                      Defaults to 1.
+            num_gpus (int, optional): The number of gpus to use.
+                                      If None is specified, all available GPUs
+                                      will be used. Defaults to None.
             batch_size (int, optional): Scoring batch size. Defaults to 32.
         Returns:
             [ndarray]: Predicted classes.
