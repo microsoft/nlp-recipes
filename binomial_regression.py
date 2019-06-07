@@ -19,11 +19,16 @@ BATCH_SIZE = 1
 NUM_GPUS = 1
 NUM_EPOCHS = 10
 
+# Scenario
+# 1st sentence is the past click history (e.g. titles of the last 10 clicked stories)
+# 2nd sentence is the content items shown to the user
+# Since the user profile (=past click history) and the stories can be limited in cardinality,
+# it's feasible to aggregate them into clicks/non-clicks
 text_train = [
-    ["this is a mouse", "hunt a cat"],
-    ["my car", "BMW is nice"],
-    ["my other car", "BMW is not nice"],
-    ["my other car", "BMW is not nice"]
+    ["this is a mouse", "cats everywhere"],
+    ["that car", "Play games"],
+    ["sailing now", "Play games"],
+    ["Party people", "Going to Ibiza"]
 ]
 
 labels_train = [
