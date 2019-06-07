@@ -32,7 +32,7 @@ def read_data(data_file):
     return text
 
 
-def get_train_test_data(text, test_percentage=0.5):
+def get_train_test_data(text, test_percentage=0.5, random_seed=None):
     """
     Get the training and testing data based on test_percentage.
 
@@ -41,6 +41,7 @@ def get_train_test_data(text, test_percentage=0.5):
         test_percentage (float, optional): Percentage of data ot use for
             testing. Since this is a small dataset, the default testing
             percentage is set to 0.5
+        random_seed (float, optional): Random seed used to shuffle the data.
 
     Returns:
         tuple: A tuple containing four lists:
@@ -51,11 +52,13 @@ def get_train_test_data(text, test_percentage=0.5):
             test_labels_list: List of lists. Each sublist contains the
                 entity labels of the word in the testing sentence.
     """
-
     # Input data are separated by empty lines
     text_split = text.split("\n\n")
     # Remove empty line at EOF
     text_split = text_split[:-1]
+
+    if random_seed:
+        random.seed(random_seed)
     random.shuffle(text_split)
 
     sentence_count = len(text_split)
