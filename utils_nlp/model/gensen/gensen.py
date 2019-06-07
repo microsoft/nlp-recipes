@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License.
+
 """GenSen Encoder"""
 import h5py
 from sklearn.linear_model import LinearRegression
@@ -367,76 +370,3 @@ class GenSenSingle(nn.Module):
             return h.data.cpu().numpy(), h_t.data.cpu().numpy()
         else:
             return h, h_t
-
-
-if __name__ == "__main__":
-    # Sentences need to be lowercased.
-    sentences = [
-        "hello world .",
-        "the quick brown fox jumped over the lazy dog .",
-        "this is a sentence .",
-    ]
-    vocab = [
-        "the",
-        "quick",
-        "brown",
-        "fox",
-        "jumped",
-        "over",
-        "lazy",
-        "dog",
-        "hello",
-        "world",
-        ".",
-        "this",
-        "is",
-        "a",
-        "sentence",
-        "<s>",
-        "</s>",
-        "<pad>",
-        "<unk>",
-    ]
-
-    ###########################
-    ##### GenSenSingle ########
-    ###########################
-
-    gensen_1 = GenSenSingle(
-        model_folder="./data/models",
-        filename_prefix="nli_large_bothskip",
-        pretrained_emb="./data/embedding/glove.840B.300d.h5",
-    )
-    reps_h, reps_h_t = gensen_1.get_representation(
-        sentences, pool="last", return_numpy=True
-    )
-    # reps_h contains the hidden states for all words in all sentences (padded to the max length of sentences) (batch_size x seq_len x 2048)
-    # reps_h_t contains only the last hidden state for all sentences in the minibatch (batch_size x 2048)
-    print(reps_h.shape, reps_h_t.shape)
-
-    # gensen_1 = GenSenSingle(
-    #     model_folder='./data/models/example',
-    #     filename_prefix='gensen.model',
-    #     pretrained_emb='./data/embedding/glove.840B.300d.h5'
-    # )
-    # reps_h, reps_h_t = gensen_1.get_representation(
-    #     sentences, pool='last', return_numpy=True
-    # )
-    # # reps_h contains the hidden states for all words in all sentences (padded to the max length of sentences) (batch_size x seq_len x 2048)
-    # # reps_h_t contains only the last hidden state for all sentences in the minibatch (batch_size x 2048)
-    # print(reps_h.shape, reps_h_t.shape)
-
-    """
-    gensen_2 = GenSenSingle(
-        model_folder='./data/models',
-        filename_prefix='nli_large_bothskip_parse',
-        pretrained_emb='./data/embedding/glove.840B.300d.h5'
-    )
-    gensen = GenSen(gensen_1, gensen_2)
-    reps_h, reps_h_t = gensen.get_representation(
-        sentences, pool='last', return_numpy=True
-    )
-    # reps_h contains the hidden states for all words in all sentences (padded to the max length of sentences) (batch_size x seq_len x 2048)
-    # reps_h_t contains only the last hidden state for all sentences in the minibatch (batch_size x 4096)
-    print reps_h.shape, reps_h_t.shape
-    """

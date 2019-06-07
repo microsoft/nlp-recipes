@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License.
+
 """A Gated Recurrent Unit (GRU) cell with peepholes."""
 import math
 import torch

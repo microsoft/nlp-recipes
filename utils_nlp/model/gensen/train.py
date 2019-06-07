@@ -1,6 +1,16 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""Run script."""
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License.
+
+"""
+The GenSen training process follows the steps:
+1. Create or load the dataset vocabulary
+2. Train on the training dataset for each batch epoch (batch size = 48 updates)
+3. Evaluate on the validation dataset for every 10 epoches
+4. Find the local minimum point on validation loss
+5. Save the best model and stop the training process
+"""
 import logging
 import argparse
 import os
