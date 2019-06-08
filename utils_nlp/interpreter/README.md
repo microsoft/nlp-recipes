@@ -15,11 +15,9 @@ numpy
 tqdm
 ```
 
-You may also need to install jupyter notebook to visit our [torturial](Torturial.ipynb).
-
 ## How to use
 
-The important class we need to utilize is the `Interpreter` in [Interpreter.py](Interpreter.py). Given any input word embeddings and a forward function $\Phi$ that transforms the word embeddings to a hidden state, Interpreter helps understand how much each input word contributes to the hidden state. Suppose the $\Phi$, the input $\bf x$ and the input words are defined as:
+We provide a notebook tutorial [here](../../scenarios/interpret_NLP_models/explain_simple_model.ipynb) to help you start quickly. The important class we need to utilize is the `Interpreter` in [Interpreter.py](Interpreter.py). Given any input word embeddings and a forward function $\Phi$ that transforms the word embeddings $\bf x$ to a hidden state $\bf s$, Interpreter helps understand how much each input word contributes to the hidden state. Suppose the $\Phi$, the input $\bf x$ and the input words are defined as:
 ```
 import torch
 
@@ -71,11 +69,11 @@ interpreter.visualize()
 ```
 Then, we can get results below:
 
-![](img/result.PNG)
+![](result.PNG)
 
 which means that the second and forth words are most important to $\Phi$, which is reasonable because the weight of them are larger.
 
 ## Explain a certain layer in any saved pytorch model
 
-We provide an example on how to use our method to explain a saved pytorch model (*pre-trained BERT model in our case*) [here](Torturial_BERT.ipynb). 
+We provide an example on how to use our method to explain a saved pytorch model (*pre-trained BERT model in our case*) [here](../../scenarios/interpret_NLP_models/explain_BERT_model.ipynb). 
 > NOTE: This result may not be consistent with the result in the paper because  we use the pre-trained BERT model directly for simplicity, while the BERT model we use in paper is fine-tuned on specific dataset like SST-2.
