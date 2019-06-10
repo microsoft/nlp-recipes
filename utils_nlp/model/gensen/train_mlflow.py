@@ -17,7 +17,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
-from utils_nlp.model.gensen.multi_task_model import MultitaskModel
+from utils_nlp.model.gensen.models import MultitaskModel
 from utils_nlp.model.gensen.utils import (
     BufferedDataIterator,
     NLIIterator,
