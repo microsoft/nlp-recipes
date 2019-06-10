@@ -44,6 +44,7 @@ CONDA_BASE = {
     "scipy": "scipy>=1.0.0",
     "tensorflow": "tensorflow==1.12.0",
     "h5py": "h5py>=2.8.0",
+    "azureml-mlflow": "azureml-mlflow>=1.0.41",
     "tensorflow-hub": "tensorflow-hub==0.5.0",
     "py-xgboost": "py-xgboost<=0.80",
 }
@@ -57,7 +58,7 @@ CONDA_GPU = {
 
 PIP_BASE = {
     "azureml-sdk[automl]": "azureml-sdk[automl]==1.0.48",
-    "azureml-train-automl":"azureml-train-automl==1.0.48",
+    "azureml-train-automl": "azureml-train-automl==1.0.48",
     "azureml-dataprep": "azureml-dataprep==1.1.8",
     "azureml-widgets": "azureml-widgets==1.0.48",
     "black": "black>=18.6b4",

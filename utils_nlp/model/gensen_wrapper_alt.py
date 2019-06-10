@@ -5,7 +5,7 @@ import os
 
 from sklearn.metrics.pairwise import cosine_similarity
 
-from utils_nlp.model.gensen import train_mlflow
+from utils_nlp.model.gensen import train
 from utils_nlp.model.gensen.create_gensen_model import (
     create_multiseq2seq_model,
 )
@@ -37,6 +37,7 @@ class GenSenClassifier:
         self.cache_dir = cache_dir
         self.pretrained_embedding_path = pretrained_embedding_path
         self.model_name = "gensen_multiseq2seq"
+        self.config = self._read_config(self.config_file)
 
     def _validate_params(self):
         """Validate input params."""
@@ -99,7 +100,7 @@ class GenSenClassifier:
             ),
         )
 
-    def fit(self, train_df, dev_df, test_df):
+    def fit(self):
 
         """ Method to train the Gensen model.
 
@@ -109,10 +110,10 @@ class GenSenClassifier:
             test_df: A dataframe containing tokenized sentences from the test set.
         """
 
-        self._validate_params()
-        self.cache_dir = self._get_gensen_tokens(train_df, dev_df, test_df)
+        # self._validate_params()
+        # self.cache_dir = self._get_gensen_tokens(train_df, dev_df, test_df)
 
-        train_mlflow.train(
+        train.train(
             data_folder=self.cache_dir,
             config=self.config,
             learning_rate=self.learning_rate,
@@ -134,7 +135,7 @@ class GenSenClassifier:
 
         """
 
-        self._validate_params()
+        # self._validate_params()
 
         # Use only if you have the model trained and saved.
         # self.cache_dir = os.path.join(self.cache_dir, "clean/snli_1.0")
