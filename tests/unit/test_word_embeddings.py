@@ -15,9 +15,6 @@ from utils_nlp.pretrained_embeddings.glove import (
 )
 from utils_nlp.pretrained_embeddings.word2vec import (
     load_pretrained_vectors as load_word2vec,
-    load_pretrained_vectors,
-    download_word2vec_corpus,
-    extract_word2vec_corpus,
 )
 
 

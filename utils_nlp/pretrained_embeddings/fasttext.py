@@ -36,6 +36,10 @@ def _download_fasttext_vectors(download_dir, file_name="wiki.simple.zip"):
     fastText. You can directly download the vectors from here:
     https://dl.fbaipublicfiles.com/fasttext/vectors-wiki/wiki.simple.zip
 
+    For the full version of pre-trained word vectors, change the url for
+    FASTTEXT_EN_URL to https://dl.fbaipublicfiles.com/fasttext/vectors-wiki/wiki.en.zip
+    in __init__.py
+
     Args:
         download_dir (str): File path to download the file
         file_name (str) : File name given by default but can be changed by the user.
