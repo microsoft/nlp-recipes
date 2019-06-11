@@ -9,6 +9,7 @@ import numpy as np
 import pickle
 import os
 import copy
+import logging
 
 import torch
 import torch.nn as nn
@@ -56,7 +57,7 @@ class Encoder(nn.Module):
         if embedding_matrix.shape[0] != self.src_embedding.weight.size(
             0
         ) or embedding_matrix.shape[1] != self.src_embedding.weight.size(1):
-            print(
+            logging.info(
                 """
                 Warning pretrained embedding shape mismatch %d x %d
                 expected %d x %d"""
@@ -271,7 +272,7 @@ class GenSenSingle(nn.Module):
         """ Training linear regression model for the first time."""
 
         # Read pre-trained word embedding h5 file
-        print("Loading pretrained word embeddings")
+        logging.info("Loading pretrained word embeddings")
         pretrained_embeddings = h5py.File(self.pretrained_emb)
         pretrained_embedding_matrix = pretrained_embeddings["embedding"].value
         pretrain_vocab = pretrained_embeddings["words_flatten"].value.split(
@@ -294,7 +295,7 @@ class GenSenSingle(nn.Module):
                     pretrained_embedding_matrix[pretrain_word2id[word]]
                 )
 
-        print("Training vocab expansion on model")
+        logging.info("Training vocab expansion on model")
         lreg = LinearRegression()
         lreg.fit(pretrain_train, model_train)
         self.lreg = lreg
@@ -350,8 +351,8 @@ class GenSenSingle(nn.Module):
                     self.model_embedding_matrix[self.word2id["<unk>"]]
                 )
 
-        print("Found %d task OOVs " % (oov_task))
-        print("Found %d pretrain OOVs " % (oov_pretrain))
+        logging.info("Found %d task OOVs " % (oov_task))
+        logging.info("Found %d pretrain OOVs " % (oov_pretrain))
         task_embeddings = np.stack(task_embeddings)
         self.encoder.set_pretrained_embeddings(task_embeddings)
         self.vocab_expanded = True
