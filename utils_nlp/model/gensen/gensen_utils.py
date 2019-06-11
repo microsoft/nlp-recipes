@@ -7,7 +7,7 @@ import shutil
 SPLIT_MAP = {}
 
 
-def _preprocess(data_path):
+def _preprocess(data_path, column_names):
     """
     Method to save the tokens for each split in a snli_1.0_{split}.txt.clean file,
     with the sentence pairs and scores tab-separated and the tokens separated by a
@@ -15,6 +15,7 @@ def _preprocess(data_path):
 
     Args:
         data_path(str): Path to the data folder.
+        column_names(list): List of column names for the new columns created.
 
     """
 
@@ -23,27 +24,41 @@ def _preprocess(data_path):
             data_path, "clean/snli_1.0/snli_1.0_{}.txt".format(file_split)
         )
 
-        df["s1.tok"] = df["sentence1_tokens"].apply(lambda x: " ".join(x))
-        df["s2.tok"] = df["sentence2_tokens"].apply(lambda x: " ".join(x))
-        df["s1.tok"].to_csv(
-            "{}.s1.tok".format(base_txt_path), sep=" ", header=False, index=False
+        df[column_names[0]] = df["sentence1_tokens"].apply(
+            lambda x: " " "".join(x)
         )
-        df["s2.tok"].to_csv(
-            "{}.s2.tok".format(base_txt_path), sep=" ", header=False, index=False
+        df[column_names[1]] = df["sentence2_tokens"].apply(
+            lambda x: " " "".join(x)
         )
-        df["score"].to_csv(
+        df[column_names[0]].to_csv(
+            "{}.s1.tok".format(base_txt_path),
+            sep=" ",
+            header=False,
+            index=False,
+        )
+        df[column_names[1]].to_csv(
+            "{}.s2.tok".format(base_txt_path),
+            sep=" ",
+            header=False,
+            index=False,
+        )
+        df[column_names[2]].to_csv(
             "{}.lab".format(base_txt_path), sep=" ", header=False, index=False
         )
-        df_clean = df[["s1.tok", "s2.tok", "score"]]
+        df_clean = df[column_names]
         df_clean.to_csv(
-            "{}.clean".format(base_txt_path), sep="\t", header=False, index=False
+            "{}.clean".format(base_txt_path),
+            sep="\t",
+            header=False,
+            index=False,
         )
         # remove rows with blank scores
-        df_noblank = df_clean.loc[df_clean["score"] != "-"].copy()
-        print(base_txt_path)
+        df_noblank = df_clean.loc[df_clean[column_names[2]] != "-"].copy()
         df_noblank.to_csv(
-            "{}.clean.noblank".format(base_txt_path), sep="\t", header=False,
-            index=False
+            "{}.clean.noblank".format(base_txt_path),
+            sep="\t",
+            header=False,
+            index=False,
         )
 
 
@@ -60,18 +75,22 @@ def _split_and_cleanup(data_path):
 
     for file_split in SPLIT_MAP.keys():
         s1_tok_path = os.path.join(
-            data_path, "clean/snli_1.0/snli_1.0_{}.txt.s1.tok".format(file_split)
+            data_path,
+            "clean/snli_1.0/snli_1.0_{}.txt.s1.tok".format(file_split),
         )
         s2_tok_path = os.path.join(
-            data_path, "clean/snli_1.0/snli_1.0_{}.txt.s2.tok".format(file_split)
+            data_path,
+            "clean/snli_1.0/snli_1.0_{}.txt.s2.tok".format(file_split),
         )
-        with open(s1_tok_path, "r") as fin, open("{}.tmp".format(s1_tok_path),
-                                                 "w") as tmp:
+        with open(s1_tok_path, "r") as fin, open(
+            "{}.tmp".format(s1_tok_path), "w"
+        ) as tmp:
             for line in fin:
                 s = line.replace('"', "")
                 tmp.write(s)
-        with open(s2_tok_path, "r") as fin, open("{}.tmp".format(s2_tok_path),
-                                                 "w") as tmp:
+        with open(s2_tok_path, "r") as fin, open(
+            "{}.tmp".format(s2_tok_path), "w"
+        ) as tmp:
             for line in fin:
                 s = line.replace('"', "")
                 tmp.write(s)
@@ -90,6 +109,9 @@ def gensen_preprocess(train_tok, dev_tok, test_tok, data_path):
         test_tok(pd.Dataframe): Tokenized test dataframe.
         data_path(str): Path to the data folder.
 
+    Returns:
+        str: Path to the processed dataset for GenSen.
+
     """
     global SPLIT_MAP
     SPLIT_MAP = {}
@@ -101,7 +123,9 @@ def gensen_preprocess(train_tok, dev_tok, test_tok, data_path):
     if test_tok is not None:
         SPLIT_MAP["test"] = test_tok
 
-    _preprocess(data_path)
+    column_names = ["s1.tok", "s2.tok", "score"]
+
+    _preprocess(data_path, column_names)
     _split_and_cleanup(data_path)
 
     return os.path.join(data_path, "clean/snli_1.0")
