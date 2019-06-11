@@ -48,15 +48,17 @@ if torch.cuda.is_available():
     # Horovod: pin GPU to local rank.
     torch.cuda.set_device(hvd.local_rank())
 
-"""
-parser = argparse.ArgumentParser()
-parser.add_argument("--config", help="path to json config", required=True)
-parser.add_argument("--data_folder", type=str, help="data folder")
-# Add learning rate to tune model.
-parser.add_argument(
-    "--learning_rate", type=float, default=0.0001, help="learning rate"
-)
-"""
+
+def metric_average(value, name):
+    """
+    Sync the validation loss with nodes.
+    :param value:
+    :param name:
+    :return:
+    """
+    tensor = torch.tensor(value)
+    avg_tensor = hvd.allreduce(tensor, name=name)
+    return avg_tensor.item()
 
 
 def train(config, data_folder, learning_rate=0.0001):
@@ -194,7 +196,7 @@ def train(config, data_folder, learning_rate=0.0001):
         logging.info(model)
         """Using Horovod"""
         # Horovod: scale learning rate by the number of GPUs.
-        optimizer = optim.Adam(model.parameters(), lr=learning_rate * hvd.size())
+        optimizer = optim.Adam(model.parameters(), lr=learning_rate / hvd.size())
 
         # Horovod: broadcast parameters & optimizer state.
         hvd.broadcast_parameters(model.state_dict(), root_rank=0)
@@ -392,6 +394,7 @@ def train(config, data_folder, learning_rate=0.0001):
                         task_idx,
                         lowercase=True,
                     )
+                    validation_loss = metric_average(validation_loss, "val_loss")
                     logging.info(
                         "%s Validation Loss : %.3f" % (task, validation_loss)
                     )
@@ -506,7 +509,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
     data_folder = args.data_folder
     learning_rate = args.learning_rate
-    # os.chdir(data_folder)
 
     config_file_path = args.config
     config = read_config(config_file_path)

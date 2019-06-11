@@ -10,7 +10,8 @@ import pickle
 import torch
 
 
-def create_multiseq2seq_model(trained_model_folder, save_folder, save_name):
+def create_multiseq2seq_model(trained_model_folder, save_folder, save_name,
+                              trained_model_name="best_model.model"):
 
     """
     Method that creates a GenSen model from a MultiSeq2Seq model.
@@ -19,13 +20,14 @@ def create_multiseq2seq_model(trained_model_folder, save_folder, save_name):
         trained_model_folder (str): Path to the folder containing a saved model
         save_folder (str): Path to save the encoder
         save_name (str): Name of the model
+        trained_model_name (str, optional): Loaded model as the input
 
     Returns: None
 
     """
 
     model = torch.load(
-        open(os.path.join(trained_model_folder, "best_model.model"), "rb")
+        open(os.path.join(trained_model_folder, trained_model_name), "rb")
     )
     # model.copy() prevents raising the error.
     for item in model.copy().keys():
@@ -50,3 +52,5 @@ def create_multiseq2seq_model(trained_model_folder, save_folder, save_name):
         model_vocab,
         open(os.path.join(save_folder, "%s_vocab.pkl" % save_name), "wb"),
     )
+
+# Original source: https://github.com/Maluuba/gensen

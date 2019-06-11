@@ -30,7 +30,7 @@ class ConditionalGRU(nn.Module):
             weight.data.uniform_(-stdv, stdv)
 
     def forward(self, input, hidden, ctx):
-        r"""Propogate input through the layer.
+        """Propogate input through the layer.
 
         inputs:
         input   - batch size x target sequence length  x embedding dimension
@@ -71,3 +71,5 @@ class ConditionalGRU(nn.Module):
         output = torch.cat(output, 0).view(input.size(0), *output[0].size())
         output = output.transpose(0, 1)
         return output, hidden
+
+# Original source: https://github.com/Maluuba/gensen
