@@ -1,0 +1,46 @@
+{
+    "training": {
+        "optimizer": "adam",
+        "clip_c": 1,
+        "lrate": 0.0001,
+        "batch_size": 48,
+        "n_gpus": 1,
+        "stop_patience": 2
+    },
+    "management": {
+        "monitor_loss": 480,
+        "print_samples": 12800,
+        "checkpoint_freq": 480000,
+        "eval_freq": 9600
+    },
+    "data": {
+        "paths": [
+            {
+                "train_src": "data/processed/snli_1.0_train.txt.s1.tok",
+                "train_trg": "data/processed/snli_1.0_train.txt.s2.tok",
+                "val_src": "data/processed/snli_1.0_dev.txt.s1.tok",
+                "val_trg": "data/processed/snli_1.0_dev.txt.s1.tok",
+                "taskname": "snli"
+            }
+        ],
+        "max_src_length": 90,
+        "max_trg_length": 90,
+        "task": "multi-seq2seq-nli",
+        "save_dir": "data/models/example",
+        "nli_train": "data/processed/snli_1.0_train.txt.clean.noblank",
+        "nli_dev": "data/processed/snli_1.0_dev.txt.clean.noblank",
+        "nli_test": "data/processed/snli_1.0_test.txt.clean.noblank"
+    },
+    "model": {
+        "dim_src": 2048,
+        "dim_trg": 2048,
+        "dim_word_src": 512,
+        "dim_word_trg": 512,
+        "n_words_src": 80000,
+        "n_words_trg": 30000,
+        "n_layers_src": 1,
+        "bidirectional": true,
+        "layernorm": false,
+        "dropout": 0.8
+    }
+}
