@@ -3,25 +3,29 @@
 
 import os
 import shutil
+from utils_nlp.model.gensen import SNLI_CLEAN_PATH
 
-SPLIT_MAP = {}
 
-
-def _preprocess(data_path, column_names):
+def _preprocess(split_map, data_path, column_names):
     """
     Method to save the tokens for each split in a snli_1.0_{split}.txt.clean file,
     with the sentence pairs and scores tab-separated and the tokens separated by a
     single space.
 
     Args:
+        split_map(dict) : A dictionary containing train, test and dev
+        tokenized dataframes.
         data_path(str): Path to the data folder.
         column_names(list): List of column names for the new columns created.
 
     """
 
-    for file_split, df in SPLIT_MAP.items():
+    for file_split, df in split_map.items():
         base_txt_path = os.path.join(
-            data_path, "clean/snli_1.0/snli_1.0_{}.txt".format(file_split)
+            data_path,
+            os.path.join(
+                SNLI_CLEAN_PATH, "/snli_1.0_{}.txt".format(file_split)
+            ),
         )
 
         df[column_names[0]] = df["sentence1_tokens"].apply(
@@ -62,25 +66,32 @@ def _preprocess(data_path, column_names):
         )
 
 
-def _split_and_cleanup(data_path):
+def _split_and_cleanup(split_map, data_path):
     """
     Method that removes quotations from .tok files and saves the tokenized sentence
     and labels separately, in the form snli_1.0_{split}.txt.s1.tok or snli_1.0_{
     split}.txt.s2.tok or snli_1.0_{split}.txt.lab.
 
     Args:
-        data_path: Path to the data folder.
+        split_map(dict) : A dictionary containing train, test and dev
+        tokenized dataframes.
+        data_path(str): Path to the data folder.
 
     """
 
-    for file_split in SPLIT_MAP.keys():
+    for file_split in split_map.keys():
+
         s1_tok_path = os.path.join(
             data_path,
-            "clean/snli_1.0/snli_1.0_{}.txt.s1.tok".format(file_split),
+            os.path.join(
+                SNLI_CLEAN_PATH, "/snli_1.0_{}.txt.s1.tok".format(file_split)
+            ),
         )
         s2_tok_path = os.path.join(
             data_path,
-            "clean/snli_1.0/snli_1.0_{}.txt.s2.tok".format(file_split),
+            os.path.join(
+                SNLI_CLEAN_PATH, "/snli_1.0_{}.txt.s2.tok".format(file_split)
+            ),
         )
         with open(s1_tok_path, "r") as fin, open(
             "{}.tmp".format(s1_tok_path), "w"
@@ -113,19 +124,19 @@ def gensen_preprocess(train_tok, dev_tok, test_tok, data_path):
         str: Path to the processed dataset for GenSen.
 
     """
-    global SPLIT_MAP
-    SPLIT_MAP = {}
+
+    split_map = {}
 
     if train_tok is not None:
-        SPLIT_MAP["train"] = train_tok
+        split_map["train"] = train_tok
     if dev_tok is not None:
-        SPLIT_MAP["dev"] = dev_tok
+        split_map["dev"] = dev_tok
     if test_tok is not None:
-        SPLIT_MAP["test"] = test_tok
+        split_map["test"] = test_tok
 
     column_names = ["s1.tok", "s2.tok", "score"]
 
-    _preprocess(data_path, column_names)
-    _split_and_cleanup(data_path)
+    _preprocess(split_map, data_path, column_names)
+    _split_and_cleanup(split_map, data_path)
 
-    return os.path.join(data_path, "clean/snli_1.0")
+    return os.path.join(data_path, SNLI_CLEAN_PATH)
