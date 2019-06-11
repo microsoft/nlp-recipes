@@ -35,7 +35,7 @@ def maybe_download(
         r = requests.get(url, stream=True)
         total_size = int(r.headers.get("content-length", 0))
         block_size = 1024
-        num_iterables = math.ceil(total_size // block_size)
+        num_iterables = math.ceil(total_size / block_size)
 
         with open(filepath, "wb") as file:
             for data in tqdm(
@@ -54,6 +54,34 @@ def maybe_download(
             raise IOError("Failed to verify {}".format(filepath))
 
     return filepath
+
+
+def extract_tar(file_path, dest_path="."):
+    """Extracts all contents of a tar archive file.
+    Args:
+        file_path (str): Path of file to extract.
+        dest_path (str, optional): Destination directory. Defaults to ".".
+    """
+    if not os.path.exists(file_path):
+        raise IOError("File doesn't exist")
+    if not os.path.exists(dest_path):
+        raise IOError("Destination directory doesn't exist")
+    with tarfile.open(file_path) as t:
+        t.extractall(path=dest_path)
+
+
+def extract_zip(file_path, dest_path="."):
+    """Extracts all contents of a zip archive file.
+    Args:
+        file_path (str): Path of file to extract.
+        dest_path (str, optional): Destination directory. Defaults to ".".
+    """
+    if not os.path.exists(file_path):
+        raise IOError("File doesn't exist")
+    if not os.path.exists(dest_path):
+        raise IOError("Destination directory doesn't exist")
+    with ZipFile(file_path) as z:
+        z.extractall(path=dest_path)
 
 
 @contextmanager

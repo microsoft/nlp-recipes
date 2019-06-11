@@ -1,13 +1,21 @@
 
-| Branch | Status |     | Branch | Status | 
-|  ---   |  ---   | --- |  ---   |  ---   |
-| master | [![Build Status](https://dev.azure.com/best-practices/nlp/_apis/build/status/unit-test-master?branchName=master)](https://dev.azure.com/best-practices/nlp/_build/latest?definitionId=22&branchName=master) |  | staging | [![Build Status](https://dev.azure.com/best-practices/nlp/_apis/build/status/unit-test-staging?branchName=staging)](https://dev.azure.com/best-practices/nlp/_build/latest?definitionId=21&branchName=staging) |
+| Branch | Status                                                                                                                                                                                                      |     | Branch  | Status                                                                                                                                                                                                         |
+| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| master | [![Build Status](https://dev.azure.com/best-practices/nlp/_apis/build/status/unit-test-master?branchName=master)](https://dev.azure.com/best-practices/nlp/_build/latest?definitionId=22&branchName=master) |     | staging | [![Build Status](https://dev.azure.com/best-practices/nlp/_apis/build/status/unit-test-staging?branchName=staging)](https://dev.azure.com/best-practices/nlp/_build/latest?definitionId=21&branchName=staging) |
 
 
 # NLP Best Practices
 
-This repository will provide examples and best practices for building NLP systems, provided as Jupyter notebooks.
+This repository will provide examples and best practices for building NLP systems, provided as Jupyter notebooks and utility functions.
 
+
+## Scenarios
+
+| Scenario                 | Applications                                 | Languages | Models |
+|---| ------------------------ | -------------------------------------------- | ------------------- |
+| Text Classification      | Sentiment Analysis <br> Topic Classification | English | BERT, fastText             |
+| Named Entity Recognition |                                              | English  | BERT           |
+| Sentence Encoding        | Sentence Similarity                          | English             |
 
 
 ## Planning etc documents
