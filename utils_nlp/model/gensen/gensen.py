@@ -370,3 +370,5 @@ class GenSenSingle(nn.Module):
             return h.data.cpu().numpy(), h_t.data.cpu().numpy()
         else:
             return h, h_t
+
+# Original source: https://github.com/Maluuba/gensen

@@ -275,3 +275,6 @@ class MultitaskModel(nn.Module):
             h_t = torch.max(src_h, 1)[0].squeeze()
 
         return src_h, h_t
+
+
+# Original source: https://github.com/Maluuba/gensen
