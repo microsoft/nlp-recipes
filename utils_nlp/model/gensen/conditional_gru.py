@@ -11,8 +11,15 @@ import torch.nn.functional as F
 class ConditionalGRU(nn.Module):
     """A Gated Recurrent Unit (GRU) cell with peepholes."""
 
-    def __init__(self, input_dim, hidden_dim, dropout=0.):
-        """Initialize params."""
+    def __init__(self, input_dim, hidden_dim, dropout=0.0):
+        """Initialize params.
+
+        Args:
+            input_dim: Dimension of the input vector.
+            hidden_dim: Dimension of the hidden layer.
+            dropout: Dropout of the network.
+        """
+
         super(ConditionalGRU, self).__init__()
         self.input_dim = input_dim
         self.hidden_dim = hidden_dim
@@ -24,7 +31,7 @@ class ConditionalGRU(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
-        """Set params."""
+        """Set params. """
         stdv = 1.0 / math.sqrt(self.hidden_dim)
         for weight in self.parameters():
             weight.data.uniform_(-stdv, stdv)
@@ -32,16 +39,19 @@ class ConditionalGRU(nn.Module):
     def forward(self, input, hidden, ctx):
         """Propogate input through the layer.
 
-        inputs:
-        input   - batch size x target sequence length  x embedding dimension
-        hidden  - batch size x hidden dimension
-        ctx     - batch size x source sequence length  x hidden dimension
+        Args:
+            input: batch size x target sequence length  x embedding dimension.
+            hidden: batch size x hidden dimension.
+            ctx: batch size x source sequence length  x hidden dimension.
 
-        returns: output, hidden
-        output  - batch size x target sequence length  x hidden dimension
-        hidden  - (batch size x hidden dimension, \
-            batch size x hidden dimension)
+        Returns:
+            output(torch.Tensor)  - batch size x target sequence length  x
+            hidden dimension
+            hidden(torch.Tensor)  - (batch size x hidden dimension, batch size x hidden
+            dimension)
+
         """
+
         def recurrence(input, hidden, ctx):
             """Recurrence helper."""
             input_gate = self.input_weights(input)
@@ -70,6 +80,9 @@ class ConditionalGRU(nn.Module):
 
         output = torch.cat(output, 0).view(input.size(0), *output[0].size())
         output = output.transpose(0, 1)
+        print(type(output), type(hidden))
+
         return output, hidden
+
 
 # Original source: https://github.com/Maluuba/gensen
