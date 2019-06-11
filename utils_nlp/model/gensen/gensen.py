@@ -22,7 +22,15 @@ class Encoder(nn.Module):
     def __init__(
         self, vocab_size, embedding_dim, hidden_dim, num_layers, rnn_type="GRU"
     ):
-        """Initialize params."""
+        """Initialize all the parameters.
+
+        Args:
+            vocab_size (int): Size of the vocabulary.
+            embedding_dim (int): the size of each embedding vector
+            hidden_dim (int): the size of each hidden vector
+            num_layers (int): the number of layers.
+            rnn_type (str): Type of RNN.
+        """
         super(Encoder, self).__init__()
         self.rnn_type = rnn_type
         rnn = getattr(nn, rnn_type)
@@ -39,7 +47,12 @@ class Encoder(nn.Module):
         )
 
     def set_pretrained_embeddings(self, embedding_matrix):
-        """Set embedding weights."""
+        """Set embedding weights.
+
+        Args:
+            embedding_matrix(torch.Tensor): Embedding matrix.
+
+        """
         if embedding_matrix.shape[0] != self.src_embedding.weight.size(
             0
         ) or embedding_matrix.shape[1] != self.src_embedding.weight.size(1):
@@ -72,7 +85,18 @@ class Encoder(nn.Module):
         self.src_embedding.cuda()
 
     def forward(self, input, lengths, return_all=False, pool="last"):
-        """Propogate input through the encoder."""
+        """ Propogate input through the encoder.
+
+        Args:
+            input(torch.Tensor): Embedding matrix
+            lengths (torch.Tensor): list of sequences lengths of each batch element.
+            return_all (bool): Return all or only the last hidden state.
+            pool(str): Type of getting hidden state.
+
+        Returns:
+            torch.Tensor: Return last or all hidden states.
+
+        """
         embedding = self.src_embedding(input)
         src_emb = pack_padded_sequence(embedding, lengths, batch_first=True)
         if self.rnn_type == "LSTM":
@@ -98,15 +122,19 @@ class Encoder(nn.Module):
 
 
 class GenSen(nn.Module):
-    """Concat Gensen."""
+    """A wrapper class for multiple GenSen models."""
 
     def __init__(self, *args, **kwargs):
-        """A wrapper class for multiple GenSen models."""
         super(GenSen, self).__init__()
         self.gensen_models = args
 
     def vocab_expansion(self, task_vocab):
-        """Expand the model's vocabulary with pretrained word embeddings."""
+        """Expand the model's vocabulary with pretrained word embeddings.
+
+        Args:
+            task_vocab(list): Vocabulary for each task.
+
+        """
         for model in self.gensen_models:
             model.vocab_expansion(task_vocab)
 
@@ -118,7 +146,20 @@ class GenSen(nn.Module):
         return_numpy=True,
         add_start_end=True,
     ):
-        """Get model representations."""
+        """ Get model representations.
+
+        Args:
+            sentences(list): Sentences to get embeddings.
+            pool(str): Type of getting hidden state.
+            tokenize(bool): To tokenize or not.
+            return_numpy(bool): To return a numpy array or not.
+            add_start_end(bool): To add start and end notation (<s> </s>) to each
+            sentence or not.
+
+        Returns:
+            torch.Tensor : Return last or all hidden states.
+
+        """
         representations = [
             model.get_representation(
                 sentences,
@@ -137,7 +178,7 @@ class GenSen(nn.Module):
         else:
             return (
                 torch.cat([x[0] for x in representations], 2),
-                torch.cat([x[1] for x in rerepresentations], 1),
+                torch.cat([x[1] for x in representations], 1),
             )
 
 
@@ -152,7 +193,16 @@ class GenSenSingle(nn.Module):
         cuda=False,
         rnn_type="GRU",
     ):
-        """Initialize params."""
+        """ Initialize params.
+
+        Args:
+            model_folder(str): Folder where the model resides.
+            filename_prefix(str): Prefix for the model file.
+            pretrained_emb(torch.Tensor): Pretrained Embedding vector.
+            cuda(bool): Use Cuda or not.
+            rnn_type(str): Type of RNN.
+        """
+
         super(GenSenSingle, self).__init__()
         self.model_folder = model_folder
         self.filename_prefix = filename_prefix
@@ -218,7 +268,8 @@ class GenSenSingle(nn.Module):
             self.encoder = self.encoder.cuda()
 
     def first_expansion(self):
-        """Traing linear regression model for the first time."""
+        """ Training linear regression model for the first time."""
+
         # Read pre-trained word embedding h5 file
         print("Loading pretrained word embeddings")
         pretrained_embeddings = h5py.File(self.pretrained_emb)
@@ -251,7 +302,12 @@ class GenSenSingle(nn.Module):
         self.pretrained_embedding_matrix = pretrained_embedding_matrix
 
     def vocab_expansion(self, task_vocab):
-        """Expand the model's vocabulary with pretrained word embeddings."""
+        """ Expand the model's vocabulary with pretrained word embeddings.
+
+        Args:
+            task_vocab(list): Vocabulary for each task.
+        """
+
         self.task_word2id = {"<s>": 0, "<pad>": 1, "</s>": 2, "<unk>": 3}
 
         self.task_id2word = {0: "<s>", 1: "<pad>", 2: "</s>", 3: "<unk>"}
@@ -305,7 +361,18 @@ class GenSenSingle(nn.Module):
             self.encoder = self.encoder.cuda()
 
     def get_minibatch(self, sentences, tokenize=False, add_start_end=True):
-        """Prepare minibatch."""
+        """Prepare minibatch.
+
+        Args:
+            sentences(list): Sentences to get embeddings.
+            tokenize(bool): To tokenize or not.
+            add_start_end(bool): To add start and end notation (<s> </s>) to each
+            sentence or not.
+
+        Returns:
+            dict: A dictionary with sentences, lengths and sentence embeddings.
+
+        """
         if tokenize:
             sentences = [
                 nltk.word_tokenize(sentence) for sentence in sentences
@@ -354,7 +421,21 @@ class GenSenSingle(nn.Module):
         return_numpy=True,
         add_start_end=True,
     ):
-        """Get model representations."""
+        """Get model representations.
+
+        Args:
+            sentences(list): Sentences to get embeddings.
+            pool(str): Type of getting hidden state.
+            tokenize(bool): To tokenize or not.
+            return_numpy(bool): To return a numpy array or not.
+            add_start_end(bool): To add start and end notation (<s> </s>) to each
+            sentence or not.
+
+        Returns:
+            torch.Tensor : Return last or all hidden states.
+
+        """
+
         minibatch = self.get_minibatch(
             sentences, tokenize=tokenize, add_start_end=add_start_end
         )
@@ -370,5 +451,6 @@ class GenSenSingle(nn.Module):
             return h.data.cpu().numpy(), h_t.data.cpu().numpy()
         else:
             return h, h_t
+
 
 # Original source: https://github.com/Maluuba/gensen
