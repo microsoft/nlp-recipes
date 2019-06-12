@@ -62,14 +62,14 @@ PIP_BASE = {
     "pyemd": "pyemd==0.5.1",
     "ipywebrtc": "ipywebrtc==0.4.3",
     "pre-commit": "pre-commit>=1.14.4",
+    "spacy": "spacy>=2.1.4",
     "spacy-models": "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-2.1.0/en_core_web_sm-2.1.0.tar.gz",
     "gensim": "gensim>=3.7.0",
     "nltk": "nltk>=3.4",
     "pytorch-pretrained-bert": "pytorch-pretrained-bert>=0.6",
-    "horovod": "horovod>=0.16.1",
 }
 
-PIP_GPU = {}
+PIP_GPU = {"horovod": "horovod>=0.16.1"}
 
 
 if __name__ == "__main__":
