@@ -80,7 +80,6 @@ class ConditionalGRU(nn.Module):
 
         output = torch.cat(output, 0).view(input.size(0), *output[0].size())
         output = output.transpose(0, 1)
-        print(type(output), type(hidden))
 
         return output, hidden
 
