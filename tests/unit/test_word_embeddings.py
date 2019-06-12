@@ -36,6 +36,7 @@ def test_load_pretrained_vectors_word2vec():
 
     shutil.rmtree(os.path.join(os.getcwd(), dir_path))
 
+    assert isinstance(load_word2vec(dir_path), Word2VecKeyedVectors)
 
 def test_load_pretrained_vectors_glove():
     dir_path = "temp_data/"
