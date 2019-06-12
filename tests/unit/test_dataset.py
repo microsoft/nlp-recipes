@@ -2,16 +2,25 @@
 # Licensed under the MIT License.
 
 import os
+import sys
+
+nlp_path = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+)
+if nlp_path not in sys.path:
+    sys.path.insert(0, nlp_path)
 
 import pytest
 
 from utils_nlp.dataset.url_utils import maybe_download
 from utils_nlp.dataset.msrpc import load_pandas_df
+import utils_nlp.dataset.wikigold as wg
 
 
 def test_maybe_download():
     # ToDo: Change this url when repo goes public.
-    file_url = "https://raw.githubusercontent.com/Microsoft/Recommenders/master/LICENSE"
+    file_url = "https://raw.githubusercontent.com/Microsoft/Recommenders/" \
+               "master/LICENSE"
     filepath = "license.txt"
     assert not os.path.exists(filepath)
     filepath = maybe_download(file_url, "license.txt", expected_bytes=1162)
@@ -24,3 +33,32 @@ def test_maybe_download():
 def test_load_pandas_df_msrpc():
     with pytest.raises(Exception):
         load_pandas_df(dataset_type="Dummy")
+
+
+def test_wikigold():
+    wg_text_length = 318333
+    wg_sentence_count = 1841
+    wg_test_percentage = 0.5
+    wg_test_sentence_count = round(wg_sentence_count * wg_test_percentage)
+    wg_train_sentence_count = wg_sentence_count - wg_test_sentence_count
+
+    # test download
+    downloaded_file = "wikigold.conll.txt"
+    assert not os.path.exists(downloaded_file)
+    wg.download()
+    assert os.path.exists(downloaded_file)
+
+    # test read_data
+    wg_text = wg.read_data(downloaded_file)
+    assert len(wg_text) == wg_text_length
+
+    # test get_train_test_data
+    train_text, train_labels, test_text, test_labels = wg.get_train_test_data(
+        wg_text, test_percentage=wg_test_percentage
+    )
+    assert len(train_text) == wg_train_sentence_count
+    assert len(train_labels) == wg_train_sentence_count
+    assert len(test_text) == wg_test_sentence_count
+    assert len(test_labels) == wg_test_sentence_count
+
+    os.remove(downloaded_file)

@@ -10,7 +10,7 @@ URL = (
 )
 
 
-def download(dir_path):
+def download(dir_path="."):
     """Download the wikigold data file to dir_path if it doesn't exist yet."""
     file_name = URL.split("/")[-1]
     maybe_download(URL, file_name, dir_path)
@@ -75,7 +75,7 @@ def get_train_test_data(text, test_percentage=0.5, random_seed=None):
             s_split = s.split("\n")
             # split "word label" pairs
             s_split_split = [t.split() for t in s_split]
-            sentence_list.append(" ".join([t[0] for t in s_split_split]))
+            sentence_list.append("".join([t[0] for t in s_split_split]))
             labels_list.append([t[1] for t in s_split_split])
             if len(s_split_split) > max_seq_len:
                 max_seq_len = len(s_split_split)
