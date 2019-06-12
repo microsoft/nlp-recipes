@@ -76,14 +76,34 @@ def _load_sts(src_file_path):
     Args:
         src_file_path (str): filepath to train/dev/test csv files.
     """
-    with open(src_file_path, 'r', encoding="utf-8") as f:
+    with open(src_file_path, "r", encoding="utf-8") as f:
         sent_pairs = []
         for line in f:
             l = line.strip().split("\t")
-            sent_pairs.append([l[0].strip(), l[1].strip(), l[2].strip(), l[3].strip(), float(l[4]), l[5].strip(),
-                               l[6].strip()])
+            sent_pairs.append(
+                [
+                    l[0].strip(),
+                    l[1].strip(),
+                    l[2].strip(),
+                    l[3].strip(),
+                    float(l[4]),
+                    l[5].strip(),
+                    l[6].strip(),
+                ]
+            )
 
-        sdf = pd.DataFrame(sent_pairs, columns=["column_0", "column_1", "column_2", "column_3", "column_4", "column_5", "column_6"])
+        sdf = pd.DataFrame(
+            sent_pairs,
+            columns=[
+                "column_0",
+                "column_1",
+                "column_2",
+                "column_3",
+                "column_4",
+                "column_5",
+                "column_6",
+            ],
+        )
         return sdf
 
 
@@ -93,6 +113,15 @@ def clean_sts(df):
     Args:
         df (pandas.Dataframe): drop columns from train/test/dev files.
     """
-    clean_df = df.drop(["column_0", "column_1", "column_2", "column_3"], axis=1)
-    clean_df = clean_df.rename(index=str, columns={"column_4": "score", "column_5": "sentence1", "column_6": "sentence2"})
+    clean_df = df.drop(
+        ["column_0", "column_1", "column_2", "column_3"], axis=1
+    )
+    clean_df = clean_df.rename(
+        index=str,
+        columns={
+            "column_4": "score",
+            "column_5": "sentence1",
+            "column_6": "sentence2",
+        },
+    )
     return clean_df
