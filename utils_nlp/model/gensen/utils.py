@@ -150,7 +150,6 @@ class BufferedDataIterator(DataIterator):
             {"data": [], "word2id": None, "id2word": None}
             for i in range(len(self.fname_trg))
         ]
-        run.log("Building vocabulary ...", 2)
         self.build_vocab()
 
         """Reset file pointers to the start after reading the file to
@@ -622,6 +621,41 @@ def get_validation_minibatch(
         "type": "seq2seq",
     }
 
+from torch.utils.data import Dataset
+
+
+class DataIteratorWrapper(Dataset):
+    """Face Landmarks dataset."""
+
+    def __init__(self, data_iterator_nonsense, batch_size, sent_type="train"):
+        """
+        Args:
+            csv_file (string): Path to the csv file with annotations.
+            root_dir (string): Directory with all the images.
+            transform (callable, optional): Optional transform to be applied
+                on a sample.
+        """
+        self.data_iterator_nonsense = data_iterator_nonsense
+        self.batch_size = batch_size
+        self.type = sent_type
+        if self.type == "train":
+            self.length = len(self.data_iterator_nonsense.train_lines)
+        elif self.type == "dev":
+            self.length = len(self.data_iterator_nonsense.dev_lines)
+        elif self.type == "test":
+            self.length = len(self.data_iterator_nonsense.test_lines)
+        else:
+            raise ValueError("Invalid sent_type: {}".format(sent_type))
+
+    def __len__(self):
+        return self.length
+
+    def __getitem__(self, idx):
+        return self.data_iterator_nonsense.get_parallel_minibatch(idx, self.batch_size, sent_type=self.type)
+
+# TODO add test that uses this with each of the datasets to run it locally. No need to load pytorch model just this class
+# TODO replace use of Iterator with this, then wrap with the distributed class from pytorch example
+# TODO fight with the script until it runs properly
 
 def compute_validation_loss(
         config, model, train_iterator, criterion, task_idx, lowercase=False

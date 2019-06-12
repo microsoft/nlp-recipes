@@ -55,6 +55,7 @@ def metric_average(value, name):
     """
     tensor = torch.tensor(value)
     avg_tensor = hvd.allreduce(tensor, name=name)
+
     return avg_tensor.item()
 
 
@@ -69,12 +70,11 @@ def setup_horovod(model, learning_rate):
     gradients and applying updates.
 
     """
-    # Horovod: scale learning rate by the number of GPUs.
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate / hvd.size())
-
     # Horovod: broadcast parameters & optimizer state.
     hvd.broadcast_parameters(model.state_dict(), root_rank=0)
-    hvd.broadcast_optimizer_state(optimizer, root_rank=0)
+
+    # Horovod: scale learning rate by the number of GPUs.
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate / hvd.size())
 
     # Horovod: (optional) compression algorithm.
     compression = hvd.Compression.fp16
@@ -85,6 +85,7 @@ def setup_horovod(model, learning_rate):
         named_parameters=model.named_parameters(),
         compression=compression,
     )
+    hvd.broadcast_optimizer_state(optimizer, root_rank=0)
 
     return optimizer
 
@@ -225,10 +226,8 @@ def evaluate_nli(nli_iterator, model, batch_size, n_gpus):
     """
     n_correct = 0.0
     n_wrong = 0.0
-    for j in range(0, len(nli_iterator.dev_lines), batch_size * n_gpus):
-        minibatch = nli_iterator.get_parallel_minibatch(
-            j, batch_size * n_gpus, "dev"
-        )
+    for batch_idx, (minibatch, target) in enumerate(dev_nli_iterator_loader):
+
         class_logits = model(
             minibatch, -1, return_hidden=False, paired_trg=None
         )
@@ -244,10 +243,8 @@ def evaluate_nli(nli_iterator, model, batch_size, n_gpus):
     logging.info("NLI Dev Acc : %.5f" % (n_correct / (n_correct + n_wrong)))
     n_correct = 0.0
     n_wrong = 0.0
-    for j in range(0, len(nli_iterator.test_lines), batch_size * n_gpus):
-        minibatch = nli_iterator.get_parallel_minibatch(
-            j, batch_size * n_gpus, "test"
-        )
+    for batch_idx, (minibatch, target) in enumerate(test_nli_iterator_loader):
+
         class_logits = model(
             minibatch, -1, return_hidden=False, paired_trg=None
         )
@@ -323,6 +320,18 @@ def train(config, data_folder, learning_rate=0.0001):
             buffer_size=1e6,
             lowercase=True,
         )
+        train_dataset = DataIteratorWrapper(train_iterator, 16, "train")
+
+        # Horovod: use DistributedSampler to partition the training data.
+
+        train_sampler = torch.utils.data.distributed.DistributedSampler(
+             train_dataset, num_replicas=hvd.size(), rank=hvd.rank())
+
+        train_loader = torch.utils.data.DataLoader(
+
+                train_dataset, batch_size=args.batch_size, sampler=train_sampler, **kwargs)
+
+
 
         nli_iterator = NLIIterator(
             train=config["data"]["nli_train"],
