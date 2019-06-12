@@ -115,13 +115,13 @@ class BufferedDataIterator(DataIterator):
         """Initialize params.
         
         Args:
-            src(torch.Tensor): source dataset.
-            trg(torch.Tensor): target dataset.
+            src(list): source dataset.
+            trg(list): target dataset.
             src_vocab_size(int): The size of source vocab.
             trg_vocab_size(int): The size of target vocab.
             tasknames(list): The list of task names.
             save_dir(str): The saving dir.
-            buffer_size(int): Buffer size.
+            buffer_size(float): Buffer size.
             lowercase(bool): if lowercase the data.
         """
         self.fname_src = src
@@ -395,7 +395,7 @@ class NLIIterator(DataIterator):
             test(torch.Tensor): Testing dataset.
             vocab_size(int): The size of the vocabulary.
             lowercase(bool): If lowercase the dataset.
-            vocab(list): The list of the vocabulary.
+            vocab(Union): The list of the vocabulary.
         """
         self.train = train
         self.dev = dev
