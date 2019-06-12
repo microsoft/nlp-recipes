@@ -16,7 +16,6 @@ def _extract_word2vec_vectors(zip_path, dest_filepath):
     Args:
         zip_path: Path to the downloaded compressed file.
         dest_filepath: Final destination file path to the extracted zip file.
-
     """
 
     if os.path.exists(zip_path):
