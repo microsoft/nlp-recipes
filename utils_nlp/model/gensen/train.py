@@ -189,10 +189,7 @@ def evaluate(
                 min_val_loss,
             )
         )
-        if (
-            monitor_epoch - min_val_loss_epoch
-            > config["training"]["stop_patience"]
-        ):
+        if (monitor_epoch - min_val_loss_epoch) > config["training"]["stop_patience"]:
             logging.info("Saving model ...")
             # Save the name with validation loss.
             torch.save(
@@ -208,9 +205,9 @@ def evaluate(
             "##### Training Time ##### %f seconds"
             % (time.time() - starting_time)
         )
-        return True
+        return True, min_val_loss_epoch, min_val_loss
     else:
-        return False
+        return False, min_val_loss_epoch, min_val_loss
 
 
 def evaluate_nli(nli_iterator, model, batch_size, n_gpus):
@@ -372,6 +369,7 @@ def train(config, data_folder, learning_rate=0.0001):
         ).cuda()
 
         optimizer = setup_horovod(model, learning_rate=learning_rate)
+        # optimizer = optim.Adam(model.parameters(), lr=learning_rate)
         logging.info(model)
 
         n_gpus = config["training"]["n_gpus"]
@@ -391,6 +389,7 @@ def train(config, data_folder, learning_rate=0.0001):
         rng_num_tasks = len(tasknames) - 1 if paired_tasks else len(tasknames)
         logging.info("Commencing Training ...")
         while True:
+            # logging.info("Model hash: %f" % hash(model.state_dict()))
             start = time.time()
             # Train NLI once every 10 minibatches of other tasks
             if nli_ctr % 10 == 0:
@@ -544,7 +543,7 @@ def train(config, data_folder, learning_rate=0.0001):
                 logging.info("############################")
                 logging.info("##### Evaluating model #####")
                 logging.info("############################")
-                training_complete = evaluate(
+                training_complete, min_val_loss_epoch, min_val_loss = evaluate(
                     config=config,
                     train_iterator=train_iterator,
                     model=model,
