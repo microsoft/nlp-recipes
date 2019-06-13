@@ -45,7 +45,7 @@ class BERTTokenClassifier:
         """
 
         if num_labels < 2:
-            raise Exception("Number of labels should be at least 2.")
+            raise ValueError("Number of labels should be at least 2.")
 
         self.language = language
         self.num_labels = num_labels
@@ -150,8 +150,8 @@ class BERTTokenClassifier:
         else:
             num_gpus_used = min(num_gpus, torch.cuda.device_count())
 
-        num_train_optimization_steps = (
-            int(len(token_ids) / batch_size) * num_epochs
+        num_train_optimization_steps = max(
+            (int(len(token_ids) / batch_size) * num_epochs), 1
         )
         optimizer = self._get_optimizer(
             learning_rate=learning_rate,
