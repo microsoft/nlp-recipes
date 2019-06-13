@@ -13,8 +13,8 @@ if nlp_path not in sys.path:
 
 from utils_nlp.bert.common import Tokenizer, create_data_loader, Language
 
-INPUT_TEXT = ["Johnathan is studying in the University of Michigan."]
-INPUT_LABELS = [["I-PER", "O", "O", "O", "O", "I-ORG", "I-ORG", "I-ORG"]]
+INPUT_TEXT = ["Johnathan is studying in the University of Michigan ."]
+INPUT_LABELS = [["I-PER", "O", "O", "O", "O", "I-ORG", "I-ORG", "I-ORG", "O"]]
 INPUT_TOKEN_IDS = [
     [
         1287,
@@ -40,7 +40,7 @@ INPUT_TOKEN_IDS = [
     ]
 ]
 INPUT_LABEL_IDS = [
-    [3, 5, 5, 0, 0, 0, 0, 4, 4, 4, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    [3, 5, 5, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 ]
 INPUT_MASK = [[1] * 11 + [0] * 9]
 
@@ -51,11 +51,11 @@ LABEL_MAP = {label: i for i, label in enumerate(UNIQUE_LABELS)}
 
 def test_tokenizer_preprocess_ner_tokens():
     expected_trailing_token_mask = [[True] * 20]
-    false_pos = [1, 2, 10]
+    false_pos = [1, 2]
     for p in false_pos:
         expected_trailing_token_mask[0][p] = False
     expected_label_ids = [
-        [3, 5, 5, 0, 0, 0, 0, 4, 4, 4, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        [3, 5, 5, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     ]
     seq_length = 20
 

@@ -43,14 +43,14 @@ INPUT_TOKEN_IDS = [
     ]
 ]
 INPUT_LABEL_IDS = [
-    [3, 5, 5, 0, 0, 0, 0, 4, 4, 4, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    [3, 5, 5, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 ]
 INPUT_MASK = [[1] * 11 + [0] * 9]
 PREDICTED_LABELS = [
-    [3, 5, 5, 0, 0, 0, 0, 4, 4, 4, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    [3, 5, 5, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 ]
 TRAILING_TOKEN_MASK = [[True] * 20]
-false_pos = [1, 2, 10]
+false_pos = [1, 2]
 for p in false_pos:
     TRAILING_TOKEN_MASK[0][p] = False
 
@@ -96,7 +96,7 @@ def test_token_classifier_fit_predict():
 
 def test_postprocess_token_labels():
     expected_labels_no_padding = [
-        ["I-PER", "X", "X", "O", "O", "O", "O", "I-ORG", "I-ORG", "I-ORG", "X"]
+        ["I-PER", "X", "X", "O", "O", "O", "O", "I-ORG", "I-ORG", "I-ORG", "O"]
     ]
 
     labels_no_padding = postprocess_token_labels(
@@ -108,7 +108,7 @@ def test_postprocess_token_labels():
 
 def test_postprocess_token_labels_remove_trailing():
     expected_postprocessed_labels = [
-        ["I-PER", "O", "O", "O", "O", "I-ORG", "I-ORG", "I-ORG"]
+        ["I-PER", "O", "O", "O", "O", "I-ORG", "I-ORG", "I-ORG", "O"]
     ]
 
     labels_no_padding_no_trailing = postprocess_token_labels(
