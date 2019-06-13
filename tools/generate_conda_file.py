@@ -67,6 +67,7 @@ PIP_BASE = {
     "nltk": "nltk>=3.4",
     "pytorch-pretrained-bert": "pytorch-pretrained-bert>=0.6",
     "horovod": "horovod>=0.16.1",
+    "seqeval": "seqeval>=0.0.12",
 }
 
 PIP_GPU = {}
