@@ -393,8 +393,8 @@ def train(config, data_folder, learning_rate=0.0001):
         min_val_loss_epoch = -1
         rng_num_tasks = len(tasknames) - 1 if paired_tasks else len(tasknames)
         logging.info("Commencing Training ...")
+        start = time.time()
         while True:
-            start = time.time()
             # Train NLI once every 10 minibatches of other tasks
             if nli_ctr % 10 == 0:
                 minibatch = nli_iterator.get_parallel_minibatch(

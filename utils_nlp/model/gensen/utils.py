@@ -93,7 +93,6 @@ class DataIterator(object):
                     vocab[word] = 1
                 else:
                     vocab[word] += 1
-        run.log("Found %d words in dataset ", len(vocab))
         word2id, id2word = self._trim_vocab(vocab, vocab_size)
         return word2id, id2word
 
@@ -152,7 +151,6 @@ class BufferedDataIterator(DataIterator):
             {"data": [], "word2id": None, "id2word": None}
             for i in range(len(self.fname_trg))
         ]
-        run.log("Building vocabulary ...", 2)
         self.build_vocab()
 
         """Reset file pointers to the start after reading the file to
@@ -180,10 +178,6 @@ class BufferedDataIterator(DataIterator):
             reset(bool): If need to reset the contents of the current buffer.
 
         """
-        run.log("Fetching sentences ...", 2)
-        run.log("Processing corpus : ", idx)
-        run.log("task", self.tasknames[idx])
-
         # Reset the contents of the current buffer.
         if reset:
             self.src[idx]["data"] = []
