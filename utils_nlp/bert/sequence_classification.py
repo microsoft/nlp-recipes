@@ -1,13 +1,18 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
+# This script reuses some code from
+# https://github.com/huggingface/pytorch-pretrained-BERT/blob/master/examples/run_classifier.py
+
 import random
+
 import numpy as np
 import torch
 import torch.nn as nn
 from pytorch_pretrained_bert.modeling import BertForSequenceClassification
 from pytorch_pretrained_bert.optimization import BertAdam
 from tqdm import tqdm
+
 from utils_nlp.bert.common import Language
 from utils_nlp.pytorch.device_utils import get_device, move_to_device
 
@@ -135,7 +140,7 @@ class BERTSequenceClassifier:
                                 epoch + 1,
                                 num_epochs,
                                 i + 1,
-                                i + 1 + (num_batches // 10),
+                                (i + 1 + (num_batches // 10)) % num_batches,
                                 num_batches,
                                 loss.data,
                             )
