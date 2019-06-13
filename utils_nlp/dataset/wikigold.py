@@ -75,7 +75,7 @@ def get_train_test_data(text, test_percentage=0.5, random_seed=None):
             s_split = s.split("\n")
             # split "word label" pairs
             s_split_split = [t.split() for t in s_split]
-            sentence_list.append("".join([t[0] for t in s_split_split]))
+            sentence_list.append(" ".join([t[0] for t in s_split_split]))
             labels_list.append([t[1] for t in s_split_split])
             if len(s_split_split) > max_seq_len:
                 max_seq_len = len(s_split_split)
