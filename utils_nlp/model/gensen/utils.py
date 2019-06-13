@@ -111,19 +111,21 @@ class BufferedDataIterator(DataIterator):
             save_dir,
             buffer_size=1e6,
             lowercase=False,
+            seed=0
     ):
         """Initialize params.
-        
+
         Args:
-            src(list): source dataset.
-            trg(list): target dataset.
+            src(torch.Tensor): source dataset.
+            trg(torch.Tensor): target dataset.
             src_vocab_size(int): The size of source vocab.
             trg_vocab_size(int): The size of target vocab.
             tasknames(list): The list of task names.
             save_dir(str): The saving dir.
-            buffer_size(float): Buffer size.
+            buffer_size(int): Buffer size.
             lowercase(bool): if lowercase the data.
         """
+        self.seed = seed
         self.fname_src = src
         self.fname_trg = trg
         self.src_vocab_size = src_vocab_size
@@ -275,7 +277,7 @@ class BufferedDataIterator(DataIterator):
     def shuffle_dataset(self, idx):
         """Shuffle current buffer."""
         self.src[idx]["data"], self.trg[idx]["data"] = shuffle(
-            self.src[idx]["data"], self.trg[idx]["data"]
+            self.src[idx]["data"], self.trg[idx]["data"], random_state=self.seed
         )
 
     def get_parallel_minibatch(
@@ -382,7 +384,7 @@ class NLIIterator(DataIterator):
     """Data iterator for tokenized NLI datasets."""
 
     def __init__(
-            self, train, dev, test, vocab_size, lowercase=True, vocab=None
+            self, train, dev, test, vocab_size, lowercase=True, vocab=None, seed=0
     ):
         """Initialize params.
 
@@ -395,8 +397,9 @@ class NLIIterator(DataIterator):
             test(torch.Tensor): Testing dataset.
             vocab_size(int): The size of the vocabulary.
             lowercase(bool): If lowercase the dataset.
-            vocab(Union): The list of the vocabulary.
+            vocab(list): The list of the vocabulary.
         """
+        self.seed = seed
         self.train = train
         self.dev = dev
         self.test = test
@@ -437,7 +440,7 @@ class NLIIterator(DataIterator):
 
     def shuffle_dataset(self):
         """Shuffle training data."""
-        self.train_lines = shuffle(self.train_lines)
+        self.train_lines = shuffle(self.train_lines, random_state=self.seed)
 
     def get_parallel_minibatch(self, index, batch_size, sent_type="train"):
         """Prepare minibatch.

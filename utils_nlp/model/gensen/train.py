@@ -12,6 +12,7 @@ The GenSen training process follows the steps:
 5. Save the best model and stop the training process
 
 AzureML provides AI Compute to train the model and track the performance.
+
 """
 import logging
 import argparse
@@ -70,7 +71,7 @@ def setup_horovod(model, learning_rate):
 
     """
     # Horovod: scale learning rate by the number of GPUs.
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate / hvd.size())
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate*hvd.size())
 
     # Horovod: broadcast parameters & optimizer state.
     hvd.broadcast_parameters(model.state_dict(), root_rank=0)
@@ -168,8 +169,11 @@ def evaluate(
         )
         validation_loss = metric_average(validation_loss, "val_loss")
         logging.info("%s Validation Loss : %.3f" % (task, validation_loss))
-        # log the best val accuracy to AML run
-        run.log("best_val_loss", np.float(validation_loss))
+
+        # Horovod: print output only on first rank.
+        if hvd.rank() == 0:
+            # log the best val accuracy to AML run
+            run.log("best_val_loss", np.float(validation_loss))
 
         # If the validation loss is small enough, and it starts to go up.
         # Should stop training.
@@ -319,6 +323,7 @@ def train(config, data_folder, learning_rate=0.0001):
             save_dir,
             buffer_size=1e6,
             lowercase=True,
+            seed=(hvd.rank() + 1) * 12345
         )
 
         nli_iterator = NLIIterator(
@@ -327,6 +332,7 @@ def train(config, data_folder, learning_rate=0.0001):
             test=config["data"]["nli_test"],
             vocab_size=-1,
             vocab=os.path.join(save_dir, "src_vocab.pkl"),
+            seed=(hvd.rank() + 1) * 12345
         )
 
         src_vocab_size = len(train_iterator.src[0]["word2id"])
@@ -373,7 +379,6 @@ def train(config, data_folder, learning_rate=0.0001):
         logging.info(model)
 
         n_gpus = config["training"]["n_gpus"]
-        model = torch.nn.DataParallel(model, device_ids=range(n_gpus))
 
         task_losses = [[] for _ in tasknames]
         task_idxs = [0 for _ in tasknames]
@@ -389,7 +394,6 @@ def train(config, data_folder, learning_rate=0.0001):
         rng_num_tasks = len(tasknames) - 1 if paired_tasks else len(tasknames)
         logging.info("Commencing Training ...")
         while True:
-            # logging.info("Model hash: %f" % hash(model.state_dict()))
             start = time.time()
             # Train NLI once every 10 minibatches of other tasks
             if nli_ctr % 10 == 0:
@@ -496,6 +500,9 @@ def train(config, data_folder, learning_rate=0.0001):
                     task_losses[task_idx].append(loss.item())
 
                 loss.backward()
+                # For distributed optimizer need to sync before gradient clipping.
+                optimizer.synchronize()
+
                 torch.nn.utils.clip_grad_norm(model.parameters(), 1.0)
                 optimizer.step()
 
