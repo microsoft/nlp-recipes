@@ -23,12 +23,8 @@ def load_pandas_df(local_cache_path=None):
     """Downloads and extracts the dataset files
     Args:
         local_cache_path ([type], optional): [description]. Defaults to None.
-        file_split (str, optional): The subset to load.
-            One of: {"train", "dev_matched", "dev_mismatched"}
-            Defaults to "train".
     Returns:
-        pd.DataFrame: pandas DataFrame containing the specified
-            MultiNLI subset.
+        pd.DataFrame: pandas DataFrame containing the loaded dataset.
     """
     zip_file = URL.split("/")[-1]
     csv_file_path = os.path.join(
