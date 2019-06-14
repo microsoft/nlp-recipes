@@ -22,7 +22,7 @@ def _preprocess(split_map, data_path, column_names):
 
     for file_split, df in split_map.items():
         base_txt_path = os.path.join(
-            data_path, SNLI_CLEAN_PATH, "/snli_1.0_{}.txt".format(file_split)
+            data_path, SNLI_CLEAN_PATH, "snli_1.0_{}.txt".format(file_split)
         )
 
         df[column_names[0]] = df["sentence1_tokens"].apply(
@@ -81,12 +81,12 @@ def _split_and_cleanup(split_map, data_path):
         s1_tok_path = os.path.join(
             data_path,
             SNLI_CLEAN_PATH,
-            "/snli_1.0_{}.txt.s1.tok".format(file_split),
+            "snli_1.0_{}.txt.s1.tok".format(file_split),
         )
         s2_tok_path = os.path.join(
             data_path,
             SNLI_CLEAN_PATH,
-            "/snli_1.0_{}.txt.s2.tok".format(file_split),
+            "snli_1.0_{}.txt.s2.tok".format(file_split),
         )
         with open(s1_tok_path, "r") as fin, open(
             "{}.tmp".format(s1_tok_path), "w"
