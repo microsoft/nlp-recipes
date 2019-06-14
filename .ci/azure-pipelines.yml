@@ -23,11 +23,11 @@ steps:
     python tools/generate_conda_file.py --gpu
     conda env create -n nlp_gpu -f nlp_gpu.yaml
     conda env list  
-    conda activate nlp_gpu
+    source activate nlp_gpu
   displayName: 'Creating Conda Environment with dependencies'
 
 - bash: |
-    conda activate nlp_gpu
+    source activate nlp_gpu
     python -m ipykernel install --user --name nlp_gpu --display-name "nlp_gpu"
     # Commenting out pytest since it contains bunch of tests from other project which are not applicable.
     # But keeping the line here to show how to run it once tests relevant to this project are added
