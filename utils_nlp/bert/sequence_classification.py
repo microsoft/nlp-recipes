@@ -31,7 +31,7 @@ class BERTSequenceClassifier:
                 Defaults to ".".
         """
         if num_labels < 2:
-            raise Exception("Number of labels should be at least 2.")
+            raise ValueError("Number of labels should be at least 2.")
 
         self.language = language
         self.num_labels = num_labels
