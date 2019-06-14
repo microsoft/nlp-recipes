@@ -46,13 +46,11 @@ class Tokenizer:
         self.language = language
 
     def tokenize(self, text):
-        """Uses a BERT tokenizer
-
+        """Tokenizes a list of documents using a BERT tokenizer
         Args:
-            text (list): [description]
-
+            text (list(str)): list of text documents.
         Returns:
-            [list]: [description]
+            [list(str)]: list of token lists.
         """
         tokens = [self.tokenizer.tokenize(x) for x in text]
         return tokens
