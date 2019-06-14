@@ -140,7 +140,7 @@ class BERTSequenceClassifier:
                                 epoch + 1,
                                 num_epochs,
                                 i + 1,
-                                (i + 1 + (num_batches // 10)) % num_batches,
+                                min(i + 1 + num_batches // 10, num_batches),
                                 num_batches,
                                 loss.data,
                             )
