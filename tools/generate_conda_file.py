@@ -13,7 +13,6 @@
 
 import argparse
 import textwrap
-from sys import platform
 
 
 HELP_MSG = """
@@ -25,13 +24,15 @@ $ conda env update -f {conda_env}.yaml
 
 To register the conda environment in Jupyter:
 $ conda activate {conda_env}
-$ python -m ipykernel install --user --name {conda_env} --display-name "Python ({conda_env})"
+$ python -m ipykernel install --user --name {conda_env} \
+    --display-name "Python ({conda_env})"
 """
 
 CHANNELS = ["defaults", "conda-forge", "pytorch"]
 
 CONDA_BASE = {
     "python": "python==3.6.8",
+    "pip": "pip>=19.1.1",
     "gitpython": "gitpython>=2.1.8",
     "ipykernel": "ipykernel>=4.6.1",
     "jupyter": "jupyter>=1.0.0",
@@ -53,7 +54,9 @@ CONDA_GPU = {
 }
 
 PIP_BASE = {
-    "azureml-sdk[notebooks,tensorboard]": "azureml-sdk[notebooks,tensorboard]==1.0.33",
+    "azureml-sdk[notebooks,tensorboard]": (
+        "azureml-sdk[notebooks,tensorboard]==1.0.33"
+    ),
     "azureml-dataprep": "azureml-dataprep==1.1.4",
     "black": "black>=18.6b4",
     "papermill": "papermill==0.18.2",
@@ -62,15 +65,18 @@ PIP_BASE = {
     "pyemd": "pyemd==0.5.1",
     "ipywebrtc": "ipywebrtc==0.4.3",
     "pre-commit": "pre-commit>=1.14.4",
-    "spacy-models": "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-2.1.0/en_core_web_sm-2.1.0.tar.gz",
+    "spacy": "spacy>=2.1.4",
+    "spacy-models": (
+        "https://github.com/explosion/spacy-models/releases/download/"
+        "en_core_web_sm-2.1.0/en_core_web_sm-2.1.0.tar.gz"
+    ),
     "gensim": "gensim>=3.7.0",
     "nltk": "nltk>=3.4",
     "pytorch-pretrained-bert": "pytorch-pretrained-bert>=0.6",
-    "horovod": "horovod>=0.16.1",
     "seqeval": "seqeval>=0.0.12",
 }
 
-PIP_GPU = {}
+PIP_GPU = {"horovod": "horovod>=0.16.1"}
 
 
 if __name__ == "__main__":
@@ -78,7 +84,8 @@ if __name__ == "__main__":
         description=textwrap.dedent(
             """
         This script generates a conda file for different environments.
-        Plain python is the default, but flags can be used to support GPU functionality"""
+        Plain python is the default,
+        but flags can be used to support GPU functionality."""
         ),
         epilog=HELP_MSG,
         formatter_class=argparse.RawDescriptionHelpFormatter,
