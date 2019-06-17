@@ -73,6 +73,7 @@ PIP_BASE = {
     "gensim": "gensim>=3.7.0",
     "nltk": "nltk>=3.4",
     "pytorch-pretrained-bert": "pytorch-pretrained-bert>=0.6",
+    "seqeval": "seqeval>=0.0.12",
 }
 
 PIP_GPU = {"horovod": "horovod>=0.16.1"}
