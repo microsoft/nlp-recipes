@@ -128,7 +128,7 @@ class MultitaskModel(nn.Module):
         self, minibatch, task_idx,
         return_hidden=False, paired_trg=None
     ):
-        r"""Propogate input through the network.
+        """Propogate input through the network.
 
         Seq2Seq:
         inputs: minibatch['input_src'], minibatch['input_trg']

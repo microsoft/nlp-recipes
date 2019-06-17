@@ -373,9 +373,8 @@ def train(config, data_folder, learning_rate=0.0001):
             num_tasks=len(train_iterator.src),
             paired_tasks=paired_tasks,
         ).cuda()
-
+        
         optimizer = setup_horovod(model, learning_rate=learning_rate)
-        # optimizer = optim.Adam(model.parameters(), lr=learning_rate)
         logging.info(model)
 
         n_gpus = config["training"]["n_gpus"]
