@@ -12,6 +12,7 @@ The GenSen training process follows the steps:
 5. Save the best model and stop the training process
 
 AzureML provides AI Compute to train the model and track the performance.
+This training process is based on GPU only.
 
 """
 import logging
