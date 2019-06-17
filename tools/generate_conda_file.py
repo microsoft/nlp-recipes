@@ -32,7 +32,7 @@ CHANNELS = ["defaults", "conda-forge", "pytorch"]
 
 CONDA_BASE = {
     "python": "python==3.6.8",
-    "pip": "pip",
+    "pip": "pip>=19.1.1",
     "gitpython": "gitpython>=2.1.8",
     "ipykernel": "ipykernel>=4.6.1",
     "jupyter": "jupyter>=1.0.0",
