@@ -29,8 +29,8 @@ import torch.optim as optim
 from azureml.core.run import Run
 import horovod.torch as hvd
 
-from utils_nlp.model.gensen.multi_task_model import MultitaskModel
-from utils_nlp.model.gensen.utils import (
+from utils_nlp.gensen.multi_task_model import MultitaskModel
+from utils_nlp.gensen.utils import (
     BufferedDataIterator,
     NLIIterator,
     compute_validation_loss,
