@@ -7,7 +7,8 @@ https://www.nyu.edu/projects/bowman/multinli/
 
 import os
 import pandas as pd
-from utils_nlp.dataset.url_utils import extract_zip, maybe_download
+
+from .url_utils import extract_zip, maybe_download
 
 URL = "http://www.nyu.edu/projects/bowman/multinli/multinli_1.0.zip"
 DATA_FILES = {

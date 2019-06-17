@@ -7,7 +7,7 @@ import pathlib
 
 import pandas as pd
 
-from utils_nlp.dataset.url_utils import maybe_download, download_path
+from .url_utils import maybe_download, download_path
 
 DATASET_DICT = {
     "train": "msr_paraphrase_train.txt",

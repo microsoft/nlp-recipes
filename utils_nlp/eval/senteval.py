@@ -1,32 +1,31 @@
 import os
 import sys
+
 import pandas as pd
 
 
-class SentEvalRunner:
-    def __init__(self, path_to_senteval=".", use_azureml=False):
-        """AzureML-compatible wrapper class that interfaces with the original implementation of SentEval
-        
+class SentEvalRunner(object):
+    def __init__(self, path_to_senteval="."):
+        """AzureML-compatible wrapper class that interfaces with the
+           original implementation of SentEval
+
         Args:
             path_to_senteval (str, optional): Path to the SentEval source code.
-            use_azureml (bool, optional): Defaults to false.
+            use_azureml (bool, optional): Defaults to False.
         """
         self.path_to_senteval = path_to_senteval
-        self.use_azureml = use_azureml
 
     def set_transfer_data_path(self, relative_path):
         """Set the datapath that contains the datasets for the SentEval transfer tasks
-        
+
         Args:
             relative_path (str): Relative datapath
         """
-        self.transfer_data_path = os.path.join(
-            self.path_to_senteval, relative_path
-        )
+        self.transfer_data_path = os.path.join(self.path_to_senteval, relative_path)
 
     def set_transfer_tasks(self, task_list):
         """Set the transfer tasks to use for evaluation
-        
+
         Args:
             task_list (list(str)): List of downstream transfer tasks
         """
@@ -79,24 +78,18 @@ class SentEvalRunner:
 
     def run(self, batcher_func, prepare_func):
         """Run the SentEval engine on the model on the transfer tasks
-        
+
         Args:
-            batcher_func (function): Function required by SentEval that transforms a batch of text sentences into 
+            batcher_func (function): Function required by SentEval that transforms a batch of text sentences into
                                      sentence embeddings
-            prepare_func (function): Function that sees the whole dataset of each task and can thus construct the word 
+            prepare_func (function): Function that sees the whole dataset of each task and can thus construct the word
                                      vocabulary, the dictionary of word vectors, etc
-        
+
         Returns:
             dict: Dictionary of results
         """
-        if self.use_azureml:
-            sys.path.insert(
-                0, os.path.relpath(self.path_to_senteval, os.getcwd())
-            )
-            import senteval
-        else:
-            sys.path.insert(0, self.path_to_senteval)
-            import senteval
+        sys.path.insert(0, os.path.relpath(self.path_to_senteval, os.getcwd())
+        import senteval
 
         se = senteval.engine.SE(
             self.params_senteval, batcher_func, prepare_func
@@ -104,9 +97,10 @@ class SentEvalRunner:
 
         return se.eval(self.transfer_tasks)
 
+    #  TODO: This function does not print
     def print_mean(self, results, selected_metrics=[], round_decimals=3):
         """Print the means of selected metrics of the transfer tasks as a table
-        
+
         Args:
             results (dict): Results from the SentEval evaluation engine
             selected_metrics (list(str), optional): List of metric names
@@ -122,6 +116,7 @@ class SentEvalRunner:
             else:
                 row = [results[task][metric] for metric in selected_metrics]
             data.append(row)
+
         table = pd.DataFrame(
             data=data, columns=selected_metrics, index=self.transfer_tasks
         )

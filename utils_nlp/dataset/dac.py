@@ -10,7 +10,7 @@ paper link:  ("https://www.mendeley.com/catalogue/
 
 import os
 import pandas as pd
-from utils_nlp.dataset.url_utils import extract_zip, maybe_download
+from .url_utils import extract_zip, maybe_download
 
 URL = (
     "https://data.mendeley.com/datasets/v524p5dhpj/2"

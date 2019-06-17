@@ -4,9 +4,8 @@
 import os
 import tarfile
 import pandas as pd
-import azureml.dataprep as dp
 
-from utils_nlp.dataset.url_utils import maybe_download
+from .url_utils import maybe_download
 
 STS_URL = "http://ixa2.si.ehu.es/stswiki/images/4/48/Stsbenchmark.tar.gz"
 DEFAULT_FILE_SPLIT = "train"
@@ -14,11 +13,11 @@ DEFAULT_FILE_SPLIT = "train"
 
 def load_pandas_df(data_path, file_split=DEFAULT_FILE_SPLIT):
     """Load the STS Benchmark dataset as a pd.DataFrame
-    
+
     Args:
         data_path (str): Path to data directory
         file_split (str, optional): File split to load. One of (train, dev, test). Defaults to train.
-    
+
     Returns:
         pd.DataFrame: STS Benchmark dataset
     """
@@ -30,6 +29,7 @@ def load_pandas_df(data_path, file_split=DEFAULT_FILE_SPLIT):
 
 
 def _maybe_download_and_extract(base_data_path, clean_file_path):
+    import azureml.dataprep as dp
     if not os.path.exists(clean_file_path):
         raw_data_path = os.path.join(base_data_path, "raw")
         if not os.path.exists(raw_data_path):
@@ -45,7 +45,7 @@ def _maybe_download_and_extract(base_data_path, clean_file_path):
 
 
 def _download_sts(dirpath):
-    """Download and extract data from http://ixa2.si.ehu.es/stswiki/images/4/48/Stsbenchmark.tar.gz 
+    """Download and extract data from http://ixa2.si.ehu.es/stswiki/images/4/48/Stsbenchmark.tar.gz
 
     Args:
         dirpath (str): Path to data directory.
@@ -87,6 +87,7 @@ def _clean_sts(filenames, src_dir, target_dir):
         src_dir (str): Directory for the raw csv files.
         target_dir (str): Directory for the clean csv files to be written to.
     """
+    import azureml.dataprep as dp
     if not os.path.exists(target_dir):
         os.makedirs(target_dir)
     filepaths = [os.path.join(src_dir, f) for f in filenames]

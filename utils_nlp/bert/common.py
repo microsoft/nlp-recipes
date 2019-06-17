@@ -1,11 +1,12 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
-from pytorch_pretrained_bert.tokenization import BertTokenizer
 from enum import Enum
-import warnings
-import torch
+import logging
 
+from pytorch_pretrained_bert.tokenization import BertTokenizer
+
+import torch
 from torch.utils.data import (
     DataLoader,
     RandomSampler,
@@ -13,6 +14,8 @@ from torch.utils.data import (
     TensorDataset,
 )
 from torch.utils.data.distributed import DistributedSampler
+
+module_logger = logging.getLogger(__name__)
 
 # Max supported sequence length
 BERT_MAX_LEN = 512
@@ -29,7 +32,7 @@ class Language(Enum):
     MULTILINGUAL = "bert-base-multilingual-cased"
 
 
-class Tokenizer:
+class Tokenizer(object):
     def __init__(
         self, language=Language.ENGLISH, to_lower=False, cache_dir="."
     ):
@@ -37,6 +40,8 @@ class Tokenizer:
         Args:
             language (Language, optional): The pretrained model's language.
                                            Defaults to Language.ENGLISH.
+            to_lower (bool, optional): Whether to downcast inputs to lower.
+                Defaults to False.
             cache_dir (str, optional): Location of BERT's cache directory.
                 Defaults to ".".
         """
@@ -52,8 +57,7 @@ class Tokenizer:
         Returns:
             [list(str)]: list of token lists.
         """
-        tokens = [self.tokenizer.tokenize(x) for x in text]
-        return tokens
+        return [self.tokenizer.tokenize(x) for x in text]
 
     def preprocess_classification_tokens(self, tokens, max_len=BERT_MAX_LEN):
         """Preprocessing of input tokens:
@@ -71,10 +75,8 @@ class Tokenizer:
             list of input mask lists
         """
         if max_len > BERT_MAX_LEN:
-            print(
-                "setting max_len to max allowed tokens: {}".format(
-                    BERT_MAX_LEN
-                )
+            module_logger.info(
+                "setting max_len to max allowed tokens: {}".format(BERT_MAX_LEN)
             )
             max_len = BERT_MAX_LEN
 
@@ -143,19 +145,19 @@ class Tokenizer:
                     each sublist contains token labels of a input
                     sentence/paragraph, if labels is provided.
         """
+        # TODO can this return a namedtuple to support returned_obj.label_ids_all
+        # https://pymotw.com/2/collections/namedtuple.html and avoid returned_obj[3]
         if max_len > BERT_MAX_LEN:
-            warnings.warn(
-                "setting max_len to max allowed tokens: {}".format(
-                    BERT_MAX_LEN
-                )
-            )
             max_len = BERT_MAX_LEN
+            logger.warning(
+                "set max_len to max allowed tokens: {}".format(max_len)
+            )
 
-        label_available = True
-        if labels is None:
-            label_available = False
-            # create an artificial label list for creating trailing token mask
-            labels = ["O"] * len(text)
+        #  Must be called before setting label to the default value
+        label_available = labels is not None
+
+        # create an artificial label list for creating trailing token mask
+        labels = labels if labels is not None else ["O"] * len(text)
 
         input_ids_all = []
         input_mask_all = []
@@ -191,10 +193,7 @@ class Tokenizer:
             new_labels += label_padding
 
             trailing_token_mask_all.append(
-                [
-                    True if label != trailing_piece_tag else False
-                    for label in new_labels
-                ]
+                [label != trailing_piece_tag for label in new_labels]
             )
 
             if label_map:
@@ -258,20 +257,44 @@ def create_data_loader(
     else:
         tensor_data = TensorDataset(input_ids_tensor, input_mask_tensor)
 
-    if sample_method == "random":
-        sampler = RandomSampler(tensor_data)
-    elif sample_method == "sequential":
-        sampler = SequentialSampler(tensor_data)
-    elif sample_method == "distributed":
-        sampler = DistributedSampler(tensor_data)
-    else:
+    name_to_sampler_class = {
+        "random": RandomSampler,
+        "sequential": SequentialSampler,
+        "distributed": DistributedSampler
+    }
+    try:
+        sampler_class = name_to_sampler_class[sample_method]
+        sampler = sampler_class(tensor_data)
+    except KeyError:
         raise ValueError(
-            "Invalid sample_method value, accepted values are: "
-            "random, sequential, and distributed"
+            "Invalid sample_method value: {}, accepted values are: "
+            "random, sequential, and distributed".format(sample_method)
         )
 
-    dataloader = DataLoader(
-        tensor_data, sampler=sampler, batch_size=batch_size
-    )
+    return DataLoader(tensor_data, sampler=sampler, batch_size=batch_size)
 
-    return dataloader
+
+class BERTModelWrapper(object):
+      """BERT-based model"""
+
+    def __init__(self, language=Language.ENGLISH, num_labels=2, cache_dir="."):
+        """Initializes the underlying pretrained model.
+        Args:
+            language (Language, optional): The pretrained model's language.
+                                           Defaults to Language.ENGLISH.
+            num_labels (int, optional): The number of unique labels in the
+                training data. Defaults to 2.
+            cache_dir (str, optional): Location of BERT's cache directory.
+                Defaults to ".".
+        """
+        if num_labels < 2:
+            raise ValueError("Number of labels should be at least 2. Was {}.".format(num_labels))
+
+        self.language = language
+        self.num_labels = num_labels
+        self.cache_dir = cache_dir
+        self.model = self._load_model()
+
+    def _load_model(self):
+        """Called to initialize the BERT pretrained model."""
+        raise NotImplementedError("BERT model wrappers must override _load_model")

@@ -6,40 +6,29 @@
 
 import random
 
+from tqdm import tqdm
 import numpy as np
-import torch
-import torch.nn as nn
+
 from pytorch_pretrained_bert.modeling import BertForSequenceClassification
 from pytorch_pretrained_bert.optimization import BertAdam
-from tqdm import tqdm
 
-from utils_nlp.bert.common import Language
+import torch
+import torch.nn as nn
+
+from .common import Language, BERTModelWrapper
 from utils_nlp.pytorch.device_utils import get_device, move_to_device
 
 
-class BERTSequenceClassifier:
+class BERTSequenceClassifier(BERTModelWrapper):
     """BERT-based sequence classifier"""
 
-    def __init__(self, language=Language.ENGLISH, num_labels=2, cache_dir="."):
-        """Initializes the classifier and the underlying pretrained model.
-        Args:
-            language (Language, optional): The pretrained model's language.
-                                           Defaults to Language.ENGLISH.
-            num_labels (int, optional): The number of unique labels in the
-                training data. Defaults to 2.
-            cache_dir (str, optional): Location of BERT's cache directory.
-                Defaults to ".".
+    def _load_model(self):
+        """Loads the classifier and the underlying pretrained model.
+        Returns:
+            Model: A BERT based PyTorch Sequence Classifier.
         """
-        if num_labels < 2:
-            raise ValueError("Number of labels should be at least 2.")
-
-        self.language = language
-        self.num_labels = num_labels
-        self.cache_dir = cache_dir
-
-        # create classifier
-        self.model = BertForSequenceClassification.from_pretrained(
-            language.value, cache_dir=cache_dir, num_labels=num_labels
+        return BertForSequenceClassification.from_pretrained(
+            self.language.value, cache_dir=self.cache_dir, num_labels=self.num_labels
         )
 
     def fit(
@@ -133,18 +122,17 @@ class BERTSequenceClassifier:
                 loss = loss_func(y_h, y_batch).mean()
                 loss.backward()
                 opt.step()
-                if verbose:
-                    if i % ((num_batches // 10) + 1) == 0:
-                        print(
-                            "epoch:{}/{}; batch:{}->{}/{}; loss:{:.6f}".format(
-                                epoch + 1,
-                                num_epochs,
-                                i + 1,
-                                min(i + 1 + num_batches // 10, num_batches),
-                                num_batches,
-                                loss.data,
-                            )
+                if verbose and i % ((num_batches // 10) + 1) == 0:
+                    module_logger.info(
+                        "epoch:{}/{}; batch:{}->{}/{}; loss:{:.6f}".format(
+                            epoch + 1,
+                            num_epochs,
+                            i + 1,
+                            min(i + 1 + num_batches // 10, num_batches),
+                            num_batches,
+                            loss.data,
                         )
+                    )
         # empty cache
         del [x_batch, y_batch, mask_batch]
         torch.cuda.empty_cache()
@@ -189,5 +177,4 @@ class BERTSequenceClassifier:
                 if i % batch_size == 0:
                     pbar.update(batch_size)
         preds = [x.argmax(1) for x in preds]
-        preds = np.concatenate(preds)
-        return preds
+        return np.concatenate(preds)

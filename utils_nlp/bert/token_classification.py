@@ -8,50 +8,27 @@
 import numpy as np
 from tqdm import tqdm, trange
 
-import torch
-import torch.nn as nn
-
 from pytorch_pretrained_bert.optimization import BertAdam
 from pytorch_pretrained_bert.modeling import BertForTokenClassification
 
-from .common import Language, create_data_loader
+import torch
+import torch.nn as nn
+
+from .common import Language, create_data_loader, BERTModelWrapper
 
 from utils_nlp.pytorch.device_utils import get_device, move_to_device
 
 
-class BERTTokenClassifier:
+# TODO shared API with sequence classification but no shared code?
+class BERTTokenClassifier(BERTModelWrapper):
     """BERT-based token classifier."""
 
-    def __init__(self, language=Language.ENGLISH, num_labels=2, cache_dir="."):
-
+    def _load_model(self):
+        """Loads the classifier and the underlying pre-trained model.
+        Returns:
+            Model: A BERT based PyTorch Token Classifier.
         """
-        Initializes the classifier and the underlying pre-trained model.
-
-        Args:
-            language (Language, optional): The pre-trained model's language.
-                The value of this argument determines which BERT model is
-                used:
-                    Language.ENGLISH: "bert-base-uncased"
-                    Language.ENGLISHCASED: "bert-base-cased"
-                    Language.ENGLISHLARGE: "bert-large-uncased"
-                    Language.ENGLISHLARGECASED: "bert-large-cased"
-                    Language.CHINESE: "bert-base-chinese"
-                    Language.MULTILINGUAL: "bert-base-multilingual-cased"
-                Defaults to Language.ENGLISH.
-            num_labels (int, optional): The number of unique labels in the
-                data. Defaults to 2.
-            cache_dir (str, optional): Location of BERT's cache directory.
-                Defaults to ".".
-        """
-
-        if num_labels < 2:
-            raise Exception("Number of labels should be at least 2.")
-
-        self.language = language
-        self.num_labels = num_labels
-        self.cache_dir = cache_dir
-
-        self.model = BertForTokenClassification.from_pretrained(
+        return BertForTokenClassification.from_pretrained(
             language.value, cache_dir=cache_dir, num_labels=num_labels
         )
 

@@ -8,7 +8,7 @@ https://www.nyu.edu/projects/bowman/xnli/
 import os
 import pandas as pd
 import requests
-from utils_nlp.dataset.url_utils import extract_zip, maybe_download
+from .url_utils import extract_zip, maybe_download
 
 
 URL = "https://www.nyu.edu/projects/bowman/xnli/XNLI-1.0.zip"
@@ -17,7 +17,7 @@ DATA_FILES = {"dev": "XNLI-1.0/xnli.dev.jsonl", "test": "XNLI-1.0/xnli.test.json
 
 
 def load_pandas_df(local_cache_path=None, file_split="train"):
-    """Downloads and extracts the dataset files    
+    """Downloads and extracts the dataset files
     Args:
         local_cache_path ([type], optional): [description]. Defaults to None.
         file_split (str, optional): The subset to load.
@@ -41,4 +41,3 @@ def load_pandas_df(local_cache_path=None, file_split="train"):
     return pd.read_json(
         os.path.join(local_cache_path, DATA_FILES[file_split]), lines=True
     )
-

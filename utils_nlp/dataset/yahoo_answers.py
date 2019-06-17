@@ -5,7 +5,8 @@
 
 import os
 import pandas as pd
-from utils_nlp.dataset.url_utils import maybe_download, extract_tar
+
+from .url_utils import maybe_download, extract_tar
 
 
 URL = "https://s3.amazonaws.com/fast-ai-nlp/yahoo_answers_csv.tgz"

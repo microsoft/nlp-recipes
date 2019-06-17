@@ -6,13 +6,15 @@ import math
 import os
 import tarfile
 import zipfile
+
+import requests
+
 from contextlib import contextmanager
 from tempfile import TemporaryDirectory
 
-import requests
 from tqdm import tqdm
 
-log = logging.getLogger(__name__)
+module_logger = logging.getLogger(__name__)
 
 
 def maybe_download(
@@ -47,7 +49,7 @@ def maybe_download(
             ):
                 file.write(data)
     else:
-        log.debug("File {} already downloaded".format(filepath))
+        module_logger.debug("File {} already downloaded".format(filepath))
     if expected_bytes is not None:
         statinfo = os.stat(filepath)
         if statinfo.st_size != expected_bytes:

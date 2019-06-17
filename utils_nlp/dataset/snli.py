@@ -3,10 +3,11 @@
 
 import os
 import shutil
-import azureml.dataprep as dprep
-import pandas as pd
 from zipfile import ZipFile
-from utils_nlp.dataset.url_utils import maybe_download, download_path
+
+import pandas as pd
+
+from .url_utils import maybe_download, download_path
 
 
 # Constants
@@ -150,6 +151,7 @@ def clean_snli(source_file_path):
 
 
 def load_azureml_df(
+    import azureml.dataprep as dprep
     local_cache_path=None,
     file_split=DEFAULT_FILE_SPLIT,
     file_type=DEFAULT_FILE_TYPE,

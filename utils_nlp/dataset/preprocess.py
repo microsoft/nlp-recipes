@@ -3,6 +3,7 @@
 
 import pandas as pd
 import spacy
+
 import nltk
 from nltk.corpus import stopwords
 
@@ -46,16 +47,16 @@ def to_spacy_tokens(
     token_cols=["sentence1_tokens", "sentence2_tokens"],
 ):
     """
-	This function tokenizes the sentence pairs using spaCy, defaulting to the 
+	This function tokenizes the sentence pairs using spaCy, defaulting to the
 	spaCy en_core_web_sm model
-	
+
 	Args:
 		df (pd.DataFrame): Dataframe with columns sentence_cols to tokenize.
 		sentence_cols (list, optional): Column names of the raw sentence pairs.
 		token_cols (list, optional): Column names for the tokenized sentences.
-	
+
 	Returns:
-		pd.DataFrame: Dataframe with new columns token_cols, each containing 
+		pd.DataFrame: Dataframe with new columns token_cols, each containing
 							a list of tokens for their respective sentences.
 	"""
     nlp = spacy.load("en_core_web_sm")
@@ -79,17 +80,17 @@ def rm_spacy_stopwords(
     """
 	This function tokenizes the sentence pairs using spaCy and remove stopwords, 
 	defaulting to the spaCy en_core_web_sm model
-	
+
 	Args:
 		df (pd.DataFrame): Dataframe with columns sentence_cols to tokenize.
 		sentence_cols (list, optional): Column names for the raw sentence pairs.
-		stop_cols (list, optional): Column names for the tokenized sentences 
+		stop_cols (list, optional): Column names for the tokenized sentences
 			without stop words.
-		custom_stopwords (list of str, optional): List of custom stopwords to 
+		custom_stopwords (list of str, optional): List of custom stopwords to
 			register with the spaCy model.
-	
+
 	Returns:
-		pd.DataFrame: Dataframe with new columns stop_cols, each containing a 
+		pd.DataFrame: Dataframe with new columns stop_cols, each containing a
 			list of tokens for their respective sentences.
 	"""
     nlp = spacy.load("en_core_web_sm")

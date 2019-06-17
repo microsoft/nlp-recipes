@@ -2,7 +2,8 @@
 # Licensed under the MIT License.
 
 import random
-from utils_nlp.dataset.url_utils import maybe_download
+
+from .url_utils import maybe_download
 
 URL = (
     "https://raw.githubusercontent.com/juand-r/entity-recognition-datasets"

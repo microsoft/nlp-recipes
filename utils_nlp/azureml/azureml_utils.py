@@ -23,53 +23,37 @@ def get_or_create_workspace(
         workspace_region (str): region
 
     Returns:
-        Workspace
+        azureml.core.Workspace
     """
 
     # use environment variables if needed
     if subscription_id is None:
-        subscription_id = os.getenv("SUBSCRIPTION_ID")
+        subscription_id = os.getenv("AZUREML_SUBSCRIPTION_ID")
     if resource_group is None:
-        resource_group = os.getenv("RESOURCE_GROUP")
+        resource_group = os.getenv("AZUREML_RESOURCE_GROUP")
     if workspace_name is None:
-        workspace_name = os.getenv("WORKSPACE_NAME")
+        workspace_name = os.getenv("AZUREML_WORKSPACE_NAME")
     if workspace_region is None:
-        workspace_region = os.getenv("WORKSPACE_REGION")
+        workspace_region = os.getenv("AZUREML_WORKSPACE_REGION")
 
     # define fallback options in order to try
-    options = [
-        (
-            Workspace,
-            dict(
-                subscription_id=subscription_id,
-                resource_group=resource_group,
-                workspace_name=workspace_name,
-            ),
-        ),
-        (Workspace.from_config, dict(path=config_path)),
-        (
-            Workspace.create,
-            dict(
-                subscription_id=subscription_id,
-                resource_group=resource_group,
-                name=workspace_name,
-                location=workspace_region,
-                create_resource_group=True,
-                exist_ok=True,
-            ),
-        ),
-    ]
-
-    for function, kwargs in options:
+    try:
+        ws = Workspace.from_config(path=config_path)
+    except Exception:
         try:
-            ws = function(**kwargs)
-            break
+            kwargs = dict(
+                    subscription_id=subscription_id,
+                    resource_group=resource_group,
+                    name=workspace_name,
+                    location=workspace_region,
+                    create_resource_group=True,
+                    exist_ok=True)
+            ws = Workspace.create(**kwargs)
         except Exception:
-            continue
-    else:
-        raise ValueError(
-            "Failed to get or create AzureML Workspace with the configuration information provided"
-        )
+            raise ValueError(
+                "Failed to get or create AzureML Workspace with "
+                "the configuration information provided: {}.".format(kwargs)
+            )
 
     ws.write_config(path=config_path)
     return ws

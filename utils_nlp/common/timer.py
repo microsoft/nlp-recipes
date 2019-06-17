@@ -8,7 +8,7 @@ from datetime import timedelta
 class Timer(object):
     """Timer class.
     Original code: https://github.com/miguelgfierro/codebase
-    
+
     Examples:
         >>> import time
         >>> t = Timer()

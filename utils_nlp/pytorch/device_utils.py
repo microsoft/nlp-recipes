@@ -20,7 +20,8 @@ def get_device(device="gpu"):
     elif device == "cpu":
         return torch.device("cpu")
     else:
-        raise Exception("Only 'cpu' and 'gpu' devices are supported.")
+        raise Exception("Only 'cpu' and 'gpu' devices "
+                        "are supported. device was {}.".format(device))
 
 
 def move_to_device(model, device, num_gpus=1):
