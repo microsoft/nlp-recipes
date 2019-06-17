@@ -71,7 +71,7 @@ def setup_horovod(model, learning_rate):
 
     """
     # Horovod: scale learning rate by the number of GPUs.
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate*hvd.size())
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate * hvd.size())
 
     # Horovod: broadcast parameters & optimizer state.
     hvd.broadcast_parameters(model.state_dict(), root_rank=0)
@@ -134,10 +134,11 @@ def evaluate(
     min_val_loss_epoch,
     save_dir,
     starting_time,
+    model_state,
 ):
     """ Function to validate the model.
-
     Args:
+        model_state(dict): Saved model weights.
         config(dict): Config object.
         train_iterator(BufferedDataIterator): BufferedDataIterator object.
         model(MultitaskModel): The MultitaskModel object.
@@ -147,13 +148,10 @@ def evaluate(
         min_val_loss_epoch(int): Epoch where the minimum validation loss was seen.
         save_dir(str): Directory path to save the model dictionary.
         starting_time(time.Time): Starting time of the training.
-
     Returns:
         bool: Whether to continue training or not.
-
     """
 
-    model_state = {}
     break_flag = 0
 
     for task_idx, task in enumerate(train_iterator.tasknames):
@@ -173,7 +171,7 @@ def evaluate(
         # Horovod: print output only on first rank.
         if hvd.rank() == 0:
             # log the best val accuracy to AML run
-            run.log("best_val_loss", np.float(validation_loss))
+            run.log("Best Validation Loss", np.float(validation_loss))
 
         # If the validation loss is small enough, and it starts to go up.
         # Should stop training.
@@ -182,6 +180,8 @@ def evaluate(
             min_val_loss = validation_loss
             min_val_loss_epoch = monitor_epoch
             model_state = model.state_dict()
+
+        run.log("Validation Loss", validation_loss)
         print(monitor_epoch, min_val_loss_epoch, min_val_loss)
         logging.info(
             "Monitor epoch: %d Validation Loss:  %.3f Min Validation Epoch: "
@@ -193,7 +193,9 @@ def evaluate(
                 min_val_loss,
             )
         )
-        if (monitor_epoch - min_val_loss_epoch) > config["training"]["stop_patience"]:
+        if (monitor_epoch - min_val_loss_epoch) > config["training"][
+            "stop_patience"
+        ]:
             logging.info("Saving model ...")
             # Save the name with validation loss.
             torch.save(
@@ -209,9 +211,9 @@ def evaluate(
             "##### Training Time ##### %f seconds"
             % (time.time() - starting_time)
         )
-        return True, min_val_loss_epoch, min_val_loss
+        return True, min_val_loss_epoch, min_val_loss, model_state
     else:
-        return False, min_val_loss_epoch, min_val_loss
+        return False, min_val_loss_epoch, min_val_loss, model_state
 
 
 def evaluate_nli(nli_iterator, model, batch_size, n_gpus):
@@ -242,7 +244,7 @@ def evaluate_nli(nli_iterator, model, batch_size, n_gpus):
                 n_correct += 1.0
             else:
                 n_wrong += 1.0
-    logging.info("NLI Dev Acc : %.5f" % (n_correct / (n_correct + n_wrong)))
+    print("NLI Dev Acc : %.5f" % (n_correct / (n_correct + n_wrong)))
     n_correct = 0.0
     n_wrong = 0.0
     for j in range(0, len(nli_iterator.test_lines), batch_size * n_gpus):
@@ -261,7 +263,7 @@ def evaluate_nli(nli_iterator, model, batch_size, n_gpus):
                 n_correct += 1.0
             else:
                 n_wrong += 1.0
-    logging.info("NLI Test Acc : %.5f" % (n_correct / (n_correct + n_wrong)))
+    print("NLI Test Acc : %.5f" % (n_correct / (n_correct + n_wrong)))
     logging.info("******************************************************")
 
 
@@ -293,6 +295,7 @@ def train(config, data_folder, learning_rate=0.0001):
         trg_vocab_size = config["model"]["n_words_trg"]
         max_len_src = config["data"]["max_src_length"]
         max_len_trg = config["data"]["max_trg_length"]
+        model_state = {}
 
         train_src = [item["train_src"] for item in config["data"]["paths"]]
         train_trg = [item["train_trg"] for item in config["data"]["paths"]]
@@ -323,7 +326,7 @@ def train(config, data_folder, learning_rate=0.0001):
             save_dir,
             buffer_size=1e6,
             lowercase=True,
-            seed=(hvd.rank() + 1) * 12345
+            seed=(hvd.rank() + 1) * 12345,
         )
 
         nli_iterator = NLIIterator(
@@ -332,7 +335,7 @@ def train(config, data_folder, learning_rate=0.0001):
             test=config["data"]["nli_test"],
             vocab_size=-1,
             vocab=os.path.join(save_dir, "src_vocab.pkl"),
-            seed=(hvd.rank() + 1) * 12345
+            seed=(hvd.rank() + 1) * 12345,
         )
 
         src_vocab_size = len(train_iterator.src[0]["word2id"])
@@ -373,11 +376,12 @@ def train(config, data_folder, learning_rate=0.0001):
             num_tasks=len(train_iterator.src),
             paired_tasks=paired_tasks,
         ).cuda()
-        
+
         optimizer = setup_horovod(model, learning_rate=learning_rate)
         logging.info(model)
 
         n_gpus = config["training"]["n_gpus"]
+        model = torch.nn.DataParallel(model, device_ids=range(n_gpus))
 
         task_losses = [[] for _ in tasknames]
         task_idxs = [0 for _ in tasknames]
@@ -499,7 +503,8 @@ def train(config, data_folder, learning_rate=0.0001):
                     task_losses[task_idx].append(loss.item())
 
                 loss.backward()
-                # For distributed optimizer need to sync before gradient clipping.
+                # For distributed optimizer need to sync before gradient
+                # clipping.
                 optimizer.synchronize()
 
                 torch.nn.utils.clip_grad_norm(model.parameters(), 1.0)
@@ -549,7 +554,7 @@ def train(config, data_folder, learning_rate=0.0001):
                 logging.info("############################")
                 logging.info("##### Evaluating model #####")
                 logging.info("############################")
-                training_complete, min_val_loss_epoch, min_val_loss = evaluate(
+                training_complete, min_val_loss_epoch, min_val_loss, model_state = evaluate(
                     config=config,
                     train_iterator=train_iterator,
                     model=model,
@@ -559,6 +564,7 @@ def train(config, data_folder, learning_rate=0.0001):
                     min_val_loss_epoch=min_val_loss_epoch,
                     save_dir=save_dir,
                     starting_time=start,
+                    model_state=model_state,
                 )
                 if training_complete:
                     break
