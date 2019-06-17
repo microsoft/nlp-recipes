@@ -113,7 +113,7 @@ class GenSenClassifier:
         self.cache_dir = self._get_gensen_tokens(train_df, dev_df, test_df)
 
         train_mlflow.train(
-            data_folder=self.cache_dir,
+            data_folder=os.path.abspath(self.cache_dir),
             config=self.config,
             learning_rate=self.learning_rate,
         )

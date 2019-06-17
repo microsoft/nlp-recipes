@@ -1,21 +1,33 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""Run script."""
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License.
+
+"""
+The GenSen training process follows the steps:
+1. Create or load the dataset vocabulary
+2. Train on the training dataset for each batch epoch (batch size = 48 updates)
+3. Evaluate on the validation dataset for every 10 epoches
+4. Find the local minimum point on validation loss
+5. Save the best model and stop the training process
+
+AzureML provides AI Compute to train the model and track the performance.
+
+"""
 import logging
 import argparse
 import os
-import sys
 import json
 import time
 
 import numpy as np
 import torch
-import mlflow
-import horovod.torch as hvd
 import torch.backends.cudnn as cudnn
 import torch.nn as nn
-import torch.nn.functional as F
+import torch.nn.functional as f
 import torch.optim as optim
+import mlflow
+import horovod.torch as hvd
 
 from utils_nlp.model.gensen.multi_task_model import MultitaskModel
 from utils_nlp.model.gensen.utils import (
@@ -24,21 +36,247 @@ from utils_nlp.model.gensen.utils import (
     compute_validation_loss,
 )
 
-sys.path.append(".")  # Required to run on the MILA machines with SLURM
-
 cudnn.benchmark = True
 
 hvd.init()
-
 if torch.cuda.is_available():
     # Horovod: pin GPU to local rank.
     torch.cuda.set_device(hvd.local_rank())
+
+
+def metric_average(value, name):
+    """
+    Sync the validation loss with nodes.
+    :param value:
+    :param name:
+    :return:
+    """
+    tensor = torch.tensor(value)
+    avg_tensor = hvd.allreduce(tensor, name=name)
+    return avg_tensor.item()
+
+
+def setup_horovod(model, learning_rate):
+    """ Setup for Horovod usage.
+
+    Args:
+        model(MultitaskModel): The MultitaskModel object.
+        learning_rate(float): Learning rate for the model.
+
+    Returns: hvd.DistributedOptimizer: Optimizer to use for computing
+    gradients and applying updates.
+
+    """
+    # Horovod: scale learning rate by the number of GPUs.
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate * hvd.size())
+
+    # Horovod: broadcast parameters & optimizer state.
+    hvd.broadcast_parameters(model.state_dict(), root_rank=0)
+    hvd.broadcast_optimizer_state(optimizer, root_rank=0)
+
+    # Horovod: (optional) compression algorithm.
+    compression = hvd.Compression.fp16
+
+    # Horovod: wrap optimizer with DistributedOptimizer.
+    optimizer = hvd.DistributedOptimizer(
+        optimizer,
+        named_parameters=model.named_parameters(),
+        compression=compression,
+    )
+
+    return optimizer
+
+
+def setup_logging(config):
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        filename="log/%s" % (config["data"]["task"]),
+        filemode="w",
+    )
+
+    console = logging.StreamHandler()
+    console.setLevel(logging.INFO)
+    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+    console.setFormatter(formatter)
+    logging.getLogger("").addHandler(console)
+
+
+def log_config(config):
+    logging.info("Model Parameters : ")
+    logging.info("Task : %s " % (config["data"]["task"]))
+    logging.info(
+        "Source Word Embedding Dim  : %s" % (config["model"]["dim_word_src"])
+    )
+    logging.info(
+        "Target Word Embedding Dim  : %s" % (config["model"]["dim_word_trg"])
+    )
+    logging.info("Source RNN Hidden Dim  : %s" % (config["model"]["dim_src"]))
+    logging.info("Target RNN Hidden Dim  : %s" % (config["model"]["dim_trg"]))
+    logging.info(
+        "Source RNN Bidirectional  : %s" % (config["model"]["bidirectional"])
+    )
+    logging.info("Batch Size : %d " % (config["training"]["batch_size"]))
+    logging.info("Optimizer : %s " % (config["training"]["optimizer"]))
+    logging.info("Learning Rate : %f " % (config["training"]["lrate"]))
+
+
+def evaluate(
+    config,
+    train_iterator,
+    model,
+    loss_criterion,
+    monitor_epoch,
+    min_val_loss,
+    min_val_loss_epoch,
+    save_dir,
+    starting_time,
+    model_state,
+):
+    """ Function to validate the model.
+
+    Args:
+        model_state(dict): Saved model weights.
+        config(dict): Config object.
+        train_iterator(BufferedDataIterator): BufferedDataIterator object.
+        model(MultitaskModel): The MultitaskModel object.
+        loss_criterion(nn.CrossEntropyLoss): Cross entropy loss.
+        monitor_epoch(int): Current epoch count.
+        min_val_loss(float): Minimum validation loss
+        min_val_loss_epoch(int): Epoch where the minimum validation loss was seen.
+        save_dir(str): Directory path to save the model dictionary.
+        starting_time(time.Time): Starting time of the training.
+
+    Returns:
+        bool: Whether to continue training or not.
+
+    """
+
+    break_flag = 0
+
+    for task_idx, task in enumerate(train_iterator.tasknames):
+        if "skipthought" in task:
+            continue
+        validation_loss = compute_validation_loss(
+            config,
+            model,
+            train_iterator,
+            loss_criterion,
+            task_idx,
+            lowercase=True,
+        )
+        validation_loss = metric_average(validation_loss, "val_loss")
+        logging.info("%s Validation Loss : %.3f" % (task, validation_loss))
+
+        # Horovod: print output only on first rank.
+        if hvd.rank() == 0:
+            # log the best val accuracy to AML run
+            mlflow.log_metric(
+                "Best Validation Loss", np.float(validation_loss)
+            )
+
+        # If the validation loss is small enough, and it starts to go up.
+        # Should stop training.
+        # Small is defined by the number of epochs it lasts.
+        if validation_loss < min_val_loss:
+            min_val_loss = validation_loss
+            min_val_loss_epoch = monitor_epoch
+            model_state = model.state_dict()
+
+        mlflow.log_metric(
+            "Validation Loss", validation_loss, step=monitor_epoch
+        )
+        print(monitor_epoch, min_val_loss_epoch, min_val_loss)
+        logging.info(
+            "Monitor epoch: %d Validation Loss:  %.3f Min Validation Epoch: "
+            "%d Loss : %.3f "
+            % (
+                monitor_epoch,
+                validation_loss,
+                min_val_loss_epoch,
+                min_val_loss,
+            )
+        )
+        if (monitor_epoch - min_val_loss_epoch) > config["training"][
+            "stop_patience"
+        ]:
+            logging.info("Saving model ...")
+            # Save the name with validation loss.
+            torch.save(
+                model_state,
+                open(os.path.join(save_dir, "best_model.model"), "wb"),
+            )
+            # Let the training end.
+            break_flag = 1
+            break
+    if break_flag == 1:
+        logging.info("##### Training stopped at ##### %f" % min_val_loss)
+        logging.info(
+            "##### Training Time ##### %f seconds"
+            % (time.time() - starting_time)
+        )
+        return True, min_val_loss_epoch, min_val_loss, model_state
+    else:
+        return False, min_val_loss_epoch, min_val_loss, model_state
+
+
+def evaluate_nli(nli_iterator, model, batch_size, n_gpus):
+    """
+
+    Args:
+        nli_iterator(NLIIterator): NLIIterator object.
+        model(MultitaskModel): Multitask model object.
+        batch_size(int): Batch size.
+        n_gpus(int): Number of gpus
+
+    """
+    n_correct = 0.0
+    n_wrong = 0.0
+    for j in range(0, len(nli_iterator.dev_lines), batch_size * n_gpus):
+        minibatch = nli_iterator.get_parallel_minibatch(
+            j, batch_size * n_gpus, "dev"
+        )
+        class_logits = model(
+            minibatch, -1, return_hidden=False, paired_trg=None
+        )
+        class_preds = (
+            f.softmax(class_logits).data.cpu().numpy().argmax(axis=-1)
+        )
+        labels = minibatch["labels"].data.cpu().numpy()
+        for pred, label in zip(class_preds, labels):
+            if pred == label:
+                n_correct += 1.0
+            else:
+                n_wrong += 1.0
+    print("NLI Dev Acc : %.5f" % (n_correct / (n_correct + n_wrong)))
+    n_correct = 0.0
+    n_wrong = 0.0
+    for j in range(0, len(nli_iterator.test_lines), batch_size * n_gpus):
+        minibatch = nli_iterator.get_parallel_minibatch(
+            j, batch_size * n_gpus, "test"
+        )
+        class_logits = model(
+            minibatch, -1, return_hidden=False, paired_trg=None
+        )
+        class_preds = (
+            f.softmax(class_logits).data.cpu().numpy().argmax(axis=-1)
+        )
+        labels = minibatch["labels"].data.cpu().numpy()
+        for pred, label in zip(class_preds, labels):
+            if pred == label:
+                n_correct += 1.0
+            else:
+                n_wrong += 1.0
+    print("NLI Test Acc : %.5f" % (n_correct / (n_correct + n_wrong)))
+    logging.info("******************************************************")
 
 
 def train(config, data_folder, learning_rate=0.0001, tracking_uri="mlruns"):
     """ Train the Gensen model.
 
     Args:
+        tracking_uri(str): Tracking Uri for the mlflow server. This is
+        mlruns by default.
         config(dict): Loaded json file as a python object.
         data_folder(str): Path to the folder containing the data.
         learning_rate(float): Learning rate for the model.
@@ -49,39 +287,26 @@ def train(config, data_folder, learning_rate=0.0001, tracking_uri="mlruns"):
 
     mlflow.set_tracking_uri(tracking_uri)
     with mlflow.start_run(nested=True):
-
         save_dir = config["data"]["save_dir"]
+
+        os.chdir(data_folder)
 
         if not os.path.exists("./log"):
             os.makedirs("./log")
 
         os.makedirs(save_dir, exist_ok=True)
 
-        logging.basicConfig(
-            level=logging.INFO,
-            format="%(asctime)s - %(levelname)s - %(message)s",
-            filename="log/%s" % (config["data"]["task"]),
-            filemode="w",
-        )
-
-        console = logging.StreamHandler()
-        console.setLevel(logging.INFO)
-        formatter = logging.Formatter(
-            "%(asctime)s - %(levelname)s - %(message)s"
-        )
-        console.setFormatter(formatter)
-        logging.getLogger("").addHandler(console)
+        setup_logging(config)
 
         batch_size = config["training"]["batch_size"]
         src_vocab_size = config["model"]["n_words_src"]
         trg_vocab_size = config["model"]["n_words_trg"]
         max_len_src = config["data"]["max_src_length"]
         max_len_trg = config["data"]["max_trg_length"]
+        model_state = {}
 
         train_src = [item["train_src"] for item in config["data"]["paths"]]
         train_trg = [item["train_trg"] for item in config["data"]["paths"]]
-        val_src = [item["val_src"] for item in config["data"]["paths"]]
-        val_trg = [item["val_trg"] for item in config["data"]["paths"]]
         tasknames = [item["taskname"] for item in config["data"]["paths"]]
 
         # Keep track of indicies to train forward and backward jointly
@@ -109,6 +334,7 @@ def train(config, data_folder, learning_rate=0.0001, tracking_uri="mlruns"):
             save_dir,
             buffer_size=1e6,
             lowercase=True,
+            seed=(hvd.rank() + 1) * 12345,
         )
 
         nli_iterator = NLIIterator(
@@ -117,12 +343,15 @@ def train(config, data_folder, learning_rate=0.0001, tracking_uri="mlruns"):
             test=config["data"]["nli_test"],
             vocab_size=-1,
             vocab=os.path.join(save_dir, "src_vocab.pkl"),
+            seed=(hvd.rank() + 1) * 12345,
         )
 
         src_vocab_size = len(train_iterator.src[0]["word2id"])
         trg_vocab_size = len(train_iterator.trg[0]["word2id"])
 
+        # Logging set up.
         logging.info("Finished creating iterator ...")
+        log_config(config)
         logging.info(
             "Found %d words in source : "
             % (len(train_iterator.src[0]["id2word"]))
@@ -132,31 +361,6 @@ def train(config, data_folder, learning_rate=0.0001, tracking_uri="mlruns"):
                 "Found %d target words in task %s "
                 % (len(train_iterator.trg[idx]["id2word"]), taskname)
             )
-
-        logging.info("Model Parameters : ")
-        logging.info("Task : %s " % (config["data"]["task"]))
-        logging.info(
-            "Source Word Embedding Dim  : %s"
-            % (config["model"]["dim_word_src"])
-        )
-        logging.info(
-            "Target Word Embedding Dim  : %s"
-            % (config["model"]["dim_word_trg"])
-        )
-        logging.info(
-            "Source RNN Hidden Dim  : %s" % (config["model"]["dim_src"])
-        )
-        logging.info(
-            "Target RNN Hidden Dim  : %s" % (config["model"]["dim_trg"])
-        )
-        logging.info(
-            "Source RNN Bidirectional  : %s"
-            % (config["model"]["bidirectional"])
-        )
-        logging.info("Batch Size : %d " % (config["training"]["batch_size"]))
-        logging.info("Optimizer : %s " % (config["training"]["optimizer"]))
-        logging.info("Learning Rate : %f " % (config["training"]["lrate"]))
-
         logging.info("Found %d words in src " % src_vocab_size)
         logging.info("Found %d words in trg " % trg_vocab_size)
 
@@ -181,57 +385,28 @@ def train(config, data_folder, learning_rate=0.0001, tracking_uri="mlruns"):
             paired_tasks=paired_tasks,
         ).cuda()
 
+        optimizer = setup_horovod(model, learning_rate=learning_rate)
+        # optimizer = optim.Adam(model.parameters(), lr=learning_rate)
         logging.info(model)
-
-        """Using Horovod"""
-        # Horovod: scale learning rate by the number of GPUs.
-        optimizer = optim.Adam(
-            model.parameters(), lr=learning_rate * hvd.size()
-        )
-        # optimizer = optim.SGD(model.parameters(), lr=args.lr * hvd.size(),
-        # momentum=args.momentum)
-
-        # Horovod: broadcast parameters & optimizer state.
-        hvd.broadcast_parameters(model.state_dict(), root_rank=0)
-        hvd.broadcast_optimizer_state(optimizer, root_rank=0)
-
-        # Horovod: (optional) compression algorithm.
-        compression = hvd.Compression.fp16
-
-        # Horovod: wrap optimizer with DistributedOptimizer.
-        optimizer = hvd.DistributedOptimizer(
-            optimizer,
-            named_parameters=model.named_parameters(),
-            compression=compression,
-        )
 
         n_gpus = config["training"]["n_gpus"]
         model = torch.nn.DataParallel(model, device_ids=range(n_gpus))
 
-        # Use Adam optimizer.
-        # optimizer = optim.Adam(model.parameters(), lr=learning_rate)
-
-        task_losses = [[] for task in tasknames]
-        task_idxs = [0 for task in tasknames]
+        task_losses = [[] for _ in tasknames]
+        task_idxs = [0 for _ in tasknames]
         nli_losses = []
         updates = 0
         nli_ctr = 0
         nli_epoch = 0
         monitor_epoch = 0
         nli_mbatch_ctr = 0
-        model_state = {}
         mbatch_times = []
-        logging.info("Commencing Training ...")
-        rng_num_tasks = len(tasknames) - 1 if paired_tasks else len(tasknames)
-
         min_val_loss = 10000000
         min_val_loss_epoch = -1
-        break_flag = 0
-
-        mlflow.log_param("Learning Rate", learning_rate)
-
+        rng_num_tasks = len(tasknames) - 1 if paired_tasks else len(tasknames)
+        logging.info("Commencing Training ...")
+        start = time.time()
         while True:
-            start = time.time()
             # Train NLI once every 10 minibatches of other tasks
             if nli_ctr % 10 == 0:
                 minibatch = nli_iterator.get_parallel_minibatch(
@@ -252,6 +427,7 @@ def train(config, data_folder, learning_rate=0.0001, tracking_uri="mlruns"):
                 loss.backward()
                 torch.nn.utils.clip_grad_norm(model.parameters(), 1.0)
                 optimizer.step()
+
                 nli_mbatch_ctr += batch_size * n_gpus
                 if nli_mbatch_ctr >= len(nli_iterator.train_lines):
                     nli_mbatch_ctr = 0
@@ -269,8 +445,8 @@ def train(config, data_folder, learning_rate=0.0001, tracking_uri="mlruns"):
                     max_len_trg,
                 )
 
-                """Increment pointer into task and if current buffer is exhausted,
-                fetch new buffer."""
+                """Increment pointer into task and if current buffer is 
+                exhausted, fetch new buffer. """
                 task_idxs[task_idx] += batch_size * n_gpus
                 if task_idxs[task_idx] >= train_iterator.buffer_size:
                     train_iterator.fetch_buffer(task_idx)
@@ -333,12 +509,16 @@ def train(config, data_folder, learning_rate=0.0001, tracking_uri="mlruns"):
                     task_losses[task_idx].append(loss.item())
 
                 loss.backward()
+                # For distributed optimizer need to sync before gradient clipping.
+                optimizer.synchronize()
+
                 torch.nn.utils.clip_grad_norm(model.parameters(), 1.0)
                 optimizer.step()
 
             end = time.time()
             mbatch_times.append(end - start)
 
+            # Validations
             if (
                 updates % config["management"]["monitor_loss"] == 0
                 and updates != 0
@@ -357,144 +537,46 @@ def train(config, data_folder, learning_rate=0.0001, tracking_uri="mlruns"):
                         )
                     )
                     mlflow.log_metric(
-                        "Seq2Seq Examples Processed",
-                        value=updates,
-                        step=monitor_epoch,
-                    )
-                    mlflow.log_metric(
-                        "Loss",
-                        value=np.mean(task_losses[idx]),
-                        step=monitor_epoch,
-                    )
-                    mlflow.log_metric(
-                        "Minibatch",
-                        value=len(task_losses[idx]),
-                        step=monitor_epoch,
+                        "Loss", np.mean(task_losses[idx]), step=monitor_epoch
                     )
 
                 logging.info(
-                    "******************************************************"
+                    "Round: %d NLI Epoch : %d NLI Examples Processed : %d NLI "
+                    "Loss : %.5f "
+                    % (nli_ctr, nli_epoch, nli_mbatch_ctr, np.mean(nli_losses))
                 )
-                task_losses = [[] for task in tasknames]
+                mlflow.log_metric(
+                    "NLI Loss", np.mean(nli_losses), step=nli_epoch
+                )
+                task_losses = [[] for _ in tasknames]
                 mbatch_times = []
                 nli_losses = []
 
-                # For validation
+                # For validate and break if done.
                 logging.info("############################")
                 logging.info("##### Evaluating model #####")
                 logging.info("############################")
-                for task_idx, task in enumerate(train_iterator.tasknames):
-                    if "skipthought" in task:
-                        continue
-                    validation_loss = compute_validation_loss(
-                        config,
-                        model,
-                        train_iterator,
-                        loss_criterion,
-                        task_idx,
-                        lowercase=True,
-                    )
-                    logging.info(
-                        "%s Validation Loss : %.3f" % (task, validation_loss)
-                    )
-                    # log the best val accuracy to AML run
-                    mlflow.log_metric(
-                        "Best Validation Loss", np.float(validation_loss)
-                    )
-
-                    # If the validation loss is small enough, and it starts
-                    # to go up. Should stop training. Small is defined by the
-                    # number of epochs it lasts.
-                    if validation_loss < min_val_loss:
-                        min_val_loss = validation_loss
-                        min_val_loss_epoch = monitor_epoch
-                        model_state = model.state_dict()
-                    print(monitor_epoch, min_val_loss_epoch, min_val_loss)
-                    if (
-                        monitor_epoch - min_val_loss_epoch
-                        > config["training"]["stop_patience"]
-                    ):
-                        logging.info("Saving model ...")
-                        # Save the name with validation loss.
-                        torch.save(
-                            model_state,
-                            open(
-                                os.path.join(save_dir, "best_model.model"),
-                                "wb",
-                            ),
-                        )
-
-                        torch.save(
-                            model.state_dict(),
-                            open(
-                                os.path.join(save_dir, "best_model.model"),
-                                "wb",
-                            ),
-                        )
-
-                        # Let the training end.
-                        break_flag = 1
-                        break
-                if break_flag == 1:
-                    logging.info(
-                        "##### Training stopped at ##### %f" % min_val_loss
-                    )
+                training_complete, min_val_loss_epoch, min_val_loss, model_state = evaluate(
+                    config=config,
+                    train_iterator=train_iterator,
+                    model=model,
+                    loss_criterion=loss_criterion,
+                    monitor_epoch=monitor_epoch,
+                    min_val_loss=min_val_loss,
+                    min_val_loss_epoch=min_val_loss_epoch,
+                    save_dir=save_dir,
+                    starting_time=start,
+                    model_state=model_state,
+                )
+                if training_complete:
                     break
+
                 logging.info("Evaluating on NLI")
-                n_correct = 0.0
-                n_wrong = 0.0
-                for j in range(
-                    0, len(nli_iterator.dev_lines), batch_size * n_gpus
-                ):
-                    minibatch = nli_iterator.get_parallel_minibatch(
-                        j, batch_size * n_gpus, "dev"
-                    )
-                    class_logits = model(
-                        minibatch, -1, return_hidden=False, paired_trg=None
-                    )
-                    class_preds = (
-                        F.softmax(class_logits)
-                        .data.cpu()
-                        .numpy()
-                        .argmax(axis=-1)
-                    )
-                    labels = minibatch["labels"].data.cpu().numpy()
-                    for pred, label in zip(class_preds, labels):
-                        if pred == label:
-                            n_correct += 1.0
-                        else:
-                            n_wrong += 1.0
-                logging.info(
-                    "NLI Dev Acc : %.5f" % (n_correct / (n_correct + n_wrong))
-                )
-                n_correct = 0.0
-                n_wrong = 0.0
-                for j in range(
-                    0, len(nli_iterator.test_lines), batch_size * n_gpus
-                ):
-                    minibatch = nli_iterator.get_parallel_minibatch(
-                        j, batch_size * n_gpus, "test"
-                    )
-                    class_logits = model(
-                        minibatch, -1, return_hidden=False, paired_trg=None
-                    )
-                    class_preds = (
-                        F.softmax(class_logits)
-                        .data.cpu()
-                        .numpy()
-                        .argmax(axis=-1)
-                    )
-                    labels = minibatch["labels"].data.cpu().numpy()
-                    for pred, label in zip(class_preds, labels):
-                        if pred == label:
-                            n_correct += 1.0
-                        else:
-                            n_wrong += 1.0
-                logging.info(
-                    "NLI Test Acc : %.5f" % (n_correct / (n_correct + n_wrong))
-                )
-                logging.info(
-                    "******************************************************"
+                evaluate_nli(
+                    nli_iterator=nli_iterator,
+                    model=model,
+                    n_gpus=n_gpus,
+                    batch_size=batch_size,
                 )
 
             updates += batch_size * n_gpus
@@ -518,19 +600,10 @@ if __name__ == "__main__":
         "--learning_rate", type=float, default=0.0001, help="learning rate"
     )
 
-    parser.add_argument(
-        "--tracking_uri",
-        type=float,
-        default="mlruns",
-        help="Mlflow Tracking URI",
-    )
-
     args = parser.parse_args()
-    data_folder = args.data_folder
-    learning_rate = args.learning_rate
-    tracking_uri = args.tracking_uri
-    # os.chdir(data_folder)
+    data_path = args.data_folder
+    lr = args.learning_rate
 
     config_file_path = args.config
-    config = read_config(config_file_path)
-    train(config, data_folder, learning_rate, tracking_uri)
+    config_obj = read_config(config_file_path)
+    train(config_obj, data_path, lr)

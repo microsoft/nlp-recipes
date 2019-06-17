@@ -90,13 +90,13 @@ def _split_and_cleanup(split_map, data_path):
             "snli_1.0_{}.txt.s2.tok".format(file_split),
         )
         with open(s1_tok_path, "r") as fin, open(
-            "{}.tmp".format(s1_tok_path), "w"
+                "{}.tmp".format(s1_tok_path), "w"
         ) as tmp:
             for line in fin:
                 s = line.replace('"', "")
                 tmp.write(s)
         with open(s2_tok_path, "r") as fin, open(
-            "{}.tmp".format(s2_tok_path), "w"
+                "{}.tmp".format(s2_tok_path), "w"
         ) as tmp:
             for line in fin:
                 s = line.replace('"', "")
