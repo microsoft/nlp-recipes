@@ -71,7 +71,7 @@ def _extract_sts(tarpath, target_dirpath=".", tmode="r"):
 
 
 def _load_sts(src_file_path):
-    """Drop columns containing irrelevant metadata and save as new csv files in the target_dir
+    """Load datafile as dataframe
 
     Args:
         src_file_path (str): filepath to train/dev/test csv files.
