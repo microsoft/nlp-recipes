@@ -5,18 +5,16 @@ import sys
 import os
 
 # Need to append a full path instead of relative path.
-# This seems to be an issue from Azure DevOps command line task.
 # NOTE this does not affect running directly in the shell.
 sys.path.append(os.getcwd())
 import argparse
 import traceback
 import logging
-from datetime import datetime
 from dateutil.parser import isoparse
 from pymongo import MongoClient
 from datetime import datetime
-from scripts.repo_metrics.git_stats import Github
-from scripts.repo_metrics.config import (
+from tools.repo_metrics.git_stats import Github
+from tools.repo_metrics.config import (
     GITHUB_TOKEN,
     CONNECTION_STRING,
     DATABASE,
@@ -32,6 +30,7 @@ log = logging.getLogger()
 
 def parse_args():
     """Argument parser.
+    
     Returns:
         obj: Parser.
     """
@@ -61,8 +60,10 @@ def parse_args():
 
 def connect(uri="mongodb://localhost"):
     """Mongo connector.
+    
     Args:
         uri (str): Connection string.
+    
     Returns:
         obj: Mongo client.
     """
@@ -78,9 +79,11 @@ def connect(uri="mongodb://localhost"):
 
 def event_as_dict(event, date):
     """Encodes an string event input as a dictionary with the date.
+    
     Args:
         event (str): Details of a event.
         date (datetime): Date of the event.
+    
     Returns:
         dict: Dictionary with the event and the date.
     """
@@ -89,8 +92,10 @@ def event_as_dict(event, date):
 
 def github_stats_as_dict(github):
     """Encodes Github statistics as a dictionary with the date.
+    
     Args:
         obj: Github object.
+    
     Returns:
         dict: Dictionary with Github details and the date.
     """
@@ -125,6 +130,7 @@ def github_stats_as_dict(github):
 
 def tracker(args):
     """Main function to track metrics.
+    
     Args:
         args (obj): Parsed arguments.
     """
