@@ -1,6 +1,11 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
+# This script reuses some code from
+# https://github.com/huggingface/pytorch-pretrained-BERT/blob/master/examples
+# /run_classifier.py
+
+
 from pytorch_pretrained_bert.tokenization import BertTokenizer
 from enum import Enum
 import warnings
@@ -50,10 +55,10 @@ class Tokenizer:
         """Uses a BERT tokenizer
 
         Args:
-            text (list): [description]
+            text (list): List of strings (one sequence) or tuples (two sequences).
 
         Returns:
-            [list]: [description]
+            [list]: List of lists. Each sublist contains WordPiece tokens of the input sequence(s). 
         """
         if isinstance(text[0], str):
             return [self.tokenizer.tokenize(x) for x in tqdm(text)]
@@ -63,17 +68,20 @@ class Tokenizer:
     def preprocess_classification_tokens(self, tokens, max_len=BERT_MAX_LEN):
         """Preprocessing of input tokens:
             - add BERT sentence markers ([CLS] and [SEP])
-            - map tokens to indices
+            - map tokens to token indices in the BERT vocabulary
             - pad and truncate sequences
             - create an input_mask
+            - create token type ids, aka. segment ids
         Args:
-            tokens (list): List of tokens to preprocess.
+            tokens (list): List of token lists to preprocess.
             max_len (int, optional): Maximum number of tokens
                             (documents will be truncated or padded).
                             Defaults to 512.
-        Returns:
-            list of preprocesssed token lists
-            list of input mask lists
+        Returns: 
+            tuple: A tuple containing the following three lists
+                list of preprocesssed token lists
+                list of input mask lists
+                list of token type id lists
         """
         if max_len > BERT_MAX_LEN:
             print(

@@ -55,8 +55,10 @@ class BERTSequenceClassifier:
             token_ids (list): List of training token id lists.
             input_mask (list): List of input mask lists.
             labels (list): List of training labels.
-            device (str, optional): Device used for training ("cpu" or "gpu").
-                                    Defaults to "gpu".
+            token_type_ids (list, optional): List of lists. Each sublist
+                contains segment ids indicating if the token belongs to 
+                the first sentence(0) or second sentence(1). Only needed 
+                for two-sentence tasks.  
             num_gpus (int, optional): The number of gpus to use.
                                       If None is specified, all available GPUs
                                       will be used. Defaults to None.
@@ -172,6 +174,10 @@ class BERTSequenceClassifier:
         Args:
             token_ids (list): List of training token lists.
             input_mask (list): List of input mask lists.
+            token_type_ids (list, optional): List of lists. Each sublist
+                contains segment ids indicating if the token belongs to 
+                the first sentence(0) or second sentence(1). Only needed 
+                for two-sentence tasks. 
             num_gpus (int, optional): The number of gpus to use.
                                       If None is specified, all available GPUs
                                       will be used. Defaults to None.
