@@ -87,7 +87,6 @@ def load_pretrained_vectors(dir_path, file_name="glove.840B.300d.txt", limit=Non
 
     Returns:
         gensim.models.keyedvectors.Word2VecKeyedVectors: Loaded word2vectors
-
     """
 
     file_path = _maybe_download_and_extract(dir_path, file_name)
