@@ -1,4 +1,4 @@
-# Setup guide
+# Setup Guide
 
 This document describes how to setup all the dependencies to run the notebooks in this repository.
 
@@ -16,12 +16,12 @@ For training at scale, operationalization or hyperparameter tuning, it is recomm
   * [Register the conda environment in the DSVM JupyterHub](#register-the-conda-environment-in--the-dsvm-jupyterhub)
 
 
-## Compute environments
+## Compute Environments
 
 Depending on the type of NLP system and the notebook that needs to be run, there are different computational requirements. Currently, this repository supports **Python CPU** and **Python GPU**.
 
 
-## Setup guide for Local or DSVM
+## Setup Guide for Local or DSVM
 
 ### Requirements
 
@@ -29,7 +29,7 @@ Depending on the type of NLP system and the notebook that needs to be run, there
 * Anaconda with Python version >= 3.6. 
     * This is pre-installed on Azure DSVM such that one can run the following steps directly. To setup on your local machine, [Miniconda](https://docs.conda.io/en/latest/miniconda.html) is a quick way to get started.
 
-### Dependencies setup
+### Dependencies Setup
 
 
 We provide a script, [generate_conda_file.py](tools/generate_conda_file.py), to generate a conda-environment yaml file
@@ -57,7 +57,7 @@ Assuming that you have a GPU machine, to install the Python GPU environment, whi
 </details>
 
 
-### Register the conda environment in the DSVM JupyterHub
+### Register Conda Environment in DSVM JupyterHub
 
 We can register our created conda environment to appear as a kernel in the Jupyter notebooks.
 

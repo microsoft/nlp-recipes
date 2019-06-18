@@ -18,7 +18,6 @@ from torch.utils.data import (
     SequentialSampler,
     TensorDataset,
 )
-from torch.utils.data.distributed import DistributedSampler
 
 # Max supported sequence length
 BERT_MAX_LEN = 512
@@ -52,13 +51,18 @@ class Tokenizer:
         self.language = language
 
     def tokenize(self, text):
-        """Uses a BERT tokenizer
-
+        """Tokenizes a list of documents using a BERT tokenizer
         Args:
+<<<<<<< HEAD
             text (list): List of strings (one sequence) or tuples (two sequences).
 
         Returns:
             [list]: List of lists. Each sublist contains WordPiece tokens of the input sequence(s). 
+=======
+            text (list(str)): list of text documents.
+        Returns:
+            [list(str)]: list of token lists.
+>>>>>>> origin/staging
         """
         if isinstance(text[0], str):
             return [self.tokenizer.tokenize(x) for x in tqdm(text)]
@@ -212,7 +216,7 @@ class Tokenizer:
         if labels is None:
             label_available = False
             # create an artificial label list for creating trailing token mask
-            labels = ["O"] * len(text)
+            labels = [["O"] * len(text)]
 
         input_ids_all = []
         input_mask_all = []
@@ -221,18 +225,28 @@ class Tokenizer:
         for t, t_labels in zip(text, labels):
             new_labels = []
             tokens = []
-            for word, tag in zip(t.split(), t_labels):
-                sub_words = self.tokenizer.tokenize(word)
-                for count, sub_word in enumerate(sub_words):
-                    if count > 0:
-                        tag = trailing_piece_tag
-                    new_labels.append(tag)
-                    tokens.append(sub_word)
+            if label_available:
+                for word, tag in zip(t.split(), t_labels):
+                    sub_words = self.tokenizer.tokenize(word)
+                    for count, sub_word in enumerate(sub_words):
+                        if count > 0:
+                            tag = trailing_piece_tag
+                        new_labels.append(tag)
+                        tokens.append(sub_word)
+            else:
+                for word in t.split():
+                    sub_words = self.tokenizer.tokenize(word)
+                    for count, sub_word in enumerate(sub_words):
+                        if count > 0:
+                            tag = trailing_piece_tag
+                        else:
+                            tag = "O"
+                        new_labels.append(tag)
+                        tokens.append(sub_word)
 
             if len(tokens) > max_len:
                 tokens = tokens[:max_len]
                 new_labels = new_labels[:max_len]
-
             input_ids = self.tokenizer.convert_tokens_to_ids(tokens)
 
             # The mask has 1 for real tokens and 0 for padding tokens.
@@ -294,8 +308,7 @@ def create_data_loader(
             each sublist contains token labels of a input
             sentence/paragraph. Default value is None.
         sample_method (str, optional): Order of data sampling. Accepted
-            values are "random", "sequential" and "distributed". Default
-            value is "random".
+            values are "random", "sequential". Default value is "random".
         batch_size (int, optional): Number of samples used in each training
             iteration. Default value is 32.
 
@@ -319,8 +332,6 @@ def create_data_loader(
         sampler = RandomSampler(tensor_data)
     elif sample_method == "sequential":
         sampler = SequentialSampler(tensor_data)
-    elif sample_method == "distributed":
-        sampler = DistributedSampler(tensor_data)
     else:
         raise ValueError(
             "Invalid sample_method value, accepted values are: "

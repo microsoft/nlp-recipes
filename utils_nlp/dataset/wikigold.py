@@ -10,7 +10,7 @@ URL = (
 )
 
 
-def download(dir_path):
+def download(dir_path="."):
     """Download the wikigold data file to dir_path if it doesn't exist yet."""
     file_name = URL.split("/")[-1]
     maybe_download(URL, file_name, dir_path)

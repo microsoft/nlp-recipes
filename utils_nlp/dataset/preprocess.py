@@ -122,12 +122,8 @@ def to_nltk_tokens(
     pd.DataFrame: Dataframe with new columns token_cols, each containing a
     list of tokens for their respective sentences.
     """
-
-    nltk.download("punkt")
     text_df = df[sentence_cols]
-    tok_df = text_df.applymap(
-        lambda sentence: nltk.word_tokenize(sentence)
-    )
+    tok_df = text_df.applymap(lambda sentence: nltk.word_tokenize(sentence))
     tok_df.columns = token_cols
     tokenized = pd.concat([df, tok_df], axis=1)
     return tokenized
@@ -158,11 +154,9 @@ def rm_nltk_stopwords(
     nltk.download("stopwords")
     stop_words = tuple(stopwords.words("english"))
     text_df = df[sentence_cols]
-    stop_df = (
-        text_df
-        .applymap(lambda sentence: nltk.word_tokenize(sentence))
-        .applymap(lambda l: [word for word in l if word not in stop_words])
-    )
+    stop_df = text_df.applymap(
+        lambda sentence: nltk.word_tokenize(sentence)
+    ).applymap(lambda l: [word for word in l if word not in stop_words])
 
     stop_df.columns = stop_cols
     return pd.concat([df, stop_df], axis=1)
