@@ -57,3 +57,15 @@ class DaskCSVLoader:
                 )
             else:
                 yield sample_part
+
+    def get_sequential_batches(self, batch_size):
+        """Creates a sequential generator.
+            Batches returned are pandas dataframes of length=batch_size.
+            Note: Final batch might be of smaller size.
+        Args:
+            batch_size (int): Batch size.
+        """
+        for i in range(self.df.npartitions):
+            part = self.df.partitions[i].compute()
+            for j in range(0, part.shape[0], batch_size):
+                yield part.iloc[j : j + batch_size, :]
