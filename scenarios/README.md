@@ -22,7 +22,9 @@ To successfully run these notebooks, the users **need an Azure subscription** or
 The Azure products featured in the notebooks include:
 
 * [Azure Machine Learning service](https://azure.microsoft.com/en-us/services/machine-learning-service/) - Azure Machine Learning service is a cloud service used to train, deploy, automate, and manage machine learning models, all at the broad scale that the cloud provides. It is used across various notebooks for the AI model development related tasks like:
+  * Using Datastores
   * Tracking and monitoring metrics to enhance the model creation process
+  * Distributed Training
   * Hyperparameter tuning
   * Scaling up and out on Azure Machine Learning Compute
   * Deploying a web service to both Azure Container Instance and Azure Kubernetes Service
