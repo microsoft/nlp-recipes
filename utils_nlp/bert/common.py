@@ -53,16 +53,10 @@ class Tokenizer:
     def tokenize(self, text):
         """Tokenizes a list of documents using a BERT tokenizer
         Args:
-<<<<<<< HEAD
             text (list): List of strings (one sequence) or tuples (two sequences).
 
         Returns:
             [list]: List of lists. Each sublist contains WordPiece tokens of the input sequence(s). 
-=======
-            text (list(str)): list of text documents.
-        Returns:
-            [list(str)]: list of token lists.
->>>>>>> origin/staging
         """
         if isinstance(text[0], str):
             return [self.tokenizer.tokenize(x) for x in tqdm(text)]
