@@ -5,6 +5,7 @@ import pandas as pd
 import spacy
 import nltk
 from nltk.corpus import stopwords
+import six
 
 
 def to_lowercase_all(df):
@@ -160,3 +161,12 @@ def rm_nltk_stopwords(
 
     stop_df.columns = stop_cols
     return pd.concat([df, stop_df], axis=1)
+
+def convert_to_unicode(input_text):
+    """Converts intput_text to Unicode. Input must be utf-8."""
+    if isinstance(input_text, str):
+        return input_text
+    elif isinstance(input_text, bytes):
+        return input_text.decode("utf-8", "ignore")
+    else:
+        raise TypeError("Unsupported string type: %s" % (type(input_text)))
