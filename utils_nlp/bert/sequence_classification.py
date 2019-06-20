@@ -61,9 +61,9 @@ class BERTSequenceClassifier:
             input_mask (list): List of input mask lists.
             labels (list): List of training labels.
             token_type_ids (list, optional): List of lists. Each sublist
-                contains segment ids indicating if the token belongs to 
-                the first sentence(0) or second sentence(1). Only needed 
-                for two-sentence tasks.  
+                contains segment ids indicating if the token belongs to
+                the first sentence(0) or second sentence(1). Only needed
+                for two-sentence tasks.
             num_gpus (int, optional): The number of gpus to use.
                                       If None is specified, all available GPUs
                                       will be used. Defaults to None.
@@ -123,7 +123,7 @@ class BERTSequenceClassifier:
         self.model.train()  # training mode
         num_examples = len(token_ids)
         num_batches = int(num_examples / batch_size)
-        
+
         token_type_ids_batch = None
         for epoch in range(num_epochs):
             for i in range(num_batches):
@@ -140,11 +140,13 @@ class BERTSequenceClassifier:
                 mask_batch = torch.tensor(
                     input_mask[start:end], dtype=torch.long, device=device
                 )
-                
+
                 if token_type_ids is not None:
-                        token_type_ids_batch = torch.tensor(
-                            token_type_ids[start:end], dtype=torch.long, device=device
-                        )
+                    token_type_ids_batch = torch.tensor(
+                        token_type_ids[start:end],
+                        dtype=torch.long,
+                        device=device,
+                    )
 
                 opt.zero_grad()
 
@@ -174,15 +176,22 @@ class BERTSequenceClassifier:
         del [x_batch, y_batch, mask_batch, token_type_ids_batch]
         torch.cuda.empty_cache()
 
-    def predict(self, token_ids, input_mask, token_type_ids=None, num_gpus=None, batch_size=32):
+    def predict(
+        self,
+        token_ids,
+        input_mask,
+        token_type_ids=None,
+        num_gpus=None,
+        batch_size=32,
+    ):
         """Scores the given dataset and returns the predicted classes.
         Args:
             token_ids (list): List of training token lists.
             input_mask (list): List of input mask lists.
             token_type_ids (list, optional): List of lists. Each sublist
-                contains segment ids indicating if the token belongs to 
-                the first sentence(0) or second sentence(1). Only needed 
-                for two-sentence tasks. 
+                contains segment ids indicating if the token belongs to
+                the first sentence(0) or second sentence(1). Only needed
+                for two-sentence tasks.
             num_gpus (int, optional): The number of gpus to use.
                                       If None is specified, all available GPUs
                                       will be used. Defaults to None.
@@ -210,8 +219,9 @@ class BERTSequenceClassifier:
                 token_type_ids_batch = None
                 if token_type_ids is not None:
                     token_type_ids_batch = torch.tensor(
-                        token_type_ids[i : i +
-                                       batch_size], dtype=torch.long, device=device
+                        token_type_ids[i : i + batch_size],
+                        dtype=torch.long,
+                        device=device,
                     )
                 with torch.no_grad():
                     p_batch = self.model(
