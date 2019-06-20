@@ -198,7 +198,7 @@ class BERTSequenceClassifier:
                         attention_mask=mask_batch,
                         labels=None,
                     )
-                preds.append(p_batch.cpu().data.numpy())
+                preds.append(p_batch.cpu())
                 if i % batch_size == 0:
                     pbar.update(batch_size)
 
