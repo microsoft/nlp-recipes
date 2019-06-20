@@ -18,12 +18,14 @@ BERT_MAX_LEN = 512
 
 
 class Language(Enum):
-    """An enumeration of the supported languages."""
+    """An enumeration of the supported pretrained models and languages."""
 
     ENGLISH = "bert-base-uncased"
     ENGLISHCASED = "bert-base-cased"
     ENGLISHLARGE = "bert-large-uncased"
     ENGLISHLARGECASED = "bert-large-cased"
+    ENGLISHLARGEWW = "bert-large-uncased-whole-word-masking"
+    ENGLISHLARGECASEDWW = "bert-large-cased-whole-word-masking"
     CHINESE = "bert-base-chinese"
     MULTILINGUAL = "bert-base-multilingual-cased"
 
@@ -33,6 +35,7 @@ class Tokenizer:
         self, language=Language.ENGLISH, to_lower=False, cache_dir="."
     ):
         """Initializes the underlying pretrained BERT tokenizer.
+
         Args:
             language (Language, optional): The pretrained model's language.
                                            Defaults to Language.ENGLISH.
@@ -46,6 +49,7 @@ class Tokenizer:
 
     def tokenize(self, text):
         """Tokenizes a list of documents using a BERT tokenizer
+
         Args:
             text (list(str)): list of text documents.
         Returns:
@@ -60,6 +64,7 @@ class Tokenizer:
             - map tokens to indices
             - pad and truncate sequences
             - create an input_mask
+
         Args:
             tokens (list): List of tokens to preprocess.
             max_len (int, optional): Maximum number of tokens
@@ -235,6 +240,7 @@ def create_data_loader(
 ):
     """
     Create a dataloader for sampling and serving data batches.
+
     Args:
         input_ids (list): List of lists. Each sublist contains numerical
             values, i.e. token ids, corresponding to the tokens in the input
