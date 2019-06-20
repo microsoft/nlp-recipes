@@ -54,9 +54,7 @@ CONDA_GPU = {
 }
 
 PIP_BASE = {
-    "azureml-sdk[notebooks,tensorboard]": (
-        "azureml-sdk[notebooks,tensorboard]==1.0.33"
-    ),
+    "azureml-sdk[notebooks,tensorboard]": "azureml-sdk[notebooks,tensorboard]==1.0.43",
     "azureml-dataprep": "azureml-dataprep==1.1.4",
     "black": "black>=18.6b4",
     "papermill": "papermill==0.18.2",
@@ -74,6 +72,7 @@ PIP_BASE = {
     "nltk": "nltk>=3.4",
     "pytorch-pretrained-bert": "pytorch-pretrained-bert>=0.6",
     "seqeval": "seqeval>=0.0.12",
+    "azureml-mlflow": "azureml-mlflow>=1.0.41",
 }
 
 PIP_GPU = {"horovod": "horovod>=0.16.1"}

@@ -128,3 +128,6 @@ nlp_*.yaml
 data/
 sentence-similarity/data/
 
+#Scripts
+utils_nlp/gensen/gensen_config.json
+utils_nlp/gensen/gensen_train.py

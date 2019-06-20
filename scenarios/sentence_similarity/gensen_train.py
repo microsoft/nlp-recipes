@@ -15,20 +15,20 @@ AzureML provides AI Compute to train the model and track the performance.
 This training process is based on GPU only.
 
 """
-import logging
 import argparse
-import os
 import json
+import logging
+import os
 import time
 
+import horovod.torch as hvd
+import mlflow
 import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
 import torch.nn as nn
 import torch.nn.functional as f
 import torch.optim as optim
-from azureml.core.run import Run
-import horovod.torch as hvd
 
 from utils_nlp.gensen.multi_task_model import MultitaskModel
 from utils_nlp.gensen.utils import (
@@ -36,9 +36,6 @@ from utils_nlp.gensen.utils import (
     NLIIterator,
     compute_validation_loss,
 )
-
-# get the Azure ML run object
-run = Run.get_context()
 
 cudnn.benchmark = True
 
@@ -172,7 +169,7 @@ def evaluate(
         # Horovod: print output only on first rank.
         if hvd.rank() == 0:
             # log the best val accuracy to AML run
-            run.log("Best Validation Loss", np.float(validation_loss))
+            logging.info("Best Validation Loss: %f", np.float(validation_loss))
 
         # If the validation loss is small enough, and it starts to go up.
         # Should stop training.
@@ -182,7 +179,6 @@ def evaluate(
             min_val_loss_epoch = monitor_epoch
             model_state = model.state_dict()
 
-        run.log("Validation Loss", validation_loss)
         print(monitor_epoch, min_val_loss_epoch, min_val_loss)
         logging.info(
             "Monitor epoch: %d Validation Loss:  %.3f Min Validation Epoch: "
@@ -275,15 +271,12 @@ def train(config, data_folder, learning_rate=0.0001):
         config(dict): Loaded json file as a python object.
         data_folder(str): Path to the folder containing the data.
         learning_rate(float): Learning rate for the model.
-
     """
     owd = os.getcwd()
+    os.chdir(data_folder)
 
-    try:
+    with mlflow.start_run():
         save_dir = config["data"]["save_dir"]
-
-        os.chdir(data_folder)
-
         if not os.path.exists("./log"):
             os.makedirs("./log")
 
@@ -396,6 +389,8 @@ def train(config, data_folder, learning_rate=0.0001):
         min_val_loss = 10000000
         min_val_loss_epoch = -1
         rng_num_tasks = len(tasknames) - 1 if paired_tasks else len(tasknames)
+        print(os.environ)
+        mlflow.log_param("Learning Rate", learning_rate)
         logging.info("Commencing Training ...")
         start = time.time()
         while True:
@@ -419,9 +414,6 @@ def train(config, data_folder, learning_rate=0.0001):
                 loss.backward()
                 torch.nn.utils.clip_grad_norm(model.parameters(), 1.0)
                 optimizer.step()
-
-                # For AML.
-                run.log("loss", loss.item())
 
                 nli_mbatch_ctr += batch_size * n_gpus
                 if nli_mbatch_ctr >= len(nli_iterator.train_lines):
@@ -532,20 +524,23 @@ def train(config, data_folder, learning_rate=0.0001):
                             len(task_losses[idx]),
                         )
                     )
-                    run.log("Task Loss", np.mean(task_losses[idx]))
+                    mlflow.log_metric(
+                        "Validation Loss",
+                        np.mean(task_losses[idx]),
+                        step=monitor_epoch,
+                    )
 
                 logging.info(
                     "Round: %d NLI Epoch : %d NLI Examples Processed : %d NLI "
                     "Loss : %.5f "
                     % (nli_ctr, nli_epoch, nli_mbatch_ctr, np.mean(nli_losses))
                 )
-                run.log("NLI Loss", np.mean(nli_losses))
+                mlflow.log_metric(
+                    "NLI Loss", np.mean(nli_losses), step=nli_epoch
+                )
                 logging.info(
                     "Average time per mininbatch : %.5f"
                     % (np.mean(mbatch_times))
-                )
-                run.log(
-                    "Average time per mininbatch : ", np.mean(mbatch_times)
                 )
                 task_losses = [[] for _ in tasknames]
                 mbatch_times = []
@@ -581,8 +576,7 @@ def train(config, data_folder, learning_rate=0.0001):
             updates += batch_size * n_gpus
             nli_ctr += 1
             logging.info("Updates: %d" % updates)
-    finally:
-        os.chdir(owd)
+    os.chdir(owd)
 
 
 def read_config(json_file):

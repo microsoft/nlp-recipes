@@ -38,6 +38,7 @@ def test_load_pretrained_vectors_word2vec():
 
     assert isinstance(load_word2vec(dir_path), Word2VecKeyedVectors)
 
+
 def test_load_pretrained_vectors_glove():
     dir_path = "temp_data/"
     file_path = os.path.join(
@@ -58,7 +59,8 @@ def test_load_pretrained_vectors_glove():
 
 def test_load_pretrained_vectors_fasttext():
     dir_path = "temp_data/"
-    file_path = os.path.join(os.path.join(dir_path, "fastText"), "wiki.simple.bin")
+    file_path = os.path.join(os.path.join(dir_path, "fastText"),
+                             "wiki.simple.bin")
 
     assert isinstance(load_fasttext(dir_path), FastText)
 
