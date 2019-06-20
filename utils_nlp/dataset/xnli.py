@@ -92,7 +92,3 @@ def load_pandas_df(local_cache_path="./", file_split="dev", language="zh"):
     df = pd.DataFrame({"text": text_list, "label": label_list})
 
     return df
-
-
-if __name__ == "__main__":
-    load_pandas_df()
