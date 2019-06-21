@@ -72,7 +72,7 @@ PIP_BASE = {
     "nltk": "nltk>=3.4",
     "pytorch-pretrained-bert": "pytorch-pretrained-bert>=0.6",
     "seqeval": "seqeval>=0.0.12",
-    "azureml-mlflow": "azureml-mlflow>=1.0.41",
+    "azureml-mlflow": "azureml-mlflow>=1.0.43.1",
 }
 
 PIP_GPU = {"horovod": "horovod>=0.16.1"}

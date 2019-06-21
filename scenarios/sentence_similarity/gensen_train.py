@@ -38,6 +38,7 @@ from utils_nlp.gensen.utils import (
 )
 
 cudnn.benchmark = True
+logger = logging.getLogger(__name__)
 
 hvd.init()
 if torch.cuda.is_available():
@@ -169,7 +170,9 @@ def evaluate(
         # Horovod: print output only on first rank.
         if hvd.rank() == 0:
             # log the best val accuracy to AML run
-            logging.info("Best Validation Loss: %f", np.float(validation_loss))
+            logging.info(
+                "Best Validation Loss: {}".format(np.float(validation_loss))
+            )
 
         # If the validation loss is small enough, and it starts to go up.
         # Should stop training.
@@ -179,7 +182,6 @@ def evaluate(
             min_val_loss_epoch = monitor_epoch
             model_state = model.state_dict()
 
-        print(monitor_epoch, min_val_loss_epoch, min_val_loss)
         logging.info(
             "Monitor epoch: %d Validation Loss:  %.3f Min Validation Epoch: "
             "%d Loss : %.3f "
@@ -275,308 +277,331 @@ def train(config, data_folder, learning_rate=0.0001):
     owd = os.getcwd()
     os.chdir(data_folder)
 
-    with mlflow.start_run():
-        save_dir = config["data"]["save_dir"]
-        if not os.path.exists("./log"):
-            os.makedirs("./log")
+    try:
+        with mlflow.start_run():
+            save_dir = config["data"]["save_dir"]
+            if not os.path.exists("./log"):
+                os.makedirs("./log")
 
-        os.makedirs(save_dir, exist_ok=True)
+            os.makedirs(save_dir, exist_ok=True)
 
-        setup_logging(config)
+            setup_logging(config)
 
-        batch_size = config["training"]["batch_size"]
-        src_vocab_size = config["model"]["n_words_src"]
-        trg_vocab_size = config["model"]["n_words_trg"]
-        max_len_src = config["data"]["max_src_length"]
-        max_len_trg = config["data"]["max_trg_length"]
-        model_state = {}
+            batch_size = config["training"]["batch_size"]
+            src_vocab_size = config["model"]["n_words_src"]
+            trg_vocab_size = config["model"]["n_words_trg"]
+            max_len_src = config["data"]["max_src_length"]
+            max_len_trg = config["data"]["max_trg_length"]
+            model_state = {}
 
-        train_src = [item["train_src"] for item in config["data"]["paths"]]
-        train_trg = [item["train_trg"] for item in config["data"]["paths"]]
-        tasknames = [item["taskname"] for item in config["data"]["paths"]]
+            train_src = [item["train_src"] for item in config["data"]["paths"]]
+            train_trg = [item["train_trg"] for item in config["data"]["paths"]]
+            tasknames = [item["taskname"] for item in config["data"]["paths"]]
 
-        # Keep track of indicies to train forward and backward jointly
-        if (
-            "skipthought_next" in tasknames
-            and "skipthought_previous" in tasknames
-        ):
-            skipthought_idx = tasknames.index("skipthought_next")
-            skipthought_backward_idx = tasknames.index("skipthought_previous")
-            paired_tasks = {
-                skipthought_idx: skipthought_backward_idx,
-                skipthought_backward_idx: skipthought_idx,
-            }
-        else:
-            paired_tasks = None
-            skipthought_idx = None
-            skipthought_backward_idx = None
-
-        train_iterator = BufferedDataIterator(
-            train_src,
-            train_trg,
-            src_vocab_size,
-            trg_vocab_size,
-            tasknames,
-            save_dir,
-            buffer_size=1e6,
-            lowercase=True,
-            seed=(hvd.rank() + 1) * 12345,
-        )
-
-        nli_iterator = NLIIterator(
-            train=config["data"]["nli_train"],
-            dev=config["data"]["nli_dev"],
-            test=config["data"]["nli_test"],
-            vocab_size=-1,
-            vocab=os.path.join(save_dir, "src_vocab.pkl"),
-            seed=(hvd.rank() + 1) * 12345,
-        )
-
-        src_vocab_size = len(train_iterator.src[0]["word2id"])
-        trg_vocab_size = len(train_iterator.trg[0]["word2id"])
-
-        # Logging set up.
-        logging.info("Finished creating iterator ...")
-        log_config(config)
-        logging.info(
-            "Found %d words in source : "
-            % (len(train_iterator.src[0]["id2word"]))
-        )
-        for idx, taskname in enumerate(tasknames):
-            logging.info(
-                "Found %d target words in task %s "
-                % (len(train_iterator.trg[idx]["id2word"]), taskname)
-            )
-        logging.info("Found %d words in src " % src_vocab_size)
-        logging.info("Found %d words in trg " % trg_vocab_size)
-
-        weight_mask = torch.ones(trg_vocab_size).cuda()
-        weight_mask[train_iterator.trg[0]["word2id"]["<pad>"]] = 0
-        loss_criterion = nn.CrossEntropyLoss(weight=weight_mask).cuda()
-        nli_criterion = nn.CrossEntropyLoss().cuda()
-
-        model = MultitaskModel(
-            src_emb_dim=config["model"]["dim_word_src"],
-            trg_emb_dim=config["model"]["dim_word_trg"],
-            src_vocab_size=src_vocab_size,
-            trg_vocab_size=trg_vocab_size,
-            src_hidden_dim=config["model"]["dim_src"],
-            trg_hidden_dim=config["model"]["dim_trg"],
-            bidirectional=config["model"]["bidirectional"],
-            pad_token_src=train_iterator.src[0]["word2id"]["<pad>"],
-            pad_token_trg=train_iterator.trg[0]["word2id"]["<pad>"],
-            nlayers_src=config["model"]["n_layers_src"],
-            dropout=config["model"]["dropout"],
-            num_tasks=len(train_iterator.src),
-            paired_tasks=paired_tasks,
-        ).cuda()
-
-        optimizer = setup_horovod(model, learning_rate=learning_rate)
-        logging.info(model)
-
-        n_gpus = config["training"]["n_gpus"]
-        model = torch.nn.DataParallel(model, device_ids=range(n_gpus))
-
-        task_losses = [[] for _ in tasknames]
-        task_idxs = [0 for _ in tasknames]
-        nli_losses = []
-        updates = 0
-        nli_ctr = 0
-        nli_epoch = 0
-        monitor_epoch = 0
-        nli_mbatch_ctr = 0
-        mbatch_times = []
-        min_val_loss = 10000000
-        min_val_loss_epoch = -1
-        rng_num_tasks = len(tasknames) - 1 if paired_tasks else len(tasknames)
-        print(os.environ)
-        mlflow.log_param("Learning Rate", learning_rate)
-        logging.info("Commencing Training ...")
-        start = time.time()
-        while True:
-            # Train NLI once every 10 minibatches of other tasks
-            if nli_ctr % 10 == 0:
-                minibatch = nli_iterator.get_parallel_minibatch(
-                    nli_mbatch_ctr, batch_size * n_gpus
+            # Keep track of indicies to train forward and backward jointly
+            if (
+                "skipthought_next" in tasknames
+                and "skipthought_previous" in tasknames
+            ):
+                skipthought_idx = tasknames.index("skipthought_next")
+                skipthought_backward_idx = tasknames.index(
+                    "skipthought_previous"
                 )
-                optimizer.zero_grad()
-                class_logits = model(
-                    minibatch, -1, return_hidden=False, paired_trg=None
-                )
-
-                loss = nli_criterion(
-                    class_logits.contiguous().view(-1, class_logits.size(1)),
-                    minibatch["labels"].contiguous().view(-1),
-                )
-
-                # nli_losses.append(loss.data[0])
-                nli_losses.append(loss.item())
-                loss.backward()
-                torch.nn.utils.clip_grad_norm(model.parameters(), 1.0)
-                optimizer.step()
-
-                nli_mbatch_ctr += batch_size * n_gpus
-                if nli_mbatch_ctr >= len(nli_iterator.train_lines):
-                    nli_mbatch_ctr = 0
-                    nli_epoch += 1
+                paired_tasks = {
+                    skipthought_idx: skipthought_backward_idx,
+                    skipthought_backward_idx: skipthought_idx,
+                }
             else:
-                # Sample a random task
-                task_idx = np.random.randint(low=0, high=rng_num_tasks)
+                paired_tasks = None
+                skipthought_idx = None
+                skipthought_backward_idx = None
 
-                # Get a minibatch corresponding to the sampled task
-                minibatch = train_iterator.get_parallel_minibatch(
-                    task_idx,
-                    task_idxs[task_idx],
-                    batch_size * n_gpus,
-                    max_len_src,
-                    max_len_trg,
+            train_iterator = BufferedDataIterator(
+                train_src,
+                train_trg,
+                src_vocab_size,
+                trg_vocab_size,
+                tasknames,
+                save_dir,
+                buffer_size=1e6,
+                lowercase=True,
+                seed=(hvd.rank() + 1) * 12345,
+            )
+
+            nli_iterator = NLIIterator(
+                train=config["data"]["nli_train"],
+                dev=config["data"]["nli_dev"],
+                test=config["data"]["nli_test"],
+                vocab_size=-1,
+                vocab=os.path.join(save_dir, "src_vocab.pkl"),
+                seed=(hvd.rank() + 1) * 12345,
+            )
+
+            src_vocab_size = len(train_iterator.src[0]["word2id"])
+            trg_vocab_size = len(train_iterator.trg[0]["word2id"])
+
+            # Logging set up.
+            logging.info("Finished creating iterator ...")
+            log_config(config)
+            logging.info(
+                "Found %d words in source : "
+                % (len(train_iterator.src[0]["id2word"]))
+            )
+            for idx, taskname in enumerate(tasknames):
+                logging.info(
+                    "Found %d target words in task %s "
+                    % (len(train_iterator.trg[idx]["id2word"]), taskname)
                 )
+            logging.info("Found %d words in src " % src_vocab_size)
+            logging.info("Found %d words in trg " % trg_vocab_size)
 
-                """Increment pointer into task and if current buffer is 
-                exhausted, fetch new buffer. """
-                task_idxs[task_idx] += batch_size * n_gpus
-                if task_idxs[task_idx] >= train_iterator.buffer_size:
-                    train_iterator.fetch_buffer(task_idx)
-                    task_idxs[task_idx] = 0
+            weight_mask = torch.ones(trg_vocab_size).cuda()
+            weight_mask[train_iterator.trg[0]["word2id"]["<pad>"]] = 0
+            loss_criterion = nn.CrossEntropyLoss(weight=weight_mask).cuda()
+            nli_criterion = nn.CrossEntropyLoss().cuda()
 
-                if task_idx == skipthought_idx:
-                    minibatch_back = train_iterator.get_parallel_minibatch(
-                        skipthought_backward_idx,
-                        task_idxs[skipthought_backward_idx],
+            model = MultitaskModel(
+                src_emb_dim=config["model"]["dim_word_src"],
+                trg_emb_dim=config["model"]["dim_word_trg"],
+                src_vocab_size=src_vocab_size,
+                trg_vocab_size=trg_vocab_size,
+                src_hidden_dim=config["model"]["dim_src"],
+                trg_hidden_dim=config["model"]["dim_trg"],
+                bidirectional=config["model"]["bidirectional"],
+                pad_token_src=train_iterator.src[0]["word2id"]["<pad>"],
+                pad_token_trg=train_iterator.trg[0]["word2id"]["<pad>"],
+                nlayers_src=config["model"]["n_layers_src"],
+                dropout=config["model"]["dropout"],
+                num_tasks=len(train_iterator.src),
+                paired_tasks=paired_tasks,
+            ).cuda()
+
+            optimizer = setup_horovod(model, learning_rate=learning_rate)
+            logging.info(model)
+
+            n_gpus = config["training"]["n_gpus"]
+            model = torch.nn.DataParallel(model, device_ids=range(n_gpus))
+
+            task_losses = [[] for _ in tasknames]
+            task_idxs = [0 for _ in tasknames]
+            nli_losses = []
+            updates = 0
+            nli_ctr = 0
+            nli_epoch = 0
+            monitor_epoch = 0
+            nli_mbatch_ctr = 0
+            mbatch_times = []
+            min_val_loss = 10000000
+            min_val_loss_epoch = -1
+            rng_num_tasks = (
+                len(tasknames) - 1 if paired_tasks else len(tasknames)
+            )
+            logging.info("OS Environ: \n {} \n\n".format(os.environ))
+            mlflow.log_param("learning_rate", learning_rate)
+            logging.info("Commencing Training ...")
+            start = time.time()
+            while True:
+                batch_start_time = time.time()
+                # Train NLI once every 10 minibatches of other tasks
+                if nli_ctr % 10 == 0:
+                    minibatch = nli_iterator.get_parallel_minibatch(
+                        nli_mbatch_ctr, batch_size * n_gpus
+                    )
+                    optimizer.zero_grad()
+                    class_logits = model(
+                        minibatch, -1, return_hidden=False, paired_trg=None
+                    )
+
+                    loss = nli_criterion(
+                        class_logits.contiguous().view(
+                            -1, class_logits.size(1)
+                        ),
+                        minibatch["labels"].contiguous().view(-1),
+                    )
+
+                    # nli_losses.append(loss.data[0])
+                    nli_losses.append(loss.item())
+                    loss.backward()
+                    torch.nn.utils.clip_grad_norm(model.parameters(), 1.0)
+                    optimizer.step()
+
+                    nli_mbatch_ctr += batch_size * n_gpus
+                    if nli_mbatch_ctr >= len(nli_iterator.train_lines):
+                        nli_mbatch_ctr = 0
+                        nli_epoch += 1
+                else:
+                    # Sample a random task
+                    task_idx = np.random.randint(low=0, high=rng_num_tasks)
+
+                    # Get a minibatch corresponding to the sampled task
+                    minibatch = train_iterator.get_parallel_minibatch(
+                        task_idx,
+                        task_idxs[task_idx],
                         batch_size * n_gpus,
                         max_len_src,
                         max_len_trg,
                     )
-                    task_idxs[skipthought_backward_idx] += batch_size * n_gpus
-                    if (
-                        task_idxs[skipthought_backward_idx]
-                        >= train_iterator.buffer_size
-                    ):
-                        train_iterator.fetch_buffer(skipthought_backward_idx)
-                        task_idxs[skipthought_backward_idx] = 0
 
-                    optimizer.zero_grad()
-                    decoder_logit, decoder_logit_2 = model(
-                        minibatch,
-                        task_idx,
-                        paired_trg=minibatch_back["input_trg"],
-                    )
+                    """Increment pointer into task and if current buffer is 
+                    exhausted, fetch new buffer. """
+                    task_idxs[task_idx] += batch_size * n_gpus
+                    if task_idxs[task_idx] >= train_iterator.buffer_size:
+                        train_iterator.fetch_buffer(task_idx)
+                        task_idxs[task_idx] = 0
 
-                    loss_f = loss_criterion(
-                        decoder_logit.contiguous().view(
-                            -1, decoder_logit.size(2)
-                        ),
-                        minibatch["output_trg"].contiguous().view(-1),
-                    )
+                    if task_idx == skipthought_idx:
+                        minibatch_back = train_iterator.get_parallel_minibatch(
+                            skipthought_backward_idx,
+                            task_idxs[skipthought_backward_idx],
+                            batch_size * n_gpus,
+                            max_len_src,
+                            max_len_trg,
+                        )
+                        task_idxs[skipthought_backward_idx] += (
+                            batch_size * n_gpus
+                        )
+                        if (
+                            task_idxs[skipthought_backward_idx]
+                            >= train_iterator.buffer_size
+                        ):
+                            train_iterator.fetch_buffer(
+                                skipthought_backward_idx
+                            )
+                            task_idxs[skipthought_backward_idx] = 0
 
-                    loss_b = loss_criterion(
-                        decoder_logit_2.contiguous().view(
-                            -1, decoder_logit_2.size(2)
-                        ),
-                        minibatch_back["output_trg"].contiguous().view(-1),
-                    )
+                        optimizer.zero_grad()
+                        decoder_logit, decoder_logit_2 = model(
+                            minibatch,
+                            task_idx,
+                            paired_trg=minibatch_back["input_trg"],
+                        )
 
-                    task_losses[task_idx].append(loss_f.data[0])
-                    task_losses[skipthought_backward_idx].append(
-                        loss_b.data[0]
-                    )
-                    loss = loss_f + loss_b
+                        loss_f = loss_criterion(
+                            decoder_logit.contiguous().view(
+                                -1, decoder_logit.size(2)
+                            ),
+                            minibatch["output_trg"].contiguous().view(-1),
+                        )
 
-                else:
-                    optimizer.zero_grad()
-                    decoder_logit = model(minibatch, task_idx)
+                        loss_b = loss_criterion(
+                            decoder_logit_2.contiguous().view(
+                                -1, decoder_logit_2.size(2)
+                            ),
+                            minibatch_back["output_trg"].contiguous().view(-1),
+                        )
 
-                    loss = loss_criterion(
-                        decoder_logit.contiguous().view(
-                            -1, decoder_logit.size(2)
-                        ),
-                        minibatch["output_trg"].contiguous().view(-1),
-                    )
+                        task_losses[task_idx].append(loss_f.data[0])
+                        task_losses[skipthought_backward_idx].append(
+                            loss_b.data[0]
+                        )
+                        loss = loss_f + loss_b
 
-                    task_losses[task_idx].append(loss.item())
+                    else:
+                        optimizer.zero_grad()
+                        decoder_logit = model(minibatch, task_idx)
 
-                loss.backward()
-                # For distributed optimizer need to sync before gradient
-                # clipping.
-                optimizer.synchronize()
+                        loss = loss_criterion(
+                            decoder_logit.contiguous().view(
+                                -1, decoder_logit.size(2)
+                            ),
+                            minibatch["output_trg"].contiguous().view(-1),
+                        )
 
-                torch.nn.utils.clip_grad_norm(model.parameters(), 1.0)
-                optimizer.step()
+                        task_losses[task_idx].append(loss.item())
 
-            end = time.time()
-            mbatch_times.append(end - start)
+                    loss.backward()
+                    # For distributed optimizer need to sync before gradient
+                    # clipping.
+                    optimizer.synchronize()
 
-            # Validations
-            if (
-                updates % config["management"]["monitor_loss"] == 0
-                and updates != 0
-            ):
-                monitor_epoch += 1
-                for idx, task in enumerate(tasknames):
-                    logging.info(
-                        "Seq2Seq Examples Processed : %d %s Loss : %.5f Num %s "
-                        "minibatches : %d"
-                        % (
-                            updates,
-                            task,
+                    torch.nn.utils.clip_grad_norm(model.parameters(), 1.0)
+                    optimizer.step()
+
+                end = time.time()
+                mbatch_times.append(end - batch_start_time)
+
+                # Validations
+                if (
+                    updates % config["management"]["monitor_loss"] == 0
+                    and updates != 0
+                ):
+                    monitor_epoch += 1
+                    for idx, task in enumerate(tasknames):
+                        logging.info(
+                            "Seq2Seq Examples Processed : %d %s Loss : %.5f Num %s "
+                            "minibatches : %d"
+                            % (
+                                updates,
+                                task,
+                                np.mean(task_losses[idx]),
+                                task,
+                                len(task_losses[idx]),
+                            )
+                        )
+                        mlflow.log_metric(
+                            "validation_loss",
                             np.mean(task_losses[idx]),
-                            task,
-                            len(task_losses[idx]),
+                            step=monitor_epoch,
+                        )
+
+                    logging.info(
+                        "Round: %d NLI Epoch : %d NLI Examples Processed : %d NLI "
+                        "Loss : %.5f "
+                        % (
+                            nli_ctr,
+                            nli_epoch,
+                            nli_mbatch_ctr,
+                            np.mean(nli_losses),
                         )
                     )
                     mlflow.log_metric(
-                        "Validation Loss",
-                        np.mean(task_losses[idx]),
-                        step=monitor_epoch,
+                        "nli_loss", np.mean(nli_losses), step=nli_epoch
                     )
 
-                logging.info(
-                    "Round: %d NLI Epoch : %d NLI Examples Processed : %d NLI "
-                    "Loss : %.5f "
-                    % (nli_ctr, nli_epoch, nli_mbatch_ctr, np.mean(nli_losses))
-                )
-                mlflow.log_metric(
-                    "NLI Loss", np.mean(nli_losses), step=nli_epoch
-                )
-                logging.info(
-                    "Average time per mininbatch : %.5f"
-                    % (np.mean(mbatch_times))
-                )
-                task_losses = [[] for _ in tasknames]
-                mbatch_times = []
-                nli_losses = []
+                    logging.info(
+                        "Average time per mininbatch : %.5f"
+                        % (np.mean(mbatch_times))
+                    )
+                    mlflow.log_metric(
+                        "minibatch_avg_duration", np.mean(mbatch_times)
+                    )
 
-                # For validate and break if done.
-                logging.info("############################")
-                logging.info("##### Evaluating model #####")
-                logging.info("############################")
-                training_complete, min_val_loss_epoch, min_val_loss, model_state = evaluate(
-                    config=config,
-                    train_iterator=train_iterator,
-                    model=model,
-                    loss_criterion=loss_criterion,
-                    monitor_epoch=monitor_epoch,
-                    min_val_loss=min_val_loss,
-                    min_val_loss_epoch=min_val_loss_epoch,
-                    save_dir=save_dir,
-                    starting_time=start,
-                    model_state=model_state,
-                )
-                if training_complete:
-                    break
+                    task_losses = [[] for _ in tasknames]
+                    mbatch_times = []
+                    nli_losses = []
 
-                logging.info("Evaluating on NLI")
-                evaluate_nli(
-                    nli_iterator=nli_iterator,
-                    model=model,
-                    n_gpus=n_gpus,
-                    batch_size=batch_size,
-                )
+                    # For validate and break if done.
+                    logging.info("############################")
+                    logging.info("##### Evaluating model #####")
+                    logging.info("############################")
+                    training_complete, min_val_loss_epoch, min_val_loss, model_state = evaluate(
+                        config=config,
+                        train_iterator=train_iterator,
+                        model=model,
+                        loss_criterion=loss_criterion,
+                        monitor_epoch=monitor_epoch,
+                        min_val_loss=min_val_loss,
+                        min_val_loss_epoch=min_val_loss_epoch,
+                        save_dir=save_dir,
+                        starting_time=start,
+                        model_state=model_state,
+                    )
+                    if training_complete:
+                        break
 
-            updates += batch_size * n_gpus
-            nli_ctr += 1
-            logging.info("Updates: %d" % updates)
-    os.chdir(owd)
+                    logging.info("Evaluating on NLI")
+                    evaluate_nli(
+                        nli_iterator=nli_iterator,
+                        model=model,
+                        n_gpus=n_gpus,
+                        batch_size=batch_size,
+                    )
+
+                updates += batch_size * n_gpus
+                nli_ctr += 1
+                logging.info("Updates: %d" % updates)
+    finally:
+        os.chdir(owd)
 
 
 def read_config(json_file):
