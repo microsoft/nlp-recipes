@@ -24,8 +24,8 @@ class Language(Enum):
     ENGLISHCASED = "bert-base-cased"
     ENGLISHLARGE = "bert-large-uncased"
     ENGLISHLARGECASED = "bert-large-cased"
-    ENGLISHLARGEWW = "bert-large-uncased-whole-word-masking"
-    ENGLISHLARGECASEDWW = "bert-large-cased-whole-word-masking"
+    ENGLISHLARGEWWM = "bert-large-uncased-whole-word-masking"
+    ENGLISHLARGECASEDWWM = "bert-large-cased-whole-word-masking"
     CHINESE = "bert-base-chinese"
     MULTILINGUAL = "bert-base-multilingual-cased"
 
