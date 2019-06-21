@@ -169,12 +169,12 @@ class BERTSequenceClassifier:
                                       If None is specified, all available GPUs
                                       will be used. Defaults to None.
             batch_size (int, optional): Scoring batch size. Defaults to 32.
-            return_proba (bool, optional):
+            probabilities (bool, optional):
                 If True, the predicted probability distribution
                 is also returned. Defaults to False.
         Returns:
             1darray, namedtuple(1darray, ndarray): Predicted classes or
-                (classes, probabilities) if return_proba is True.
+                (classes, probabilities) if probabilities is True.
         """
 
         device = get_device("cpu" if num_gpus == 0 else "gpu")
@@ -206,7 +206,7 @@ class BERTSequenceClassifier:
 
         preds = np.concatenate(preds)
 
-        if return_proba:
+        if probabilities:
             return namedtuple("Predictions", "classes probabilities")(
                 preds.argmax(axis=1),
                 nn.Softmax(dim=1)(torch.Tensor(preds)).numpy(),
