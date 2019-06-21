@@ -17,7 +17,8 @@ URL_XNLI_MT = "https://www.nyu.edu/projects/bowman/xnli/XNLI-MT-1.0.zip"
 
 
 def load_pandas_df(local_cache_path="./", file_split="dev", language="zh"):
-    """Downloads and extracts the dataset files
+    """Downloads and extracts the dataset files.
+
     Args:
         local_cache_path (str, optional): Path to store the data.
             Defaults to "./".

@@ -102,9 +102,9 @@ class BERTSequenceClassifier:
             },
         ]
 
-        num_train_optimization_steps = (
-            int(len(token_ids) / batch_size) * num_epochs
-        )
+        num_examples = len(token_ids)
+        num_batches = int(num_examples / batch_size)
+        num_train_optimization_steps = num_batches * num_epochs
 
         if warmup_proportion is None:
             opt = BertAdam(optimizer_grouped_parameters, lr=lr)
@@ -121,8 +121,6 @@ class BERTSequenceClassifier:
 
         # train
         self.model.train()  # training mode
-        num_examples = len(token_ids)
-        num_batches = int(num_examples / batch_size)
 
         token_type_ids_batch = None
         for epoch in range(num_epochs):
