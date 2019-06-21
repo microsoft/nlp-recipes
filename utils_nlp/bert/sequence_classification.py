@@ -158,7 +158,7 @@ class BERTSequenceClassifier:
         input_mask,
         num_gpus=None,
         batch_size=32,
-        probabilities=False,
+        return_proba=False,
     ):
         """Scores the given dataset and returns the predicted classes.
 
@@ -169,15 +169,12 @@ class BERTSequenceClassifier:
                                       If None is specified, all available GPUs
                                       will be used. Defaults to None.
             batch_size (int, optional): Scoring batch size. Defaults to 32.
-            class_proba (bool, str, optional):
-                If True, the predicted probability distribution is returned;
-                If False, the predicted classes are returned;
-                If "both", both the predicted classes and probabilities
-                are returned.
-                Defaults to False.
+            return_proba (bool, optional):
+                If True, the predicted probability distribution
+                is also returned. Defaults to False.
         Returns:
-            ndarray, namedtuple(ndarray, ndarray): Predicted classes,
-                probabilities, or both.
+            1darray, namedtuple(1darray, ndarray): Predicted classes or
+                (classes, probabilities) if return_proba is True.
         """
 
         device = get_device("cpu" if num_gpus == 0 else "gpu")
@@ -209,12 +206,10 @@ class BERTSequenceClassifier:
 
         preds = np.concatenate(preds)
 
-        if class_proba == "both":
-            return namedtuple("Predictions", "probabilities classes")(
-                nn.Softmax(dim=1)(torch.Tensor(preds)).numpy(),
+        if return_proba:
+            return namedtuple("Predictions", "classes probabilities")(
                 preds.argmax(axis=1),
+                nn.Softmax(dim=1)(torch.Tensor(preds)).numpy(),
             )
-        elif class_proba:
-            return nn.Softmax(dim=1)(torch.Tensor(preds)).numpy()
         else:
             return preds.argmax(axis=1)
