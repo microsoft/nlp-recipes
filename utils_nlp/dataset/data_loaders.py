@@ -18,18 +18,19 @@ class DaskCSVLoader:
         random_seed=None,
     ):
         """Initializes the loader.
-    Args:
-        file_path (str): Path to delimited file.
-        sep (str, optional): Delimiter. Defaults to ",".
-        header (str, optional): Number of rows to be used as the header.
-            See pandas.read_csv()
-            Defaults to "infer".
-        block_size (int, optional): Size of partition in bytes.
-            See dask.dataframe.read_csv()
-            Defaults to 10e6.
-        random_seed (int, optional): Random seed. See random.seed().
-             Defaults to None.
-    """
+
+        Args:
+            file_path (str): Path to delimited file.
+            sep (str, optional): Delimiter. Defaults to ",".
+            header (str, optional): Number of rows to be used as the header.
+                See pandas.read_csv()
+                Defaults to "infer".
+            block_size (int, optional): Size of partition in bytes.
+                See dask.dataframe.read_csv()
+                Defaults to 10e6.
+            random_seed (int, optional): Random seed. See random.seed().
+                Defaults to None.
+        """
 
         self.df = dd.read_csv(
             file_path, sep=sep, header=header, blocksize=block_size
@@ -62,6 +63,7 @@ class DaskCSVLoader:
         """Creates a sequential generator.
             Batches returned are pandas dataframes of length=batch_size.
             Note: Final batch might be of smaller size.
+
         Args:
             batch_size (int): Batch size.
         """

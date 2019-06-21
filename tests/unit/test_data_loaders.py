@@ -8,7 +8,7 @@ import pytest
 
 from utils_nlp.dataset.data_loaders import DaskCSVLoader
 
-UNIF1 = {"a": 0, "b": 10, "n": 1000}
+UNIF1 = {"a": 0, "b": 10, "n": 1000}  # some uniform distribution
 
 
 @pytest.fixture()
@@ -29,7 +29,7 @@ def csv_file(tmpdir):
     return str(f)
 
 
-def test_dask_csv_loader(csv_file):
+def test_dask_csv_rnd_loader(csv_file):
     num_batches = 500
     batch_size = 12
     num_partitions = 4
@@ -46,3 +46,21 @@ def test_dask_csv_loader(csv_file):
     assert loader.df.npartitions == num_partitions
     assert sample.mean().round() == UNIF1["a"] + UNIF1["b"] / 2
     assert len(sample) <= num_batches * batch_size
+
+
+def test_dask_csv_seq_loader(csv_file):
+    batch_size = 12
+    num_partitions = 4
+
+    loader = DaskCSVLoader(
+        csv_file, header=None, block_size=5 * int(UNIF1["n"] / num_partitions)
+    )
+
+    sample = []
+    for batch in loader.get_sequential_batches(batch_size):
+        sample.append(list(batch.iloc[:, 1]))
+    sample = np.concatenate(sample)
+
+    assert loader.df.npartitions == num_partitions
+    assert sample.mean().round() == UNIF1["a"] + UNIF1["b"] / 2
+    assert len(sample) == UNIF1["n"]
