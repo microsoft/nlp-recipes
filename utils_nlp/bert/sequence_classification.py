@@ -158,7 +158,7 @@ class BERTSequenceClassifier:
         input_mask,
         num_gpus=None,
         batch_size=32,
-        return_proba=False,
+        probabilities=False,
     ):
         """Scores the given dataset and returns the predicted classes.
 
