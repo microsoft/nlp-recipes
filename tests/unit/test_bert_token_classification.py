@@ -44,6 +44,15 @@ def test_token_classifier_fit_predict(tmp_path, ner_test_data):
         labels=ner_test_data["INPUT_LABEL_IDS"],
     )
 
+    # test output probabilities
+    predictions = token_classifier.predict(
+        token_ids=ner_test_data["INPUT_TOKEN_IDS"],
+        input_mask=ner_test_data["INPUT_MASK"],
+        labels=ner_test_data["INPUT_LABEL_IDS"],
+        probabilities=True,
+    )
+    assert len(predictions.classes) == predictions.probabilities.shape[0]
+
 
 def test_postprocess_token_labels(ner_test_data):
     labels_no_padding = postprocess_token_labels(
