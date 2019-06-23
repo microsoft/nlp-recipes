@@ -30,27 +30,19 @@ def test_load_pandas_df_msrpc():
 
 
 def test_wikigold(tmp_path):
-    wg_text_length = 318333
     wg_sentence_count = 1841
     wg_test_percentage = 0.5
     wg_test_sentence_count = round(wg_sentence_count * wg_test_percentage)
     wg_train_sentence_count = wg_sentence_count - wg_test_sentence_count
 
-    # test download
     downloaded_file = os.path.join(tmp_path, "wikigold.conll.txt")
     assert not os.path.exists(downloaded_file)
-    wg.download(dir_path=tmp_path)
+
+    train_df, test_df = wg.load_train_test_dfs(
+        tmp_path, test_percentage=wg_test_percentage
+    )
+
     assert os.path.exists(downloaded_file)
 
-    # test read_data
-    wg_text = wg.read_data(downloaded_file)
-    assert len(wg_text) == wg_text_length
-
-    # test get_train_test_data
-    train_text, train_labels, test_text, test_labels = wg.get_train_test_data(
-        wg_text, test_percentage=wg_test_percentage
-    )
-    assert len(train_text) == wg_train_sentence_count
-    assert len(train_labels) == wg_train_sentence_count
-    assert len(test_text) == wg_test_sentence_count
-    assert len(test_labels) == wg_test_sentence_count
+    assert train_df.shape == (wg_train_sentence_count, 2)
+    assert test_df.shape == (wg_test_sentence_count, 2)
