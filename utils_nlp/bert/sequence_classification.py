@@ -47,10 +47,12 @@ class BERTSequenceClassifier:
         token_ids,
         input_mask,
         labels,
+        token_type_ids=None,
         num_gpus=None,
         num_epochs=1,
         batch_size=32,
         lr=2e-5,
+        warmup_proportion=None,
         verbose=True,
     ):
         """Fine-tunes the BERT classifier using the given training data.
@@ -58,8 +60,10 @@ class BERTSequenceClassifier:
             token_ids (list): List of training token id lists.
             input_mask (list): List of input mask lists.
             labels (list): List of training labels.
-            device (str, optional): Device used for training ("cpu" or "gpu").
-                                    Defaults to "gpu".
+            token_type_ids (list, optional): List of lists. Each sublist
+                contains segment ids indicating if the token belongs to
+                the first sentence(0) or second sentence(1). Only needed
+                for two-sentence tasks.
             num_gpus (int, optional): The number of gpus to use.
                                       If None is specified, all available GPUs
                                       will be used. Defaults to None.
@@ -67,6 +71,9 @@ class BERTSequenceClassifier:
                 Defaults to 1.
             batch_size (int, optional): Training batch size. Defaults to 32.
             lr (float): Learning rate of the Adam optimizer. Defaults to 2e-5.
+            warmup_proportion (float, optional): Proportion of training to
+                perform linear learning rate warmup for. E.g., 0.1 = 10% of
+                training. Defaults to None.
             verbose (bool, optional): If True, shows the training progress and
                 loss values. Defaults to True.
         """
@@ -95,16 +102,27 @@ class BERTSequenceClassifier:
             },
         ]
 
-        opt = BertAdam(optimizer_grouped_parameters, lr=lr)
+        num_examples = len(token_ids)
+        num_batches = int(num_examples / batch_size)
+        num_train_optimization_steps = num_batches * num_epochs
+
+        if warmup_proportion is None:
+            opt = BertAdam(optimizer_grouped_parameters, lr=lr)
+        else:
+            opt = BertAdam(
+                optimizer_grouped_parameters,
+                lr=lr,
+                t_total=num_train_optimization_steps,
+                warmup=warmup_proportion,
+            )
 
         # define loss function
         loss_func = nn.CrossEntropyLoss().to(device)
 
         # train
         self.model.train()  # training mode
-        num_examples = len(token_ids)
-        num_batches = int(num_examples / batch_size)
 
+        token_type_ids_batch = None
         for epoch in range(num_epochs):
             for i in range(num_batches):
 
@@ -121,11 +139,18 @@ class BERTSequenceClassifier:
                     input_mask[start:end], dtype=torch.long, device=device
                 )
 
+                if token_type_ids is not None:
+                    token_type_ids_batch = torch.tensor(
+                        token_type_ids[start:end],
+                        dtype=torch.long,
+                        device=device,
+                    )
+
                 opt.zero_grad()
 
                 y_h = self.model(
                     input_ids=x_batch,
-                    token_type_ids=None,
+                    token_type_ids=token_type_ids_batch,
                     attention_mask=mask_batch,
                     labels=None,
                 )
@@ -146,14 +171,25 @@ class BERTSequenceClassifier:
                             )
                         )
         # empty cache
-        del [x_batch, y_batch, mask_batch]
+        del [x_batch, y_batch, mask_batch, token_type_ids_batch]
         torch.cuda.empty_cache()
 
-    def predict(self, token_ids, input_mask, num_gpus=None, batch_size=32):
+    def predict(
+        self,
+        token_ids,
+        input_mask,
+        token_type_ids=None,
+        num_gpus=None,
+        batch_size=32,
+    ):
         """Scores the given dataset and returns the predicted classes.
         Args:
             token_ids (list): List of training token lists.
             input_mask (list): List of input mask lists.
+            token_type_ids (list, optional): List of lists. Each sublist
+                contains segment ids indicating if the token belongs to
+                the first sentence(0) or second sentence(1). Only needed
+                for two-sentence tasks.
             num_gpus (int, optional): The number of gpus to use.
                                       If None is specified, all available GPUs
                                       will be used. Defaults to None.
@@ -178,10 +214,17 @@ class BERTSequenceClassifier:
                 mask_batch = torch.tensor(
                     mask_batch, dtype=torch.long, device=device
                 )
+                token_type_ids_batch = None
+                if token_type_ids is not None:
+                    token_type_ids_batch = torch.tensor(
+                        token_type_ids[i : i + batch_size],
+                        dtype=torch.long,
+                        device=device,
+                    )
                 with torch.no_grad():
                     p_batch = self.model(
                         input_ids=x_batch,
-                        token_type_ids=None,
+                        token_type_ids=token_type_ids_batch,
                         attention_mask=mask_batch,
                         labels=None,
                     )
