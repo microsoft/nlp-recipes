@@ -26,12 +26,14 @@ BERT_MAX_LEN = 512
 
 
 class Language(Enum):
-    """An enumeration of the supported languages."""
+    """An enumeration of the supported pretrained models and languages."""
 
     ENGLISH = "bert-base-uncased"
     ENGLISHCASED = "bert-base-cased"
     ENGLISHLARGE = "bert-large-uncased"
     ENGLISHLARGECASED = "bert-large-cased"
+    ENGLISHLARGEWWM = "bert-large-uncased-whole-word-masking"
+    ENGLISHLARGECASEDWWM = "bert-large-cased-whole-word-masking"
     CHINESE = "bert-base-chinese"
     MULTILINGUAL = "bert-base-multilingual-cased"
 
@@ -41,6 +43,7 @@ class Tokenizer:
         self, language=Language.ENGLISH, to_lower=False, cache_dir="."
     ):
         """Initializes the underlying pretrained BERT tokenizer.
+
         Args:
             language (Language, optional): The pretrained model's language.
                                            Defaults to Language.ENGLISH.
@@ -54,6 +57,7 @@ class Tokenizer:
 
     def tokenize(self, text):
         """Tokenizes a list of documents using a BERT tokenizer
+
         Args:
             text (list): List of strings (one sequence) or
                 tuples (two sequences).
@@ -69,6 +73,27 @@ class Tokenizer:
                 [self.tokenizer.tokenize(x) for x in sentences]
                 for sentences in tqdm(text)
             ]
+
+    def _truncate_seq_pair(tokens_a, tokens_b, max_length):
+        """Truncates a sequence pair in place to the maximum length."""
+        # This is a simple heuristic which will always truncate the longer
+        # sequence one token at a time. This makes more sense than
+        # truncating an equal percent of tokens from each, since if one
+        # sequence is very short then each token that's truncated likely
+        # contains more information than a longer sequence.
+        while True:
+            total_length = len(tokens_a) + len(tokens_b)
+            if total_length <= max_length:
+                break
+            if len(tokens_a) > len(tokens_b):
+                tokens_a.pop()
+            else:
+                tokens_b.pop()
+
+        tokens_a.append("[SEP]")
+        tokens_b.append("[SEP]")
+
+        return [tokens_a, tokens_b]
 
     def preprocess_classification_tokens(self, tokens, max_len=BERT_MAX_LEN):
         """Preprocessing of input tokens:
@@ -96,32 +121,10 @@ class Tokenizer:
             )
             max_len = BERT_MAX_LEN
 
-        def _truncate_seq_pair(tokens_a, tokens_b, max_length):
-            """Truncates a sequence pair in place to the maximum length."""
-            # This is a simple heuristic which will always truncate the longer
-            # sequence one token at a time. This makes more sense than
-            # truncating an equal percent of tokens from each, since if one
-            # sequence is very short then each token that's truncated likely
-            # contains more information than a longer sequence.
-            while True:
-                total_length = len(tokens_a) + len(tokens_b)
-                if total_length <= max_length:
-                    break
-                if len(tokens_a) > len(tokens_b):
-                    tokens_a.pop()
-                else:
-                    tokens_b.pop()
-
-            tokens_a.append("[SEP]")
-            tokens_b.append("[SEP]")
-
-            return [tokens_a, tokens_b]
-
         if isinstance(tokens[0], str):
             tokens = [x[0 : max_len - 2] + ["[SEP]"] for x in tokens]
             token_type_ids = None
         else:
-            # print(tokens[:2])
             # get tokens for each sentence [[t00, t01, ...] [t10, t11,... ]]
             tokens = [
                 _truncate_seq_pair(sentence[0], sentence[1], max_len - 3)
@@ -310,6 +313,7 @@ def create_data_loader(
 ):
     """
     Create a dataloader for sampling and serving data batches.
+
     Args:
         input_ids (list): List of lists. Each sublist contains numerical
             values, i.e. token ids, corresponding to the tokens in the input

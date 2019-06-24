@@ -13,11 +13,13 @@ DEFAULT_FILE_SPLIT = "train"
 
 def load_pandas_df(data_path, file_split=DEFAULT_FILE_SPLIT):
     """Load the STS Benchmark dataset as a pd.DataFrame
-    
+
     Args:
         data_path (str): Path to data directory
-        file_split (str, optional): File split to load. One of (train, dev, test). Defaults to train.
-    
+        file_split (str, optional): File split to load.
+        One of (train, dev, test).
+        Defaults to train.
+
     Returns:
         pd.DataFrame: STS Benchmark dataset
     """
@@ -36,7 +38,8 @@ def _maybe_download_and_extract(sts_file, base_data_path):
 
 
 def _download_sts(dirpath):
-    """Download and extract data from http://ixa2.si.ehu.es/stswiki/images/4/48/Stsbenchmark.tar.gz 
+    """Download and extract data from
+        http://ixa2.si.ehu.es/stswiki/images/4/48/Stsbenchmark.tar.gz
 
     Args:
         dirpath (str): Path to data directory.
@@ -57,8 +60,11 @@ def _extract_sts(tarpath, target_dirpath=".", tmode="r"):
 
     Args:
         tarpath (str): Path to tarfile, to be deleted after extraction.
-        target_dirpath (str, optional): Directory in which to save the extracted files. 
-        tmode (str, optional): The mode for reading, of the form "filemode[:compression]". Defaults to "r".
+        target_dirpath (str, optional): Directory in which to save
+            the extracted files.
+        tmode (str, optional): The mode for reading,
+            of the form "filemode[:compression]".
+        Defaults to "r".
 
     Returns:
         str: Path to extracted STS Benchmark data.
@@ -79,16 +85,16 @@ def _load_sts(src_file_path):
     with open(src_file_path, "r", encoding="utf-8") as f:
         sent_pairs = []
         for line in f:
-            l = line.strip().split("\t")
+            line = line.strip().split("\t")
             sent_pairs.append(
                 [
-                    l[0].strip(),
-                    l[1].strip(),
-                    l[2].strip(),
-                    l[3].strip(),
-                    float(l[4]),
-                    l[5].strip(),
-                    l[6].strip(),
+                    line[0].strip(),
+                    line[1].strip(),
+                    line[2].strip(),
+                    line[3].strip(),
+                    float(line[4]),
+                    line[5].strip(),
+                    line[6].strip(),
                 ]
             )
 
@@ -108,7 +114,8 @@ def _load_sts(src_file_path):
 
 
 def clean_sts(df):
-    """Drop columns containing irrelevant metadata and save as new csv files in the target_dir
+    """Drop columns containing irrelevant metadata and
+    save as new csv files in the target_dir.
 
     Args:
         df (pandas.Dataframe): drop columns from train/test/dev files.

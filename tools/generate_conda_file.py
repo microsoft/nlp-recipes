@@ -59,6 +59,7 @@ PIP_BASE = {
     ),
     "azureml-dataprep": "azureml-dataprep==1.1.4",
     "black": "black>=18.6b4",
+    "dask": "dask[dataframe]==1.2.2",
     "papermill": "papermill==0.18.2",
     "pydocumentdb": "pydocumentdb>=2.3.3",
     "tqdm": "tqdm==4.31.1",
