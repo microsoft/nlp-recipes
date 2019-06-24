@@ -1,10 +1,16 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
+# This script reuses some code from
+# https://github.com/huggingface/pytorch-pretrained-BERT/blob/master/examples
+# /run_classifier.py
+
+
 from pytorch_pretrained_bert.tokenization import BertTokenizer
 from enum import Enum
 import warnings
 import torch
+from tqdm import tqdm
 
 from torch.utils.data import (
     DataLoader,
@@ -51,28 +57,59 @@ class Tokenizer:
         """Tokenizes a list of documents using a BERT tokenizer
 
         Args:
-            text (list(str)): list of text documents.
+            text (list): List of strings (one sequence) or
+                tuples (two sequences).
+
         Returns:
-            [list(str)]: list of token lists.
+            [list]: List of lists. Each sublist contains WordPiece tokens
+                of the input sequence(s).
         """
-        tokens = [self.tokenizer.tokenize(x) for x in text]
-        return tokens
+        if isinstance(text[0], str):
+            return [self.tokenizer.tokenize(x) for x in tqdm(text)]
+        else:
+            return [
+                [self.tokenizer.tokenize(x) for x in sentences]
+                for sentences in tqdm(text)
+            ]
+
+    def _truncate_seq_pair(tokens_a, tokens_b, max_length):
+        """Truncates a sequence pair in place to the maximum length."""
+        # This is a simple heuristic which will always truncate the longer
+        # sequence one token at a time. This makes more sense than
+        # truncating an equal percent of tokens from each, since if one
+        # sequence is very short then each token that's truncated likely
+        # contains more information than a longer sequence.
+        while True:
+            total_length = len(tokens_a) + len(tokens_b)
+            if total_length <= max_length:
+                break
+            if len(tokens_a) > len(tokens_b):
+                tokens_a.pop()
+            else:
+                tokens_b.pop()
+
+        tokens_a.append("[SEP]")
+        tokens_b.append("[SEP]")
+
+        return [tokens_a, tokens_b]
 
     def preprocess_classification_tokens(self, tokens, max_len=BERT_MAX_LEN):
         """Preprocessing of input tokens:
             - add BERT sentence markers ([CLS] and [SEP])
-            - map tokens to indices
+            - map tokens to token indices in the BERT vocabulary
             - pad and truncate sequences
             - create an input_mask
-
+            - create token type ids, aka. segment ids
         Args:
-            tokens (list): List of tokens to preprocess.
+            tokens (list): List of token lists to preprocess.
             max_len (int, optional): Maximum number of tokens
                             (documents will be truncated or padded).
                             Defaults to 512.
         Returns:
-            list of preprocesssed token lists
-            list of input mask lists
+            tuple: A tuple containing the following three lists
+                list of preprocesssed token lists
+                list of input mask lists
+                list of token type id lists
         """
         if max_len > BERT_MAX_LEN:
             print(
@@ -82,15 +119,45 @@ class Tokenizer:
             )
             max_len = BERT_MAX_LEN
 
-        # truncate and add BERT sentence markers
-        tokens = [["[CLS]"] + x[0 : max_len - 2] + ["[SEP]"] for x in tokens]
+        if isinstance(tokens[0], str):
+            tokens = [x[0 : max_len - 2] + ["[SEP]"] for x in tokens]
+            token_type_ids = None
+        else:
+            # get tokens for each sentence [[t00, t01, ...] [t10, t11,... ]]
+            tokens = [
+                _truncate_seq_pair(sentence[0], sentence[1], max_len - 3)
+                for sentence in tokens
+            ]
+
+            # construct token_type_ids
+            # [[0, 0, 0, 0, ... 0, 1, 1, 1, ... 1], [0, 0, 0, ..., 1, 1, ]
+            token_type_ids = [
+                [[i] * len(sentence) for i, sentence in enumerate(example)]
+                for example in tokens
+            ]
+            # merge sentences
+            tokens = [
+                [token for sentence in example for token in sentence]
+                for example in tokens
+            ]
+            # prefix with [0] for [CLS]
+            token_type_ids = [
+                [0] + [i for sentence in example for i in sentence]
+                for example in token_type_ids
+            ]
+            # pad sequence
+            token_type_ids = [
+                x + [0] * (max_len - len(x)) for x in token_type_ids
+            ]
+
+        tokens = [["[CLS]"] + x for x in tokens]
         # convert tokens to indices
         tokens = [self.tokenizer.convert_tokens_to_ids(x) for x in tokens]
         # pad sequence
         tokens = [x + [0] * (max_len - len(x)) for x in tokens]
         # create input mask
         input_mask = [[min(1, x) for x in y] for y in tokens]
-        return tokens, input_mask
+        return tokens, input_mask, token_type_ids
 
     def preprocess_ner_tokens(
         self,
