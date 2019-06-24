@@ -13,7 +13,7 @@ def test_tokenizer_preprocess_ner_tokens(ner_test_data):
     tokenizer = Tokenizer(language=Language.ENGLISHCASED, to_lower=False)
 
     # test providing labels
-    preprocessed_tokens = tokenizer.preprocess_ner_tokens(
+    preprocessed_tokens = tokenizer.tokenize_ner(
         text=ner_test_data["INPUT_TEXT"],
         labels=ner_test_data["INPUT_LABELS"],
         label_map=ner_test_data["LABEL_MAP"],
@@ -28,7 +28,7 @@ def test_tokenizer_preprocess_ner_tokens(ner_test_data):
     assert preprocessed_tokens[3] == ner_test_data["EXPECTED_LABEL_IDS"]
 
     # test not providing labels
-    preprocessed_tokens = tokenizer.preprocess_ner_tokens(
+    preprocessed_tokens = tokenizer.tokenize_ner(
         text=ner_test_data["INPUT_TEXT"],
         label_map=ner_test_data["LABEL_MAP"],
         max_len=20,

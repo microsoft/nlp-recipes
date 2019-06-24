@@ -1,16 +1,18 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
+
 # This script reuses some code from
 # https://github.com/huggingface/pytorch-pretrained-BERT/blob/master/examples
 # /run_classifier.py
 
 
-from pytorch_pretrained_bert.tokenization import BertTokenizer
 from enum import Enum
 import warnings
 import torch
 from tqdm import tqdm
+
+from pytorch_pretrained_bert.tokenization import BertTokenizer
 
 from torch.utils.data import (
     DataLoader,
@@ -159,7 +161,7 @@ class Tokenizer:
         input_mask = [[min(1, x) for x in y] for y in tokens]
         return tokens, input_mask, token_type_ids
 
-    def preprocess_ner_tokens(
+    def tokenize_ner(
         self,
         text,
         max_len=BERT_MAX_LEN,
@@ -168,7 +170,7 @@ class Tokenizer:
         trailing_piece_tag="X",
     ):
         """
-        Preprocesses input text, involving the following steps
+        Tokenize and preprocesses input text, involving the following steps
             0. Tokenize input text.
             1. Convert string tokens to token ids.
             2. Convert input labels to label ids, if labels and label_map are
@@ -190,8 +192,8 @@ class Tokenizer:
                 labels (which may be string type) to integers. Default value
                 is None.
             trailing_piece_tag (str, optional): Tag used to label trailing
-                word pieces. For example, "playing" is broken into "play"
-                and "##ing", "play" preserves its original label and "##ing"
+                word pieces. For example, "criticize" is broken into "critic"
+                and "##ize", "critic" preserves its original label and "##ize"
                 is labeled as trailing_piece_tag. Default value is "X".
 
         Returns:
@@ -206,7 +208,7 @@ class Tokenizer:
                 3. trailing_token_mask: List of lists. Each sublist is
                     a boolean list, True for the first word piece of each
                     original word, False for the trailing word pieces,
-                    e.g. "##ing". This mask is useful for removing the
+                    e.g. "##ize". This mask is useful for removing the
                     predictions on trailing word pieces, so that each
                     original word in the input text has a unique predicted
                     label.
@@ -214,6 +216,10 @@ class Tokenizer:
                     each sublist contains token labels of a input
                     sentence/paragraph, if labels is provided.
         """
+        text = [
+            self.tokenizer.basic_tokenizer._tokenize_chinese_chars(t)
+            for t in text
+        ]
         if max_len > BERT_MAX_LEN:
             warnings.warn(
                 "setting max_len to max allowed tokens: {}".format(
@@ -234,7 +240,7 @@ class Tokenizer:
         trailing_token_mask_all = []
         for t, t_labels in zip(text, labels):
             new_labels = []
-            tokens = []
+            new_tokens = []
             if label_available:
                 for word, tag in zip(t.split(), t_labels):
                     sub_words = self.tokenizer.tokenize(word)
@@ -242,7 +248,7 @@ class Tokenizer:
                         if count > 0:
                             tag = trailing_piece_tag
                         new_labels.append(tag)
-                        tokens.append(sub_word)
+                        new_tokens.append(sub_word)
             else:
                 for word in t.split():
                     sub_words = self.tokenizer.tokenize(word)
@@ -252,12 +258,12 @@ class Tokenizer:
                         else:
                             tag = "O"
                         new_labels.append(tag)
-                        tokens.append(sub_word)
+                        new_tokens.append(sub_word)
 
-            if len(tokens) > max_len:
-                tokens = tokens[:max_len]
+            if len(new_tokens) > max_len:
+                new_tokens = new_tokens[:max_len]
                 new_labels = new_labels[:max_len]
-            input_ids = self.tokenizer.convert_tokens_to_ids(tokens)
+            input_ids = self.tokenizer.convert_tokens_to_ids(new_tokens)
 
             # The mask has 1 for real tokens and 0 for padding tokens.
             # Only real tokens are attended to.

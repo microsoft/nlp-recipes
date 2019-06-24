@@ -2,6 +2,9 @@
 # Licensed under the MIT License.
 
 import random
+import os
+import pandas as pd
+
 from utils_nlp.dataset.url_utils import maybe_download
 
 URL = (
@@ -10,48 +13,35 @@ URL = (
 )
 
 
-def download(dir_path="."):
-    """Download the wikigold data file to dir_path if it doesn't exist yet."""
-    file_name = URL.split("/")[-1]
-    maybe_download(URL, file_name, dir_path)
-
-
-def read_data(data_file):
+def load_train_test_dfs(
+    local_cache_path="./", test_percentage=0.5, random_seed=None
+):
     """
-    Read the wikigold dataset into a string of text.
+    Get the training and testing data frames based on test_percentage.
 
     Args:
-        data_file (str): data file path, including the file name.
-
-    Returns:
-        str: One string containing the wikigold dataset.
-    """
-    with open(data_file, "r", encoding="utf8") as file:
-        text = file.read()
-
-    return text
-
-
-def get_train_test_data(text, test_percentage=0.5, random_seed=None):
-    """
-    Get the training and testing data based on test_percentage.
-
-    Args:
-        text (str): One string containing the wikigold dataset.
+        local_cache_path (str): Path to store the data. If the data file
+            doesn't exist in this path, it's downloaded.
         test_percentage (float, optional): Percentage of data ot use for
             testing. Since this is a small dataset, the default testing
             percentage is set to 0.5
         random_seed (float, optional): Random seed used to shuffle the data.
 
     Returns:
-        tuple: A tuple containing four lists:
-            train_sentence_list: List of training sentence strings.
-            train_labels_list: List of lists. Each sublist contains the
-                entity labels of the words in the training sentence.
-            test_sentence_list: List of testing sentence strings.
-            test_labels_list: List of lists. Each sublist contains the
-                entity labels of the word in the testing sentence.
+        tuple: (train_pandas_df, test_pandas_df), each data frame contains
+            two columns
+            "sentence": sentences in strings.
+            "labels": list of entity labels of the words in the sentence.
+
     """
+    file_name = URL.split("/")[-1]
+    maybe_download(URL, file_name, local_cache_path)
+
+    data_file = os.path.join(local_cache_path, file_name)
+
+    with open(data_file, "r", encoding="utf8") as file:
+        text = file.read()
+
     # Input data are separated by empty lines
     text_split = text.split("\n\n")
     # Remove empty line at EOF
@@ -94,14 +84,17 @@ def get_train_test_data(text, test_percentage=0.5, random_seed=None):
         test_text_split, "testing"
     )
 
-    return (
-        train_sentence_list,
-        train_labels_list,
-        test_sentence_list,
-        test_labels_list,
+    train_df = pd.DataFrame(
+        {"sentence": train_sentence_list, "labels": train_labels_list}
     )
+
+    test_df = pd.DataFrame(
+        {"sentence": test_sentence_list, "labels": test_labels_list}
+    )
+
+    return (train_df, test_df)
 
 
 def get_unique_labels():
     """Get the unique labels in the wikigold dataset."""
-    return ["O", "I-LOC", "I-MISC", "I-PER", "I-ORG", "X"]
+    return ["O", "I-LOC", "I-MISC", "I-PER", "I-ORG"]
