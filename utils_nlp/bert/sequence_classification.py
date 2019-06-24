@@ -5,6 +5,7 @@
 # https://github.com/huggingface/pytorch-pretrained-BERT/blob/master/examples/run_classifier.py
 
 import random
+from collections import namedtuple
 
 import numpy as np
 import torch
@@ -22,6 +23,7 @@ class BERTSequenceClassifier:
 
     def __init__(self, language=Language.ENGLISH, num_labels=2, cache_dir="."):
         """Initializes the classifier and the underlying pretrained model.
+
         Args:
             language (Language, optional): The pretrained model's language.
                                            Defaults to Language.ENGLISH.
@@ -56,6 +58,7 @@ class BERTSequenceClassifier:
         verbose=True,
     ):
         """Fine-tunes the BERT classifier using the given training data.
+
         Args:
             token_ids (list): List of training token id lists.
             input_mask (list): List of input mask lists.
@@ -181,8 +184,10 @@ class BERTSequenceClassifier:
         token_type_ids=None,
         num_gpus=None,
         batch_size=32,
+        probabilities=False,
     ):
         """Scores the given dataset and returns the predicted classes.
+
         Args:
             token_ids (list): List of training token lists.
             input_mask (list): List of input mask lists.
@@ -194,8 +199,12 @@ class BERTSequenceClassifier:
                                       If None is specified, all available GPUs
                                       will be used. Defaults to None.
             batch_size (int, optional): Scoring batch size. Defaults to 32.
+            probabilities (bool, optional):
+                If True, the predicted probability distribution
+                is also returned. Defaults to False.
         Returns:
-            [ndarray]: Predicted classes.
+            1darray, namedtuple(1darray, ndarray): Predicted classes or
+                (classes, probabilities) if probabilities is True.
         """
 
         device = get_device("cpu" if num_gpus == 0 else "gpu")
@@ -228,9 +237,16 @@ class BERTSequenceClassifier:
                         attention_mask=mask_batch,
                         labels=None,
                     )
-                preds.append(p_batch.cpu().data.numpy())
+                preds.append(p_batch.cpu())
                 if i % batch_size == 0:
                     pbar.update(batch_size)
-        preds = [x.argmax(1) for x in preds]
+
         preds = np.concatenate(preds)
-        return preds
+
+        if probabilities:
+            return namedtuple("Predictions", "classes probabilities")(
+                preds.argmax(axis=1),
+                nn.Softmax(dim=1)(torch.Tensor(preds)).numpy(),
+            )
+        else:
+            return preds.argmax(axis=1)
