@@ -2,6 +2,7 @@
 # Licensed under the MIT License.
 import json
 import os
+import pandas as pd
 
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -151,4 +152,4 @@ class GenSenClassifier:
             sentences, pool="last", return_numpy=True
         )
 
-        return cosine_similarity(reps_h_t)
+        return pd.DataFrame(cosine_similarity(reps_h_t))
