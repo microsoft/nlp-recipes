@@ -22,8 +22,7 @@ def to_lowercase_all(df):
 
 def to_lowercase(df, column_names=[]):
     """
-    This function transforms strings of the column names in the dataframe
-    passed to lowercase
+    This function transforms strings of the column names in the dataframe passed to lowercase
 
     Args:
         df (pd.DataFrame): Raw dataframe with some text columns.
@@ -47,18 +46,18 @@ def to_spacy_tokens(
     token_cols=["sentence1_tokens", "sentence2_tokens"],
 ):
     """
-    This function tokenizes the sentence pairs using spaCy, defaulting to the
-    spaCy en_core_web_sm model
-
-    Args:
-        df (pd.DataFrame): Dataframe with columns sentence_cols to tokenize.
-        sentence_cols (list, optional): Column names of the raw sentence pairs.
-        token_cols (list, optional): Column names for the tokenized sentences.
-
-    Returns:
-        pd.DataFrame: Dataframe with new columns token_cols, each containing
-                            a list of tokens for their respective sentences.
-    """
+	This function tokenizes the sentence pairs using spaCy, defaulting to the 
+	spaCy en_core_web_sm model
+	
+	Args:
+		df (pd.DataFrame): Dataframe with columns sentence_cols to tokenize.
+		sentence_cols (list, optional): Column names of the raw sentence pairs.
+		token_cols (list, optional): Column names for the tokenized sentences.
+	
+	Returns:
+		pd.DataFrame: Dataframe with new columns token_cols, each containing 
+							a list of tokens for their respective sentences.
+	"""
     nlp = spacy.load("en_core_web_sm")
     text_df = df[sentence_cols]
     nlp_df = text_df.applymap(lambda x: nlp(x))
@@ -78,22 +77,21 @@ def rm_spacy_stopwords(
     custom_stopwords=[],
 ):
     """
-    This function tokenizes the sentence pairs using spaCy and remove
-    stopwords, defaulting to the spaCy en_core_web_sm model
-
-    Args:
-        df (pd.DataFrame): Dataframe with columns sentence_cols to tokenize.
-        sentence_cols (list, optional): Column names for the raw sentence
-        pairs.
-        stop_cols (list, optional): Column names for the tokenized sentences
-            without stop words.
-        custom_stopwords (list of str, optional): List of custom stopwords to
-            register with the spaCy model.
-
-    Returns:
-        pd.DataFrame: Dataframe with new columns stop_cols, each containing a
-            list of tokens for their respective sentences.
-    """
+	This function tokenizes the sentence pairs using spaCy and remove stopwords, 
+	defaulting to the spaCy en_core_web_sm model
+	
+	Args:
+		df (pd.DataFrame): Dataframe with columns sentence_cols to tokenize.
+		sentence_cols (list, optional): Column names for the raw sentence pairs.
+		stop_cols (list, optional): Column names for the tokenized sentences 
+			without stop words.
+		custom_stopwords (list of str, optional): List of custom stopwords to 
+			register with the spaCy model.
+	
+	Returns:
+		pd.DataFrame: Dataframe with new columns stop_cols, each containing a 
+			list of tokens for their respective sentences.
+	"""
     nlp = spacy.load("en_core_web_sm")
     if len(custom_stopwords) > 0:
         for csw in custom_stopwords:
@@ -162,13 +160,3 @@ def rm_nltk_stopwords(
 
     stop_df.columns = stop_cols
     return pd.concat([df, stop_df], axis=1)
-
-
-def convert_to_unicode(input_text):
-    """Converts intput_text to Unicode. Input must be utf-8."""
-    if isinstance(input_text, str):
-        return input_text
-    elif isinstance(input_text, bytes):
-        return input_text.decode("utf-8", "ignore")
-    else:
-        raise TypeError("Unsupported string type: %s" % (type(input_text)))
