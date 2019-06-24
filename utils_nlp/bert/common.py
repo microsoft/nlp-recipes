@@ -7,8 +7,6 @@
 # /run_classifier.py
 
 
-from pytorch_pretrained_bert.tokenization import BertTokenizer
-
 from enum import Enum
 import warnings
 import torch
@@ -160,7 +158,7 @@ class Tokenizer:
         input_mask = [[min(1, x) for x in y] for y in tokens]
         return tokens, input_mask, token_type_ids
 
-    def tokenize_preprocess_ner_text(
+    def tokenize_ner(
         self,
         text,
         max_len=BERT_MAX_LEN,
@@ -215,8 +213,10 @@ class Tokenizer:
                     each sublist contains token labels of a input
                     sentence/paragraph, if labels is provided.
         """
-        text = [self.tokenizer.basic_tokenizer._tokenize_chinese_chars(t)
-            for t in text]
+        text = [
+            self.tokenizer.basic_tokenizer._tokenize_chinese_chars(t)
+            for t in text
+        ]
         if max_len > BERT_MAX_LEN:
             warnings.warn(
                 "setting max_len to max allowed tokens: {}".format(

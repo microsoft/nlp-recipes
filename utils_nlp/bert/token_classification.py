@@ -271,7 +271,7 @@ class BERTTokenClassifier:
             logits = logits.detach().cpu()
 
             if step == 0:
-                logits_all = logits
+                logits_all = logits.numpy()
             else:
                 logits_all = np.append(logits_all, logits, axis=0)
 
@@ -293,9 +293,10 @@ class BERTTokenClassifier:
 
 
 def create_label_map(label_list, trailing_piece_tag="X"):
-    if trailing_piece_tag not in label_list:
-        label_list.append(trailing_piece_tag)
     label_map = {label: i for i, label in enumerate(label_list)}
+
+    if trailing_piece_tag not in label_list:
+        label_map[trailing_piece_tag] = len(label_list)
 
     return label_map
 
