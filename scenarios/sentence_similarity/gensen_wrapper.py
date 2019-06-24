@@ -5,7 +5,7 @@ import os
 
 from sklearn.metrics.pairwise import cosine_similarity
 
-from utils_nlp.gensen.gensen_train import train
+from scenarios.sentence_similarity.gensen_train import train
 from utils_nlp.gensen.create_gensen_model import (
     create_multiseq2seq_model,
 )
