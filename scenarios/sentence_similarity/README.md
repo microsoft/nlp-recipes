@@ -24,4 +24,21 @@ The following summarizes each notebook for Sentence Similarity. Each notebook pr
 |Senteval |[local](senteval_local.ipynb), [AzureML](senteval_azureml.ipynb)|SentEval is a widely used benchmarking tool for evaluating general-purpose sentence embeddings. Running SentEval locally is easy, but not necessarily efficient depending on the model specs. We provide an example on how to do this efficiently in Azure Machine Learning Service. |
 |[GenSen on AzureML](gensen_aml_deep_dive.ipynb)| No | This notebook serves as an introduction to an end-to-end NLP solution for sentence similarity building one of the State of the Art models, GenSen, on the AzureML platform. We show the advantages of AzureML when training large NLP models with GPU.
 |[Automated Machine Learning(AutoML) with Deployment on Azure Container Instance](automl_local_deployment_aci.ipynb)| Yes |This notebook shows users how to use AutoML on local machine and deploy the model as a webservice to Azure Container Instance(ACI) to get a sentence similarity score.
-|[Google Universal Sentence Encoder with Azure Machine Learning Pipeline, AutoML with Deployment on Azure Kubernetes Service](automl_with_pipelines_deployment_aks.ipynb)| No | This notebook shows a user how to use AzureML pipelines and deploy the pipeline output model as a webservice to Azure Kubernetes Service which can be used as an end point to get sentence similarity scores.  
+|[Google Universal Sentence Encoder with Azure Machine Learning Pipeline, AutoML with Deployment on Azure Kubernetes Service](automl_with_pipelines_deployment_aks.ipynb)| No | This notebook shows a user how to use AzureML pipelines and deploy the pipeline output model as a webservice to Azure Kubernetes Service which can be used as an end point to get sentence similarity scores.|
+|[GenSen on Local](gensen_local.ipynb)| Yes | This notebook provides a easy way to train and predict a Gensen model on the Standford SNLI dataset. Running the notebook requires a GPU enabled machine.|
+
+
+## Using GPU vs Azure ML Compute
+We did a comparative study to make it easier for you to choose between a GPU enabled Azure VM 
+and Azure ML compute. The table below provides the cost vs performance trade-off for 
+each of the choices. 
+
+* The total time in the table stands for the training time + setup time.
+* Cost is the estimated cost of running the Azure ML Compute Job or the VM up-time.
+
+
+|---|Azure VM| AML 1 Node| AML 2 Nodes | AML 4 Nodes | AML 8 Nodes|
+|---|---|---|---|---|---|
+|Training Loss​|4.91​|4.81​|4.78​|4.77​|4.58​|
+|Total Time​|1h 05m|1h 54m|1h 44m​|1h2 6m​|1h 07m​|
+|Cost|$1.12​|$2.71​|$4.68​|$7.9​|$12.1​|
