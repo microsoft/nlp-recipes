@@ -5,12 +5,12 @@ import os
 
 from sklearn.metrics.pairwise import cosine_similarity
 
-from utils_nlp.model.gensen import train
-from utils_nlp.model.gensen.create_gensen_model import (
+from utils_nlp.gensen.gensen_train import train
+from utils_nlp.gensen.create_gensen_model import (
     create_multiseq2seq_model,
 )
-from utils_nlp.model.gensen.gensen import GenSenSingle
-from utils_nlp.model.gensen.gensen_utils import gensen_preprocess
+from utils_nlp.gensen.gensen import GenSenSingle
+from utils_nlp.gensen.preprocess_utils import gensen_preprocess
 
 
 class GenSenClassifier:
@@ -37,7 +37,6 @@ class GenSenClassifier:
         self.cache_dir = cache_dir
         self.pretrained_embedding_path = pretrained_embedding_path
         self.model_name = "gensen_multiseq2seq"
-        self.config = self._read_config(self.config_file)
 
     def _validate_params(self):
         """Validate input params."""
@@ -100,7 +99,7 @@ class GenSenClassifier:
             ),
         )
 
-    def fit(self):
+    def fit(self, train_df, dev_df, test_df):
 
         """ Method to train the Gensen model.
 
@@ -110,11 +109,11 @@ class GenSenClassifier:
             test_df: A dataframe containing tokenized sentences from the test set.
         """
 
-        # self._validate_params()
-        # self.cache_dir = self._get_gensen_tokens(train_df, dev_df, test_df)
+        self._validate_params()
+        self.cache_dir = self._get_gensen_tokens(train_df, dev_df, test_df)
 
-        train.train(
-            data_folder=self.cache_dir,
+        train(
+            data_folder=os.path.abspath(self.cache_dir),
             config=self.config,
             learning_rate=self.learning_rate,
         )
@@ -135,8 +134,7 @@ class GenSenClassifier:
 
         """
 
-        # self._validate_params()
-
+        self._validate_params()
         # Use only if you have the model trained and saved.
         # self.cache_dir = os.path.join(self.cache_dir, "clean/snli_1.0")
         self._create_multiseq2seq_model()
