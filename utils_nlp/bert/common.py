@@ -74,7 +74,7 @@ class Tokenizer:
                 for sentences in tqdm(text)
             ]
 
-    def _truncate_seq_pair(tokens_a, tokens_b, max_length):
+    def _truncate_seq_pair(self, tokens_a, tokens_b, max_length):
         """Truncates a sequence pair in place to the maximum length."""
         # This is a simple heuristic which will always truncate the longer
         # sequence one token at a time. This makes more sense than
@@ -127,7 +127,7 @@ class Tokenizer:
         else:
             # get tokens for each sentence [[t00, t01, ...] [t10, t11,... ]]
             tokens = [
-                _truncate_seq_pair(sentence[0], sentence[1], max_len - 3)
+                self._truncate_seq_pair(sentence[0], sentence[1], max_len - 3)
                 for sentence in tokens
             ]
 
