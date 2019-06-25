@@ -3,8 +3,7 @@
 import json
 import os
 import pandas as pd
-
-from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
 
 from scenarios.sentence_similarity.gensen_train import train
 from utils_nlp.gensen.create_gensen_model import (
@@ -39,6 +38,8 @@ class GenSenClassifier:
         self.pretrained_embedding_path = pretrained_embedding_path
         self.model_name = "gensen_multiseq2seq"
 
+        self._validate_params()
+
     def _validate_params(self):
         """Validate input params."""
 
@@ -56,7 +57,7 @@ class GenSenClassifier:
             self.config = self._read_config(self.config_file)
             f.close()
         except FileNotFoundError:
-            print("Provided config file does not exist!")
+            raise FileNotFoundError("Provided config file does not exist!")
 
     def _get_gensen_tokens(self, train_df=None, dev_df=None, test_df=None):
         """
@@ -110,7 +111,6 @@ class GenSenClassifier:
             test_df: A dataframe containing tokenized sentences from the test set.
         """
 
-        self._validate_params()
         self.cache_dir = self._get_gensen_tokens(train_df, dev_df, test_df)
 
         train(
@@ -135,8 +135,6 @@ class GenSenClassifier:
 
         """
 
-        self._validate_params()
-        # Use only if you have the model trained and saved.
         # self.cache_dir = os.path.join(self.cache_dir, "clean/snli_1.0")
         self._create_multiseq2seq_model()
 
@@ -152,4 +150,4 @@ class GenSenClassifier:
             sentences, pool="last", return_numpy=True
         )
 
-        return pd.DataFrame(cosine_similarity(reps_h_t))
+        return pd.DataFrame(np.corrcoef(reps_h_t))
