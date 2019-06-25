@@ -5,8 +5,7 @@ from utils_nlp.dataset.ner_utils import get_sentence_and_labels
 
 FILES = {
     "train": "MSRA/msra-bakeoff3-training-utf8.2col",
-    # "test": "MSRA/bakeoff3_goldstandard.txt",
-    "test": "MSRA/msra-bakeoff3-training-gb.2col",
+    "test": "MSRA/bakeoff3_goldstandard.txt",
 }
 ENCODINGS = {"train": "utf8", "test": "gbk"}
 
@@ -23,13 +22,8 @@ def load_pandas_df(local_cache_path="./", file_split="test"):
     text = text.replace("？ 0", "？ 0\n")
     text = text.replace("！ 0", "！ 0\n")
 
-    # text_list = text.split("\n\n")
-
-    # # Remove empty line at EOF
-    # text_list = text_list[:-1]
-
     sentence_list, labels_list = get_sentence_and_labels(
-        text, file_split, join_characeter=""
+        text, file_split
     )
 
     labels_list = [
