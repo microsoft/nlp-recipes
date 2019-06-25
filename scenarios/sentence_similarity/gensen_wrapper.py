@@ -2,8 +2,9 @@
 # Licensed under the MIT License.
 import json
 import os
-import pandas as pd
+
 import numpy as np
+import pandas as pd
 
 from scenarios.sentence_similarity.gensen_train import train
 from utils_nlp.gensen.create_gensen_model import (
