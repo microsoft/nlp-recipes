@@ -136,6 +136,7 @@ def evaluate(
     model_state,
 ):
     """ Function to validate the model.
+
     Args:
         model_state(dict): Saved model weights.
         config(dict): Config object.
@@ -144,9 +145,11 @@ def evaluate(
         loss_criterion(nn.CrossEntropyLoss): Cross entropy loss.
         monitor_epoch(int): Current epoch count.
         min_val_loss(float): Minimum validation loss
-        min_val_loss_epoch(int): Epoch where the minimum validation loss was seen.
+        min_val_loss_epoch(int): Epoch where the minimum validation
+            loss was seen.
         save_dir(str): Directory path to save the model dictionary.
         starting_time(time.Time): Starting time of the training.
+
     Returns:
         bool: Whether to continue training or not.
     """
@@ -442,7 +445,7 @@ def train(config, data_folder, learning_rate=0.0001):
                         max_len_trg,
                     )
 
-                    """Increment pointer into task and if current buffer is 
+                    """Increment pointer into task and if current buffer is
                     exhausted, fetch new buffer. """
                     task_idxs[task_idx] += batch_size * n_gpus
                     if task_idxs[task_idx] >= train_iterator.buffer_size:

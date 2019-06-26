@@ -102,6 +102,7 @@ class Tokenizer:
             - pad and truncate sequences
             - create an input_mask
             - create token type ids, aka. segment ids
+
         Args:
             tokens (list): List of token lists to preprocess.
             max_len (int, optional): Maximum number of tokens
@@ -121,7 +122,7 @@ class Tokenizer:
             )
             max_len = BERT_MAX_LEN
 
-        if isinstance(tokens[0], str):
+        if isinstance(tokens[0][0], str):
             tokens = [x[0 : max_len - 2] + ["[SEP]"] for x in tokens]
             token_type_ids = None
         else:
