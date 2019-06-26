@@ -9,10 +9,14 @@
 # file. You don’t need to import the fixture you want to use in a test, it
 # automatically gets discovered by pytest."
 
-import pytest
 import os
-from tests.notebooks_common import path_notebooks
 from tempfile import TemporaryDirectory
+
+import pytest
+from tests.notebooks_common import path_notebooks
+
+from utils_nlp.bert.common import Language
+from utils_nlp.bert.common import Tokenizer as BERTTokenizer
 
 
 @pytest.fixture(scope="module")
@@ -116,5 +120,5 @@ def ner_test_data():
 
 
 @pytest.fixture()
-def english_tokenizer():
-    return Tokenizer(language=Language.ENGLISHCASED, to_lower=False)
+def bert_english_tokenizer():
+    return BERTTokenizer(language=Language.ENGLISHCASED, to_lower=False)

@@ -4,7 +4,6 @@
 import os
 import tarfile
 import pandas as pd
-import azureml.dataprep as dp
 
 from utils_nlp.dataset.url_utils import maybe_download
 
@@ -14,38 +13,33 @@ DEFAULT_FILE_SPLIT = "train"
 
 def load_pandas_df(data_path, file_split=DEFAULT_FILE_SPLIT):
     """Load the STS Benchmark dataset as a pd.DataFrame
-    
+
     Args:
         data_path (str): Path to data directory
-        file_split (str, optional): File split to load. One of (train, dev, test). Defaults to train.
-    
+        file_split (str, optional): File split to load.
+        One of (train, dev, test).
+        Defaults to train.
+
     Returns:
         pd.DataFrame: STS Benchmark dataset
     """
-    clean_file_path = os.path.join(
-        data_path, "clean/stsbenchmark", "sts-{}.csv".format(file_split)
-    )
-    dflow = _maybe_download_and_extract(data_path, clean_file_path)
-    return dflow.to_pandas_dataframe()
+    file_name = "sts-{}.csv".format(file_split)
+    df = _maybe_download_and_extract(file_name, data_path)
+    return df
 
 
-def _maybe_download_and_extract(base_data_path, clean_file_path):
-    if not os.path.exists(clean_file_path):
-        raw_data_path = os.path.join(base_data_path, "raw")
-        if not os.path.exists(raw_data_path):
-            os.makedirs(raw_data_path)
-        sts_path = _download_sts(raw_data_path)
-        sts_files = [f for f in os.listdir(sts_path) if f.endswith(".csv")]
-        _clean_sts(
-            sts_files,
-            sts_path,
-            os.path.join(base_data_path, "clean", "stsbenchmark"),
-        )
-    return dp.auto_read_file(clean_file_path).drop_columns("Column1")
+def _maybe_download_and_extract(sts_file, base_data_path):
+    raw_data_path = os.path.join(base_data_path, "raw")
+    if not os.path.exists(raw_data_path):
+        os.makedirs(raw_data_path)
+    sts_path = _download_sts(raw_data_path)
+    df = _load_sts(os.path.join(sts_path, sts_file))
+    return df
 
 
 def _download_sts(dirpath):
-    """Download and extract data from http://ixa2.si.ehu.es/stswiki/images/4/48/Stsbenchmark.tar.gz 
+    """Download and extract data from
+        http://ixa2.si.ehu.es/stswiki/images/4/48/Stsbenchmark.tar.gz
 
     Args:
         dirpath (str): Path to data directory.
@@ -66,8 +60,11 @@ def _extract_sts(tarpath, target_dirpath=".", tmode="r"):
 
     Args:
         tarpath (str): Path to tarfile, to be deleted after extraction.
-        target_dirpath (str, optional): Directory in which to save the extracted files. 
-        tmode (str, optional): The mode for reading, of the form "filemode[:compression]". Defaults to "r".
+        target_dirpath (str, optional): Directory in which to save
+            the extracted files.
+        tmode (str, optional): The mode for reading,
+            of the form "filemode[:compression]".
+        Defaults to "r".
 
     Returns:
         str: Path to extracted STS Benchmark data.
@@ -79,31 +76,59 @@ def _extract_sts(tarpath, target_dirpath=".", tmode="r"):
     return os.path.join(target_dirpath, extracted)
 
 
-def _clean_sts(filenames, src_dir, target_dir):
-    """Drop columns containing irrelevant metadata and save as new csv files in the target_dir
+def _load_sts(src_file_path):
+    """Load datafile as dataframe
 
     Args:
-        filenames (list of str): List of filenames for the train/dev/test csv files.
-        src_dir (str): Directory for the raw csv files.
-        target_dir (str): Directory for the clean csv files to be written to.
+        src_file_path (str): filepath to train/dev/test csv files.
     """
-    if not os.path.exists(target_dir):
-        os.makedirs(target_dir)
-    filepaths = [os.path.join(src_dir, f) for f in filenames]
-    for i, fp in enumerate(filepaths):
-        dat = dp.auto_read_file(path=fp)
-        s = dat.keep_columns(["Column5", "Column6", "Column7"]).rename_columns(
-            {
-                "Column5": "score",
-                "Column6": "sentence1",
-                "Column7": "sentence2",
-            }
-        )
-        print(
-            "Writing clean dataframe to {}".format(
-                os.path.join(target_dir, filenames[i])
+    with open(src_file_path, "r", encoding="utf-8") as f:
+        sent_pairs = []
+        for line in f:
+            line = line.strip().split("\t")
+            sent_pairs.append(
+                [
+                    line[0].strip(),
+                    line[1].strip(),
+                    line[2].strip(),
+                    line[3].strip(),
+                    float(line[4]),
+                    line[5].strip(),
+                    line[6].strip(),
+                ]
             )
+
+        sdf = pd.DataFrame(
+            sent_pairs,
+            columns=[
+                "column_0",
+                "column_1",
+                "column_2",
+                "column_3",
+                "column_4",
+                "column_5",
+                "column_6",
+            ],
         )
-        sdf = s.to_pandas_dataframe().to_csv(
-            os.path.join(target_dir, filenames[i]), sep="\t"
-        )
+        return sdf
+
+
+def clean_sts(df):
+    """Drop columns containing irrelevant metadata and
+    save as new csv files in the target_dir.
+
+    Args:
+        df (pandas.Dataframe): drop columns from train/test/dev files.
+    """
+    clean_df = df.drop(
+        ["column_0", "column_1", "column_2", "column_3"], axis=1
+    )
+    clean_df = clean_df.rename(
+        index=str,
+        columns={
+            "column_4": "score",
+            "column_5": "sentence1",
+            "column_6": "sentence2",
+        },
+    )
+    return clean_df

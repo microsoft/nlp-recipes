@@ -29,7 +29,7 @@ def test_load_pretrained_vectors_word2vec():
 
     model = load_word2vec(dir_path, limit=500000)
     assert isinstance(model, Word2VecKeyedVectors)
-    assert (len(model.wv.vocab) == 500000)
+    assert len(model.wv.vocab) == 500000
 
     file_path = Path(file_path)
     assert file_path.is_file()
@@ -37,6 +37,7 @@ def test_load_pretrained_vectors_word2vec():
     shutil.rmtree(os.path.join(os.getcwd(), dir_path))
 
     assert isinstance(load_word2vec(dir_path), Word2VecKeyedVectors)
+
 
 def test_load_pretrained_vectors_glove():
     dir_path = "temp_data/"
@@ -48,7 +49,7 @@ def test_load_pretrained_vectors_glove():
 
     model = load_glove(dir_path, limit=50000)
     assert isinstance(model, Word2VecKeyedVectors)
-    assert (len(model.wv.vocab) == 50000)
+    assert len(model.wv.vocab) == 50000
 
     file_path = Path(file_path)
     assert file_path.is_file()
@@ -58,7 +59,9 @@ def test_load_pretrained_vectors_glove():
 
 def test_load_pretrained_vectors_fasttext():
     dir_path = "temp_data/"
-    file_path = os.path.join(os.path.join(dir_path, "fastText"), "wiki.simple.bin")
+    file_path = os.path.join(
+        os.path.join(dir_path, "fastText"), "wiki.simple.bin"
+    )
 
     assert isinstance(load_fasttext(dir_path), FastText)
 
