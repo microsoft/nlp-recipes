@@ -15,7 +15,7 @@ from utils_nlp.gensen.preprocess_utils import gensen_preprocess
 
 
 class GenSenClassifier:
-    """ GenSen Classifier that trains a model on server NLP tasks.
+    """ GenSen Classifier that trains a model on several NLP tasks.
 
     learning_rate (str): The learning rate for the model.
 

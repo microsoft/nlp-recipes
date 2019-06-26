@@ -40,5 +40,5 @@ each of the choices.
 |---|Azure VM| AML 1 Node| AML 2 Nodes | AML 4 Nodes | AML 8 Nodes|
 |---|---|---|---|---|---|
 |Training Loss​|4.91​|4.81​|4.78​|4.77​|4.58​|
-|Total Time​|1h 05m|1h 54m|1h 44m​|1h2 6m​|1h 07m​|
+|Total Time​|1h 05m|1h 54m|1h 44m​|1h 26m​|1h 07m​|
 |Cost|$1.12​|$2.71​|$4.68​|$7.9​|$12.1​|
