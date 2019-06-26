@@ -3,17 +3,24 @@
 
 import pytest
 
+from utils_nlp.bert.common import create_data_loader
 
-from utils_nlp.bert.common import Tokenizer, create_data_loader, Language
+
+def test_tokenize(bert_english_tokenizer):
+    text = ["Hello World.", "How you doing?", "greatttt"]
+    tokens = bert_english_tokenizer.tokenize(text)
+    assert len(tokens) == len(text)
+    assert len(tokens[0]) == 3
+    assert len(tokens[1]) == 4
+    assert len(tokens[2]) == 3
+    assert tokens[2][1].startswith("##")
 
 
-def test_tokenizer_preprocess_ner_tokens(ner_test_data):
+def test_tokenize_ner(ner_test_data, bert_english_tokenizer):
     seq_length = 20
 
-    tokenizer = Tokenizer(language=Language.ENGLISHCASED, to_lower=False)
-
     # test providing labels
-    preprocessed_tokens = tokenizer.preprocess_ner_tokens(
+    preprocessed_tokens = bert_english_tokenizer.tokenize_ner(
         text=ner_test_data["INPUT_TEXT"],
         labels=ner_test_data["INPUT_LABELS"],
         label_map=ner_test_data["LABEL_MAP"],
@@ -28,7 +35,7 @@ def test_tokenizer_preprocess_ner_tokens(ner_test_data):
     assert preprocessed_tokens[3] == ner_test_data["EXPECTED_LABEL_IDS"]
 
     # test not providing labels
-    preprocessed_tokens = tokenizer.preprocess_ner_tokens(
+    preprocessed_tokens = bert_english_tokenizer.tokenize_ner(
         text=ner_test_data["INPUT_TEXT"],
         label_map=ner_test_data["LABEL_MAP"],
         max_len=20,

@@ -113,3 +113,8 @@ def ner_test_data():
         "EXPECTED_TRAILING_TOKEN_MASK": TRAILING_TOKEN_MASK,
         "EXPECTED_LABEL_IDS": INPUT_LABEL_IDS,
     }
+
+
+@pytest.fixture()
+def english_tokenizer():
+    return Tokenizer(language=Language.ENGLISHCASED, to_lower=False)
