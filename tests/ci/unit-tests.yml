@@ -1,13 +1,11 @@
 
 # Pull request against these branches will trigger this build
-pr:
-- master
-- staging
+pr: none
+#- master
+#- staging
 
 #Any commit to this branch will trigger the build.
-trigger:
-- staging
-- master
+trigger: none
 
 pool:
   vmImage: 'ubuntu-16.04'
