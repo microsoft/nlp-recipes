@@ -1,6 +1,6 @@
 import os
 import pandas as pd
-from utils_nlp.dataset.ner_utils import get_sentence_and_labels
+from utils_nlp.dataset.ner_utils import preprocess_conll
 
 
 FILES = {
@@ -22,9 +22,7 @@ def load_pandas_df(local_cache_path="./", file_split="test"):
     text = text.replace("？ 0", "？ 0\n")
     text = text.replace("！ 0", "！ 0\n")
 
-    sentence_list, labels_list = get_sentence_and_labels(
-        text, file_split
-    )
+    sentence_list, labels_list = preprocess_conll(text, file_split)
 
     labels_list = [
         ["O" if label == "0" else label for label in labels]

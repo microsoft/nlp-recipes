@@ -1,4 +1,4 @@
-def get_sentence_and_labels(text, data_type="", join_characeter=" "):
+def preprocess_conll(text, data_type=""):
     """
     Helper function converting data in conll format to sentence and list
     of token labels.
@@ -16,10 +16,6 @@ def get_sentence_and_labels(text, data_type="", join_characeter=" "):
              . O"
         data_type (str, optional): String that briefly describes the data,
             e.g. "train"
-        join_characeter (str, optional): String used to join input words. 
-            Defaults to " ". For Chinese text, "" should be used because 
-            Chinese characters/words don't have spaces between them as 
-            English does.
     Returns:
         tuple:
             (list of sentences, list of token label lists)
@@ -37,7 +33,7 @@ def get_sentence_and_labels(text, data_type="", join_characeter=" "):
         # split "word label" pairs
         s_split_split = [t.split() for t in s_split]
         sentence_list.append(
-            join_characeter.join([t[0] for t in s_split_split if len(t) > 1])
+            " ".join([t[0] for t in s_split_split if len(t) > 1])
         )
         labels_list.append([t[1] for t in s_split_split if len(t) > 1])
         if len(s_split_split) > max_seq_len:
