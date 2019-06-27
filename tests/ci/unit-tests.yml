@@ -29,7 +29,7 @@ steps:
     python -m ipykernel install --user --name nlp_gpu --display-name "nlp_gpu"
     # Commenting out pytest since it contains bunch of tests from other project which are not applicable.
     # But keeping the line here to show how to run it once tests relevant to this project are added
-    # pytest --junitxml=junit/test-unitttest.xml #not running any tests for now
+    pytest tests/unit --junitxml=junit/test-unitttest.xml #not running any tests for now
   displayName: 'Run Unit tests'
 
 - task: PublishTestResults@2
