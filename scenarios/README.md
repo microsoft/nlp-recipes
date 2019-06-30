@@ -10,6 +10,7 @@ The following summarizes each scenario of the best practice notebooks. Each scen
 |---| ------------------------ | -------------------------------------------- | ------------------- |
 |[Text Classification](scenarios/text_classification)      |Topic Classification|en, zh, ar|BERT|
 |[Named Entity Recognition](scenarios/named_entity_recognition) |Wikipedia NER                                              | en, zh  |BERT|
+|[Question Answering](scenarios/question_answering) |SQuAD                                              | en |BiDAF|
 |[Sentence Similarity](scenarios/sentence_similarity)      |STS Benchmark                         |en|Representation: TF-IDF, Word Embeddings, Doc Embeddings<br>Metrics: Cosine Similarity, Word Mover's Distance|
 |[Embeddings](scenarios/embeddings)| Custom Embeddings Training|en|Word2Vec<br>fastText<br>GloVe|
 
