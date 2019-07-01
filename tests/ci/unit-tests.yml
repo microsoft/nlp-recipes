@@ -20,7 +20,6 @@ jobs:
 pr: none
 #- master
 #- staging
-
 #Any commit to this branch will trigger the build.
 trigger: none
 
