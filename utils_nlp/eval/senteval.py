@@ -1,6 +1,7 @@
 import os
 import sys
 import pandas as pd
+from azureml.core.run import Run
 
 
 class SentEvalRunner:
@@ -13,6 +14,7 @@ class SentEvalRunner:
         """
         self.path_to_senteval = path_to_senteval
         self.use_azureml = use_azureml
+        self.params_senteval = {}
 
     def set_transfer_data_path(self, relative_path):
         """Set the datapath that contains the datasets for the SentEval transfer tasks
@@ -23,6 +25,7 @@ class SentEvalRunner:
         self.transfer_data_path = os.path.join(
             self.path_to_senteval, relative_path
         )
+        self.params_senteval["task_path"] = self.transfer_data_path
 
     def set_transfer_tasks(self, task_list):
         """Set the transfer tasks to use for evaluation
@@ -34,28 +37,11 @@ class SentEvalRunner:
 
     def set_model(self, model):
         """Set the model to evaluate"""
-        self.model = model
+        self.params_senteval["model"] = model
 
-    def set_params_senteval(
-        self,
-        use_pytorch=True,
-        kfold=10,
-        nhid=0,
-        optim="adam",
-        batch_size=64,
-        tenacity=5,
-        epoch_size=4,
-    ):
-        """
-        Define the required parameters for SentEval (model, task_path, usepytorch, kfold).
-        Also gives the option to directly set parameters for a classifier if necessary.
-        """
-        self.params_senteval = {
-            "model": self.model,
-            "task_path": self.transfer_data_path,
-            "usepytorch": use_pytorch,
-            "kfold": kfold,
-        }
+    def set_params(self, params):
+        self.params_senteval = dict(self.params_senteval, **params)
+
         classifying_tasks = {
             "MR",
             "CR",
@@ -68,14 +54,13 @@ class SentEvalRunner:
             "SNLI",
             "MRPC",
         }
+
         if any(t in classifying_tasks for t in self.transfer_tasks):
-            self.params_senteval["classifier"] = {
-                "nhid": nhid,
-                "optim": optim,
-                "batch_size": batch_size,
-                "tenacity": tenacity,
-                "epoch_size": epoch_size,
-            }
+            assert "classifier" in self.params_senteval.keys()
+            assert all(
+                set("nhid", "optim", "batch_size", "tenacity", "epoch_size")
+                in self.params_senteval["classifier"].keys()
+            )
 
     def run(self, batcher_func, prepare_func):
         """Run the SentEval engine on the model on the transfer tasks
@@ -104,25 +89,47 @@ class SentEvalRunner:
 
         return se.eval(self.transfer_tasks)
 
-    def print_mean(self, results, selected_metrics=[], round_decimals=3):
-        """Print the means of selected metrics of the transfer tasks as a table
+    def log_mean(self, results, selected_metrics=[], round_decimals=3):
+        """Log the means of selected metrics of the transfer tasks
         
         Args:
             results (dict): Results from the SentEval evaluation engine
             selected_metrics (list(str), optional): List of metric names
             round_decimals (int, optional): Number of decimal digits to round to; defaults to 3
+        
+        Returns:
+            pd.DataFrame table of formatted results if use_azureml is False. 
+            Otherwise, returns nothing (metrics are logged as scalars in AzureML)
         """
-        data = []
-        for task in self.transfer_tasks:
-            if "all" in results[task]:
-                row = [
-                    results[task]["all"][metric]["mean"]
-                    for metric in selected_metrics
-                ]
-            else:
-                row = [results[task][metric] for metric in selected_metrics]
-            data.append(row)
-        table = pd.DataFrame(
-            data=data, columns=selected_metrics, index=self.transfer_tasks
-        )
-        return table.round(round_decimals)
+        if self.use_azureml:
+            run = Run.get_context()
+            for task in self.transfer_tasks:
+                for metric in selected_metrics:
+                    if "all" in results[task]:
+                        run.log(
+                            "{0}::{1}".format(task, metric),
+                            results[task]["all"][metric]["mean"],
+                        )
+                    else:
+                        run.log(
+                            "{0}::{1}".format(task, metric),
+                            results[task][metric],
+                        )
+            return
+        else:
+            data = []
+            for task in self.transfer_tasks:
+                if "all" in results[task]:
+                    row = [
+                        results[task]["all"][metric]["mean"]
+                        for metric in selected_metrics
+                    ]
+                else:
+                    row = [
+                        results[task][metric] for metric in selected_metrics
+                    ]
+                data.append(row)
+            table = pd.DataFrame(
+                data=data, columns=selected_metrics, index=self.transfer_tasks
+            )
+            return table.round(round_decimals)

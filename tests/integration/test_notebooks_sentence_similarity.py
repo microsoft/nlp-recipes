@@ -1,47 +1,68 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
+import sys
 import pytest
 import papermill as pm
+import scrapbook as sb
+from azureml.core import Experiment
+from azureml.core.run import Run
 
-from tests.notebooks_common import OUTPUT_NOTEBOOK, KERNEL_NAME
+sys.path.append("../../")
+from utils_nlp.azureml.azureml_utils import get_or_create_workspace
+from tests.notebooks_common import OUTPUT_NOTEBOOK
 
 
 ABS_TOL = 0.1
 
 
-@pytest.fixture(scope="module")
-def embeddins_results():
-    return {
-        "Word2vec Cosine": 0.6337760059182685,
-        "Word2vec Cosine with Stop Words": 0.647674307797345,
-        "Word2vec WMD": 0.6578256301323717,
-        "Word2vec WMD with Stop Words": 0.5697910628727217,
-        "GLoVe Cosine": 0.642064729899729,
-        "GLoVe Cosine with Stop Words": 0.5639670964748242,
-        "GLoVe WMD": 0.6272339050920003,
-        "GLoVe WMD with Stop Words": 0.48560149551724,
-        "fastText Cosine": 0.6288780924569853,
-        "fastText Cosine with Stop Words": 0.5958470751204786,
-        "fastText WMD": 0.527520845792085,
-        "fastText WMD with Stop Words": 0.44198752510004097,
-        "TF-IDF Cosine": 0.6683811410442562,
-        "TF-IDF Cosine with Stop Words": 0.7034695168223282,
-        "Doc2vec Cosine": 0.5082738341805563,
-        "Doc2vec Cosine with Stop Words": 0.4116873013460912
- }
+@pytest.mark.notebooks
+@pytest.mark.cpu
+def test_similarity_embeddings_baseline_runs(notebooks, baseline_results):
+    notebook_path = notebooks["similarity_embeddings_baseline"]
+    pm.execute_notebook(notebook_path, OUTPUT_NOTEBOOK)
+    results = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict["results"]
+    for key, value in baseline_results.items():
+        assert results[key] == pytest.approx(value, abs=ABS_TOL)
 
 
 @pytest.mark.notebooks
-def test_similarity_embeddings_baseline_runs(notebooks, embeddins_results):
-    notebook_path = notebooks["similarity_embeddings_baseline"]
+@pytest.mark.gpu
+def test_similarity_senteval_local_runs(notebooks, gensen_senteval_results):
+    notebook_path = notebooks["senteval_local"]
     pm.execute_notebook(
         notebook_path,
         OUTPUT_NOTEBOOK,
-        kernel_name=KERNEL_NAME,
+        parameters=dict(
+            PATH_TO_SENTEVAL="../SentEval", PATH_TO_GENSEN="../gensen"
+        ),
     )
-    metrics = pm.read_notebook(OUTPUT_NOTEBOOK).dataframe.set_index("name")["value"]
-    results = metrics["results"]
-    for key, value in embeddins_results.items():
-        assert results[key] == pytest.approx(value, abs=ABS_TOL)
+    out = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict["results"]
+    for key, val in gensen_senteval_results.items():
+        for task, result in val.items():
+            assert out[key][task] == result
 
+
+@pytest.mark.notebooks
+@pytest.mark.cpu
+@pytest.mark.azureml
+def test_similarity_senteval_azureml_runs(notebooks, gensen_senteval_results):
+    notebook_path = notebooks["senteval_azureml"]
+    pm.execute_notebook(
+        notebook_path,
+        OUTPUT_NOTEBOOK,
+        parameters=dict(
+            PATH_TO_SENTEVAL="../SentEval",
+            PATH_TO_GENSEN="../gensen",
+            PATH_TO_SER="utils_nlp/eval/senteval.py",
+            AZUREML_VERBOSE=False,
+            config_path="tests/ci",
+        ),
+    )
+    result = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict
+    ws = get_or_create_workspace(config_path="tests/ci")
+    experiment = Experiment(ws, name=result["experiment_name"])
+    run = Run(experiment, result["run_id"])
+    assert run.get_metrics()["STSBenchmark::pearson"] == pytest.approx(
+        gensen_senteval_results["pearson"]["STSBenchmark"], abs=ABS_TOL
+    )
