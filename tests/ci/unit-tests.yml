@@ -1,4 +1,21 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License.
+#
+variables:
+  test: 'tests/ci/run_pytest.py'
+  maxnodes : 4
+  reponame : 'nlp'
+  rg       : 'nlprg'
+  wsname   : ''
+# CPU
+  vmsize'  : 'STANDARD_D3_V2'
+  dockerproc : 'cpu'
 
+jobs:
+- job : unit_tests
+  displayName : 'unit_tests'
+  pool:
+    vmImage: 'ubuntu-16.04'
 # Pull request against these branches will trigger this build
 pr: none
 #- master
@@ -6,9 +23,6 @@ pr: none
 
 #Any commit to this branch will trigger the build.
 trigger: none
-
-pool:
-  vmImage: 'ubuntu-16.04'
 
 steps:
 
@@ -18,15 +32,15 @@ steps:
 
 - bash: |
     conda remove -q -n nlp --all -y
-    python tools/generate_conda_file.py --gpu
-    conda env create -n nlp_gpu -f nlp_gpu.yaml
+    python tools/generate_conda_file.py
+    conda env create -n nlp -f nlp.yaml
     conda env list  
-    source activate nlp_gpu
+    # source activate nlp_gpu
   displayName: 'Creating Conda Environment with dependencies'
 
 - bash: |
-    source activate nlp_gpu
-    python -m ipykernel install --user --name nlp_gpu --display-name "nlp_gpu"
+    source activate nlp
+    python -m ipykernel install --user --name nlp --display-name "nlp"
     # Commenting out pytest since it contains bunch of tests from other project which are not applicable.
     # But keeping the line here to show how to run it once tests relevant to this project are added
     pytest tests/unit --junitxml=junit/test-unitttest.xml #not running any tests for now
