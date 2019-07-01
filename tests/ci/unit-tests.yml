@@ -10,9 +10,6 @@ variables:
 # CPU
   vmsize'  : 'STANDARD_D3_V2'
   dockerproc : 'cpu'
-
-jobs:
-- job : unit_tests
   displayName : 'unit_tests'
   pool:
     vmImage: 'ubuntu-16.04'
