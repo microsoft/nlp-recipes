@@ -2,7 +2,7 @@
 
 [![Build Status](https://dev.azure.com/best-practices/nlp/_apis/build/status/repo_metrics?branchName=master)](https://dev.azure.com/best-practices/nlp/_build/latest?definitionId=36&branchName=master)
 
-We developed a script that allows us to track the metrics of the Recommenders repo. Some of the metrics we can track are listed here:
+We developed a script that allows us to track the repo metrics. Some of the metrics we can track are listed here:
 
 * Number of stars
 * Number of forks
@@ -18,7 +18,7 @@ The first step is to set up the credentials, copy the configuration file and fil
 
 To track the current state of the repository and save it to CosmosDB:
 
-    python scripts/repo_metrics/track_metrics.py --github_repo "https://github.com/Microsoft/Recommenders" --save_to_database
+    python tools/repo_metrics/track_metrics.py --github_repo "https://github.com/Microsoft/NLP" --save_to_database
 
 To track an event related to this repository and save it to CosmosDB:
 
