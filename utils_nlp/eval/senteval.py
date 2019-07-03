@@ -55,11 +55,31 @@ class SentEvalRunner:
         }
 
         if any(t in classifying_tasks for t in self.transfer_tasks):
-            assert "classifier" in self.params_senteval.keys()
-            assert all(
-                set("nhid", "optim", "batch_size", "tenacity", "epoch_size")
-                in self.params_senteval["classifier"].keys()
-            )
+            try:
+                a = "classifier" in self.params_senteval
+                if not a:
+                    raise ValueError(
+                        "Include param['classifier'] to run task {}".format(t)
+                    )
+                else:
+                    b = (
+                        set(
+                            "nhid",
+                            "optim",
+                            "batch_size",
+                            "tenacity",
+                            "epoch_size",
+                        )
+                        in self.params_senteval["classifier"].keys()
+                    )
+                    if not b:
+                        raise ValueError(
+                            "Include nhid, optim, batch_size, tenacity, and epoch_size params to run task {}".format(
+                                t
+                            )
+                        )
+            except ValueError as ve:
+                print(ve)
 
     def run(self, batcher_func, prepare_func):
         """Run the SentEval engine on the model on the transfer tasks
@@ -107,9 +127,7 @@ class SentEvalRunner:
                     for metric in selected_metrics
                 ]
             else:
-                row = [
-                    results[task][metric] for metric in selected_metrics
-                ]
+                row = [results[task][metric] for metric in selected_metrics]
             data.append(row)
         table = pd.DataFrame(
             data=data, columns=selected_metrics, index=self.transfer_tasks
