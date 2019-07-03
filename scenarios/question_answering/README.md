@@ -1,0 +1,16 @@
+# Question Answering (QA)
+
+This folder contains examples and best practices, written in Jupyter notebooks, for building question answering models. These models can be used in a wide variety of applications, such as search engines, and virtual assistants.
+
+## What is Question Answering?
+
+Question Answering is a classical NLP task which consists of determining the relevant "answer" (snippet of text out of a provided passage) that answers a user's "question". This task is a subset of Machine Comprehension, or measuring how well a machine comprehends a passage of text. The Stanford Question Answering Dataset ([SQuAD](https://rajpurkar.github.io/SQuAD-explorer/)) leaderboard displays the state-of-the-art models in this space. Traditional QA models are varients of Bidirectional Recurrent Neural (BRNN) Networks. 
+
+## Summary
+
+The following summarizes each notebook for Question Answering. Each notebook provides more details and guiding in principles on building state of the art models.
+
+|Notebook|Runs Local|Description|
+|---|---|---|
+|[Deployed QA System in Under 20 minutes](question_answering_system_bidaf_quickstart.ipynb)| No| Learn how to deploy a QA system in under 20 minutes using Azure Container Instances (ACI) and a popular AllenNLP pre-trained model called BiDAF.
+
