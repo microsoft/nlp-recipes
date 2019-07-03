@@ -17,7 +17,6 @@ ABS_TOL = 0.1
 
 
 @pytest.mark.notebooks
-@pytest.mark.cpu
 def test_similarity_embeddings_baseline_runs(notebooks, baseline_results):
     notebook_path = notebooks["similarity_embeddings_baseline"]
     pm.execute_notebook(notebook_path, OUTPUT_NOTEBOOK)
@@ -44,7 +43,6 @@ def test_similarity_senteval_local_runs(notebooks, gensen_senteval_results):
 
 
 @pytest.mark.notebooks
-@pytest.mark.cpu
 @pytest.mark.azureml
 def test_similarity_senteval_azureml_runs(notebooks, gensen_senteval_results):
     notebook_path = notebooks["senteval_azureml"]
