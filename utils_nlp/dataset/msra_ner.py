@@ -24,6 +24,9 @@ def load_pandas_df(local_cache_path="./", file_split="test"):
 
     sentence_list, labels_list = preprocess_conll(text, file_split)
 
+    # random.shuffle(sentence_list, 42)
+    # random.shuffle(labels_list, 42)
+
     labels_list = [
         ["O" if label == "0" else label for label in labels]
         for labels in labels_list

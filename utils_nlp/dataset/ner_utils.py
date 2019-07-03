@@ -1,7 +1,7 @@
 def preprocess_conll(text, data_type=""):
     """
-    Helper function converting data in conll format to sentence and list
-    of token labels.
+    Helper function converting data in conll format to word lists
+    and token label lists.
 
     Args:
         text (str): Text string in conll format, e.g.
@@ -18,7 +18,7 @@ def preprocess_conll(text, data_type=""):
             e.g. "train"
     Returns:
         tuple:
-            (list of sentences, list of token label lists)
+            (list of word lists, list of token label lists)
     """
     text_list = text.split("\n\n")
     if text_list[-1] in (" ", ""):
@@ -32,14 +32,17 @@ def preprocess_conll(text, data_type=""):
         s_split = s.split("\n")
         # split "word label" pairs
         s_split_split = [t.split() for t in s_split]
-        sentence_list.append(
-            " ".join([t[0] for t in s_split_split if len(t) > 1])
-        )
+        sentence_list.append([t[0] for t in s_split_split if len(t) > 1])
         labels_list.append([t[1] for t in s_split_split if len(t) > 1])
+
+        # for t in s_split_split:
+        #     if len(t) <= 1:
+        #         print(t)
+
         if len(s_split_split) > max_seq_len:
             max_seq_len = len(s_split_split)
     print(
-        "Maximum sequence length in {0} data is: {1}".format(
+        "Maximum sequence length in the {0} data is: {1}".format(
             data_type, max_seq_len
         )
     )
