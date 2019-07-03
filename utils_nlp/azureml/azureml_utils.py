@@ -73,3 +73,32 @@ def get_or_create_workspace(
 
     ws.write_config(path=config_path)
     return ws
+
+def log_metrics_scalar(value, run, name="", description=None):
+    """Log scalar metric to the AzureML run
+    
+    Args:
+        value : numerical or string value to log
+        run : AzureML Run object
+        name : name of metric
+        description : description of metric
+    """
+    run.log(name, value, description)
+
+def log_metrics_table(df, run, name="", description=None, as_scalar=False):
+    """Log data from pd.DataFrame to the AzureML run
+    
+    Args:
+        df : pd.DataFrame containing metrics to log
+        run : AzureML Run object
+        name : name of metric
+        description : description of metric
+        as_scalar : when True, logs each cell of the table as a scalar metric; defaults to False
+    """
+    if as_scalar:
+        for rn in df.index:
+            for cn in df.columns:
+                log_metrics_scalar(df.loc[rn, cn], run, name="{0}::{1}".format(rn, cn), description=description)
+
+    else:
+        run.log_table(name, df.to_dict(), description)

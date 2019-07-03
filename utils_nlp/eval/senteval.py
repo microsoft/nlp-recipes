@@ -1,7 +1,6 @@
 import os
 import sys
 import pandas as pd
-from azureml.core.run import Run
 
 
 class SentEvalRunner:
@@ -98,38 +97,21 @@ class SentEvalRunner:
             round_decimals (int, optional): Number of decimal digits to round to; defaults to 3
         
         Returns:
-            pd.DataFrame table of formatted results if use_azureml is False. 
-            Otherwise, returns nothing (metrics are logged as scalars in AzureML)
+            pd.DataFrame table of formatted results
         """
-        if self.use_azureml:
-            run = Run.get_context()
-            for task in self.transfer_tasks:
-                for metric in selected_metrics:
-                    if "all" in results[task]:
-                        run.log(
-                            "{0}::{1}".format(task, metric),
-                            results[task]["all"][metric]["mean"],
-                        )
-                    else:
-                        run.log(
-                            "{0}::{1}".format(task, metric),
-                            results[task][metric],
-                        )
-            return
-        else:
-            data = []
-            for task in self.transfer_tasks:
-                if "all" in results[task]:
-                    row = [
-                        results[task]["all"][metric]["mean"]
-                        for metric in selected_metrics
-                    ]
-                else:
-                    row = [
-                        results[task][metric] for metric in selected_metrics
-                    ]
-                data.append(row)
-            table = pd.DataFrame(
-                data=data, columns=selected_metrics, index=self.transfer_tasks
-            )
-            return table.round(round_decimals)
+        data = []
+        for task in self.transfer_tasks:
+            if "all" in results[task]:
+                row = [
+                    results[task]["all"][metric]["mean"]
+                    for metric in selected_metrics
+                ]
+            else:
+                row = [
+                    results[task][metric] for metric in selected_metrics
+                ]
+            data.append(row)
+        table = pd.DataFrame(
+            data=data, columns=selected_metrics, index=self.transfer_tasks
+        )
+        return table.round(round_decimals)
