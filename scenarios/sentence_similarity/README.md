@@ -1,16 +1,17 @@
 # Sentence Similarity
 
-This folder contains examples and best practices, written in Jupyter notebooks, for building sentence similarity models. The scores can be used in a wide variety of applications, such as search/retrieval, nearest-neighbor or kernel-based classification methods, recommendation, and ranking tasks.
+This folder contains examples and best practices, written in Jupyter notebooks, for building sentence similarity models. The scores can be used in a wide variety of applications, such as search/retrieval, nearest-neighbor or kernel-based classification methods, recommendations, and ranking tasks.
 
 ## What is sentence similarity
 
-Sentence similarity or semantic textual similarity is to determine how similar two pieces of texts are and a measure of the degree to which two pieces of text express the same meaning. This can take the form of assigning a score from 1 to 5. Related tasks are paraphrase or duplicate identification. The common methods used for text similarity range from simple word-vector dot products to pairwise classification, and more recently, Siamese recurrent/convolutional neural networks with triplet loss functions.
+Sentence similarity or semantic textual similarity is a measure of how similar two pieces of text are, or to what degree they express the same meaning. Related tasks include paraphrase or duplicate identification, search, and matching applications. The common methods used for text similarity range from simple word-vector dot products to pairwise classification, and more recently, deep neural networks.
 
 Sentence similarity is normally calculated by the following two steps:
 
 1. obtaining the embeddings of the sentences
 
-2. taking the cosine similarity between them as shown in the following figure([Source](https://tfhub.dev/google/universal-sentence-encoder/1)):
+2. taking the cosine similarity between them as shown in the following figure([source](https://tfhub.dev/google/universal-sentence-encoder/1)):
+
     ![Sentence Similarity](https://nlpbp.blob.core.windows.net/images/example-similarity.png)
 
 ## Summary
