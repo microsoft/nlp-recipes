@@ -5,10 +5,7 @@
 
 # NLP Best Practices
 
-This repository contains examples and best practices for building NLP systems, provided as Jupyter notebooks and utility functions. The focus of the repository is on state-of-the-art methods and common scenarios that are popular among researchers and practitioners working on problems involving text and language.
-
-## Planning
-All feature planning is done via projects, milestones, and issues in this repository.
+This repository contains examples and best practices for building NLP systems, provided as [Jupyter notebooks](scenarios) and [utility functions](utils_nlp). The focus of the repository is on state-of-the-art methods and common scenarios that are popular among researchers and practitioners working on problems involving text and language.
 
 ## Getting Started
 To get started, navigate to the [Setup Guide](SETUP.md), where you'll find instructions on how to setup your environment and dependencies.
