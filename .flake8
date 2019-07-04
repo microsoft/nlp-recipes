@@ -13,4 +13,4 @@
 # F821  undefined name 'get_ipython' --> from generated python files using nbconvert
 
 ignore = E203, E266, W503, F403, F405, E402, E731, F821
-max-line-length = 79
+max-line-length = 100
