@@ -1,4 +1,5 @@
 import os
+import random
 import pandas as pd
 from utils_nlp.dataset.ner_utils import preprocess_conll
 
@@ -24,8 +25,9 @@ def load_pandas_df(local_cache_path="./", file_split="test"):
 
     sentence_list, labels_list = preprocess_conll(text, file_split)
 
-    # random.shuffle(sentence_list, 42)
-    # random.shuffle(labels_list, 42)
+    sentence_and_labels = list(zip(sentence_list, labels_list))
+    random.shuffle(sentence_and_labels)
+    sentence_list[:], labels_list[:] = zip(*sentence_and_labels)
 
     labels_list = [
         ["O" if label == "0" else label for label in labels]

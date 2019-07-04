@@ -172,7 +172,7 @@ class Tokenizer:
         trailing_piece_tag="X",
     ):
         """
-        Tokenize and preprocesses word lists, involving the following steps
+        Tokenize and preprocesses input word lists, involving the following steps
             0. WordPiece tokenization.
             1. Convert string tokens to token ids.
             2. Convert input labels to label ids, if labels and label_map are

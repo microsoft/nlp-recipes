@@ -35,10 +35,6 @@ def preprocess_conll(text, data_type=""):
         sentence_list.append([t[0] for t in s_split_split if len(t) > 1])
         labels_list.append([t[1] for t in s_split_split if len(t) > 1])
 
-        # for t in s_split_split:
-        #     if len(t) <= 1:
-        #         print(t)
-
         if len(s_split_split) > max_seq_len:
             max_seq_len = len(s_split_split)
     print(

@@ -19,8 +19,6 @@ def test_tokenize(bert_english_tokenizer):
 def test_tokenize_ner(ner_test_data, bert_english_tokenizer):
     seq_length = 20
 
-    print(ner_test_data)
-
     # test providing labels
     preprocessed_tokens = bert_english_tokenizer.tokenize_ner(
         text=ner_test_data["INPUT_TEXT"],
