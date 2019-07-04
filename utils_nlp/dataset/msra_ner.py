@@ -26,6 +26,7 @@ def load_pandas_df(local_cache_path="./", file_split="test"):
     sentence_list, labels_list = preprocess_conll(text, file_split)
 
     sentence_and_labels = list(zip(sentence_list, labels_list))
+    random.seed(100)
     random.shuffle(sentence_and_labels)
     sentence_list[:], labels_list[:] = zip(*sentence_and_labels)
 
