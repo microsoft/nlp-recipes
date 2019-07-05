@@ -10,6 +10,7 @@ The following is a summary of the scenarios covered in the best practice noteboo
 |---| ------------------------ | ------------------- |
 |[Text Classification](scenarios/text_classification)      |Topic Classification|BERT|
 |[Named Entity Recognition](scenarios/named_entity_recognition) |Wikipedia NER                                              |BERT|
+|[Entailment](scenarios/entailment)|XNLI Natural Language Inference|BERT|
 |[Question Answering](scenarios/question_answering) |SQuAD                                              | BiDAF|
 |[Sentence Similarity](scenarios/sentence_similarity)      |STS Benchmark                         |Representation: TF-IDF, Word Embeddings, Doc Embeddings<br>Metrics: Cosine Similarity, Word Mover's Distance|
 |[Embeddings](scenarios/embeddings)| Custom Embeddings Training|Word2Vec<br>fastText<br>GloVe|
