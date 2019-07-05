@@ -59,10 +59,45 @@ def ner_test_data():
     ]
     return {
         "INPUT_TEXT": [
-            "Johnathan is studying in the University of Michigan ."
+            [
+                "Johnathan",
+                "is",
+                "studying",
+                "in",
+                "the",
+                "University",
+                "of",
+                "Michigan",
+                ".",
+            ]
+        ],
+        "INPUT_TEXT_SINGLE": [
+            "Johnathan",
+            "is",
+            "studying",
+            "in",
+            "the",
+            "University",
+            "of",
+            "Michigan",
+            ".",
         ],
         "INPUT_LABELS": [
             ["I-PER", "O", "O", "O", "O", "I-ORG", "I-ORG", "I-ORG", "O"]
+        ],
+        "INPUT_LABELS_SINGLE": [
+            "I-PER",
+            "O",
+            "O",
+            "O",
+            "O",
+            "I-ORG",
+            "I-ORG",
+            "I-ORG",
+            "O",
+        ],
+        "INPUT_LABELS_WRONG": [
+            ["I-PER", "O", "O", "O", "O", "I-ORG", "I-ORG", "I-ORG"]
         ],
         "INPUT_TOKEN_IDS": [
             [
