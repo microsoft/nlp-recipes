@@ -54,7 +54,7 @@ CONDA_GPU = {
 }
 
 PIP_BASE = {
-    "azureml-sdk[notebooks,tensorboard]": "azureml-sdk[notebooks,tensorboard]==1.0.43",
+    "azureml-sdk[notebooks,tensorboard]": "azureml-sdk[notebooks,tensorboard]>=1.0.43",
     "azureml-dataprep": "azureml-dataprep==1.1.4",
     "black": "black>=18.6b4",
     "dask": "dask[dataframe]==1.2.2",
