@@ -4,15 +4,13 @@ import pandas as pd
 
 
 class SentEvalRunner:
-    def __init__(self, path_to_senteval=".", use_azureml=False):
-        """AzureML-compatible wrapper class that interfaces with the original implementation of SentEval
+    def __init__(self, path_to_senteval="."):
+        """Wrapper class interfacing with the original implementation of SentEval
         
         Args:
             path_to_senteval (str, optional): Path to the SentEval source code.
-            use_azureml (bool, optional): Defaults to false.
         """
         self.path_to_senteval = path_to_senteval
-        self.use_azureml = use_azureml
         self.params_senteval = {}
 
     def set_transfer_data_path(self, relative_path):
@@ -93,14 +91,8 @@ class SentEvalRunner:
         Returns:
             dict: Dictionary of results
         """
-        if self.use_azureml:
-            sys.path.insert(
-                0, os.path.relpath(self.path_to_senteval, os.getcwd())
-            )
-            import senteval
-        else:
-            sys.path.insert(0, self.path_to_senteval)
-            import senteval
+        sys.path.insert(0, self.path_to_senteval)
+        import senteval
 
         se = senteval.engine.SE(
             self.params_senteval, batcher_func, prepare_func
