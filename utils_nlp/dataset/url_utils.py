@@ -32,7 +32,7 @@ def maybe_download(
         filename = url.split("/")[-1]
     filepath = os.path.join(work_directory, filename)
     if not os.path.exists(filepath):
-
+        if not os.path.isdir(work_directory): os.makedirs(work_directory)
         r = requests.get(url, stream=True)
         total_size = int(r.headers.get("content-length", 0))
         block_size = 1024
