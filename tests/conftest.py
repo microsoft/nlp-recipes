@@ -25,11 +25,6 @@ def notebooks():
 
     # Path for the notebooks
     paths = {
-        "msrpc": os.path.join(folder_notebooks, "data_prep", "msrpc.ipynb"),
-        "snli": os.path.join(folder_notebooks, "data_prep", "snli.ipynb"),
-        "stsbenchmark": os.path.join(
-            folder_notebooks, "data_prep", "stsbenchmark.ipynb"
-        ),
         "similarity_embeddings_baseline": os.path.join(
             folder_notebooks, "sentence_similarity", "baseline_deep_dive.ipynb"
         ),
