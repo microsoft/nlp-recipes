@@ -7,9 +7,7 @@ import numpy as np
 import pandas as pd
 
 from scenarios.sentence_similarity.gensen_train import train
-from utils_nlp.gensen.create_gensen_model import (
-    create_multiseq2seq_model,
-)
+from utils_nlp.gensen.create_gensen_model import create_multiseq2seq_model
 from utils_nlp.gensen.gensen import GenSenSingle
 from utils_nlp.gensen.preprocess_utils import gensen_preprocess
 
@@ -27,11 +25,11 @@ class GenSenClassifier:
     """
 
     def __init__(
-            self,
-            config_file,
-            pretrained_embedding_path,
-            learning_rate=0.0001,
-            cache_dir=".",
+        self,
+        config_file,
+        pretrained_embedding_path,
+        learning_rate=0.0001,
+        cache_dir=".",
     ):
         self.learning_rate = learning_rate
         self.config_file = config_file
@@ -45,7 +43,7 @@ class GenSenClassifier:
         """Validate input params."""
 
         if not isinstance(self.learning_rate, float) or (
-                self.learning_rate <= 0.0
+            self.learning_rate <= 0.0
         ):
             raise ValueError(
                 "Learning rate must be of type float and greater than 0"
@@ -72,6 +70,7 @@ class GenSenClassifier:
         test set.
 
         Returns:
+            str: Path to the folder containing all preprocessed token files.
 
         """
         return gensen_preprocess(train_df, dev_df, test_df, self.cache_dir)
@@ -83,7 +82,8 @@ class GenSenClassifier:
         Args:
             config_file: Path to the config file.
 
-        Returns(dict): The loaded json file as python object
+        Returns
+            dict: The loaded json file as python object
 
         """
         json_object = json.load(open(config_file, "r", encoding="utf-8"))
@@ -131,8 +131,9 @@ class GenSenClassifier:
         Args:
             sentences(list) : List of sentences.
 
-        Returns(array): A pairwise cosine similarity for the sentences provided based
-        on their gensen vector representations.
+        Returns
+            array: A pairwise cosine similarity for the sentences provided based on their gensen
+            vector representations.
 
         """
 
