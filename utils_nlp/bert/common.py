@@ -9,6 +9,7 @@
 
 from enum import Enum
 import warnings
+from collections import Iterable
 import torch
 from tqdm import tqdm
 
@@ -171,8 +172,8 @@ class Tokenizer:
         trailing_piece_tag="X",
     ):
         """
-        Tokenize and preprocesses input text, involving the following steps
-            0. Tokenize input text.
+        Tokenize and preprocesses input word lists, involving the following steps
+            0. WordPiece tokenization.
             1. Convert string tokens to token ids.
             2. Convert input labels to label ids, if labels and label_map are
                 provided.
@@ -183,11 +184,14 @@ class Tokenizer:
             5. Create input_mask for masking out padded tokens.
 
         Args:
-            text (list): List of input sentences/paragraphs.
+            text (list): List of lists. Each sublist is a list of words in an
+                input sentence.
             max_len (int, optional): Maximum length of the list of
                 tokens. Lists longer than this are truncated and shorter
                 ones are padded with "O"s. Default value is BERT_MAX_LEN=512.
-            labels (list, optional): List of token label lists. Default
+            labels (list, optional): List of word label lists. Each sublist
+                contains labels corresponding to the input word list. The lengths
+                of the label list and word list must be the same. Default
                 value is None.
             label_map (dict, optional): Dictionary for mapping original token
                 labels (which may be string type) to integers. Default value
@@ -217,10 +221,10 @@ class Tokenizer:
                     each sublist contains token labels of a input
                     sentence/paragraph, if labels is provided.
         """
-        text = [
-            self.tokenizer.basic_tokenizer._tokenize_chinese_chars(t)
-            for t in text
-        ]
+
+        def _is_iterable_but_not_string(obj):
+            return isinstance(obj, Iterable) and not isinstance(obj, str)
+
         if max_len > BERT_MAX_LEN:
             warnings.warn(
                 "setting max_len to max allowed tokens: {}".format(
@@ -229,21 +233,48 @@ class Tokenizer:
             )
             max_len = BERT_MAX_LEN
 
+        if not _is_iterable_but_not_string(text):
+            # The input text must be an non-string Iterable
+            raise ValueError(
+                "Input text must be an iterable and not a string."
+            )
+        else:
+            # If the input text is a single list of words, convert it to
+            # list of lists for later iteration
+            if not _is_iterable_but_not_string(text[0]):
+                text = [text]
+        if labels is not None:
+            if not _is_iterable_but_not_string(labels):
+                raise ValueError(
+                    "labels must be an iterable and not a string."
+                )
+            else:
+                if not _is_iterable_but_not_string(labels[0]):
+                    labels = [labels]
+
         label_available = True
         if labels is None:
             label_available = False
             # create an artificial label list for creating trailing token mask
-            labels = [["O"] * len(text)]
+            labels = [["O"] * len(t) for t in text]
 
         input_ids_all = []
         input_mask_all = []
         label_ids_all = []
         trailing_token_mask_all = []
         for t, t_labels in zip(text, labels):
+
+            if len(t) != len(t_labels):
+                raise ValueError(
+                    "The number of words is {0}, but the number of labels is {1}.".format(
+                        len(t), len(t_labels)
+                    )
+                )
+
             new_labels = []
             new_tokens = []
             if label_available:
-                for word, tag in zip(t.split(), t_labels):
+                for word, tag in zip(t, t_labels):
                     sub_words = self.tokenizer.tokenize(word)
                     for count, sub_word in enumerate(sub_words):
                         if count > 0:
@@ -251,7 +282,7 @@ class Tokenizer:
                         new_labels.append(tag)
                         new_tokens.append(sub_word)
             else:
-                for word in t.split():
+                for word in t:
                     sub_words = self.tokenizer.tokenize(word)
                     for count, sub_word in enumerate(sub_words):
                         if count > 0:

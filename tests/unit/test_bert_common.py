@@ -34,6 +34,21 @@ def test_tokenize_ner(ner_test_data, bert_english_tokenizer):
     )
     assert preprocessed_tokens[3] == ner_test_data["EXPECTED_LABEL_IDS"]
 
+    # test when input is a single list
+    preprocessed_tokens = bert_english_tokenizer.tokenize_ner(
+        text=ner_test_data["INPUT_TEXT_SINGLE"],
+        labels=ner_test_data["INPUT_LABELS_SINGLE"],
+        label_map=ner_test_data["LABEL_MAP"],
+        max_len=seq_length,
+    )
+
+    assert len(preprocessed_tokens[0][0]) == seq_length
+    assert len(preprocessed_tokens[1][0]) == seq_length
+    assert (
+        preprocessed_tokens[2] == ner_test_data["EXPECTED_TRAILING_TOKEN_MASK"]
+    )
+    assert preprocessed_tokens[3] == ner_test_data["EXPECTED_LABEL_IDS"]
+
     # test not providing labels
     preprocessed_tokens = bert_english_tokenizer.tokenize_ner(
         text=ner_test_data["INPUT_TEXT"],
@@ -43,6 +58,15 @@ def test_tokenize_ner(ner_test_data, bert_english_tokenizer):
     assert (
         preprocessed_tokens[2] == ner_test_data["EXPECTED_TRAILING_TOKEN_MASK"]
     )
+
+    # text exception when number of words and number of labels are different
+    with pytest.raises(ValueError):
+        preprocessed_tokens = bert_english_tokenizer.tokenize_ner(
+            text=ner_test_data["INPUT_TEXT"],
+            labels=ner_test_data["INPUT_LABELS_WRONG"],
+            label_map=ner_test_data["LABEL_MAP"],
+            max_len=seq_length,
+        )
 
 
 def test_create_data_loader(ner_test_data):
