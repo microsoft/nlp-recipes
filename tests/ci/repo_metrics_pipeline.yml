@@ -1,4 +1,12 @@
-
+# More info on scheduling: https://docs.microsoft.com/en-us/azure/devops/pipelines/build/triggers?view=azure-devops&tabs=yaml#scheduled-triggers
+schedules:
+- cron: "56 22 * * *"
+  displayName: Daily track of metrics
+  branches:
+    include:
+    - master
+  always: true
+  
 jobs:
 - job: Repometrics
   pool:
