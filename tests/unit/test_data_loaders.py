@@ -13,6 +13,7 @@ from utils_nlp.dataset.data_loaders import DaskLoader
 
 UNIF1 = {"a": 4, "b": 6, "n": 10000}  # some uniform distribution
 row_size = 5  # "a,b\n (5 bytes)"
+json_row_size = 18  # "{"a": 1, "b": 5}\n (18 bytes)"
 
 
 @pytest.fixture()
@@ -98,7 +99,7 @@ def test_dask_json_rnd_loader(json_file):
     loader = DaskLoader(
         json_file,
         file_type="json",
-        block_size= 20 * int(UNIF1["n"] / num_partitions),
+        block_size=json_row_size * int(UNIF1["n"] / num_partitions),
         random_seed=0,
         lines=True
     )
@@ -111,3 +112,26 @@ def test_dask_json_rnd_loader(json_file):
     assert loader.df.npartitions == num_partitions
     assert sample.mean().round() == (UNIF1["a"] + UNIF1["b"]) / 2
     assert len(sample) <= num_batches * batch_size
+
+
+def test_dask_json_seq_loader(json_file):
+    batch_size = 12
+    num_partitions = 4
+
+    loader = DaskLoader(
+        json_file,
+        file_type="json",
+        block_size=json_row_size * int(UNIF1["n"] / num_partitions),
+        random_seed=0,
+        lines=True
+    )
+
+    sample = []
+    for batch in loader.get_sequential_batches(batch_size):
+        sample.append(list(batch.iloc[:, 1]))
+    sample = np.concatenate(sample)
+
+    assert loader.df.npartitions == num_partitions
+    assert sample.mean().round() == (UNIF1["a"] + UNIF1["b"]) / 2
+    assert len(sample) == UNIF1["n"]
+
