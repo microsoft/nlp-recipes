@@ -7,6 +7,12 @@ schedules:
     - master
   always: true
   
+# no PR builds
+pr: none
+
+# no CI trigger
+trigger: none
+
 jobs:
 - job: Repometrics
   pool:
