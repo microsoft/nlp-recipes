@@ -36,7 +36,7 @@ def load_pandas_df(local_cache_path=".", file_split="train"):
     maybe_download(URL, file_name, local_cache_path)
 
     if not os.path.exists(
-            os.path.join(local_cache_path, DATA_FILES[file_split])
+        os.path.join(local_cache_path, DATA_FILES[file_split])
     ):
         extract_zip(
             os.path.join(local_cache_path, file_name), local_cache_path
@@ -47,12 +47,12 @@ def load_pandas_df(local_cache_path=".", file_split="train"):
 
 
 def load_dask_df(
-        local_cache_path=".",
-        file_split="train",
-        block_size=10e6,
-        random_seed=None,
-        num_batches=1000,
-        batch_size=1000,
+    local_cache_path=".",
+    file_split="train",
+    block_size=10e6,
+    random_seed=None,
+    num_batches=1000,
+    batch_size=1000,
 ):
     """Downloads and extracts the dataset files
     Args:
@@ -72,7 +72,7 @@ def load_dask_df(
     maybe_download(URL, file_name, local_cache_path)
 
     if not os.path.exists(
-            os.path.join(local_cache_path, DATA_FILES[file_split])
+        os.path.join(local_cache_path, DATA_FILES[file_split])
     ):
         extract_zip(
             os.path.join(local_cache_path, file_name), local_cache_path
@@ -82,7 +82,7 @@ def load_dask_df(
         os.path.join(local_cache_path, DATA_FILES[file_split]),
         block_size=block_size,
         random_seed=random_seed,
-        file_type='json'
+        file_type="json",
     )
 
     return loader.get_random_batches(
