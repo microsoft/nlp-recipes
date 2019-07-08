@@ -2,20 +2,20 @@ import random
 import dask.dataframe as dd
 
 
-class DaskCSVLoader:
-    """Class for creating and using a loader for large csv
-        or other delimited files. The loader uses dask to read
-        smaller partitions of a file into memory (one partition at a time),
-        before sampling batches from the partitions.
-    """
+class DaskLoader:
+    """Class for creating and using a loader for large file of type csv, json or other delimited
+    files. The loader uses dask to read smaller partitions of a file into memory (one partition
+    at a time), before sampling batches from the partitions."""
 
     def __init__(
         self,
         file_path,
+        file_type="csv",
         sep=",",
         header="infer",
         block_size=10e6,
         random_seed=None,
+        lines=True,
     ):
         """Initializes the loader.
 
@@ -30,11 +30,18 @@ class DaskCSVLoader:
                 Defaults to 10e6.
             random_seed (int, optional): Random seed. See random.seed().
                 Defaults to None.
+            lines (bool, optional): Read the file as a json object per line. Defaults to True.
         """
 
-        self.df = dd.read_csv(
-            file_path, sep=sep, header=header, blocksize=block_size
-        )
+        if file_type == "csv":
+            self.df = dd.read_csv(
+                file_path, sep=sep, header=header, blocksize=block_size
+            )
+        elif file_type == "json":
+            self.df = dd.read_json(
+                file_path, blocksize=block_size, lines=lines
+            )
+
         self.random_seed = random_seed
         random.seed(random_seed)
 

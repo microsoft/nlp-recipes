@@ -82,7 +82,7 @@ def extract_zip(file_path, dest_path="."):
     if not os.path.exists(dest_path):
         raise IOError("Destination directory doesn't exist")
     with zipfile.ZipFile(file_path) as z:
-        z.extractall(path=dest_path)
+        z.extractall(dest_path, filter(lambda f: not f.endswith('\r'), z.namelist()))
 
 
 @contextmanager
