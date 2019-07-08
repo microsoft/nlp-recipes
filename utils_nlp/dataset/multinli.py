@@ -46,7 +46,7 @@ def load_pandas_df(local_cache_path=".", file_split="train"):
     )
 
 
-def load_dask_df(
+def get_generator(
     local_cache_path=".",
     file_split="train",
     block_size=10e6,
@@ -54,7 +54,8 @@ def load_dask_df(
     num_batches=1000,
     batch_size=1000,
 ):
-    """Downloads and extracts the dataset files
+    """ Downloads and extracts the dataset files and then returns a random batch generator that
+    yields pandas dataframes.
     Args:
         local_cache_path ([type], optional): [description]. Defaults to None.
         file_split (str, optional): The subset to load.
@@ -65,7 +66,7 @@ def load_dask_df(
         num_batches (int): Number of batches to generate.
         batch_size (int]): Batch size.
     Returns:
-        array: Arrays of pandas dataframes partitioned from the dask dataframe.
+        Generator[pd.Dataframe, None, None] : Random batch generator that yields pandas dataframes.
     """
 
     file_name = URL.split("/")[-1]
