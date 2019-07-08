@@ -35,9 +35,6 @@ def test_dask_csv_rnd_loader(csv_file):
     batch_size = 12
     num_partitions = 4
 
-    import os
-
-    print("size:", os.stat(csv_file).st_size)
     loader = DaskCSVLoader(
         csv_file,
         header=None,
