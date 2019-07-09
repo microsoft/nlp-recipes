@@ -9,7 +9,8 @@ import json
 import os
 import io
 
-from utils_nlp.dataset.data_loaders import DaskLoader
+from utils_nlp.dataset.data_loaders import DaskCSVLoader
+from utils_nlp.dataset.data_loaders import DaskJSONLoader
 
 UNIF1 = {"a": 4, "b": 6, "n": 10000}  # some uniform distribution
 row_size = 5  # "a,b\n (5 bytes)"
@@ -45,7 +46,7 @@ def json_file(tmpdir):
                 "b": random.randint(UNIF1["a"], UNIF1["b"]),
             }
             json.dump(data_dict, f)
-            f.write('\n')
+            f.write("\n")
     return json_path
 
 
@@ -54,7 +55,7 @@ def test_dask_csv_rnd_loader(csv_file):
     batch_size = 12
     num_partitions = 4
 
-    loader = DaskLoader(
+    loader = DaskCSVLoader(
         csv_file,
         header=None,
         block_size=row_size * int(UNIF1["n"] / num_partitions),
@@ -75,7 +76,7 @@ def test_dask_csv_seq_loader(csv_file):
     batch_size = 12
     num_partitions = 4
 
-    loader = DaskLoader(
+    loader = DaskCSVLoader(
         csv_file,
         header=None,
         block_size=row_size * int(UNIF1["n"] / num_partitions),
@@ -96,12 +97,11 @@ def test_dask_json_rnd_loader(json_file):
     batch_size = 12
     num_partitions = 4
 
-    loader = DaskLoader(
+    loader = DaskJSONLoader(
         json_file,
-        file_type="json",
         block_size=json_row_size * int(UNIF1["n"] / num_partitions),
         random_seed=0,
-        lines=True
+        lines=True,
     )
 
     sample = []
@@ -118,12 +118,11 @@ def test_dask_json_seq_loader(json_file):
     batch_size = 12
     num_partitions = 4
 
-    loader = DaskLoader(
+    loader = DaskJSONLoader(
         json_file,
-        file_type="json",
         block_size=json_row_size * int(UNIF1["n"] / num_partitions),
         random_seed=0,
-        lines=True
+        lines=True,
     )
 
     sample = []
@@ -134,4 +133,3 @@ def test_dask_json_seq_loader(json_file):
     assert loader.df.npartitions == num_partitions
     assert sample.mean().round() == (UNIF1["a"] + UNIF1["b"]) / 2
     assert len(sample) == UNIF1["n"]
-

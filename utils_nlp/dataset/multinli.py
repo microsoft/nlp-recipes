@@ -9,7 +9,7 @@ import os
 
 import pandas as pd
 
-from utils_nlp.dataset.data_loaders import DaskLoader
+from utils_nlp.dataset.data_loaders import DaskJSONLoader
 from utils_nlp.dataset.url_utils import extract_zip, maybe_download
 
 URL = "http://www.nyu.edu/projects/bowman/multinli/multinli_1.0.zip"
@@ -79,11 +79,10 @@ def get_generator(
             os.path.join(local_cache_path, file_name), local_cache_path
         )
 
-    loader = DaskLoader(
+    loader = DaskJSONLoader(
         os.path.join(local_cache_path, DATA_FILES[file_split]),
         block_size=block_size,
         random_seed=random_seed,
-        file_type="json",
     )
 
     return loader.get_random_batches(
