@@ -4,15 +4,14 @@ import pandas as pd
 
 
 class SentEvalRunner:
-    def __init__(self, path_to_senteval=".", use_azureml=False):
-        """AzureML-compatible wrapper class that interfaces with the original implementation of SentEval
+    def __init__(self, path_to_senteval="."):
+        """Wrapper class interfacing with the original implementation of SentEval
         
         Args:
             path_to_senteval (str, optional): Path to the SentEval source code.
-            use_azureml (bool, optional): Defaults to false.
         """
         self.path_to_senteval = path_to_senteval
-        self.use_azureml = use_azureml
+        self.params_senteval = {}
 
     def set_transfer_data_path(self, relative_path):
         """Set the datapath that contains the datasets for the SentEval transfer tasks
@@ -23,6 +22,7 @@ class SentEvalRunner:
         self.transfer_data_path = os.path.join(
             self.path_to_senteval, relative_path
         )
+        self.params_senteval["task_path"] = self.transfer_data_path
 
     def set_transfer_tasks(self, task_list):
         """Set the transfer tasks to use for evaluation
@@ -34,28 +34,11 @@ class SentEvalRunner:
 
     def set_model(self, model):
         """Set the model to evaluate"""
-        self.model = model
+        self.params_senteval["model"] = model
 
-    def set_params_senteval(
-        self,
-        use_pytorch=True,
-        kfold=10,
-        nhid=0,
-        optim="adam",
-        batch_size=64,
-        tenacity=5,
-        epoch_size=4,
-    ):
-        """
-        Define the required parameters for SentEval (model, task_path, usepytorch, kfold).
-        Also gives the option to directly set parameters for a classifier if necessary.
-        """
-        self.params_senteval = {
-            "model": self.model,
-            "task_path": self.transfer_data_path,
-            "usepytorch": use_pytorch,
-            "kfold": kfold,
-        }
+    def set_params(self, params):
+        self.params_senteval = dict(self.params_senteval, **params)
+
         classifying_tasks = {
             "MR",
             "CR",
@@ -68,14 +51,33 @@ class SentEvalRunner:
             "SNLI",
             "MRPC",
         }
+
         if any(t in classifying_tasks for t in self.transfer_tasks):
-            self.params_senteval["classifier"] = {
-                "nhid": nhid,
-                "optim": optim,
-                "batch_size": batch_size,
-                "tenacity": tenacity,
-                "epoch_size": epoch_size,
-            }
+            try:
+                a = "classifier" in self.params_senteval
+                if not a:
+                    raise ValueError(
+                        "Include param['classifier'] to run task {}".format(t)
+                    )
+                else:
+                    b = (
+                        set(
+                            "nhid",
+                            "optim",
+                            "batch_size",
+                            "tenacity",
+                            "epoch_size",
+                        )
+                        in self.params_senteval["classifier"].keys()
+                    )
+                    if not b:
+                        raise ValueError(
+                            "Include nhid, optim, batch_size, tenacity, and epoch_size params to run task {}".format(
+                                t
+                            )
+                        )
+            except ValueError as ve:
+                print(ve)
 
     def run(self, batcher_func, prepare_func):
         """Run the SentEval engine on the model on the transfer tasks
@@ -89,14 +91,8 @@ class SentEvalRunner:
         Returns:
             dict: Dictionary of results
         """
-        if self.use_azureml:
-            sys.path.insert(
-                0, os.path.relpath(self.path_to_senteval, os.getcwd())
-            )
-            import senteval
-        else:
-            sys.path.insert(0, self.path_to_senteval)
-            import senteval
+        sys.path.insert(0, self.path_to_senteval)
+        import senteval
 
         se = senteval.engine.SE(
             self.params_senteval, batcher_func, prepare_func
@@ -104,13 +100,16 @@ class SentEvalRunner:
 
         return se.eval(self.transfer_tasks)
 
-    def print_mean(self, results, selected_metrics=[], round_decimals=3):
-        """Print the means of selected metrics of the transfer tasks as a table
+    def log_mean(self, results, selected_metrics=[], round_decimals=3):
+        """Log the means of selected metrics of the transfer tasks
         
         Args:
             results (dict): Results from the SentEval evaluation engine
             selected_metrics (list(str), optional): List of metric names
             round_decimals (int, optional): Number of decimal digits to round to; defaults to 3
+        
+        Returns:
+            pd.DataFrame table of formatted results
         """
         data = []
         for task in self.transfer_tasks:

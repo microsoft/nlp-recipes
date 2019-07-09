@@ -4,15 +4,16 @@ This folder contains examples and best practices, written in Jupyter notebooks, 
 
 ## Summary
 
-The following summarizes each scenario of the best practice notebooks. Each scenario is demonstrated in one or more Jupyter notebook examples that make use of the core code base of models and utilities.
+The following is a summary of the scenarios covered in the best practice notebooks. Each scenario is demonstrated in one or more Jupyter notebook examples that make use of the core code base of models and utilities.
 
-| Scenario                 | Applications                                 | Languages | Models |
-|---| ------------------------ | -------------------------------------------- | ------------------- |
-|[Text Classification](scenarios/text_classification)      |Topic Classification|en, zh, ar|BERT|
-|[Named Entity Recognition](scenarios/named_entity_recognition) |Wikipedia NER                                              | en, zh  |BERT|
-|[Question Answering](scenarios/question_answering) |SQuAD                                              | en |BiDAF|
-|[Sentence Similarity](scenarios/sentence_similarity)      |STS Benchmark                         |en|Representation: TF-IDF, Word Embeddings, Doc Embeddings<br>Metrics: Cosine Similarity, Word Mover's Distance|
-|[Embeddings](scenarios/embeddings)| Custom Embeddings Training|en|Word2Vec<br>fastText<br>GloVe|
+| Scenario                 | Applications                                 |  Models |
+|---| ------------------------ | ------------------- |
+|[Text Classification](text_classification)      |Topic Classification|BERT|
+|[Named Entity Recognition](named_entity_recognition) |Wikipedia NER                                              |BERT|
+|[Entailment](./entailment)|XNLI Natural Language Inference|BERT|
+|[Question Answering](question_answering) |SQuAD                                              | BiDAF|
+|[Sentence Similarity](sentence_similarity)      |STS Benchmark                         |Representation: TF-IDF, Word Embeddings, Doc Embeddings<br>Metrics: Cosine Similarity, Word Mover's Distance|
+|[Embeddings](embeddings)| Custom Embeddings Training|Word2Vec<br>fastText<br>GloVe|
 
 ## Azure-enhanced notebooks
 

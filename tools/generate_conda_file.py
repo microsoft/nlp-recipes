@@ -51,14 +51,16 @@ CONDA_GPU = {
     "numba": "numba>=0.38.1",
     "pytorch": "pytorch>=1.0.0",
     "tensorflow": "tensorflow-gpu==1.12.0",
+    "cudatoolkit": "cudatoolkit==9.2",
 }
 
 PIP_BASE = {
-    "azureml-sdk[notebooks,tensorboard]": "azureml-sdk[notebooks,tensorboard]==1.0.43",
+    "azureml-sdk[notebooks,tensorboard]": "azureml-sdk[notebooks,tensorboard]>=1.0.43",
     "azureml-dataprep": "azureml-dataprep==1.1.4",
     "black": "black>=18.6b4",
     "dask": "dask[dataframe]==1.2.2",
-    "papermill": "papermill==0.18.2",
+    "papermill": "papermill>=1.0.1",
+    "nteract-scrapbook": "nteract-scrapbook>=0.2.1",
     "pydocumentdb": "pydocumentdb>=2.3.3",
     "tqdm": "tqdm==4.31.1",
     "pyemd": "pyemd==0.5.1",
