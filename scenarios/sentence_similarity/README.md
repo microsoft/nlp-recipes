@@ -21,12 +21,10 @@ The following summarizes each notebook for Sentence Similarity. Each notebook pr
 |Notebook|Runs Local|Description|
 |---|---|---|
 |[Creating a Baseline model](baseline_deep_dive.ipynb)| Yes| A baseline model is a basic solution that serves as a point of reference for comparing other models to. The baseline model's performance gives us an indication of how much better our models can perform relative to a naive approach.|
-|Senteval |[local](senteval_local.ipynb), [AzureML](senteval_azureml.ipynb)|SentEval is a widely used benchmarking tool for evaluating general-purpose sentence embeddings. Running SentEval locally is easy, but not necessarily efficient depending on the model specs. We provide an example on how to do this efficiently in Azure Machine Learning Service. |
-|[GenSen on AzureML](gensen_aml_deep_dive.ipynb)| No | This notebook serves as an introduction to an end-to-end NLP solution for sentence similarity building one of the State of the Art models, GenSen, on the AzureML platform. We show the advantages of AzureML when training large NLP models with GPU.
+|Senteval |[Local](senteval_local.ipynb), [AzureML](senteval_azureml.ipynb)|SentEval is a widely used benchmarking tool for evaluating general-purpose sentence embeddings. Running SentEval locally is easy, but not necessarily efficient depending on the model specs. We provide an example on how to do this efficiently in Azure Machine Learning Service. |
+|Gensen | [Local](gensen_local.ipynb), [AzureML](gensen_aml_deep_dive.ipynb)|This notebook serves as an introduction to an end-to-end NLP solution for sentence similarity building one of the State of the Art models, GenSen. We provide two notebooks. One, which runs on the AzureML platform.  We show the advantages of AzureML when training large NLP models with GPU in this notebook. The other example walks through using a GPU enabled VM to train and score Gensen.|
 |[Automated Machine Learning(AutoML) with Deployment on Azure Container Instance](automl_local_deployment_aci.ipynb)| Yes |This notebook shows users how to use AutoML on local machine and deploy the model as a webservice to Azure Container Instance(ACI) to get a sentence similarity score.
 |[Google Universal Sentence Encoder with Azure Machine Learning Pipeline, AutoML with Deployment on Azure Kubernetes Service](automl_with_pipelines_deployment_aks.ipynb)| No | This notebook shows a user how to use AzureML pipelines and deploy the pipeline output model as a webservice to Azure Kubernetes Service which can be used as an end point to get sentence similarity scores.|
-|[GenSen on Local](gensen_local.ipynb)| Yes | This notebook provides a easy way to train and predict a Gensen model on the Standford SNLI dataset. Running the notebook requires a GPU enabled machine.|
-
 
 ## Using GPU vs Azure ML Compute
 We did a comparative study to make it easier for you to choose between a GPU enabled Azure VM 
