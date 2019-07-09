@@ -1,8 +1,6 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
-import os
-
 import pytest
 import pandas as pd
 import numpy as np
@@ -98,3 +96,11 @@ def test_rm_nltk_stopwords(df_sentences):
     assert stop_df.shape[1] == df_sentences.shape[1] + len(stop_cols) and sum(
         list(map(lambda x: (stop_df[x].apply(type) == list).all(), stop_cols))
     ) == len(stop_cols)
+
+
+def test_convert_to_unicode():
+    test_str = "test"
+    test_byte = test_str.encode("utf-8")
+
+    assert isinstance(preprocess.convert_to_unicode(test_str), str)
+    assert isinstance(preprocess.convert_to_unicode(test_byte), str)
