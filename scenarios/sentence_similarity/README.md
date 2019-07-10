@@ -34,6 +34,8 @@ each of the choices.
 * The total time in the table stands for the training time + setup time.
 * Cost is the estimated cost of running the Azure ML Compute Job or the VM up-time.
 
+**Please note:** These were the estimated cost for running these notebooks as of July 1. Please 
+look at the [Azure Pricing Calculator](https://azure.microsoft.com/en-us/pricing/calculator/) to see the most up to date pricing information. 
 
 |---|Azure VM| AML 1 Node| AML 2 Nodes | AML 4 Nodes | AML 8 Nodes|
 |---|---|---|---|---|---|
