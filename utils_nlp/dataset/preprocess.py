@@ -164,11 +164,9 @@ def rm_nltk_stopwords(
     return pd.concat([df, stop_df], axis=1)
 
 
-def convert_to_unicode(input_text):
+def convert_to_unicode(input_text, encoding="utf-8"):
     """Converts intput_text to Unicode. Input must be utf-8."""
     if isinstance(input_text, str):
         return input_text
     elif isinstance(input_text, bytes):
-        return input_text.decode("utf-8", "ignore")
-    else:
-        raise TypeError("Unsupported string type: %s" % (type(input_text)))
+        return input_text.decode(encoding, "ignore")

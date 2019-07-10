@@ -202,7 +202,7 @@ class Tokenizer:
                 is labeled as trailing_piece_tag. Default value is "X".
 
         Returns:
-            tuple: A tuple containing the following three or four lists.
+            tuple: A tuple containing the following four lists.
                 1. input_ids_all: List of lists. Each sublist contains
                     numerical values, i.e. token ids, corresponding to the
                     tokens in the input text data.
@@ -219,7 +219,8 @@ class Tokenizer:
                     label.
                 4. label_ids_all: List of lists of numerical labels,
                     each sublist contains token labels of a input
-                    sentence/paragraph, if labels is provided.
+                    sentence/paragraph, if labels is provided. If the `labels`
+                    argument is not provided, the value of this is None.
         """
 
         def _is_iterable_but_not_string(obj):
@@ -333,7 +334,7 @@ class Tokenizer:
                 label_ids_all,
             )
         else:
-            return input_ids_all, input_mask_all, trailing_token_mask_all
+            return input_ids_all, input_mask_all, trailing_token_mask_all, None
 
 
 def create_data_loader(
