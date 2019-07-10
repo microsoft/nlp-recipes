@@ -10,10 +10,6 @@ schedules:
 # no PR builds
 pr: none
 
-- script: 
-    sh time
-  displayName: show time
-
 # no CI trigger
 trigger: none
 
@@ -23,6 +19,11 @@ jobs:
     vmImage: 'ubuntu-16.04'
 
   steps:
+
+  - script: 
+      sh time
+    displayName: show time
+
   - task: UsePythonVersion@0
     inputs:
       versionSpec: '3.6'
