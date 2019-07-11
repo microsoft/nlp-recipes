@@ -1,6 +1,6 @@
 # Towards a Deep and Unified Understanding of Deep Neural Models in NLP
 
-Code implementation of paper *Towards a Deep and Unified Understanding of Deep Neural Models in NLP*
+Code implementation of paper [*Towards a Deep and Unified Understanding of Deep Neural Models in NLP*](http://proceedings.mlr.press/v97/guan19a/guan19a.pdf)
 
 ## Environment
 
@@ -69,7 +69,7 @@ interpreter.visualize()
 ```
 Then, we can get results below:
 
-![](result.PNG)
+![](https://nlpbp.blob.core.windows.net/images/result.png)
 
 which means that the second and forth words are most important to $\Phi$, which is reasonable because the weight of them are larger.
 
