@@ -3,7 +3,7 @@
 
 import os
 import shutil
-from utils_nlp.models.gensen import SNLI_CLEAN_PATH
+from utils_nlp.gensen import SNLI_CLEAN_PATH
 
 
 def _preprocess(split_map, data_path, column_names):
@@ -19,7 +19,7 @@ def _preprocess(split_map, data_path, column_names):
         column_names(list): List of column names for the new columns created.
 
     """
-
+        
     for file_split, df in split_map.items():
         base_txt_path = os.path.join(
             data_path, SNLI_CLEAN_PATH, "snli_1.0_{}.txt".format(file_split)
@@ -89,13 +89,13 @@ def _split_and_cleanup(split_map, data_path):
             "snli_1.0_{}.txt.s2.tok".format(file_split),
         )
         with open(s1_tok_path, "r") as fin, open(
-                "{}.tmp".format(s1_tok_path), "w"
+            "{}.tmp".format(s1_tok_path), "w"
         ) as tmp:
             for line in fin:
                 s = line.replace('"', "")
                 tmp.write(s)
         with open(s2_tok_path, "r") as fin, open(
-                "{}.tmp".format(s2_tok_path), "w"
+            "{}.tmp".format(s2_tok_path), "w"
         ) as tmp:
             for line in fin:
                 s = line.replace('"', "")
@@ -130,10 +130,10 @@ def gensen_preprocess(train_tok, dev_tok, test_tok, data_path):
         split_map["test"] = test_tok
 
     column_names = ["s1.tok", "s2.tok", "score"]
-
+    
     if not os.path.exists(os.path.join(data_path, SNLI_CLEAN_PATH)):
         os.makedirs(os.path.join(data_path, SNLI_CLEAN_PATH), exist_ok=True)
-
+        
     _preprocess(split_map, data_path, column_names)
     _split_and_cleanup(split_map, data_path)
 
