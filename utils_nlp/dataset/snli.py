@@ -74,7 +74,7 @@ def _maybe_download_and_extract(zip_path, file_split, file_type):
         os.makedirs(dir_path)
 
     # format csv filename
-    file_name = "{0}_{1}.{2}".format(SNLI_FILE_PREFIX, file_split, file_type)
+    file_name = "{0}_{1}.{2}".format(SNLI_FILE_PREFIX, file_split.value, file_type)
     extract_path = os.path.join(dir_path, file_name)
 
     if not os.path.exists(extract_path):
@@ -112,7 +112,7 @@ def extract_snli(zip_path, source_path, dest_path):
 
     """
     with ZipFile(zip_path, "r") as z:
-        with z.open(source_file_name) as zf, open(dest_path, "wb") as f:
+        with z.open(source_path) as zf, open(dest_path, "wb") as f:
             shutil.copyfileobj(zf, f)
 
 

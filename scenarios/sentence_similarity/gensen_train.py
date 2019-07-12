@@ -562,7 +562,7 @@ def train(config, data_folder, learning_rate=0.0001):
                     )
 
                     logging.info(
-                        "Average time per mininbatch : %.5f"
+                        "Average time per minibatch : %.5f"
                         % (np.mean(mbatch_times))
                     )
                     mlflow.log_metric(
@@ -590,6 +590,7 @@ def train(config, data_folder, learning_rate=0.0001):
                         model_state=model_state,
                     )
                     if training_complete:
+                        mlflow.log_metric("min_val_loss", float(min_val_loss))
                         break
 
                     logging.info("Evaluating on NLI")
