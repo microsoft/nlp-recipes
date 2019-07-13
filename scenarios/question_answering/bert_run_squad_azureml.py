@@ -967,7 +967,8 @@ def main():
         result = evaluate(dataset, predictions)
         for key in result.keys():
             logger.info("  %s = %s", key, str(result[key]))
-            run.log(key, result[key])
+        run.log('exact_match', result['exact_match'])
+        run.log('f1', result['f1'])
 
 
 if __name__ == "__main__":
