@@ -4,6 +4,9 @@ MICROSOFT PROVIDES THE DATASETS ON AN "AS IS" BASIS. MICROSOFT MAKES NO WARRANTI
 
 The datasets are provided under the original terms that Microsoft received such datasets. See below for more information about each dataset.
 
+### Microsoft Research Paraphrase Corpus
+Original source: https://www.microsoft.com/en-us/download/details.aspx?id=52398
+
 ### Dataset for Arabic Classification
 >This dataset is provided under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.ast).
 Redistributing the dataset "arabic_dataset_classifiction.csv" with attribution:  
@@ -20,20 +23,23 @@ Original source: https://www.nyu.edu/projects/bowman/multinli/
 >This dataset is provided under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
 Redistributing the dataset "snli_1.0.zip" with attribution:  
 Samuel R. Bowman, Gabor Angeli, Christopher Potts, and Christopher D. Manning. 2015. A large annotated corpus for learning natural language inference. In Proceedings of the 2015 Conference on Empirical Methods in Natural Language Processing (EMNLP).  
-Original source: https://nlp.stanford.edu/projects/snli/
+Original source: https://nlp.stanford.edu/projects/snli/  
+The dataset is preprocessed to remove unused columns and badly formatted rows.
 
 ### Wikigold dataset
 >This dataset is provided under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.ast).
 Redistributing the dataset "wikigold.conll.txt" with attribution:  
 Balasuriya, Dominic, et al. "Named entity recognition in wikipedia."
 Proceedings of the 2009 Workshop on The People's Web Meets NLP: Collaboratively Constructed Semantic Resources. Association for Computational Linguistics, 2009.  
-Original source: https://github.com/juand-r/entity-recognition-datasets/tree/master/data/wikigold/CONLL-format/data
+Original source: https://github.com/juand-r/entity-recognition-datasets/tree/master/data/wikigold/CONLL-format/data  
+The dataset is preprocessed to fit data format requirement of BERT.
 
 ### The Cross-Lingual NLI Corpus (XNLI)
 >The majority of the corpus sentences are released under the [OANC](https://www.anc.org/OANC/license.txt)’s license. The data in the Fiction genre from Captain Blood are under [The_Project_Gutenberg_License](http://www.gutenberg.org/wiki/Gutenberg:The_Project_Gutenberg_License). See details in the [XNLI paper](https://arxiv.org/pdf/1809.05053.pdf).
 Redistributing the datasets "XNLI 1.0.zip" and "XNLI-MT 1.0.zip" with attribution:   
 Alexis Conneau, Guillaume Lample, Ruty Rinott, Holger Schwenk, Ves Stoyanov. 2018. XNLI: Evaluating Cross-lingual Sentence Representations. Proceedings of the 2018 Conference on Empirical Methods in Natural Language Processing.  
-Original source: https://www.nyu.edu/projects/bowman/xnli/
+Original source: https://www.nyu.edu/projects/bowman/xnli/  
+The dataset is preprocessed to remove unused columns.
 
 
 ### The STSbenchmark dataset
@@ -42,7 +48,8 @@ Eneko Agirre, Daniel Cer, Mona Diab, Iñigo Lopez-Gazpio, Lucia
  Specia. Semeval-2017 Task 1: Semantic Textual Similarity
  Multilingual and Crosslingual Focused Evaluation. Proceedings of
  SemEval 2017.  
- Oriignal source:http://ixa2.si.ehu.es/stswiki/index.php/STSbenchmark  
+ Orignal source:http://ixa2.si.ehu.es/stswiki/index.php/STSbenchmark  
+ The dataset is preprocessed to remove unused columns.  
 >The scores are released under [Commons Attribution - Share Alike 4.0
 International License](http://creativecommons.org/licenses/by-sa/4.0/)  
 > The text of each dataset has a license of its own, as follows:
