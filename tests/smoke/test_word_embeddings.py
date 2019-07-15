@@ -31,7 +31,7 @@ def test_load_pretrained_vectors_word2vec(tmp_path):
 @pytest.mark.smoke
 def test_load_pretrained_vectors_glove(tmp_path):
     filename = "glove.840B.300d.txt"
-    model = load_glove(tmp_path, limit=500000)
+    model = load_glove(tmp_path, limit=50000)
     filepath = os.path.join(os.path.join(tmp_path, "gloVe"), filename)
     statinfo = os.stat(filepath)
     assert statinfo.st_size == 5646236541
