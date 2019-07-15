@@ -43,8 +43,11 @@ def notebooks():
 
 @pytest.fixture
 def tmp(tmp_path_factory):
-    with TemporaryDirectory(dir=tmp_path_factory.getbasetemp()) as td:
-        yield td
+    td = TemporaryDirectory(dir=tmp_path_factory.getbasetemp())
+    try:
+        yield td.name
+    finally:
+        td.cleanup()
 
 
 @pytest.fixture(scope="module")

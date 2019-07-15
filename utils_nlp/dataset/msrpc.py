@@ -27,7 +27,7 @@ def download_msrpc(download_dir):
 
     url = (
         "https://download.microsoft.com/download/D/4/6/D46FF87A-F6B9-4252-AA8B"
-        "-3604ED519838/MSRParaphraseCorpus.msi "
+        "-3604ED519838/MSRParaphraseCorpus.msi"
     )
     return maybe_download(url, work_directory=download_dir)
 
