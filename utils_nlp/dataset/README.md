@@ -5,13 +5,8 @@ MICROSOFT PROVIDES THE DATASETS ON AN "AS IS" BASIS. MICROSOFT MAKES NO WARRANTI
 The datasets are provided under the original terms that Microsoft received such datasets. See below for more information about each dataset.
 
 ### Microsoft Research Paraphrase Corpus
-Original source: https://www.microsoft.com/en-us/download/details.aspx?id=52398
+>Original source: https://www.microsoft.com/en-us/download/details.aspx?id=52398
 
-### Dataset for Arabic Classification
->This dataset is provided under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.ast).
-Redistributing the dataset "arabic_dataset_classifiction.csv" with attribution:  
-Boukil, S., Biniz, M., Adnani, F. E., Cherrat, L., & Moutaouakkil, A. E. E. (2018). Arabic Text Classification Using Deep Learning Technics.   
-Original source: https://data.mendeley.com/datasets/v524p5dhpj/2
 
 ### The Multi-Genre NLI Corpus (MultiNLI)
 >The majority of the corpus is released under the [OANC](https://www.anc.org/OANC/license.txt)’s license, The data in the FICTION section falls under several permissive licenses. See the [data description paper](https://www.nyu.edu/projects/bowman/multinli/paper.pdf) for details.  
