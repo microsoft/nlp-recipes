@@ -25,7 +25,7 @@ def test_load_pretrained_vectors_word2vec(tmp_path):
     statinfo = os.stat(filepath)
     assert statinfo.st_size == 3644258522
     assert isinstance(model, Word2VecKeyedVectors)
-    assert len(model.wv.vocab) == 500000
+    assert len(model.vocab) == 500000
 
 
 @pytest.mark.smoke
@@ -36,7 +36,7 @@ def test_load_pretrained_vectors_glove(tmp_path):
     statinfo = os.stat(filepath)
     assert statinfo.st_size == 5646236541
     assert isinstance(model, Word2VecKeyedVectors)
-    assert len(model.wv.vocab) == 50000
+    assert len(model.vocab) == 50000
 
 
 @pytest.mark.smoke
