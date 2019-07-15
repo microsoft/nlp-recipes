@@ -47,7 +47,9 @@ def _download_glove_vectors(download_dir, file_name="glove.840B.300d.zip"):
         str: file_path to the downloaded vectors.
     """
 
-    return maybe_download(GLOVE_URL, filename=file_name, work_directory=download_dir)
+    return maybe_download(
+        GLOVE_URL, filename=file_name, work_directory=download_dir
+    )
 
 
 def _maybe_download_and_extract(dest_path, file_name):
@@ -75,7 +77,9 @@ def _maybe_download_and_extract(dest_path, file_name):
     return file_path
 
 
-def load_pretrained_vectors(dir_path, file_name="glove.840B.300d.txt", limit=None):
+def load_pretrained_vectors(
+    dir_path, file_name="glove.840B.300d.txt", limit=None
+):
     """ Method that loads gloVe vectors. Downloads if it doesn't exist.
 
     Args:

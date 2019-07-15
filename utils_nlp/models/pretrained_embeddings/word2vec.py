@@ -44,7 +44,9 @@ def _download_word2vec_vectors(
         str: file_path to the downloaded vectors.
     """
 
-    return maybe_download(WORD2VEC_URL, filename=file_name, work_directory=download_dir)
+    return maybe_download(
+        WORD2VEC_URL, filename=file_name, work_directory=download_dir
+    )
 
 
 def _maybe_download_and_extract(dest_path, file_name):

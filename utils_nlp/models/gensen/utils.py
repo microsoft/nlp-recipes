@@ -67,7 +67,7 @@ class DataIterator(object):
         return word2id, id2word
 
     def construct_vocab(
-            self, sentences, vocab_size, lowercase=False, charlevel=False
+        self, sentences, vocab_size, lowercase=False, charlevel=False
     ):
         """Create vocabulary.
 
@@ -101,16 +101,16 @@ class BufferedDataIterator(DataIterator):
     """Multi Parallel corpus data iterator."""
 
     def __init__(
-            self,
-            src,
-            trg,
-            src_vocab_size,
-            trg_vocab_size,
-            tasknames,
-            save_dir,
-            buffer_size=1e6,
-            lowercase=False,
-            seed=0
+        self,
+        src,
+        trg,
+        src_vocab_size,
+        trg_vocab_size,
+        tasknames,
+        save_dir,
+        buffer_size=1e6,
+        lowercase=False,
+        seed=0,
     ):
         """Initialize params.
 
@@ -271,11 +271,13 @@ class BufferedDataIterator(DataIterator):
     def shuffle_dataset(self, idx):
         """Shuffle current buffer."""
         self.src[idx]["data"], self.trg[idx]["data"] = shuffle(
-            self.src[idx]["data"], self.trg[idx]["data"], random_state=self.seed
+            self.src[idx]["data"],
+            self.trg[idx]["data"],
+            random_state=self.seed,
         )
 
     def get_parallel_minibatch(
-            self, corpus_idx, index, batch_size, max_len_src, max_len_trg
+        self, corpus_idx, index, batch_size, max_len_src, max_len_trg
     ):
         """Prepare minibatch.
 
@@ -292,15 +294,15 @@ class BufferedDataIterator(DataIterator):
         src_lines = [
             ["<s>"] + line[: max_len_src - 2] + ["</s>"]
             for line in self.src[corpus_idx]["data"][
-                        index: index + batch_size
-                        ]
+                index : index + batch_size
+            ]
         ]
 
         trg_lines = [
             ["<s>"] + line[: max_len_trg - 2] + ["</s>"]
             for line in self.trg[corpus_idx]["data"][
-                        index: index + batch_size
-                        ]
+                index : index + batch_size
+            ]
         ]
 
         """Sort sentences by decreasing length within a minibatch for
@@ -360,8 +362,8 @@ class BufferedDataIterator(DataIterator):
         output_lines_trg = Variable(torch.LongTensor(output_lines_trg)).cuda()
         sorted_src_lens = (
             Variable(torch.LongTensor(sorted_src_lens), volatile=True)
-                .squeeze()
-                .cuda()
+            .squeeze()
+            .cuda()
         )
 
         # Return minibatch of src-trg pairs
@@ -378,7 +380,7 @@ class NLIIterator(DataIterator):
     """Data iterator for tokenized NLI datasets."""
 
     def __init__(
-            self, train, dev, test, vocab_size, lowercase=True, vocab=None, seed=0
+        self, train, dev, test, vocab_size, lowercase=True, vocab=None, seed=0
     ):
         """Initialize params.
 
@@ -456,17 +458,17 @@ class NLIIterator(DataIterator):
 
         sent1 = [
             ["<s>"] + line[0].split() + ["</s>"]
-            for line in lines[index: index + batch_size]
+            for line in lines[index : index + batch_size]
         ]
 
         sent2 = [
             ["<s>"] + line[1].split() + ["</s>"]
-            for line in lines[index: index + batch_size]
+            for line in lines[index : index + batch_size]
         ]
 
         labels = [
             self.text2label[line[2]]
-            for line in lines[index: index + batch_size]
+            for line in lines[index : index + batch_size]
         ]
 
         sent1_lens = [len(line) for line in sent1]
@@ -508,23 +510,23 @@ class NLIIterator(DataIterator):
         labels = Variable(torch.LongTensor(labels)).cuda()
         sent1_lens = (
             Variable(torch.LongTensor(sorted_sent1_lens), requires_grad=False)
-                .squeeze()
-                .cuda()
+            .squeeze()
+            .cuda()
         )
         sent2_lens = (
             Variable(torch.LongTensor(sorted_sent2_lens), requires_grad=False)
-                .squeeze()
-                .cuda()
+            .squeeze()
+            .cuda()
         )
         rev_sent1 = (
             Variable(torch.LongTensor(rev_sent1), requires_grad=False)
-                .squeeze()
-                .cuda()
+            .squeeze()
+            .cuda()
         )
         rev_sent2 = (
             Variable(torch.LongTensor(rev_sent2), requires_grad=False)
-                .squeeze()
-                .cuda()
+            .squeeze()
+            .cuda()
         )
 
         return {
@@ -540,7 +542,7 @@ class NLIIterator(DataIterator):
 
 
 def get_validation_minibatch(
-        src, trg, index, batch_size, src_word2id, trg_word2id
+    src, trg, index, batch_size, src_word2id, trg_word2id
 ):
     """Prepare minibatch.
 
@@ -556,11 +558,11 @@ def get_validation_minibatch(
         Dict for seq2seq model.
     """
     src_lines = [
-        ["<s>"] + line + ["</s>"] for line in src[index: index + batch_size]
+        ["<s>"] + line + ["</s>"] for line in src[index : index + batch_size]
     ]
 
     trg_lines = [
-        ["<s>"] + line + ["</s>"] for line in trg[index: index + batch_size]
+        ["<s>"] + line + ["</s>"] for line in trg[index : index + batch_size]
     ]
 
     src_lens = [len(line) for line in src_lines]
@@ -608,8 +610,8 @@ def get_validation_minibatch(
         # ).squeeze().cuda()
         sorted_src_lens = (
             Variable(torch.LongTensor(sorted_src_lens))
-                .view(len(sorted_src_lens))
-                .cuda()
+            .view(len(sorted_src_lens))
+            .cuda()
         )
     return {
         "input_src": input_lines_src,
@@ -621,7 +623,7 @@ def get_validation_minibatch(
 
 
 def compute_validation_loss(
-        config, model, train_iterator, criterion, task_idx, lowercase=False
+    config, model, train_iterator, criterion, task_idx, lowercase=False
 ):
     """Compute validation loss for a task.
 
@@ -680,5 +682,6 @@ def compute_validation_loss(
         losses.append(loss.item())
 
     return np.mean(losses)
+
 
 # Original source: https://github.com/Maluuba/gensen

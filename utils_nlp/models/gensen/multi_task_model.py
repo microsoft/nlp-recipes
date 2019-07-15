@@ -18,10 +18,20 @@ class MultitaskModel(nn.Module):
     """
 
     def __init__(
-        self, src_emb_dim, trg_emb_dim, src_vocab_size,
-        trg_vocab_size, src_hidden_dim, trg_hidden_dim,
-        pad_token_src, pad_token_trg, num_tasks, bidirectional=False,
-        nlayers_src=1, dropout=0., paired_tasks=None
+        self,
+        src_emb_dim,
+        trg_emb_dim,
+        src_vocab_size,
+        trg_vocab_size,
+        src_hidden_dim,
+        trg_hidden_dim,
+        pad_token_src,
+        pad_token_trg,
+        num_tasks,
+        bidirectional=False,
+        nlayers_src=1,
+        dropout=0.0,
+        paired_tasks=None,
     ):
         """Initialize Seq2Seq Model."""
         super(MultitaskModel, self).__init__()
@@ -39,14 +49,13 @@ class MultitaskModel(nn.Module):
         self.num_directions = 2 if bidirectional else 1
         self.pad_token_src = pad_token_src
         self.pad_token_trg = pad_token_trg
-        self.src_hidden_dim = src_hidden_dim // 2 \
-            if self.bidirectional else src_hidden_dim
+        self.src_hidden_dim = (
+            src_hidden_dim // 2 if self.bidirectional else src_hidden_dim
+        )
         self.decoder = ConditionalGRU
 
         self.src_embedding = nn.Embedding(
-            src_vocab_size,
-            src_emb_dim,
-            self.pad_token_src,
+            src_vocab_size, src_emb_dim, self.pad_token_src
         )
 
         self.encoder = nn.GRU(
@@ -55,38 +64,37 @@ class MultitaskModel(nn.Module):
             self.nlayers_src,
             bidirectional=bidirectional,
             batch_first=True,
-            dropout=self.dropout
+            dropout=self.dropout,
         )
 
         self.enc_drp = nn.Dropout(self.dropout)
 
-        self.trg_embedding = nn.ModuleList([
-            nn.Embedding(
-                trg_vocab_size,
-                trg_emb_dim,
-                self.pad_token_trg,
-            )
-            for task in range(self.num_tasks)
-        ])
+        self.trg_embedding = nn.ModuleList(
+            [
+                nn.Embedding(trg_vocab_size, trg_emb_dim, self.pad_token_trg)
+                for task in range(self.num_tasks)
+            ]
+        )
 
-        self.decoders = nn.ModuleList([
-            self.decoder(
-                trg_emb_dim, trg_hidden_dim,
-                dropout=self.dropout
-            )
-            for task in range(self.num_tasks)
-        ])
+        self.decoders = nn.ModuleList(
+            [
+                self.decoder(trg_emb_dim, trg_hidden_dim, dropout=self.dropout)
+                for task in range(self.num_tasks)
+            ]
+        )
 
-        self.decoder2vocab = nn.ModuleList([
-            nn.Linear(trg_hidden_dim, trg_vocab_size)
-            for task in range(self.num_tasks)
-        ])
+        self.decoder2vocab = nn.ModuleList(
+            [
+                nn.Linear(trg_hidden_dim, trg_vocab_size)
+                for task in range(self.num_tasks)
+            ]
+        )
 
         self.nli_decoder = nn.Sequential(
             nn.Dropout(0.3),
             nn.Linear(4 * src_hidden_dim, 512),
             nn.ReLU(),
-            nn.Linear(512, 3)
+            nn.Linear(512, 3),
         )
 
         self.init_weights()
@@ -102,13 +110,11 @@ class MultitaskModel(nn.Module):
 
     def set_pretrained_embeddings(self, embedding_matrix):
         """Set embedding weights."""
-        if (
-            embedding_matrix.shape[0] != self.src_embedding.weight.size(0) or
-            embedding_matrix.shape[1] != self.src_embedding.weight.size(1)
-        ):
+        if embedding_matrix.shape[0] != self.src_embedding.weight.size(
+            0
+        ) or embedding_matrix.shape[1] != self.src_embedding.weight.size(1):
             self.src_embedding = nn.Embedding(
-                embedding_matrix.shape[0],
-                embedding_matrix.shape[1]
+                embedding_matrix.shape[0], embedding_matrix.shape[1]
             )
             self.src_vocab_size = embedding_matrix.shape[0]
             self.src_emb_dim = embedding_matrix.shape[1]
@@ -117,7 +123,7 @@ class MultitaskModel(nn.Module):
             self.src_embedding.weight.data.set_(
                 torch.from_numpy(embedding_matrix)
             )
-        except:
+        except BaseException:
             self.src_embedding.weight.data.set_(
                 torch.from_numpy(embedding_matrix).cuda()
             )
@@ -125,8 +131,7 @@ class MultitaskModel(nn.Module):
         self.src_embedding.cuda()
 
     def forward(
-        self, minibatch, task_idx,
-        return_hidden=False, paired_trg=None
+        self, minibatch, task_idx, return_hidden=False, paired_trg=None
     ):
         """Propogate input through the network.
 
@@ -149,17 +154,17 @@ class MultitaskModel(nn.Module):
         returns: class_logits (pre-softmax over NLI classes)
         decoder_logit   - batch size x 3
         """
-        if minibatch['type'] == 'nli':
-            sent1_emb = self.src_embedding(minibatch['sent1'])
-            sent2_emb = self.src_embedding(minibatch['sent2'])
+        if minibatch["type"] == "nli":
+            sent1_emb = self.src_embedding(minibatch["sent1"])
+            sent2_emb = self.src_embedding(minibatch["sent2"])
 
-            sent1_lengths = minibatch['sent1_lens'].data.view(-1).tolist()
+            sent1_lengths = minibatch["sent1_lens"].data.view(-1).tolist()
             sent1_emb = pack_padded_sequence(
                 sent1_emb, sent1_lengths, batch_first=True
             )
             sent1, sent1_h = self.encoder(sent1_emb)
 
-            sent2_lengths = minibatch['sent2_lens'].data.view(-1).tolist()
+            sent2_lengths = minibatch["sent2_lens"].data.view(-1).tolist()
             sent2_emb = pack_padded_sequence(
                 sent2_emb, sent2_lengths, batch_first=True
             )
@@ -172,14 +177,18 @@ class MultitaskModel(nn.Module):
                 sent1_h = sent1_h[-1]
                 sent2_h = sent2_h[-1]
 
-            sent1_h = sent1_h.index_select(0, minibatch['rev_sent1'])
-            sent2_h = sent2_h.index_select(0, minibatch['rev_sent2'])
+            sent1_h = sent1_h.index_select(0, minibatch["rev_sent1"])
+            sent2_h = sent2_h.index_select(0, minibatch["rev_sent2"])
 
-            features = torch.cat((
-                sent1_h, sent2_h,
-                torch.abs(sent1_h - sent2_h),
-                sent1_h * sent2_h
-            ), 1)
+            features = torch.cat(
+                (
+                    sent1_h,
+                    sent2_h,
+                    torch.abs(sent1_h - sent2_h),
+                    sent1_h * sent2_h,
+                ),
+                1,
+            )
 
             if return_hidden:
                 return sent1_h, sent2_h, self.nli_decoder(features)
@@ -187,9 +196,9 @@ class MultitaskModel(nn.Module):
                 return self.nli_decoder(features)
 
         else:
-            src_emb = self.src_embedding(minibatch['input_src'])
-            trg_emb = self.trg_embedding[task_idx](minibatch['input_trg'])
-            src_lengths = minibatch['src_lens'].data.view(-1).tolist()
+            src_emb = self.src_embedding(minibatch["input_src"])
+            trg_emb = self.trg_embedding[task_idx](minibatch["input_trg"])
+            src_lengths = minibatch["src_lens"].data.view(-1).tolist()
             src_emb = pack_padded_sequence(
                 src_emb, src_lengths, batch_first=True
             )
@@ -206,7 +215,9 @@ class MultitaskModel(nn.Module):
 
             # Debug with squeeze on error.
             trg_h, _ = self.decoders[task_idx](
-                trg_emb, h_t.view(-1, self.trg_hidden_dim), h_t.view(-1, self.trg_hidden_dim)
+                trg_emb,
+                h_t.view(-1, self.trg_hidden_dim),
+                h_t.view(-1, self.trg_hidden_dim),
             )
 
             trg_h_reshape = trg_h.contiguous().view(
@@ -219,9 +230,9 @@ class MultitaskModel(nn.Module):
             )
 
             if (
-                self.paired_tasks is not None and
-                task_idx in self.paired_tasks and
-                paired_trg is not None
+                self.paired_tasks is not None
+                and task_idx in self.paired_tasks
+                and paired_trg is not None
             ):
                 other_task_idx = self.paired_tasks[task_idx]
                 trg_emb_2 = self.trg_embedding[other_task_idx](paired_trg)
@@ -259,13 +270,13 @@ class MultitaskModel(nn.Module):
         )
         return word_probs
 
-    def get_hidden(self, input_src, src_lengths, strategy='last'):
+    def get_hidden(self, input_src, src_lengths, strategy="last"):
         """Return the encoder hidden state."""
         src_emb = self.src_embedding(input_src)
         src_lengths = src_lengths.data.view(-1).tolist()
         src_emb = pack_padded_sequence(src_emb, src_lengths, batch_first=True)
         src_h, src_h_t = self.encoder(src_emb)
-        if strategy == 'last':
+        if strategy == "last":
             if self.bidirectional:
                 h_t = torch.cat((src_h_t[-1], src_h_t[-2]), 1)
             else:
