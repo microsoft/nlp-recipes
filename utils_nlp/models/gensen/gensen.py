@@ -78,7 +78,7 @@ class Encoder(nn.Module):
             self.src_embedding.weight.data.set_(
                 torch.from_numpy(embedding_matrix)
             )
-        except:
+        except BaseException:
             self.src_embedding.weight.data.set_(
                 torch.from_numpy(embedding_matrix).cuda()
             )

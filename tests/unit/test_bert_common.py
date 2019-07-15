@@ -3,7 +3,7 @@
 
 import pytest
 
-from utils_nlp.bert.common import create_data_loader
+from utils_nlp.models.bert.common import create_data_loader
 
 
 def test_tokenize(bert_english_tokenizer):

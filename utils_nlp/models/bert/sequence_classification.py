@@ -14,8 +14,8 @@ from pytorch_pretrained_bert.modeling import BertForSequenceClassification
 from pytorch_pretrained_bert.optimization import BertAdam
 from tqdm import tqdm
 
-from utils_nlp.bert.common import Language
-from utils_nlp.pytorch.device_utils import get_device, move_to_device
+from utils_nlp.models.bert.common import Language
+from utils_nlp.common.pytorch_utils import get_device, move_to_device
 
 
 class BERTSequenceClassifier:
