@@ -9,7 +9,7 @@ from gensim.scripts.glove2word2vec import glove2word2vec
 from gensim.test.utils import get_tmpfile
 
 from utils_nlp.dataset.url_utils import maybe_download
-from utils_nlp.pretrained_embeddings import GLOVE_URL
+from utils_nlp.models.pretrained_embeddings import GLOVE_URL
 
 
 def _extract_glove_vectors(zip_path, dest_path="."):

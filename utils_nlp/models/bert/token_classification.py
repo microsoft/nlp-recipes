@@ -5,18 +5,16 @@
 # https://github.com/huggingface/pytorch-pretrained-BERT/blob/master/examples
 # /run_classifier.py
 
-import numpy as np
-from tqdm import tqdm, trange
 from collections import namedtuple
 
+import numpy as np
 import torch
 import torch.nn as nn
-
-from pytorch_pretrained_bert.optimization import BertAdam
 from pytorch_pretrained_bert.modeling import BertForTokenClassification
+from pytorch_pretrained_bert.optimization import BertAdam
+from tqdm import tqdm, trange
 
-from utils_nlp.bert.common import Language, create_data_loader
-
+from utils_nlp.models.bert.common import Language, create_data_loader
 from utils_nlp.pytorch.device_utils import get_device, move_to_device
 
 

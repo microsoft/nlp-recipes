@@ -7,7 +7,7 @@ import zipfile
 from gensim.models.fasttext import load_facebook_model
 
 from utils_nlp.dataset.url_utils import maybe_download
-from utils_nlp.pretrained_embeddings import FASTTEXT_EN_URL
+from utils_nlp.models.pretrained_embeddings import FASTTEXT_EN_URL
 
 
 def _extract_fasttext_vectors(zip_path, dest_path="."):

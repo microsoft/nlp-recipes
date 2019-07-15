@@ -7,13 +7,13 @@ from pathlib import Path
 from gensim.models.fasttext import FastText
 from gensim.models.keyedvectors import Word2VecKeyedVectors
 
-from utils_nlp.pretrained_embeddings.fasttext import (
+from utils_nlp.models.pretrained_embeddings.fasttext import (
     load_pretrained_vectors as load_fasttext,
 )
-from utils_nlp.pretrained_embeddings.glove import (
+from utils_nlp.models.pretrained_embeddings.glove import (
     load_pretrained_vectors as load_glove,
 )
-from utils_nlp.pretrained_embeddings.word2vec import (
+from utils_nlp.models.pretrained_embeddings.word2vec import (
     load_pretrained_vectors as load_word2vec,
 )
 

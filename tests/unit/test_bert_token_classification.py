@@ -3,7 +3,7 @@
 
 import pytest
 
-from utils_nlp.bert.token_classification import (
+from utils_nlp.models.bert.token_classification import (
     BERTTokenClassifier,
     postprocess_token_labels,
 )

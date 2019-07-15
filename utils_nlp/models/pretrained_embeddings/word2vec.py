@@ -7,7 +7,7 @@ import os
 from gensim.models.keyedvectors import KeyedVectors
 
 from utils_nlp.dataset.url_utils import maybe_download
-from utils_nlp.pretrained_embeddings import WORD2VEC_URL
+from utils_nlp.models.pretrained_embeddings import WORD2VEC_URL
 
 
 def _extract_word2vec_vectors(zip_path, dest_filepath):
