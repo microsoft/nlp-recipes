@@ -1,6 +1,6 @@
 # More info on scheduling: https://docs.microsoft.com/en-us/azure/devops/pipelines/build/triggers?view=azure-devops&tabs=yaml#scheduled-triggers
 schedules:
-- cron: "54 16 * * *"
+- cron: "23 * * * *"
   displayName: Daily track of metrics test
   branches:
     include:
