@@ -8,8 +8,10 @@ import torch.nn as nn
 
 def get_device(device="gpu"):
     """Gets a PyTorch device.
+
     Args:
         device (str, optional): Device string: "cpu" or "gpu". Defaults to "gpu".
+
     Returns:
         torch.device: A PyTorch device (cpu or gpu).
     """
@@ -26,12 +28,15 @@ def get_device(device="gpu"):
 def move_to_device(model, device, num_gpus=1):
     """Moves a model to the specified device (cpu or gpu/s)
        and implements data parallelism when multiple gpus are specified.
+
     Args:
         model (Module): A PyTorch model
         device (torch.device): A PyTorch device
         num_gpus (int): The number of GPUs to be used. Defaults to 1.
+
     Returns:
-        Module, DataParallel: A PyTorch Module or a DataParallel wrapper (when multiple gpus are used).
+        Module, DataParallel: A PyTorch Module or
+            a DataParallel wrapper (when multiple gpus are used).
     """
     if isinstance(model, nn.DataParallel):
         model = model.module
@@ -64,7 +69,8 @@ def move_to_device(model, device, num_gpus=1):
                     return nn.DataParallel(model, device_ids=None)
                 elif num_gpus > num_cuda_devices:
                     print(
-                        "Warning: Only {0} devices are available. Setting the number of gpus to {0}".format(
+                        "Warning: Only {0} devices are available. "
+                        "Setting the number of gpus to {0}".format(
                             num_cuda_devices
                         )
                     )

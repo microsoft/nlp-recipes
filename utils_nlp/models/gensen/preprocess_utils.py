@@ -3,7 +3,8 @@
 
 import os
 import shutil
-from utils_nlp.gensen import SNLI_CLEAN_PATH
+
+from utils_nlp.models.gensen import SNLI_CLEAN_PATH
 
 
 def _preprocess(split_map, data_path, column_names):

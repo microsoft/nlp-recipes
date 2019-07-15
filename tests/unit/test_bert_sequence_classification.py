@@ -3,8 +3,10 @@
 
 import pytest
 
-from utils_nlp.bert.sequence_classification import BERTSequenceClassifier
-from utils_nlp.bert.common import Language
+from utils_nlp.models.bert.common import Language
+from utils_nlp.models.bert.sequence_classification import (
+    BERTSequenceClassifier,
+)
 
 
 @pytest.fixture()
