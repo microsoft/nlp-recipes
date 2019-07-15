@@ -91,7 +91,11 @@ def load_pretrained_vectors(dir_path, file_name="glove.840B.300d.txt", limit=Non
 
     file_path = _maybe_download_and_extract(dir_path, file_name)
     tmp_file = get_tmpfile("test_word2vec.txt")
-    _ = glove2word2vec(file_path, tmp_file)
+
+    # Convert GloVe format to word2vec
+    _ = glove2word2vec(file_path, tmp_file) 
+
     model = KeyedVectors.load_word2vec_format(tmp_file, limit=limit)
+    os.remove(tmp_file)
 
     return model
