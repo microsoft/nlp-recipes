@@ -6,12 +6,14 @@ from azureml.core.authentication import AzureCliAuthentication
 from azureml.core.authentication import InteractiveLoginAuthentication
 from azureml.core.authentication import AuthenticationException
 from azureml.core import Workspace
+from azureml.exceptions import WorkspaceException
+
 
 def get_auth():
-    """ 
+    """
     Method to get the correct Azure ML Authentication type
-    
-    Always start with CLI Authentication and if it fails, fall back 
+
+    Always start with CLI Authentication and if it fails, fall back
     to interactive login
     """
     try:
@@ -23,12 +25,12 @@ def get_auth():
 
 
 def get_or_create_workspace(
-    config_path = None,
-    subscription_id = None,
-    resource_group = None,
-    workspace_name = None,
-    workspace_region = None
-    ) -> Workspace:
+    config_path=None,
+    subscription_id=None,
+    resource_group=None,
+    workspace_name=None,
+    workspace_region=None,
+) -> Workspace:
     """
     Returns workspace if one exists already with the name
     otherwise creates a new one.
@@ -36,9 +38,9 @@ def get_or_create_workspace(
     Args
     config_path: optional directory to look for / store config.json file (defaults to current directory)
     subscription_id: Azure subscription id
-    resource_group: Azure resource group to create workspace and related resources  
-    workspace_name: name of azure ml workspace  
-    workspace_region: region for workspace 
+    resource_group: Azure resource group to create workspace and related resources
+    workspace_name: name of azure ml workspace
+    workspace_region: region for workspace
     """
     try:
         # get existing azure ml workspace
@@ -48,8 +50,7 @@ def get_or_create_workspace(
             resource_group=resource_group,
             auth=get_auth(),
         )
-
-    except:
+    except WorkspaceException:
         # this call might take a minute or two.
         print("Creating new workspace")
         ws = Workspace.create(
@@ -58,10 +59,9 @@ def get_or_create_workspace(
             resource_group=resource_group,
             create_resource_group=True,
             location=workspace_region,
-            auth=get_auth()
-            )
+            auth=get_auth(),
+        )
 
-    print(config_path)
     ws.write_config(path=config_path)
     return ws
 
@@ -77,6 +77,7 @@ def log_metrics_scalar(value, run, name="", description=None):
     """
     run.log(name, value, description)
 
+
 def log_metrics_table(df, run, name="", description=None, as_scalar=False):
     """Log data from pd.DataFrame to the AzureML run
     
@@ -90,7 +91,9 @@ def log_metrics_table(df, run, name="", description=None, as_scalar=False):
     if as_scalar:
         for rn in df.index:
             for cn in df.columns:
-                log_metrics_scalar(df.loc[rn, cn], run, name="{0}::{1}".format(rn, cn), description=description)
+                log_metrics_scalar(
+                    df.loc[rn, cn], run, name="{0}::{1}".format(rn, cn), description=description
+                )
 
     else:
         run.log_table(name, df.to_dict(), description)

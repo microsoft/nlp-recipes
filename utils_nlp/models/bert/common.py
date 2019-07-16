@@ -6,20 +6,25 @@
 # https://github.com/huggingface/pytorch-transformers/blob/master/examples
 # /run_glue.py
 
-from enum import Enum
+import csv
+import linecache
+import os
+import subprocess
 import warnings
 from collections import Iterable
+from enum import Enum
+
 import torch
-from tqdm import tqdm
-
 from pytorch_pretrained_bert.tokenization import BertTokenizer
-
 from torch.utils.data import (
     DataLoader,
+    Dataset,
     RandomSampler,
     SequentialSampler,
     TensorDataset,
+    ConcatDataset,
 )
+from tqdm import tqdm
 
 # Max supported sequence length
 BERT_MAX_LEN = 512
@@ -466,3 +471,66 @@ def create_data_loader(
     )
 
     return dataloader
+
+
+class TextDataset(Dataset):
+    """
+    Characterizes a dataset for PyTorch which can be used to load a file containing multiple rows
+    where each row is a training example.
+    """
+
+    def __init__(self, filename):
+        """
+        Initialization. We set the filename and number of lines in the file.
+        Args:
+            filename(str): Name of the file.
+        """
+        self._filename = filename
+        self._total_data = (
+            int(
+                subprocess.check_output(
+                    "wc -l " + filename, shell=True
+                ).split()[0]
+            )
+            - 1
+        )
+
+    def __len__(self):
+        """Denotes the total number of samples in the file."""
+        return self._total_data
+
+    def __getitem__(self, index):
+        """
+        Generates one sample of data. We assume that the last column is label here. We use
+        linecache to load files lazily.
+
+        Args:
+            index(int): Index of the test case.
+
+        Returns(list, list, int): Returns the tokens, mask and label for a single item.
+
+        """
+        line = linecache.getline(self._filename, index + 1)
+        row = next(csv.reader([line]))
+        return row[0], row[1], row[2]
+
+
+def get_dataset_multiple_files(path):
+    """ Get dataset from csv files in a directory
+
+    Args:
+        path: Path to the directory containing files.
+
+    Returns:
+
+        torch.utils.data.Dataset : A combined dataset of all files in the directory.
+
+    """
+    files = list(
+        map(
+            lambda x: path + x,
+            (filter(lambda x: x.endswith("csv"), os.listdir(path))),
+        )
+    )
+    datasets = list(map(lambda x: TextDataset(x), files))
+    return ConcatDataset(datasets)
