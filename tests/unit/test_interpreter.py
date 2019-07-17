@@ -5,6 +5,7 @@ import random
 
 import pytest
 
+import numpy as np
 import torch
 from torch import nn
 
@@ -41,17 +42,32 @@ def variable_length_interp():
 
 def test_fixed_length_regularization():
     dataset = torch.randn(10, 4, 10)
+    # calculate all hidden states
+    hidden = [fixed_length_Phi(x).tolist() for x in dataset]
+    # calculate the standard deviation
+    hidden = np.array(hidden)
+    regular_gt = np.std(hidden, axis=0)
     regular = calculate_regularization(dataset, fixed_length_Phi)
-    assert regular.shape == (10,)
+    assert np.sum(np.abs(regular - regular_gt)) < 1e-5
 
 
 def test_variable_length_regularization():
     function = nn.LSTM(10, 10)
     dataset = [torch.randn(random.randint(5, 9), 10) for _ in range(10)]
+    # calculate all hidden states
+    hidden = [
+        np.mean(
+            variable_length_Phi(function)(x).tolist(), axis=0, keepdims=True
+        )
+        for x in dataset
+    ]
+    # calculate the standard deviation
+    hidden = np.array(hidden)
+    regular_gt = np.std(hidden, axis=0)
     regular = calculate_regularization(
         dataset, variable_length_Phi(function), reduced_axes=[0]
     )
-    assert regular.shape == (1, 10)
+    assert np.sum(np.abs(regular - regular_gt)) < 1e-5
 
 
 def test_initialize_interpreter():
@@ -64,11 +80,27 @@ def test_initialize_interpreter():
 
 
 def test_train_fixed_length_interp(fixed_length_interp):
+    init_ratio = fixed_length_interp.ratio + 0.0  # make a copy
+    init_regular = fixed_length_interp.regular + 0.0
     fixed_length_interp.optimize(iteration=10)
+    after_ratio = fixed_length_interp.ratio + 0.0
+    after_regular = fixed_length_interp.regular + 0.0
+    # make sure the ratio is changed when optimizing
+    assert torch.sum(torch.abs(after_ratio - init_ratio)) > 1e-5
+    # make sure the regular is not changed when optimizing
+    assert torch.sum(torch.abs(after_regular - init_regular)) < 1e-5
 
 
 def test_train_variable_length_interp(variable_length_interp):
+    init_ratio = variable_length_interp.ratio + 0.0  # make a copy
+    init_regular = variable_length_interp.regular + 0.0
     variable_length_interp.optimize(iteration=10)
+    after_ratio = variable_length_interp.ratio + 0.0
+    after_regular = variable_length_interp.regular + 0.0
+    # make sure the ratio is changed when optimizing
+    assert torch.sum(torch.abs(after_ratio - init_ratio)) > 1e-5
+    # make sure the regular is not changed when optimizing
+    assert torch.sum(torch.abs(after_regular - init_regular)) < 1e-5
 
 
 def test_interpreter_get_simga(fixed_length_interp):
