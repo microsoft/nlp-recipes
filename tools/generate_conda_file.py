@@ -76,6 +76,7 @@ PIP_BASE = {
     "pytorch-pretrained-bert": "pytorch-pretrained-bert>=0.6",
     "seqeval": "seqeval>=0.0.12",
     "azureml-mlflow": "azureml-mlflow>=1.0.43.1",
+    "senteval":"git+git://github.com/facebookresearch/SentEval.git",
 }
 
 PIP_GPU = {"horovod": "horovod>=0.16.1"}
