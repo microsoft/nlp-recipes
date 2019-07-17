@@ -15,15 +15,15 @@ steps:
   displayName: Add Conda to PATH
 
 - bash: |
-    python tools/generate_conda_file.py
-    conda env create -n nlp -f nlp.yaml
-    conda env list  
+    python tools/generate_conda_file.py;
+    conda env create -n nlp -f nlp.yaml;
+    conda env list
     # source activate nlp_gpu
   displayName: 'Creating Conda Environment with dependencies'
 
 - bash: |
-    source activate nlp
-    python -m ipykernel install --user --name nlp --display-name "nlp"
+    source activate nlp;
+    python -m ipykernel install --user --name nlp --display-name "nlp";
     # Commenting out pytest since it contains bunch of tests from other project which are not applicable.
     # But keeping the line here to show how to run it once tests relevant to this project are added
     pytest tests/unit --junitxml=junit/test-unitttest.xml #not running any tests for now
