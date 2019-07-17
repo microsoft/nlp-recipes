@@ -50,8 +50,8 @@ def calculate_regularization(sampled_x, Phi, reduced_axes=None, device=None):
 
 class Interpreter(nn.Module):
     """ Interpreter for interpreting one instance. The method is from
-    paper [Towards a Deep and Unified Understanding of Deep Neural
-    Models in NLP](http://proceedings.mlr.press/v97/guan19a/guan19a.pdf)
+    paper `Towards a Deep and Unified Understanding of Deep Neural
+    Models in NLP <http://proceedings.mlr.press/v97/guan19a/guan19a.pdf>`_
 
     It will minimize the loss in Eqn.(7):
 
