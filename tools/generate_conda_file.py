@@ -38,13 +38,14 @@ CONDA_BASE = {
     "jupyter": "jupyter>=1.0.0",
     "matplotlib": "matplotlib>=2.2.2",
     "numpy": "numpy>=1.13.3",
-    "pandas": "pandas>=0.23.4",
+    "pandas": "pandas>=0.24.2",
     "pymongo": "pymongo>=3.6.1",
     "pytest": "pytest>=3.6.4",
     "pytorch": "pytorch-cpu>=1.0.0",
-    "scikit-learn": "scikit-learn>=0.19.1",
+    "py-xgboost": "py-xgboost<=0.80",
     "scipy": "scipy>=1.0.0",
     "tensorflow": "tensorflow==1.12.0",
+    "tensorflow-hub": "tensorflow-hub==0.5.0",
 }
 
 CONDA_GPU = {
@@ -55,8 +56,10 @@ CONDA_GPU = {
 }
 
 PIP_BASE = {
-    "azureml-sdk[notebooks,tensorboard]": "azureml-sdk[notebooks,tensorboard]>=1.0.43",
-    "azureml-dataprep": "azureml-dataprep==1.1.4",
+    "azureml-sdk[automl]": "azureml-sdk[automl]==1.0.48",
+    "azureml-train-automl":"azureml-train-automl==1.0.48",
+    "azureml-dataprep": "azureml-dataprep==1.1.8",
+    "azureml-widgets": "azureml-widgets==1.0.48",
     "black": "black>=18.6b4",
     "dask": "dask[dataframe]==1.2.2",
     "papermill": "papermill>=1.0.1",
@@ -66,6 +69,7 @@ PIP_BASE = {
     "pyemd": "pyemd==0.5.1",
     "ipywebrtc": "ipywebrtc==0.4.3",
     "pre-commit": "pre-commit>=1.14.4",
+    "scikit-learn": "scikit-learn>=0.19.0,<=0.20.3",
     "spacy": "spacy>=2.1.4",
     "spacy-models": (
         "https://github.com/explosion/spacy-models/releases/download/"
