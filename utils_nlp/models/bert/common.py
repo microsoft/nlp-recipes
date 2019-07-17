@@ -82,6 +82,10 @@ class Tokenizer:
         # truncating an equal percent of tokens from each, since if one
         # sequence is very short then each token that's truncated likely
         # contains more information than a longer sequence.
+
+        if not tokens_b:
+            max_length += 1
+
         while True:
             total_length = len(tokens_a) + len(tokens_b)
             if total_length <= max_length:
@@ -92,7 +96,9 @@ class Tokenizer:
                 tokens_b.pop()
 
         tokens_a.append("[SEP]")
-        tokens_b.append("[SEP]")
+
+        if tokens_b:
+            tokens_b.append("[SEP]")
 
         return [tokens_a, tokens_b]
 
