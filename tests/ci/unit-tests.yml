@@ -1,23 +1,11 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 #
-variables:
-  test: 'tests/ci/run_pytest.py'
-  maxnodes : 4
-  reponame : 'nlp'
-  rg       : 'nlprg'
-  wsname   : ''
-# CPU
-  vmsize'  : 'STANDARD_D3_V2'
-  dockerproc : 'cpu'
-  displayName : 'unit_tests'
-  pool:
-    vmImage: 'ubuntu-16.04'
+
 # Pull request against these branches will trigger this build
 pr: none
 #- master
 #- staging
-#Any commit to this branch will trigger the build.
 trigger: none
 
 steps:
@@ -27,7 +15,6 @@ steps:
   displayName: Add Conda to PATH
 
 - bash: |
-    conda remove -q -n nlp --all -y
     python tools/generate_conda_file.py
     conda env create -n nlp -f nlp.yaml
     conda env list  
