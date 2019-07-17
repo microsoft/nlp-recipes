@@ -24,7 +24,7 @@ steps:
 
 - bash: |
     source activate nlp;
-    conda install -c conda-forge ipykernel;
+    conda install -y -c conda-forge ipykernel;
     python -m ipykernel install --user --name nlp --display-name "nlp";
     conda install -c anaconda pytest;
     # Commenting out pytest since it contains bunch of tests from other project which are not applicable.
