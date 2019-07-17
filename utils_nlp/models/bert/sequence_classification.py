@@ -81,7 +81,7 @@ class BERTSequenceClassifier:
                 loss values. Defaults to True.
         """
 
-        device = get_device("cpu" if num_gpus == 0 else "gpu")
+        device = get_device("cpu" if num_gpus == 0 or not torch.cuda.is_available() else "gpu")
         self.model = move_to_device(self.model, device, num_gpus)
 
         # define optimizer and model parameters
@@ -207,7 +207,7 @@ class BERTSequenceClassifier:
                 (classes, probabilities) if probabilities is True.
         """
 
-        device = get_device("cpu" if num_gpus == 0 else "gpu")
+        device = get_device("cpu" if num_gpus == 0 or not torch.cuda.is_available() else "gpu")
         self.model = move_to_device(self.model, device, num_gpus)
 
         # score
