@@ -129,3 +129,5 @@ nohup.out
 data/
 sentence-similarity/data/
 
+# AML Config
+aml_config/

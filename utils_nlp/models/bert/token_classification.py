@@ -141,7 +141,7 @@ class BERTTokenClassifier:
             batch_size=batch_size,
         )
 
-        device = get_device("cpu" if num_gpus == 0 else "gpu")
+        device = get_device("cpu" if num_gpus == 0 or not torch.cuda.is_available() else "gpu")
         self.model = move_to_device(self.model, device, num_gpus)
 
         if num_gpus is None:
@@ -236,7 +236,7 @@ class BERTTokenClassifier:
             batch_size=batch_size,
             sample_method="sequential",
         )
-        device = get_device("cpu" if num_gpus == 0 else "gpu")
+        device = get_device("cpu" if num_gpus == 0 or not torch.cuda.is_available() else "gpu")
         self.model = move_to_device(self.model, device, num_gpus)
 
         self.model.eval()

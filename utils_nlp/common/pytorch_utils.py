@@ -4,6 +4,7 @@
 
 import torch
 import torch.nn as nn
+import warnings
 
 
 def get_device(device="gpu"):
@@ -22,17 +23,18 @@ def get_device(device="gpu"):
     elif device == "cpu":
         return torch.device("cpu")
     else:
-        raise Exception("Only 'cpu' and 'gpu' devices are supported.")
+        raise ValueError("Only 'cpu' and 'gpu' devices are supported.")
 
 
-def move_to_device(model, device, num_gpus=1):
+def move_to_device(model, device, num_gpus=None):
     """Moves a model to the specified device (cpu or gpu/s)
        and implements data parallelism when multiple gpus are specified.
 
     Args:
         model (Module): A PyTorch model
         device (torch.device): A PyTorch device
-        num_gpus (int): The number of GPUs to be used. Defaults to 1.
+        num_gpus (int): The number of GPUs to be used. Defaults to None,
+            all gpus are used.
 
     Returns:
         Module, DataParallel: A PyTorch Module or
@@ -41,17 +43,14 @@ def move_to_device(model, device, num_gpus=1):
     if isinstance(model, nn.DataParallel):
         model = model.module
 
-    # cpu
-    if num_gpus == 0:
-        if device.type == "cpu":
-            return model.to(device)
-        else:
-            raise Exception("Device type should be 'cpu' when num_gpus==0.")
+    if not isinstance(device, torch.device):
+        raise ValueError("device must be of type torch.device.")
 
-    # gpu
     if device.type == "cuda":
         model.to(device)  # inplace
-        if num_gpus == 1:
+        if num_gpus == 0:
+            raise ValueError("num_gpus must be non-zero when device.type is 'cuda'")
+        elif num_gpus == 1:
             return model
         else:
             # parallelize
@@ -79,5 +78,11 @@ def move_to_device(model, device, num_gpus=1):
                     return nn.DataParallel(
                         model, device_ids=list(range(num_gpus))
                     )
+    elif device.type == "cpu":
+        if num_gpus != 0 and num_gpus is not None:
+            warnings.warn("Device type is 'cpu'. num_gpus is ignored.")
+        return model.to(device)
+
     else:
-        raise Exception("Device type should be 'gpu' when num_gpus!=0.")
+        raise Exception("Device type '{}' not supported. Currently, only cpu "
+                        "and cuda devices are supported.".format(device.type))
