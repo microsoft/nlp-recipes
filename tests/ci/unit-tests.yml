@@ -8,7 +8,7 @@ pr: none
 #- staging
 trigger: none
 
-job: unit-tests
+job: unit_tests
 timeoutInMinutes: 120
 
 pool:
