@@ -44,7 +44,6 @@ jobs:
       date;
       pytest --durations=0 tests/unit --junitxml=junit/test-unittest.xml; #not running any tests for now
       ls -al;
-      ls -al junit
     displayName: 'Run Unit tests'
 
   - task: PublishTestResults@2
