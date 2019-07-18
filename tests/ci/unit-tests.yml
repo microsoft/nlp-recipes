@@ -10,6 +10,8 @@ trigger: none
 
 pool:
  vmImage: 'ubuntu-16.04'
+ 
+timeoutInMinutes: 120
 
 steps:
 
