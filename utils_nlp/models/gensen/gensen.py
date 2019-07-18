@@ -404,8 +404,9 @@ class GenSenSingle(nn.Module):
             for sentence in sorted_sentences
         ]
 
-        sentences = Variable(torch.LongTensor(sentences), volatile=True)
-        rev = Variable(torch.LongTensor(rev), volatile=True)
+        with torch.no_grad():
+            sentences = Variable(torch.LongTensor(sentences))
+            rev = Variable(torch.LongTensor(rev))
         lengths = sorted_lens
 
         if self.cuda:

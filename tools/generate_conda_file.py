@@ -14,7 +14,6 @@
 import argparse
 import textwrap
 
-
 HELP_MSG = """
 To create the conda environment:
 $ conda env create -f {conda_env}.yaml
@@ -42,10 +41,12 @@ CONDA_BASE = {
     "pymongo": "pymongo>=3.6.1",
     "pytest": "pytest>=3.6.4",
     "pytorch": "pytorch-cpu>=1.0.0",
-    "py-xgboost": "py-xgboost<=0.80",
     "scipy": "scipy>=1.0.0",
     "tensorflow": "tensorflow==1.12.0",
+    "h5py": "h5py>=2.8.0",
+    "azureml-mlflow": "azureml-mlflow>=1.0.41",
     "tensorflow-hub": "tensorflow-hub==0.5.0",
+    "py-xgboost": "py-xgboost<=0.80",
 }
 
 CONDA_GPU = {
@@ -57,7 +58,7 @@ CONDA_GPU = {
 
 PIP_BASE = {
     "azureml-sdk[automl]": "azureml-sdk[automl]==1.0.48",
-    "azureml-train-automl":"azureml-train-automl==1.0.48",
+    "azureml-train-automl": "azureml-train-automl==1.0.48",
     "azureml-dataprep": "azureml-dataprep==1.1.8",
     "azureml-widgets": "azureml-widgets==1.0.48",
     "black": "black>=18.6b4",
@@ -83,7 +84,6 @@ PIP_BASE = {
 }
 
 PIP_GPU = {"horovod": "horovod>=0.16.1"}
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(

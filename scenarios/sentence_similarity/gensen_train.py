@@ -246,7 +246,7 @@ def evaluate_nli(nli_iterator, model, batch_size, n_gpus):
                 n_correct += 1.0
             else:
                 n_wrong += 1.0
-    print("NLI Dev Acc : %.5f" % (n_correct / (n_correct + n_wrong)))
+    logging.info("NLI Dev Acc : %.5f" % (n_correct / (n_correct + n_wrong)))
     n_correct = 0.0
     n_wrong = 0.0
     for j in range(0, len(nli_iterator.test_lines), batch_size * n_gpus):
@@ -265,7 +265,7 @@ def evaluate_nli(nli_iterator, model, batch_size, n_gpus):
                 n_correct += 1.0
             else:
                 n_wrong += 1.0
-    print("NLI Test Acc : %.5f" % (n_correct / (n_correct + n_wrong)))
+    logging.info("NLI Test Acc : %.5f" % (n_correct / (n_correct + n_wrong)))
     logging.info("******************************************************")
 
 
