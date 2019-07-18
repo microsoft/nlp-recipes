@@ -42,8 +42,7 @@ jobs:
       python -m ipykernel install --user --name nlp --display-name "nlp";
       conda install -y -c anaconda pytest;
       date;
-      pytest --durations=0 tests/unit --junitxml=junit/test-unittest.xml; #not running any tests for now
-      ls -al;
+      pytest --durations=0 tests/unit --junitxml=junit/test-unittest.xml;
     displayName: 'Run Unit tests'
 
   - task: PublishTestResults@2
