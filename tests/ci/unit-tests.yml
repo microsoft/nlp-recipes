@@ -8,56 +8,56 @@ pr: none
 #- staging
 trigger: none
 
-job: unit_tests
-timeoutInMinutes: 120
+jobs:
 
-pool:
- vmImage: 'ubuntu-16.04'
+- job: unit_tests
+  timeoutInMinutes: 120
 
+  pool:
+   vmImage: 'ubuntu-16.04'
 
+  steps:
 
-steps:
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: '3.6'
+      architecture: 'x64'
+      addToPath: true
+    displayName: 'Use Python 3.6'
+    
+  - bash:
+      echo "##vso[task.prependpath]/usr/share/miniconda/bin"
+    displayName: Add Conda to PATH
+  
+  - bash:
+      python tools/generate_conda_file.py;
+      conda env create -n nlp -f nlp_cpu.yaml;
+      conda env list
+    displayName: 'Creating Conda Environment with dependencies'
+  
+  - bash:
+      source activate nlp;
+      date;
+      conda install -y -c conda-forge ipykernel;
+      python -m ipykernel install --user --name nlp --display-name "nlp";
+      conda install -y -c anaconda pytest;
+      date;
+      pytest --durations=0 tests/unit --junitxml=junit/test-unittest.xml; #not running any tests for now
+      ls -al;
+      ls -al junit
+    displayName: 'Run Unit tests'
 
-- task: UsePythonVersion@0
-  inputs:
-    versionSpec: '3.6'
-    architecture: 'x64'
-    addToPath: true
-  displayName: 'Use Python 3.6'
-
-- bash: |
-    echo "##vso[task.prependpath]/usr/share/miniconda/bin"
-  displayName: Add Conda to PATH
-
-- bash: |
-    python tools/generate_conda_file.py;
-    ls -al;
-    conda env create -n nlp -f nlp_cpu.yaml;
-    conda env list
-  displayName: 'Creating Conda Environment with dependencies'
-
-- bash: |
-    source activate nlp;
-    date;
-    conda install -y -c conda-forge ipykernel;
-    python -m ipykernel install --user --name nlp --display-name "nlp";
-    conda install -y -c anaconda pytest;
-    date;
-    pytest --durations=0 tests/unit --junitxml=junit/test-unittest.xml; #not running any tests for now
-    ls -al;
-    ls -al junit
-  displayName: 'Run Unit tests'
-
-- task: PublishTestResults@2
-  displayName: 'Publish Test Results **/test-unitttest.xml'
-  condition: always()
-  inputs:
-    testResultsFiles: '**/test-unittest.xml'
-    failTaskOnFailedTests: true
-    testRunTitle: 'Test results for PyTest'
-
-- task: ComponentGovernanceComponentDetection@0
-  inputs:
-    scanType: 'Register'
-    verbosity: 'Verbose'
-    alertWarningLevel: 'High'
+  - task: PublishTestResults@2
+    displayName: 'Publish Test Results **/test-unitttest.xml'
+    condition: always()
+    inputs:
+      testResultsFiles: '**/test-unittest.xml'
+      failTaskOnFailedTests: true
+      testRunTitle: 'Test results for PyTest'
+  
+  - task: ComponentGovernanceComponentDetection@0
+    inputs:
+      scanType: 'Register'
+      verbosity: 'Verbose'
+      alertWarningLevel: 'High'
+  
