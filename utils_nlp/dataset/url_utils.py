@@ -16,7 +16,7 @@ log = logging.getLogger(__name__)
 
 
 def maybe_download(
-    url, filename=None, work_directory=".", expected_bytes=None
+    url, filename=None, work_directory=".", expected_bytes=None, tty=True
 ):
     """Download a file if it is not already downloaded.
 
@@ -25,6 +25,8 @@ def maybe_download(
         work_directory (str): Working directory.
         url (str): URL of the file to download.
         expected_bytes (int): Expected file size in bytes.
+        tty (bool): Set to False for non-tty (aka non-interactive)
+            output. This will disable progress bars.
     Returns:
         str: File path of the file downloaded.
     """
@@ -41,6 +43,7 @@ def maybe_download(
         with open(filepath, "wb") as file:
             for data in tqdm(
                 r.iter_content(block_size),
+                disable=not tty,
                 total=num_iterables,
                 unit="KB",
                 unit_scale=True,

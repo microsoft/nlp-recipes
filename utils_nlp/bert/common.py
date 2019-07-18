@@ -56,23 +56,25 @@ class Tokenizer:
         )
         self.language = language
 
-    def tokenize(self, text):
+    def tokenize(self, text, tty=True):
         """Tokenizes a list of documents using a BERT tokenizer
 
         Args:
             text (list): List of strings (one sequence) or
                 tuples (two sequences).
+            tty (bool): Set to False for non-tty (aka non-interactive)
+                output. This will disable progress bars.
 
         Returns:
             [list]: List of lists. Each sublist contains WordPiece tokens
                 of the input sequence(s).
         """
         if isinstance(text[0], str):
-            return [self.tokenizer.tokenize(x) for x in tqdm(text)]
+            return [self.tokenizer.tokenize(x) for x in tqdm(text, disable=not tty)]
         else:
             return [
                 [self.tokenizer.tokenize(x) for x in sentences]
-                for sentences in tqdm(text)
+                for sentences in tqdm(text, disable=not tty)
             ]
 
     def _truncate_seq_pair(self, tokens_a, tokens_b, max_length):

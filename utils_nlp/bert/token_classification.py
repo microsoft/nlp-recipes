@@ -109,6 +109,7 @@ class BERTTokenClassifier:
         batch_size=32,
         learning_rate=2e-5,
         warmup_proportion=None,
+        tty=True,
     ):
         """
         Fine-tunes the BERT classifier using the given training data.
@@ -133,6 +134,8 @@ class BERTTokenClassifier:
             warmup_proportion (float, optional): Proportion of training to
                 perform linear learning rate warmup for. E.g., 0.1 = 10% of
                 training. Defaults to None.
+            tty (bool): Set to False for non-tty (aka non-interactive)
+                output. This will disable progress bars.
         """
 
         train_dataloader = create_data_loader(
@@ -161,11 +164,11 @@ class BERTTokenClassifier:
         )
 
         self.model.train()
-        for _ in trange(int(num_epochs), desc="Epoch"):
+        for _ in trange(int(num_epochs), desc="Epoch", disable=not tty):
             tr_loss = 0
             nb_tr_steps = 0
             for step, batch in enumerate(
-                tqdm(train_dataloader, desc="Iteration", mininterval=30)
+                tqdm(train_dataloader, desc="Iteration", mininterval=30, disable=not tty)
             ):
                 batch = tuple(t.to(device) for t in batch)
                 b_token_ids, b_input_mask, b_label_ids = batch
@@ -203,6 +206,7 @@ class BERTTokenClassifier:
         batch_size=32,
         num_gpus=None,
         probabilities=False,
+        tty=True,
     ):
         """
         Predict token labels on the testing data.
@@ -245,7 +249,7 @@ class BERTTokenClassifier:
         eval_loss = 0
         nb_eval_steps = 0
         for step, batch in enumerate(
-            tqdm(test_dataloader, desc="Iteration", mininterval=10)
+            tqdm(test_dataloader, desc="Iteration", mininterval=10, disable=not tty)
         ):
             batch = tuple(t.to(device) for t in batch)
             true_label_available = False

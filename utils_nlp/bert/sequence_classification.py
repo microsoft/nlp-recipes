@@ -185,6 +185,7 @@ class BERTSequenceClassifier:
         num_gpus=None,
         batch_size=32,
         probabilities=False,
+        tty=True
     ):
         """Scores the given dataset and returns the predicted classes.
 
@@ -202,6 +203,8 @@ class BERTSequenceClassifier:
             probabilities (bool, optional):
                 If True, the predicted probability distribution
                 is also returned. Defaults to False.
+            tty (bool): Set to False for non-tty (aka non-interactive)
+                output. This will disable progress bars.
         Returns:
             1darray, namedtuple(1darray, ndarray): Predicted classes or
                 (classes, probabilities) if probabilities is True.
@@ -213,7 +216,7 @@ class BERTSequenceClassifier:
         # score
         self.model.eval()
         preds = []
-        with tqdm(total=len(token_ids)) as pbar:
+        with tqdm(total=len(token_ids), disable=not tty) as pbar:
             for i in range(0, len(token_ids), batch_size):
                 x_batch = token_ids[i : i + batch_size]
                 mask_batch = input_mask[i : i + batch_size]
