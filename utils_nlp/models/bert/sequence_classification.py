@@ -81,7 +81,9 @@ class BERTSequenceClassifier:
                 loss values. Defaults to True.
         """
 
-        device = get_device("cpu" if num_gpus == 0 or not torch.cuda.is_available() else "gpu")
+        device = get_device(
+            "cpu" if num_gpus == 0 or not torch.cuda.is_available() else "gpu"
+        )
         self.model = move_to_device(self.model, device, num_gpus)
 
         # define optimizer and model parameters
@@ -101,7 +103,8 @@ class BERTSequenceClassifier:
                     p
                     for n, p in param_optimizer
                     if any(nd in n for nd in no_decay)
-                ]
+                ],
+                "weight_decay": 0.0,
             },
         ]
 
@@ -120,7 +123,8 @@ class BERTSequenceClassifier:
             )
 
         # define loss function
-        loss_func = nn.CrossEntropyLoss().to(device)
+        # loss_func = nn.CrossEntropyLoss().to(device)
+        loss_func = nn.CrossEntropyLoss()
 
         # train
         self.model.train()  # training mode
@@ -149,8 +153,6 @@ class BERTSequenceClassifier:
                         device=device,
                     )
 
-                opt.zero_grad()
-
                 y_h = self.model(
                     input_ids=x_batch,
                     token_type_ids=token_type_ids_batch,
@@ -158,9 +160,13 @@ class BERTSequenceClassifier:
                     labels=None,
                 )
 
-                loss = loss_func(y_h, y_batch).mean()
+                loss = loss_func(
+                    y_h.view(-1, self.num_labels), y_batch.view(-1)
+                ).mean()
                 loss.backward()
                 opt.step()
+                opt.zero_grad()
+
                 if verbose:
                     if i % ((num_batches // 10) + 1) == 0:
                         print(
@@ -207,7 +213,9 @@ class BERTSequenceClassifier:
                 (classes, probabilities) if probabilities is True.
         """
 
-        device = get_device("cpu" if num_gpus == 0 or not torch.cuda.is_available() else "gpu")
+        device = get_device(
+            "cpu" if num_gpus == 0 or not torch.cuda.is_available() else "gpu"
+        )
         self.model = move_to_device(self.model, device, num_gpus)
 
         # score
