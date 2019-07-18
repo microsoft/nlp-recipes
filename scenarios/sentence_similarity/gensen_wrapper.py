@@ -7,9 +7,9 @@ import numpy as np
 import pandas as pd
 
 from scenarios.sentence_similarity.gensen_train import train
-from utils_nlp.gensen.create_gensen_model import create_multiseq2seq_model
-from utils_nlp.gensen.gensen import GenSenSingle
-from utils_nlp.gensen.preprocess_utils import gensen_preprocess
+from utils_nlp.models.gensen.create_gensen_model import create_multiseq2seq_model
+from utils_nlp.models.gensen.gensen import GenSenSingle
+from utils_nlp.models.gensen.preprocess_utils import gensen_preprocess
 
 
 class GenSenClassifier:
