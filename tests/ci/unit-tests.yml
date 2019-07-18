@@ -8,10 +8,13 @@ pr: none
 #- staging
 trigger: none
 
+job: unit-tests
+timeoutInMinutes: 120
+
 pool:
  vmImage: 'ubuntu-16.04'
- 
-timeoutInMinutes: 120
+
+
 
 steps:
 
