@@ -56,6 +56,7 @@ CONDA_GPU = {
 }
 
 PIP_BASE = {
+    "allennlp": "allennlp==0.8.4",
     "azureml-sdk[automl]": "azureml-sdk[automl]==1.0.48",
     "azureml-train-automl":"azureml-train-automl==1.0.48",
     "azureml-dataprep": "azureml-dataprep==1.1.8",
