@@ -7,6 +7,8 @@ import pytest
 from utils_nlp.dataset.url_utils import maybe_download
 from utils_nlp.dataset.msrpc import load_pandas_df
 import utils_nlp.dataset.wikigold as wg
+import utils_nlp.dataset.xnli as xnli
+from utils_nlp.dataset.ner_utils import preprocess_conll
 
 
 def test_maybe_download():
@@ -46,3 +48,80 @@ def test_wikigold(tmp_path):
 
     assert train_df.shape == (wg_train_sentence_count, 2)
     assert test_df.shape == (wg_test_sentence_count, 2)
+
+
+@pytest.fixture
+def ner_utils_test_data(scope="module"):
+    return {
+        "input": "The O\n139th I-ORG\nwas O\nformed O\nat O\nCamp I-LOC\n"
+        "Howe I-LOC\n, O\nnear O\nPittsburgh I-LOC\n, O\non O\n"
+        "September O\n1 O\n, O\n1862 O\n. O\n\nFrederick I-PER\n"
+        "H. I-PER\nCollier I-PER\nwas O\nthe O\nfirst O\ncolonel O\n. O",
+        "expected_output": (
+            [
+                [
+                    "The",
+                    "139th",
+                    "was",
+                    "formed",
+                    "at",
+                    "Camp",
+                    "Howe",
+                    ",",
+                    "near",
+                    "Pittsburgh",
+                    ",",
+                    "on",
+                    "September",
+                    "1",
+                    ",",
+                    "1862",
+                    ".",
+                ],
+                [
+                    "Frederick",
+                    "H.",
+                    "Collier",
+                    "was",
+                    "the",
+                    "first",
+                    "colonel",
+                    ".",
+                ],
+            ],
+            [
+                [
+                    "O",
+                    "I-ORG",
+                    "O",
+                    "O",
+                    "O",
+                    "I-LOC",
+                    "I-LOC",
+                    "O",
+                    "O",
+                    "I-LOC",
+                    "O",
+                    "O",
+                    "O",
+                    "O",
+                    "O",
+                    "O",
+                    "O",
+                ],
+                ["I-PER", "I-PER", "I-PER", "O", "O", "O", "O", "O"],
+            ],
+        ),
+    }
+
+
+def test_ner_utils(ner_utils_test_data):
+    output = preprocess_conll(ner_utils_test_data["input"])
+    assert output == ner_utils_test_data["expected_output"]
+
+
+def test_xnli(tmp_path):
+    # only test for the dev df as the train dataset takes several
+    # minutes to download
+    dev_df = xnli.load_pandas_df(local_cache_path=tmp_path)
+    assert dev_df.shape == (2490, 2)

@@ -16,8 +16,9 @@ Notwithstanding any other terms, you may reverse engineer this software to the
 extent required to debug changes to any libraries licensed under the GNU Lesser
 General Public License.
 
-------------Attribution Starts Here----------------------------------------------
-Component: https://github.com/huggingface/pytorch-pretrained-BERT
+--
+
+https://github.com/huggingface/pytorch-pretrained-BERT
 
                                  Apache License
                            Version 2.0, January 2004
@@ -220,5 +221,3 @@ Component: https://github.com/huggingface/pytorch-pretrained-BERT
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
    limitations under the License.
-
-------------End of Attribution ---------------------------------------------------

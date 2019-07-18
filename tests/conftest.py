@@ -15,8 +15,8 @@ from tempfile import TemporaryDirectory
 import pytest
 from tests.notebooks_common import path_notebooks
 
-from utils_nlp.bert.common import Language
-from utils_nlp.bert.common import Tokenizer as BERTTokenizer
+from utils_nlp.models.bert.common import Language
+from utils_nlp.models.bert.common import Tokenizer as BERTTokenizer
 
 
 @pytest.fixture(scope="module")
@@ -43,8 +43,11 @@ def notebooks():
 
 @pytest.fixture
 def tmp(tmp_path_factory):
-    with TemporaryDirectory(dir=tmp_path_factory.getbasetemp()) as td:
-        yield td
+    td = TemporaryDirectory(dir=tmp_path_factory.getbasetemp())
+    try:
+        yield td.name
+    finally:
+        td.cleanup()
 
 
 @pytest.fixture(scope="module")
@@ -158,6 +161,7 @@ def ner_test_data():
 @pytest.fixture()
 def bert_english_tokenizer():
     return BERTTokenizer(language=Language.ENGLISHCASED, to_lower=False)
+
 
 @pytest.fixture(scope="module")
 def baseline_results():

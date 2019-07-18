@@ -128,3 +128,5 @@ nlp_*.yaml
 data/
 sentence-similarity/data/
 
+# AML Config
+aml_config/

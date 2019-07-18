@@ -14,8 +14,8 @@ from pytorch_pretrained_bert.modeling import BertForSequenceClassification
 from pytorch_pretrained_bert.optimization import BertAdam
 from tqdm import tqdm
 
-from utils_nlp.bert.common import Language
-from utils_nlp.pytorch.device_utils import get_device, move_to_device
+from utils_nlp.models.bert.common import Language
+from utils_nlp.common.pytorch_utils import get_device, move_to_device
 
 
 class BERTSequenceClassifier:
@@ -81,7 +81,7 @@ class BERTSequenceClassifier:
                 loss values. Defaults to True.
         """
 
-        device = get_device("cpu" if num_gpus == 0 else "gpu")
+        device = get_device("cpu" if num_gpus == 0 or not torch.cuda.is_available() else "gpu")
         self.model = move_to_device(self.model, device, num_gpus)
 
         # define optimizer and model parameters
@@ -207,7 +207,7 @@ class BERTSequenceClassifier:
                 (classes, probabilities) if probabilities is True.
         """
 
-        device = get_device("cpu" if num_gpus == 0 else "gpu")
+        device = get_device("cpu" if num_gpus == 0 or not torch.cuda.is_available() else "gpu")
         self.model = move_to_device(self.model, device, num_gpus)
 
         # score

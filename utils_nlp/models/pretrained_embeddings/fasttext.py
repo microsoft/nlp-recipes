@@ -7,7 +7,7 @@ import zipfile
 from gensim.models.fasttext import load_facebook_model
 
 from utils_nlp.dataset.url_utils import maybe_download
-from utils_nlp.pretrained_embeddings import FASTTEXT_EN_URL
+from utils_nlp.models.pretrained_embeddings import FASTTEXT_EN_URL
 
 
 def _extract_fasttext_vectors(zip_path, dest_path="."):
@@ -30,6 +30,7 @@ def _extract_fasttext_vectors(zip_path, dest_path="."):
 
     os.remove(zip_path)
     return dest_path
+
 
 def _download_fasttext_vectors(download_dir, file_name="wiki.simple.zip"):
     """ Downloads pre-trained word vectors for English, trained on Wikipedia using
