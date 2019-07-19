@@ -1,7 +1,6 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
-"""GenSen Encoder"""
 import h5py
 from sklearn.linear_model import LinearRegression
 import nltk
@@ -10,7 +9,6 @@ import pickle
 import os
 import copy
 import logging
-
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
@@ -18,7 +16,10 @@ from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
 
 
 class Encoder(nn.Module):
-    """GenSen Encoder."""
+    """GenSen Encoder.
+    
+    Original source in https://github.com/Maluuba/gensen
+    """
 
     def __init__(
         self, vocab_size, embedding_dim, hidden_dim, num_layers, rnn_type="GRU"
@@ -86,7 +87,7 @@ class Encoder(nn.Module):
         self.src_embedding.cuda()
 
     def forward(self, input, lengths, return_all=False, pool="last"):
-        """ Propogate input through the encoder.
+        """Propogate input through the encoder.
 
         Args:
             input(torch.Tensor): Embedding matrix
@@ -123,7 +124,10 @@ class Encoder(nn.Module):
 
 
 class GenSen(nn.Module):
-    """A wrapper class for multiple GenSen models."""
+    """A wrapper class for multiple GenSen models.
+    
+    Original source in https://github.com/Maluuba/gensen
+    """
 
     def __init__(self, *args, **kwargs):
         super(GenSen, self).__init__()
@@ -184,7 +188,10 @@ class GenSen(nn.Module):
 
 
 class GenSenSingle(nn.Module):
-    """GenSen Wrapper."""
+    """GenSen Wrapper.
+    
+    Original source in https://github.com/Maluuba/gensen
+    """
 
     def __init__(
         self,
@@ -404,8 +411,9 @@ class GenSenSingle(nn.Module):
             for sentence in sorted_sentences
         ]
 
-        sentences = Variable(torch.LongTensor(sentences), volatile=True)
-        rev = Variable(torch.LongTensor(rev), volatile=True)
+        with torch.no_grad():
+            sentences = Variable(torch.LongTensor(sentences))
+            rev = Variable(torch.LongTensor(rev))
         lengths = sorted_lens
 
         if self.cuda:
@@ -454,4 +462,3 @@ class GenSenSingle(nn.Module):
             return h, h_t
 
 
-# Original source: https://github.com/Maluuba/gensen
