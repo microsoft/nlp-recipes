@@ -169,6 +169,11 @@ def clean_rows(df, label_col=LABEL_COL):
 
     return snli_df
 
+def clean_df(df, label_col=LABEL_COL):
+    df = clean_cols(df)
+    df = clean_rows(df, label_col)
+
+    return df
 
 def load_azureml_df(
     local_cache_path=None, file_split=Split.TRAIN, file_type="txt"
