@@ -89,48 +89,6 @@ class BERTSequenceClassifier:
         )
         self.model = move_to_device(self.model, device, num_gpus)
 
-        # define optimizer and model parameters
-        param_optimizer = list(self.model.named_parameters())
-        no_decay = ["bias", "LayerNorm.bias", "LayerNorm.weight"]
-        optimizer_grouped_parameters = [
-            {
-                "params": [
-                    p
-                    for n, p in param_optimizer
-                    if not any(nd in n for nd in no_decay)
-                ],
-                "weight_decay": 0.01,
-            },
-            {
-                "params": [
-                    p
-                    for n, p in param_optimizer
-                    if any(nd in n for nd in no_decay)
-                ],
-                "weight_decay": 0.0,
-            },
-        ]
-
-        num_examples = len(token_ids)
-        num_batches = int(num_examples / batch_size)
-        num_train_optimization_steps = num_batches * num_epochs
-
-        if warmup_proportion is None:
-            opt = BertAdam(optimizer_grouped_parameters, lr=lr)
-        else:
-            opt = BertAdam(
-                optimizer_grouped_parameters,
-                lr=lr,
-                t_total=num_train_optimization_steps,
-                warmup=warmup_proportion,
-            )
-
-        # define loss function
-        loss_func = nn.CrossEntropyLoss().to(device)
-
-        # train
-        self.model.train()  # training mode
-
         token_ids_tensor = torch.tensor(token_ids, dtype=torch.long)
         input_mask_tensor = torch.tensor(input_mask, dtype=torch.long)
         labels_tensor = torch.tensor(labels, dtype=torch.long)
@@ -154,6 +112,46 @@ class BERTSequenceClassifier:
         train_dataloader = DataLoader(
             train_dataset, sampler=train_sampler, batch_size=batch_size
         )
+        # define optimizer and model parameters
+        param_optimizer = list(self.model.named_parameters())
+        no_decay = ["bias", "LayerNorm.bias", "LayerNorm.weight"]
+        optimizer_grouped_parameters = [
+            {
+                "params": [
+                    p
+                    for n, p in param_optimizer
+                    if not any(nd in n for nd in no_decay)
+                ],
+                "weight_decay": 0.01,
+            },
+            {
+                "params": [
+                    p
+                    for n, p in param_optimizer
+                    if any(nd in n for nd in no_decay)
+                ],
+                "weight_decay": 0.0,
+            },
+        ]
+
+        num_batches = len(train_dataloader)
+        num_train_optimization_steps = num_batches * num_epochs
+
+        if warmup_proportion is None:
+            opt = BertAdam(optimizer_grouped_parameters, lr=lr)
+        else:
+            opt = BertAdam(
+                optimizer_grouped_parameters,
+                lr=lr,
+                t_total=num_train_optimization_steps,
+                warmup=warmup_proportion,
+            )
+
+        # define loss function
+        loss_func = nn.CrossEntropyLoss().to(device)
+
+        # train
+        self.model.train()  # training mode
 
         for epoch in range(num_epochs):
             training_loss = 0
