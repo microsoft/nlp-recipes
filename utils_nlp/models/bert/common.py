@@ -3,9 +3,8 @@
 
 
 # This script reuses some code from
-# https://github.com/huggingface/pytorch-pretrained-BERT/blob/master/examples
-# /run_classifier.py
-
+# https://github.com/huggingface/pytorch-transformers/blob/master/examples
+# /run_glue.py
 
 from enum import Enum
 import warnings
@@ -391,7 +390,7 @@ def create_data_loader(
     else:
         raise ValueError(
             "Invalid sample_method value, accepted values are: "
-            "random, sequential, and distributed"
+            "random and sequential."
         )
 
     dataloader = DataLoader(

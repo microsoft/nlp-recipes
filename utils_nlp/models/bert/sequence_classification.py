@@ -1,8 +1,6 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
-# This script reuses some code from
-# https://github.com/huggingface/pytorch-pretrained-BERT/blob/master/examples/run_classifier.py
 
 from collections import namedtuple
 
