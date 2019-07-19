@@ -32,13 +32,11 @@ CHANNELS = ["defaults", "conda-forge", "pytorch"]
 CONDA_BASE = {
     "python": "python==3.6.8",
     "pip": "pip>=19.1.1",
-    "gitpython": "gitpython>=2.1.8",
     "ipykernel": "ipykernel>=4.6.1",
     "jupyter": "jupyter>=1.0.0",
     "matplotlib": "matplotlib>=2.2.2",
     "numpy": "numpy>=1.13.3",
     "pandas": "pandas>=0.24.2",
-    "pymongo": "pymongo>=3.6.1",
     "pytest": "pytest>=3.6.4",
     "pytorch": "pytorch-cpu>=1.0.0",
     "scipy": "scipy>=1.0.0",
@@ -61,6 +59,7 @@ PIP_BASE = {
     "azureml-train-automl": "azureml-train-automl==1.0.48",
     "azureml-dataprep": "azureml-dataprep==1.1.8",
     "azureml-widgets": "azureml-widgets==1.0.48",
+    "azureml-mlflow": "azureml-mlflow>=1.0.43.1",
     "black": "black>=18.6b4",
     "dask": "dask[dataframe]==1.2.2",
     "papermill": "papermill>=1.0.1",
@@ -80,7 +79,6 @@ PIP_BASE = {
     "nltk": "nltk>=3.4",
     "pytorch-pretrained-bert": "pytorch-pretrained-bert>=0.6",
     "seqeval": "seqeval>=0.0.12",
-    "azureml-mlflow": "azureml-mlflow>=1.0.43.1",
 }
 
 PIP_GPU = {"horovod": "horovod>=0.16.1"}
