@@ -30,12 +30,14 @@ class GenSenClassifier:
         pretrained_embedding_path,
         learning_rate=0.0001,
         cache_dir=".",
+        max_epoch=None,
     ):
         self.learning_rate = learning_rate
         self.config_file = config_file
         self.cache_dir = cache_dir
         self.pretrained_embedding_path = pretrained_embedding_path
         self.model_name = "gensen_multiseq2seq"
+        self.max_epoch = max_epoch
 
         self._validate_params()
 
@@ -118,6 +120,7 @@ class GenSenClassifier:
             data_folder=os.path.abspath(self.cache_dir),
             config=self.config,
             learning_rate=self.learning_rate,
+            max_epoch=self.max_epoch,
         )
 
         self._create_multiseq2seq_model()

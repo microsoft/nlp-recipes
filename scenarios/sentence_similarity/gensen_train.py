@@ -134,10 +134,12 @@ def evaluate(
     save_dir,
     starting_time,
     model_state,
+    max_epoch,
 ):
     """ Function to validate the model.
 
     Args:
+        max_epoch(int): Limit training to specified number of epochs.
         model_state(dict): Saved model weights.
         config(dict): Config object.
         train_iterator(BufferedDataIterator): BufferedDataIterator object.
@@ -197,7 +199,7 @@ def evaluate(
         )
         if (monitor_epoch - min_val_loss_epoch) > config["training"][
             "stop_patience"
-        ]:
+        ] or (max_epoch is not None and monitor_epoch > max_epoch):
             logging.info("Saving model ...")
             # Save the name with validation loss.
             torch.save(
@@ -269,10 +271,11 @@ def evaluate_nli(nli_iterator, model, batch_size, n_gpus):
     logging.info("******************************************************")
 
 
-def train(config, data_folder, learning_rate=0.0001):
+def train(config, data_folder, learning_rate=0.0001, max_epoch=None):
     """ Train the Gensen model.
 
     Args:
+        max_epoch(int): Limit training to specified number of epochs.
         config(dict): Loaded json file as a python object.
         data_folder(str): Path to the folder containing the data.
         learning_rate(float): Learning rate for the model.
@@ -588,6 +591,7 @@ def train(config, data_folder, learning_rate=0.0001):
                         save_dir=save_dir,
                         starting_time=start,
                         model_state=model_state,
+                        max_epoch=max_epoch,
                     )
                     if training_complete:
                         break
@@ -620,6 +624,12 @@ if __name__ == "__main__":
     # Add learning rate to tune model.
     parser.add_argument(
         "--learning_rate", type=float, default=0.0001, help="learning rate"
+    )
+    parser.add_argument(
+        "--max_epoch",
+        type=int,
+        default=None,
+        help="Limit training to specified number of epochs.",
     )
 
     args = parser.parse_args()
