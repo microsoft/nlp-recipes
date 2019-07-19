@@ -70,10 +70,26 @@ def load_pandas_df(local_cache_path="./", file_split="dev", language="zh"):
         lines = f.read().splitlines()
 
     line_list = [line.split("\t") for line in lines]
+
     # Remove the column name row
     line_list.pop(0)
     if file_split != "train":
         line_list = [line for line in line_list if line[0] == language]
+
+    valid_lines = [
+        True if line[sentence_1_index] and line[sentence_2_index] else False
+        for line in line_list
+    ]
+    total_line_count = len(line_list)
+    line_list = [line for line, valid in zip(line_list, valid_lines) if valid]
+    valid_line_count = len(line_list)
+
+    if valid_line_count != total_line_count:
+        print(
+            "{} invalid lines removed.".format(
+                total_line_count - valid_line_count
+            )
+        )
 
     label_list = [convert_to_unicode(line[label_index]) for line in line_list]
     old_contradict_label = convert_to_unicode("contradictory")
