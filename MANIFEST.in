@@ -1,0 +1,8 @@
+graft utils_nlp
+
+global-exclude *.py[cod] __pycache__ *.so *.dylib
+
+exclude README.md
+exclude SETUP.md
+exclude CONTRIBUTING.md
+

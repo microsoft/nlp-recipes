@@ -25,7 +25,8 @@ Depending on the type of NLP system and the notebook that needs to be run, there
 
 ### Requirements
 
-* A machine running Linux, MacOS or Windows.
+* A machine running Linux, MacOS or Windows.  
+    > NOTE: Windows machine are not **FULLY SUPPORTED**. Please use at your own risk.  
 * Miniconda or Anaconda with Python version >= 3.6. 
     * This is pre-installed on Azure DSVM such that one can run the following steps directly. To setup on your local machine, [Miniconda](https://docs.conda.io/en/latest/miniconda.html) is a quick way to get started.
     * It is recommended to update conda to the latest version: `conda update -n base -c defaults conda`
@@ -69,4 +70,15 @@ We can register our created conda environment to appear as a kernel in the Jupyt
     conda activate my_env_name
     python -m ipykernel install --user --name my_env_name --display-name "Python (my_env_name)"
     
-If you are using the DSVM, you can [connect to JupyterHub](https://docs.microsoft.com/en-us/azure/machine-learning/data-science-virtual-machine/dsvm-ubuntu-intro#jupyterhub-and-jupyterlab) by browsing to `https://your-vm-ip:8000`.
+If you are using the DSVM, you can [connect to JupyterHub](https://docs.microsoft.com/en-us/azure/machine-learning/data-science-virtual-machine/dsvm-ubuntu-intro#jupyterhub-and-jupyterlab) by browsing to `https://your-vm-ip:8000`.  
+
+## Install this repository via PIP
+A [setup.py](setup.py) file is provied in order to simplify the installation of this utilities in this repo from the main directory. 
+
+    pip install -e utils_nlp
+
+It is also possible to install directly from Github.
+
+    pip install -e  git+git@github.com:microsoft/nlp.git@master#egg=utils_nlp
+
+**NOTE** - The pip installation does not install any of the necessary package dependencies, it is expected that conda will be used as shown above to setup the environment for the utilities being used.
