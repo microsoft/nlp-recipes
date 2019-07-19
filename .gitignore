@@ -123,6 +123,7 @@ tools/repo_metrics/config.py
 *.item
 *.pkl
 nlp_*.yaml
+nohup.out
 
 # Data
 data/
