@@ -44,7 +44,6 @@ CONDA_BASE = {
     "scipy": "scipy>=1.0.0",
     "tensorflow": "tensorflow==1.12.0",
     "h5py": "h5py>=2.8.0",
-    "azureml-mlflow": "azureml-mlflow>=1.0.41",
     "tensorflow-hub": "tensorflow-hub==0.5.0",
     "py-xgboost": "py-xgboost<=0.80",
 }
