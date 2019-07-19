@@ -28,12 +28,6 @@ def notebooks():
         "similarity_embeddings_baseline": os.path.join(
             folder_notebooks, "sentence_similarity", "baseline_deep_dive.ipynb"
         ),
-        "senteval_local": os.path.join(
-            folder_notebooks, "sentence_similarity", "senteval_local.ipynb"
-        ),
-        "senteval_azureml": os.path.join(
-            folder_notebooks, "sentence_similarity", "senteval_azureml.ipynb"
-        ),
         "embedding_trainer": os.path.join(
             folder_notebooks, "embeddings", "embedding_trainer.ipynb"
         ),
