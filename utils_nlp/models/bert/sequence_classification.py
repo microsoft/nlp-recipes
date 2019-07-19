@@ -4,8 +4,7 @@
 # This script reuses some code from
 # https://github.com/huggingface/pytorch-pretrained-BERT/blob/master/examples/run_classifier.py
 
-# import random
-# from collections import namedtuple
+from collections import namedtuple
 
 import numpy as np
 import torch
@@ -18,7 +17,7 @@ from torch.utils.data import (
 )
 from pytorch_pretrained_bert.modeling import BertForSequenceClassification
 from pytorch_pretrained_bert.optimization import BertAdam
-from tqdm import tqdm, trange
+from tqdm import tqdm
 
 from utils_nlp.models.bert.common import Language
 from utils_nlp.common.pytorch_utils import get_device, move_to_device
@@ -129,55 +128,79 @@ class BERTSequenceClassifier:
             )
 
         # define loss function
-        # loss_func = nn.CrossEntropyLoss().to(device)
-        # loss_func = nn.CrossEntropyLoss()
+        loss_func = nn.CrossEntropyLoss().to(device)
 
         # train
         self.model.train()  # training mode
 
-        all_input_ids = torch.tensor(token_ids, dtype=torch.long)
-        all_input_mask = torch.tensor(input_mask, dtype=torch.long)
-        all_segment_ids = torch.tensor(token_type_ids, dtype=torch.long)
-        all_label_ids = torch.tensor(labels, dtype=torch.long)
+        token_ids_tensor = torch.tensor(token_ids, dtype=torch.long)
+        input_mask_tensor = torch.tensor(input_mask, dtype=torch.long)
+        labels_tensor = torch.tensor(labels, dtype=torch.long)
 
-        train_data = TensorDataset(
-            all_input_ids, all_input_mask, all_segment_ids, all_label_ids
-        )
-        train_sampler = RandomSampler(train_data)
+        if token_type_ids:
+            token_type_ids_tensor = torch.tensor(
+                token_type_ids, dtype=torch.long
+            )
+            train_dataset = TensorDataset(
+                token_ids_tensor,
+                input_mask_tensor,
+                token_type_ids_tensor,
+                labels_tensor,
+            )
+        else:
+            train_dataset = TensorDataset(
+                token_ids_tensor, input_mask_tensor, labels_tensor
+            )
+        train_sampler = RandomSampler(train_dataset)
 
         train_dataloader = DataLoader(
-            train_data, sampler=train_sampler, batch_size=batch_size
+            train_dataset, sampler=train_sampler, batch_size=batch_size
         )
 
-        for _ in trange(int(num_epochs), desc="Epoch"):
-            tr_loss = 0
-            nb_tr_examples, nb_tr_steps = 0, 0
-            for step, batch in enumerate(
+        for epoch in range(num_epochs):
+            training_loss = 0
+            for i, batch in enumerate(
                 tqdm(train_dataloader, desc="Iteration")
             ):
-                batch = tuple(t.to(device) for t in batch)
-                input_ids, input_mask, segment_ids, label_ids = batch
+                if token_type_ids:
+                    x_batch, mask_batch, token_type_ids_batch, y_batch = tuple(
+                        t.to(device) for t in batch
+                    )
+                else:
+                    token_type_ids_batch = None
+                    x_batch, mask_batch, y_batch = tuple(
+                        t.to(device) for t in batch
+                    )
 
-                # define a new function to compute loss values for both output_modes
-                logits = self.model(
-                    input_ids, segment_ids, input_mask, labels=None
+                opt.zero_grad()
+
+                y_h = self.model(
+                    input_ids=x_batch,
+                    token_type_ids=token_type_ids_batch,
+                    attention_mask=mask_batch,
+                    labels=None,
                 )
+                loss = loss_func(y_h, y_batch).mean()
 
-                loss_fct = nn.CrossEntropyLoss()
-                loss = loss_fct(
-                    logits.view(-1, self.num_labels), label_ids.view(-1)
-                )
-
-                loss = loss.mean()  # mean() to average on multi-gpu.
+                training_loss += loss.item()
 
                 loss.backward()
-
-                tr_loss += loss.item()
-                nb_tr_examples += input_ids.size(0)
-                nb_tr_steps += 1
-
                 opt.step()
-                opt.zero_grad()
+                if verbose:
+                    if i % ((num_batches // 10) + 1) == 0:
+                        print(
+                            "epoch:{}/{}; batch:{}->{}/{}; loss:{:.6f}".format(
+                                epoch + 1,
+                                num_epochs,
+                                i + 1,
+                                min(i + 1 + num_batches // 10, num_batches),
+                                num_batches,
+                                training_loss / (i + 1),
+                            )
+                        )
+        # empty cache
+        del [x_batch, y_batch, mask_batch, token_type_ids_batch]
+        torch.cuda.empty_cache()
 
     def predict(
         self,
@@ -217,42 +240,49 @@ class BERTSequenceClassifier:
         # score
         self.model.eval()
 
-        all_input_ids = torch.tensor(token_ids, dtype=torch.long)
-        all_input_mask = torch.tensor(input_mask, dtype=torch.long)
-        all_segment_ids = torch.tensor(token_type_ids, dtype=torch.long)
+        token_ids_tensor = torch.tensor(token_ids, dtype=torch.long)
+        input_mask_tensor = torch.tensor(input_mask, dtype=torch.long)
 
-        eval_data = TensorDataset(
-            all_input_ids, all_input_mask, all_segment_ids
+        if token_type_ids:
+            token_type_ids_tensor = torch.tensor(
+                token_type_ids, dtype=torch.long
+            )
+            test_dataset = TensorDataset(
+                token_ids_tensor, input_mask_tensor, token_type_ids_tensor
+            )
+        else:
+            test_dataset = TensorDataset(token_ids_tensor, input_mask_tensor)
+
+        test_sampler = SequentialSampler(test_dataset)
+        test_dataloader = DataLoader(
+            test_dataset, sampler=test_sampler, batch_size=batch_size
         )
 
-        eval_sampler = SequentialSampler(eval_data)
-        eval_dataloader = DataLoader(
-            eval_data, sampler=eval_sampler, batch_size=batch_size
-        )
-
-        nb_eval_steps = 0
         preds = []
-        for input_ids, input_mask, segment_ids in tqdm(
-            eval_dataloader, desc="Evaluating"
-        ):
-            input_ids = input_ids.to(device)
-            input_mask = input_mask.to(device)
-            segment_ids = segment_ids.to(device)
+        for i, batch in enumerate(tqdm(test_dataloader, desc="Iteration")):
+            if token_type_ids:
+                x_batch, mask_batch, token_type_ids_batch = tuple(
+                    t.to(device) for t in batch
+                )
+            else:
+                token_type_ids_batch = None
+                x_batch, mask_batch = tuple(t.to(device) for t in batch)
 
             with torch.no_grad():
-                logits = self.model(
-                    input_ids, segment_ids, input_mask, labels=None
+                p_batch = self.model(
+                    input_ids=x_batch,
+                    token_type_ids=token_type_ids_batch,
+                    attention_mask=mask_batch,
+                    labels=None,
                 )
+            preds.append(p_batch.cpu())
 
-            nb_eval_steps += 1
-            if len(preds) == 0:
-                preds.append(logits.detach().cpu().numpy())
-            else:
-                preds[0] = np.append(
-                    preds[0], logits.detach().cpu().numpy(), axis=0
-                )
+        preds = np.concatenate(preds)
 
-        preds = preds[0]
-        preds = np.argmax(preds, axis=1)
-
-        return preds
+        if probabilities:
+            return namedtuple("Predictions", "classes probabilities")(
+                preds.argmax(axis=1),
+                nn.Softmax(dim=1)(torch.Tensor(preds)).numpy(),
+            )
+        else:
+            return preds.argmax(axis=1)
