@@ -68,7 +68,8 @@ def test_move_to_device_exception_wrong_type(model):
     with pytest.raises(Exception):
         move_to_device(model, torch.device("opengl"))
 
-        
+
+@pytest.mark.skipif(torch.cuda.is_available(), reason="Skip if we are executing the cpu tests on a gpu machine")
 def test_move_to_device_exception_gpu_model_on_cpu_machine(model):
     # test when the model is moved to a gpu but it is a cpu machine
     with pytest.raises(Exception):
