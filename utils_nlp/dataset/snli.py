@@ -78,10 +78,10 @@ def _maybe_download_and_extract(zip_path, file_split, file_type):
     extract_path = os.path.join(dir_path, file_name)
 
     if not os.path.exists(extract_path):
-        download_snli(zip_path)
+        dpath = download_snli(zip_path)
         extract_snli(
             zip_path,
-            source_path=os.path.join(SNLI_DIRNAME, file_name),
+            source_path=SNLI_DIRNAME + "/" + file_name,
             dest_path=extract_path,
         )
 
