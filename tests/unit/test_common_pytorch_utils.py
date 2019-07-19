@@ -5,26 +5,31 @@ import pytest
 import torch
 import torch.nn as nn
 from utils_nlp.common.pytorch_utils import get_device, move_to_device
+        
+        
+def test_get_device_cpu():
+    device = get_device("cpu")
+    assert isinstance(device, torch.device)
+    assert device.type == "cpu"
 
 
-def test_get_device():
-
-    if torch.cuda.is_available():
-        device = get_device()
-        assert isinstance(device, torch.device)
-        assert device.type == "cuda"
-    else:
-        with pytest.raises(Exception):
-            get_device()
-
-        device = get_device("cpu")
-        assert isinstance(device, torch.device)
-        assert device.type == "cpu"
-
+def test_get_device_exception():
     with pytest.raises(ValueError):
         get_device("abc")
 
 
+@pytest.mark.gpu
+def test_gpu_machine():
+    assert torch.cuda.is_available() is True
+    
+    
+@pytest.mark.gpu
+def test_get_device_gpu():
+    device = get_device()
+    assert isinstance(device, torch.device)
+    assert device.type == "cuda"
+    
+    
 def test_move_to_device():
     model = nn.Sequential(
         nn.Linear(24, 8), nn.ReLU(), nn.Linear(8, 2), nn.Sigmoid()
