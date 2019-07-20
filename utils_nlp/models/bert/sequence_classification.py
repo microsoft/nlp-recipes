@@ -185,7 +185,7 @@ class BERTSequenceClassifier:
                 if verbose:
                     if i % ((num_batches // 10) + 1) == 0:
                         print(
-                            "epoch:{}/{}; batch:{}->{}/{}; loss:{:.6f}".format(
+                            "epoch:{}/{}; batch:{}->{}/{}; average training loss:{:.6f}".format(
                                 epoch + 1,
                                 num_epochs,
                                 i + 1,
