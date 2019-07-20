@@ -28,12 +28,6 @@ def notebooks():
         "similarity_embeddings_baseline": os.path.join(
             folder_notebooks, "sentence_similarity", "baseline_deep_dive.ipynb"
         ),
-        "senteval_local": os.path.join(
-            folder_notebooks, "sentence_similarity", "senteval_local.ipynb"
-        ),
-        "senteval_azureml": os.path.join(
-            folder_notebooks, "sentence_similarity", "senteval_azureml.ipynb"
-        ),
         "embedding_trainer": os.path.join(
             folder_notebooks, "embeddings", "embedding_trainer.ipynb"
         ),
@@ -161,25 +155,3 @@ def ner_test_data():
 @pytest.fixture()
 def bert_english_tokenizer():
     return BERTTokenizer(language=Language.ENGLISHCASED, to_lower=False)
-
-
-@pytest.fixture(scope="module")
-def gensen_senteval_results():
-    return {
-        "pearson": {
-            "STSBenchmark": 0.778,
-            "STS12": 0.598,
-            "STS13": 0.542,
-            "STS14": 0.639,
-            "STS15": 0.727,
-            "STS16": 0.659,
-        },
-        "spearman": {
-            "STSBenchmark": 0.780,
-            "STS12": 0.603,
-            "STS13": 0.556,
-            "STS14": 0.625,
-            "STS15": 0.729,
-            "STS16": 0.663,
-        },
-    }
