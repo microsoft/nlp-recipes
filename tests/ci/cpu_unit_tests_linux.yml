@@ -22,22 +22,24 @@ jobs:
       echo "##vso[task.prependpath]/data/anaconda/bin"
     displayName: Add Conda to PATH
 
-  - bash: |
-      python tools/generate_conda_file.py
-      conda env create -n nlp_cpu -f nlp_cpu.yaml
-    displayName: 'Creating Conda Environment with dependencies'
+# Uncomment if needed
+#  - bash: |
+#      python tools/generate_conda_file.py
+#      conda env create -n nlp_cpu -f nlp_cpu.yaml
+#    displayName: 'Creating Conda Environment with dependencies'
 
   - bash: |
-      source activate nlp_cpu
+      conda activate nlp_cpu
       pytest tests/unit -m "not notebooks and not gpu" --junitxml=junit/test-unitttest.xml
     displayName: 'Run Unit tests'
 
-  - bash: |
-      echo Remove Conda Environment
-      conda remove -n nlp_cpu --all -q --force -y
-      echo Done Cleanup
-    displayName: 'Cleanup Task'
-    condition: always()
+# Uncomment if needed
+#  - bash: |
+#      echo Remove Conda Environment
+#      conda remove -n nlp_cpu --all -q --force -y
+#      echo Done Cleanup
+#    displayName: 'Cleanup Task'
+#    condition: always()
 
   - task: PublishTestResults@2
     inputs:
