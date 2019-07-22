@@ -28,6 +28,7 @@ Depending on the type of NLP system and the notebook that needs to be run, there
 * A machine running Linux, MacOS or Windows.
 * Anaconda with Python version >= 3.6. 
     * This is pre-installed on Azure DSVM such that one can run the following steps directly. To setup on your local machine, [Miniconda](https://docs.conda.io/en/latest/miniconda.html) is a quick way to get started.
+    * It is recommended to update conda to the latest version: `conda update -n base -c defaults conda`
 
 ### Dependencies Setup
 
