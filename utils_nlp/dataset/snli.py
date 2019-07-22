@@ -112,7 +112,7 @@ def extract_snli(zip_path, source_path, dest_path):
 
     """
     with ZipFile(zip_path, "r") as z:
-        with z.open(source_file_name) as zf, open(dest_path, "wb") as f:
+        with z.open(source_path) as zf, open(dest_path, "wb") as f:
             shutil.copyfileobj(zf, f)
 
 
@@ -156,10 +156,8 @@ def clean_cols(df):
 def clean_rows(df, label_col=LABEL_COL):
     """Drop badly formatted rows from the input dataframe
     
-    Args:
-        df (pd.DataFrame): Input dataframe
-        label_col (str): Name of label column. 
-                         Defaults to the standardized column name that is set after running the clean_col method.  
+    Args: df (pd.DataFrame): Input dataframe label_col (str): Name of label column. Defaults to
+    the standardized column name that is set after running the clean_col method.
     
     Returns:
         pd.DataFrame
