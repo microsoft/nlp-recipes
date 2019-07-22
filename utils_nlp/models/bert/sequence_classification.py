@@ -1,15 +1,18 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
-# This script reuses some code from
-# https://github.com/huggingface/pytorch-pretrained-BERT/blob/master/examples/run_classifier.py
 
-import random
 from collections import namedtuple
 
 import numpy as np
 import torch
 import torch.nn as nn
+from torch.utils.data import (
+    DataLoader,
+    RandomSampler,
+    SequentialSampler,
+    TensorDataset,
+)
 from pytorch_pretrained_bert.modeling import BertForSequenceClassification
 from pytorch_pretrained_bert.optimization import BertAdam
 from tqdm import tqdm
@@ -81,9 +84,34 @@ class BERTSequenceClassifier:
                 loss values. Defaults to True.
         """
 
-        device = get_device("cpu" if num_gpus == 0 or not torch.cuda.is_available() else "gpu")
+        device = get_device(
+            "cpu" if num_gpus == 0 or not torch.cuda.is_available() else "gpu"
+        )
         self.model = move_to_device(self.model, device, num_gpus)
 
+        token_ids_tensor = torch.tensor(token_ids, dtype=torch.long)
+        input_mask_tensor = torch.tensor(input_mask, dtype=torch.long)
+        labels_tensor = torch.tensor(labels, dtype=torch.long)
+
+        if token_type_ids:
+            token_type_ids_tensor = torch.tensor(
+                token_type_ids, dtype=torch.long
+            )
+            train_dataset = TensorDataset(
+                token_ids_tensor,
+                input_mask_tensor,
+                token_type_ids_tensor,
+                labels_tensor,
+            )
+        else:
+            train_dataset = TensorDataset(
+                token_ids_tensor, input_mask_tensor, labels_tensor
+            )
+        train_sampler = RandomSampler(train_dataset)
+
+        train_dataloader = DataLoader(
+            train_dataset, sampler=train_sampler, batch_size=batch_size
+        )
         # define optimizer and model parameters
         param_optimizer = list(self.model.named_parameters())
         no_decay = ["bias", "LayerNorm.bias", "LayerNorm.weight"]
@@ -101,12 +129,12 @@ class BERTSequenceClassifier:
                     p
                     for n, p in param_optimizer
                     if any(nd in n for nd in no_decay)
-                ]
+                ],
+                "weight_decay": 0.0,
             },
         ]
 
-        num_examples = len(token_ids)
-        num_batches = int(num_examples / batch_size)
+        num_batches = len(train_dataloader)
         num_train_optimization_steps = num_batches * num_epochs
 
         if warmup_proportion is None:
@@ -125,28 +153,19 @@ class BERTSequenceClassifier:
         # train
         self.model.train()  # training mode
 
-        token_type_ids_batch = None
         for epoch in range(num_epochs):
-            for i in range(num_batches):
-
-                # get random batch
-                start = int(random.random() * num_examples)
-                end = start + batch_size
-                x_batch = torch.tensor(
-                    token_ids[start:end], dtype=torch.long, device=device
-                )
-                y_batch = torch.tensor(
-                    labels[start:end], dtype=torch.long, device=device
-                )
-                mask_batch = torch.tensor(
-                    input_mask[start:end], dtype=torch.long, device=device
-                )
-
-                if token_type_ids is not None:
-                    token_type_ids_batch = torch.tensor(
-                        token_type_ids[start:end],
-                        dtype=torch.long,
-                        device=device,
+            training_loss = 0
+            for i, batch in enumerate(
+                tqdm(train_dataloader, desc="Iteration")
+            ):
+                if token_type_ids:
+                    x_batch, mask_batch, token_type_ids_batch, y_batch = tuple(
+                        t.to(device) for t in batch
+                    )
+                else:
+                    token_type_ids_batch = None
+                    x_batch, mask_batch, y_batch = tuple(
+                        t.to(device) for t in batch
                     )
 
                 opt.zero_grad()
@@ -157,20 +176,22 @@ class BERTSequenceClassifier:
                     attention_mask=mask_batch,
                     labels=None,
                 )
-
                 loss = loss_func(y_h, y_batch).mean()
+
+                training_loss += loss.item()
+
                 loss.backward()
                 opt.step()
                 if verbose:
                     if i % ((num_batches // 10) + 1) == 0:
                         print(
-                            "epoch:{}/{}; batch:{}->{}/{}; loss:{:.6f}".format(
+                            "epoch:{}/{}; batch:{}->{}/{}; average training loss:{:.6f}".format(
                                 epoch + 1,
                                 num_epochs,
                                 i + 1,
                                 min(i + 1 + num_batches // 10, num_batches),
                                 num_batches,
-                                loss.data,
+                                training_loss / (i + 1),
                             )
                         )
         # empty cache
@@ -207,39 +228,50 @@ class BERTSequenceClassifier:
                 (classes, probabilities) if probabilities is True.
         """
 
-        device = get_device("cpu" if num_gpus == 0 or not torch.cuda.is_available() else "gpu")
+        device = get_device(
+            "cpu" if num_gpus == 0 or not torch.cuda.is_available() else "gpu"
+        )
         self.model = move_to_device(self.model, device, num_gpus)
 
         # score
         self.model.eval()
+
+        token_ids_tensor = torch.tensor(token_ids, dtype=torch.long)
+        input_mask_tensor = torch.tensor(input_mask, dtype=torch.long)
+
+        if token_type_ids:
+            token_type_ids_tensor = torch.tensor(
+                token_type_ids, dtype=torch.long
+            )
+            test_dataset = TensorDataset(
+                token_ids_tensor, input_mask_tensor, token_type_ids_tensor
+            )
+        else:
+            test_dataset = TensorDataset(token_ids_tensor, input_mask_tensor)
+
+        test_sampler = SequentialSampler(test_dataset)
+        test_dataloader = DataLoader(
+            test_dataset, sampler=test_sampler, batch_size=batch_size
+        )
+
         preds = []
-        with tqdm(total=len(token_ids)) as pbar:
-            for i in range(0, len(token_ids), batch_size):
-                x_batch = token_ids[i : i + batch_size]
-                mask_batch = input_mask[i : i + batch_size]
-                x_batch = torch.tensor(
-                    x_batch, dtype=torch.long, device=device
+        for i, batch in enumerate(tqdm(test_dataloader, desc="Iteration")):
+            if token_type_ids:
+                x_batch, mask_batch, token_type_ids_batch = tuple(
+                    t.to(device) for t in batch
                 )
-                mask_batch = torch.tensor(
-                    mask_batch, dtype=torch.long, device=device
-                )
+            else:
                 token_type_ids_batch = None
-                if token_type_ids is not None:
-                    token_type_ids_batch = torch.tensor(
-                        token_type_ids[i : i + batch_size],
-                        dtype=torch.long,
-                        device=device,
-                    )
-                with torch.no_grad():
-                    p_batch = self.model(
-                        input_ids=x_batch,
-                        token_type_ids=token_type_ids_batch,
-                        attention_mask=mask_batch,
-                        labels=None,
-                    )
-                preds.append(p_batch.cpu())
-                if i % batch_size == 0:
-                    pbar.update(batch_size)
+                x_batch, mask_batch = tuple(t.to(device) for t in batch)
+
+            with torch.no_grad():
+                p_batch = self.model(
+                    input_ids=x_batch,
+                    token_type_ids=token_type_ids_batch,
+                    attention_mask=mask_batch,
+                    labels=None,
+                )
+            preds.append(p_batch.cpu())
 
         preds = np.concatenate(preds)
 

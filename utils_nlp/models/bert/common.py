@@ -3,9 +3,8 @@
 
 
 # This script reuses some code from
-# https://github.com/huggingface/pytorch-pretrained-BERT/blob/master/examples
-# /run_classifier.py
-
+# https://github.com/huggingface/pytorch-transformers/blob/master/examples
+# /run_glue.py
 
 from enum import Enum
 import warnings
@@ -82,6 +81,10 @@ class Tokenizer:
         # truncating an equal percent of tokens from each, since if one
         # sequence is very short then each token that's truncated likely
         # contains more information than a longer sequence.
+
+        if not tokens_b:
+            max_length += 1
+
         while True:
             total_length = len(tokens_a) + len(tokens_b)
             if total_length <= max_length:
@@ -92,7 +95,9 @@ class Tokenizer:
                 tokens_b.pop()
 
         tokens_a.append("[SEP]")
-        tokens_b.append("[SEP]")
+
+        if tokens_b:
+            tokens_b.append("[SEP]")
 
         return [tokens_a, tokens_b]
 
@@ -385,7 +390,7 @@ def create_data_loader(
     else:
         raise ValueError(
             "Invalid sample_method value, accepted values are: "
-            "random, sequential, and distributed"
+            "random and sequential."
         )
 
     dataloader = DataLoader(
