@@ -6,39 +6,46 @@ pr:
 - master
 - staging
 
-pool:
-  name: "nlptestmachine"
+#Any commit to this branch will trigger the build.
+trigger:
+- staging
+- master
 
-steps:
 
-- bash: |
-    echo "##vso[task.prependpath]/data/anaconda/bin"
-  displayName: Add Conda to PATH
+jobs:
+- job: cpu_unit_tests_linux
+  pool:
+    name: nlpagentpool
 
-- bash: |
-    python tools/generate_conda_file.py
-    conda env create -n nlp_cpu -f nlp_cpu.yaml
-  displayName: 'Creating Conda Environment with dependencies'
+  steps:
+  - bash: |
+      echo "##vso[task.prependpath]/data/anaconda/bin"
+    displayName: Add Conda to PATH
 
-- bash: |
-    source activate nlp_cpu
-    pytest tests/unit -m "not notebooks and not gpu" --junitxml=junit/test-unitttest.xml
-  displayName: 'Run Unit tests'
+  - bash: |
+      python tools/generate_conda_file.py
+      conda env create -n nlp_cpu -f nlp_cpu.yaml
+    displayName: 'Creating Conda Environment with dependencies'
 
-- bash: |
+  - bash: |
+      source activate nlp_cpu
+      pytest tests/unit -m "not notebooks and not gpu" --junitxml=junit/test-unitttest.xml
+    displayName: 'Run Unit tests'
+
+  - bash: |
       echo Remove Conda Environment
       conda remove -n nlp_cpu --all -q --force -y
       echo Done Cleanup
-  displayName: 'Cleanup Task'
-  condition: always()
+    displayName: 'Cleanup Task'
+    condition: always()
 
-- task: PublishTestResults@2
-  inputs:
-    testResultsFiles: '**/test-unitttest.xml'
-    testRunTitle: 'Test results for PyTest'
+  - task: PublishTestResults@2
+    inputs:
+      testResultsFiles: '**/test-unitttest.xml'
+      testRunTitle: 'Test results for PyTest'
 
-- task: ComponentGovernanceComponentDetection@0
-  inputs:
-    scanType: 'Register'
-    verbosity: 'Verbose'
-    alertWarningLevel: 'High'
+  - task: ComponentGovernanceComponentDetection@0
+    inputs:
+      scanType: 'Register'
+      verbosity: 'Verbose'
+      alertWarningLevel: 'High'
