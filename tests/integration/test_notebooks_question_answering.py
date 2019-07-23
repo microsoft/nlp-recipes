@@ -70,3 +70,8 @@ def test_bert_qa_runs(notebooks):
             MAX_CONCURRENT_RUNS=1,
         ),
     )
+    result = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict
+    assert result['f1'] > 50
+    assert result['learning_rate'] >= 5e-5
+    assert result['learning_rate'] <= 9e-5
+
