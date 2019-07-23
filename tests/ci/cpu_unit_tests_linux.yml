@@ -14,6 +14,7 @@ trigger:
 
 jobs:
 - job: cpu_unit_tests_linux
+  timeoutInMinutes: 10 # how long to run the job before automatically cancelling
   pool:
     name: nlpagentpool
 
@@ -29,7 +30,8 @@ jobs:
 #      conda env create -n nlp_cpu -f nlp_cpu.yaml
 #    displayName: 'Creating Conda Environment with dependencies'
 
-  - script: |
+  - bash: |
+      sh /anaconda/etc/profile.d/conda.sh
       conda activate nlp_cpu
       pytest tests/unit -m "not notebooks and not gpu" --junitxml=junit/test-unitttest.xml
     displayName: 'Run Unit tests'
