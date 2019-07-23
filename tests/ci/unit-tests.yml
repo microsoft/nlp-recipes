@@ -36,12 +36,11 @@ jobs:
     displayName: 'Creating Conda Environment with dependencies'
   
   - bash:
-      source activate nlp;
-      date;
+      activate nlp;
+      conda env list;
       conda install -y -c conda-forge ipykernel;
       python -m ipykernel install --user --name nlp --display-name "nlp";
       conda install -y -c anaconda pytest;
-      date;
       pytest --durations=0 tests/unit --junitxml=junit/test-unittest.xml;
     displayName: 'Run Unit tests'
 
