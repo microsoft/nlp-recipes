@@ -16,30 +16,34 @@ jobs:
 - job: cpu_unit_tests_linux
   timeoutInMinutes: 10 # how long to run the job before automatically cancelling
   pool:
-    vmImage: 'ubuntu-16.04' # using a hosted machine for cpu tests
+    # vmImage: 'ubuntu-16.04' # hosted machine 
+    name: nlpagentpool
 
   steps:
 
-  - task: UsePythonVersion@0
-    inputs:
-      versionSpec: '3.6.8'
-      architecture: 'x64'
-      addToPath: true
-    displayName: 'Use Python 3.6.8'
+# Uncomment if hosted machine
+#  - task: UsePythonVersion@0
+#    inputs:
+#      versionSpec: '3.6.8'
+#      architecture: 'x64'
+#      addToPath: true
+#    displayName: 'Use Python 3.6.8'
   
   - bash: |
       echo "##vso[task.prependpath]/data/anaconda/bin"
       conda env list
     displayName: Add Conda to PATH
 
-  - bash: |
-      python tools/generate_conda_file.py
-      conda env create -n nlp_cpu -f nlp_cpu.yaml
-    displayName: 'Creating Conda Environment with dependencies'
+# Uncomment if needed
+# Conda creation can take around 10min
+#  - bash: |
+#      python tools/generate_conda_file.py
+#      conda env create -n nlp_cpu -f nlp_cpu.yaml
+#    displayName: 'Creating Conda Environment with dependencies'
 
   - bash: |
       source activate nlp_cpu
-      pytest tests/unit -m "not notebooks and not gpu" --junitxml=junit/test-unitttest.xml
+      pytest --durations=0 tests/unit -m "not notebooks and not gpu" --junitxml=junit/test-unitttest.xml
     displayName: 'Run Unit tests'
 
 # Uncomment if needed
@@ -55,8 +59,9 @@ jobs:
       testResultsFiles: '**/test-unitttest.xml'
       testRunTitle: 'Test results for PyTest'
 
-  - task: ComponentGovernanceComponentDetection@0
-    inputs:
-      scanType: 'Register'
-      verbosity: 'Verbose'
-      alertWarningLevel: 'High'
+# Executed only once in notebook_cpu_unit_tests_linux
+#  - task: ComponentGovernanceComponentDetection@0
+#    inputs:
+#      scanType: 'Register'
+#      verbosity: 'Verbose'
+#      alertWarningLevel: 'High'
