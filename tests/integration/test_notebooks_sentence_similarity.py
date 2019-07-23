@@ -47,6 +47,18 @@ def test_similarity_embeddings_baseline_runs(notebooks, baseline_results):
 
 
 @pytest.mark.notebooks
+def test_automl_local_runs(notebooks):
+    notebook_path = notebooks["similarity_automl_local"]
+    pm.execute_notebook(notebook_path,
+                        OUTPUT_NOTEBOOK,
+                        parameters = {'automl_iterations': 5,
+                                      'automl_iteration_timeout':7,
+                                      'config_path': "tests/ci",
+                                      'web_service_name': "aci-automl-service"})
+    result = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict["pearson_correlation"]
+    assert result == pytest.approx(0.5, abs=ABS_TOL)
+
+@pytest.mark.notebooks
 @pytest.mark.gpu
 def test_similarity_senteval_local_runs(notebooks, gensen_senteval_results):
     notebook_path = notebooks["senteval_local"]
