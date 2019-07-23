@@ -29,7 +29,7 @@ jobs:
 #      conda env create -n nlp_cpu -f nlp_cpu.yaml
 #    displayName: 'Creating Conda Environment with dependencies'
 
-  - bash: |
+  - script: |
       conda activate nlp_cpu
       pytest tests/unit -m "not notebooks and not gpu" --junitxml=junit/test-unitttest.xml
     displayName: 'Run Unit tests'
