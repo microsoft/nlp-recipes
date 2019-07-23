@@ -36,9 +36,9 @@ jobs:
     displayName: 'Creating Conda Environment with dependencies'
   
   - bash:
-      conda activate nlp;
-      conda env list;
-      ls -R /opt/conda;
+      conda activate nlp &&
+      conda env list &&
+      ls -R /opt/conda &&
       ls -R /etc;
       conda install -y -c conda-forge ipykernel;
       python -m ipykernel install --user --name nlp --display-name "nlp";
