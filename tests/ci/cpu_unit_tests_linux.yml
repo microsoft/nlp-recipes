@@ -35,7 +35,7 @@ jobs:
 #      pytest tests/unit -m "not notebooks and not gpu" --junitxml=junit/test-unitttest.xml
 #    displayName: 'Run Unit tests'
 
-- bash: |
+  - bash: |
       /bin/bash -c ". /anaconda/etc/profile.d/conda.sh && conda activate nlp_cpu && pip list"
   displayName: 'Test activate conda'
 
