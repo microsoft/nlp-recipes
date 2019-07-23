@@ -17,6 +17,7 @@ jobs:
   pool:
     name: nlpagentpool
 
+  steps:
   - bash: |
       echo "##vso[task.prependpath]/data/anaconda/bin"
       conda env list
