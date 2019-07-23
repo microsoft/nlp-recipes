@@ -16,19 +16,26 @@ jobs:
 - job: cpu_unit_tests_linux
   timeoutInMinutes: 10 # how long to run the job before automatically cancelling
   pool:
-    name: nlpagentpool
+    vmImage: 'ubuntu-16.04' # using a hosted machine for cpu tests
 
   steps:
+
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: '3.6.8'
+      architecture: 'x64'
+      addToPath: true
+    displayName: 'Use Python 3.6.8'
+  
   - bash: |
       echo "##vso[task.prependpath]/data/anaconda/bin"
       conda env list
     displayName: Add Conda to PATH
 
-# Uncomment if needed
-#  - bash: |
-#      python tools/generate_conda_file.py
-#      conda env create -n nlp_cpu -f nlp_cpu.yaml
-#    displayName: 'Creating Conda Environment with dependencies'
+  - bash: |
+      python tools/generate_conda_file.py
+      conda env create -n nlp_cpu -f nlp_cpu.yaml
+    displayName: 'Creating Conda Environment with dependencies'
 
   - bash: |
       source activate nlp_cpu
