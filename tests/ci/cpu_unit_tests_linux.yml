@@ -30,7 +30,6 @@ jobs:
 #    displayName: 'Creating Conda Environment with dependencies'
 
   - bash: |
-      conda init bash
       conda activate nlp_cpu
       pytest tests/unit -m "not notebooks and not gpu" --junitxml=junit/test-unitttest.xml
     displayName: 'Run Unit tests'
