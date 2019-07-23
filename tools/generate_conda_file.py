@@ -50,7 +50,6 @@ CONDA_GPU = {
     "numba": "numba>=0.38.1",
     "pytorch": "pytorch>=1.0.0",
     "tensorflow": "tensorflow-gpu==1.12.0",
-    "cudatoolkit": "cudatoolkit==9.2",
 }
 
 PIP_BASE = {

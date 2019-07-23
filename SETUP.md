@@ -11,7 +11,7 @@ For training at scale, operationalization or hyperparameter tuning, it is recomm
 
 * [Compute environments](#compute-environments)
 * [Setup guide for Local or DSVM](#setup-guide-for-local-or-dsvm)
-  * [Setup Requirements](#setup-requirements)
+  * [Requirements](#requirements)
   * [Dependencies setup](#dependencies-setup)
   * [Register the conda environment in the DSVM JupyterHub](#register-the-conda-environment-in--the-dsvm-jupyterhub)
 
@@ -26,9 +26,13 @@ Depending on the type of NLP system and the notebook that needs to be run, there
 ### Requirements
 
 * A machine running Linux, MacOS or Windows.
-* Anaconda with Python version >= 3.6. 
+* Miniconda or Anaconda with Python version >= 3.6. 
     * This is pre-installed on Azure DSVM such that one can run the following steps directly. To setup on your local machine, [Miniconda](https://docs.conda.io/en/latest/miniconda.html) is a quick way to get started.
     * It is recommended to update conda to the latest version: `conda update -n base -c defaults conda`
+* CUDA Toolkit >=9.2 (for GPU machines only)
+    * On Windows: Download and install [toolkit](https://developer.nvidia.com/cuda-toolkit)
+    * On Linux: *conda install cudatoolkit>=9.2*
+
 
 ### Dependencies Setup
 
