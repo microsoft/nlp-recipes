@@ -31,6 +31,7 @@ def notebooks():
         "embedding_trainer": os.path.join(
             folder_notebooks, "embeddings", "embedding_trainer.ipynb"
         ),
+        "bert_encoder": os.path.join(folder_notebooks, "sentence_similarity", "bert_encoder.ipynb")
     }
     return paths
 
