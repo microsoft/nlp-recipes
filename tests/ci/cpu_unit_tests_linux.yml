@@ -30,6 +30,8 @@ jobs:
 #      conda env create -n nlp_cpu -f nlp_cpu.yaml
 #    displayName: 'Creating Conda Environment with dependencies'
 
+  # Due to problem when activating the environment with conda, /bin/bash has to be used as a workaround
+  # More info https://github.com/microsoft/nlp/issues/186
   - bash: |
       /bin/bash -c '. /anaconda/etc/profile.d/conda.sh && \
       conda activate nlp_cpu && \
