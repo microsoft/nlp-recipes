@@ -31,6 +31,15 @@ def notebooks():
         "embedding_trainer": os.path.join(
             folder_notebooks, "embeddings", "embedding_trainer.ipynb"
         ),
+        "similarity_automl_local": os.path.join(
+            folder_notebooks, "sentence_similarity", "automl_local_deployment_aci.ipynb"
+        ),
+        "bidaf_deep_dive": os.path.join(
+            folder_notebooks, "question_answering", "bidaf_aml_deep_dive.ipynb"
+        ),
+        "bidaf_quickstart": os.path.join(
+            folder_notebooks, "question_answering", "question_answering_system_bidaf_quickstart.ipynb"
+        ),
         "bert_encoder": os.path.join(
             folder_notebooks, "sentence_similarity", "bert_encoder.ipynb"
         ),
