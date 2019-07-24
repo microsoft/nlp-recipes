@@ -52,7 +52,7 @@ class Tokenizer:
                 Defaults to ".".
         """
         self.tokenizer = BertTokenizer.from_pretrained(
-            language.value, do_lower_case=to_lower, cache_dir=cache_dir
+            language, do_lower_case=to_lower, cache_dir=cache_dir
         )
         self.language = language
 

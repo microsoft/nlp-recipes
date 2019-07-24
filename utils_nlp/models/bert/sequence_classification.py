@@ -41,7 +41,7 @@ class BERTSequenceClassifier:
 
         # create classifier
         self.model = BertForSequenceClassification.from_pretrained(
-            language.value, cache_dir=cache_dir, num_labels=num_labels
+            language, cache_dir=cache_dir, num_labels=num_labels
         )
 
     def fit(
