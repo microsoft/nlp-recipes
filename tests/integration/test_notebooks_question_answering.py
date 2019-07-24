@@ -62,8 +62,13 @@ def test_bert_qa_runs(notebooks):
         notebook_path,
         OUTPUT_NOTEBOOK,
         parameters=dict(
-            TRAIN_SCRIPT_PATH='../../scenarios/question_answering/bert_run_squad_azureml.py',
-            BERT_MODEL='bert-base-uncased',
+            DATA_FOLDER='./squad',
+            PROJECT_FOLDER='./pytorch-transformers',
+            EXPERIMENT_NAME='NLP-QA-BERT-deepdive',
+            BERT_UTIL_PATH='../../utils_nlp/azureml/azureml_bert_util.py',
+            EVALUATE_SQAD_PATH = '../../utils_nlp/eval/evaluate_squad.py',
+            TRAIN_SCRIPT_PATH="../../scenarios/question_answering/bert_run_squad_azureml.py",
+            BERT_MODEL="bert-base-uncased",
             NUM_TRAIN_EPOCHS=1.0,
             NODE_COUNT=1,
             MAX_TOTAL_RUNS=1,
@@ -71,7 +76,7 @@ def test_bert_qa_runs(notebooks):
         ),
     )
     result = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict
-    assert result['f1'] > 50
-    assert result['learning_rate'] >= 5e-5
-    assert result['learning_rate'] <= 9e-5
+    assert result["f1"] > 70
+    assert result["learning_rate"] >= 5e-5
+    assert result["learning_rate"] <= 9e-5
 
