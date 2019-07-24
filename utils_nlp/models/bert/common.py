@@ -26,17 +26,17 @@ from torch.utils.data import (
 BERT_MAX_LEN = 512
 
 
-class Language(Enum):
+class Language(str, Enum):
     """An enumeration of the supported pretrained models and languages."""
 
-    ENGLISH = "bert-base-uncased"
-    ENGLISHCASED = "bert-base-cased"
-    ENGLISHLARGE = "bert-large-uncased"
-    ENGLISHLARGECASED = "bert-large-cased"
-    ENGLISHLARGEWWM = "bert-large-uncased-whole-word-masking"
-    ENGLISHLARGECASEDWWM = "bert-large-cased-whole-word-masking"
-    CHINESE = "bert-base-chinese"
-    MULTILINGUAL = "bert-base-multilingual-cased"
+    ENGLISH : str = "bert-base-uncased"
+    ENGLISHCASED : str = "bert-base-cased"
+    ENGLISHLARGE : str = "bert-large-uncased"
+    ENGLISHLARGECASED : str = "bert-large-cased"
+    ENGLISHLARGEWWM : str = "bert-large-uncased-whole-word-masking"
+    ENGLISHLARGECASEDWWM : str = "bert-large-cased-whole-word-masking"
+    CHINESE : str = "bert-base-chinese"
+    MULTILINGUAL : str = "bert-base-multilingual-cased"
 
 
 class Tokenizer:

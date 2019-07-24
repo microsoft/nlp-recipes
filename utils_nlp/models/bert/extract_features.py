@@ -23,11 +23,11 @@ from torch.utils.data import (
 from utils_nlp.models.bert.common import Language, Tokenizer
 
 
-class PoolingStrategy(Enum):
+class PoolingStrategy(str, Enum):
     """Enumerate pooling strategies"""   
-    MAX = "max"
-    MEAN = "mean"
-    CLS = "cls"
+    MAX : str = "max"
+    MEAN : str = "mean"
+    CLS : str = "cls"
 
 
 class BERTSentenceEncoder:
@@ -57,7 +57,7 @@ class BERTSentenceEncoder:
         self.model = (
             bert_model.model.bert
             if bert_model
-            else BertModel.from_pretrained(language.value, cache_dir=cache_dir)
+            else BertModel.from_pretrained(language, cache_dir=cache_dir)
         )
         self.tokenizer = (
             tokenizer
@@ -190,11 +190,11 @@ class BERTSentenceEncoder:
             return values[0]
         
         try:
-            if pooling_strategy.value == "max":
+            if pooling_strategy == "max":
                 pool_func = max_pool
-            elif pooling_strategy.value == "mean":
+            elif pooling_strategy == "mean":
                 pool_func = mean_pool
-            elif pooling_strategy.value == "cls":
+            elif pooling_strategy == "cls":
                 pool_func = cls_pool
             else:
                 raise ValuerError("Please enter valid pooling strategy")
