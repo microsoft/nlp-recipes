@@ -118,7 +118,6 @@ class BERTSentenceEncoder:
                     token_type_ids=None,
                     attention_mask=input_mask_tensor,
                 ) 
-            all_encoder_layers = all_encoder_layers
 
             for b, example_index in enumerate(example_indices_tensor):
                 for (i, token) in enumerate(tokens[example_index.item()]):
