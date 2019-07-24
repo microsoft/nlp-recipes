@@ -24,7 +24,7 @@ $ conda env update -f {conda_env}.yaml
 To register the conda environment in Jupyter:
 $ conda activate {conda_env}
 $ python -m ipykernel install --user --name {conda_env} \
-    --display-name "Python ({conda_env})"
+--display-name "Python ({conda_env})"
 """
 
 CHANNELS = ["defaults", "conda-forge", "pytorch"]
