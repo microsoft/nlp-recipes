@@ -595,6 +595,7 @@ def train(config, data_folder, learning_rate=0.0001, max_epoch=None):
                     )
                     if training_complete:
                         mlflow.log_metric("min_val_loss", float(min_val_loss))
+                        mlflow.log_metric("learning_rate", learning_rate)
                         break
 
                     logging.info("Evaluating on NLI")
@@ -633,10 +634,18 @@ if __name__ == "__main__":
         help="Limit training to specified number of epochs.",
     )
 
+    parser.add_argument(
+        "--max_epoch",
+        type=int,
+        default=None,
+        help="Limit training to specified number of epochs.",
+    )
+
     args = parser.parse_args()
     data_path = args.data_folder
     lr = args.learning_rate
 
     config_file_path = args.config
+    max_epoch = args.max_epoch
     config_obj = read_config(config_file_path)
-    train(config_obj, data_path, lr)
+    train(config_obj, data_path, lr, max_epoch)
