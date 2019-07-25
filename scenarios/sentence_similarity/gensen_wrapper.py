@@ -3,11 +3,11 @@
 import json
 import os
 
-import numpy as np
-import pandas as pd
-
 from scenarios.sentence_similarity.gensen_train import train
-from utils_nlp.models.gensen.create_gensen_model import create_multiseq2seq_model
+from utils_nlp.eval.classification import compute_correlation_coefficients
+from utils_nlp.models.gensen.create_gensen_model import (
+    create_multiseq2seq_model,
+)
 from utils_nlp.models.gensen.gensen import GenSenSingle
 from utils_nlp.models.gensen.preprocess_utils import gensen_preprocess
 
@@ -135,13 +135,13 @@ class GenSenClassifier:
             sentences(list) : List of sentences.
 
         Returns
-            array: A pairwise cosine similarity for the sentences provided based on their gensen
-            vector representations.
+            pd.Dataframe: A pairwise cosine similarity for the sentences provided based on their
+            gensen vector representations.
 
         """
 
         # self.cache_dir = os.path.join(self.cache_dir, "clean/snli_1.0")
-        self._create_multiseq2seq_model()
+        # self._create_multiseq2seq_model()
 
         gensen_model = GenSenSingle(
             model_folder=os.path.join(
@@ -152,7 +152,7 @@ class GenSenClassifier:
         )
 
         reps_h, reps_h_t = gensen_model.get_representation(
-            sentences, pool="last", return_numpy=True
+            sentences, pool="last", return_numpy=True, tokenize=True
         )
 
-        return pd.DataFrame(np.corrcoef(reps_h_t))
+        return compute_correlation_coefficients(reps_h_t)

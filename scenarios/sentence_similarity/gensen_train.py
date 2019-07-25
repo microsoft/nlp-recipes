@@ -199,7 +199,7 @@ def evaluate(
         )
         if (monitor_epoch - min_val_loss_epoch) > config["training"][
             "stop_patience"
-        ] or (max_epoch is not None and monitor_epoch > max_epoch):
+        ] or (max_epoch is not None and monitor_epoch >= max_epoch):
             logging.info("Saving model ...")
             # Save the name with validation loss.
             torch.save(

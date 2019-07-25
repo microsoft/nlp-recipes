@@ -12,6 +12,7 @@ from tests.notebooks_common import OUTPUT_NOTEBOOK
 
 sys.path.append("../../")
 ABS_TOL = 0.2
+ABS_TOL_PEARSONS = 0.05
 
 
 @pytest.fixture(scope="module")
@@ -96,5 +97,13 @@ def test_gensen_local(notebooks):
         parameters=dict(
             max_epoch=1,
             config_filepath="../../scenarios/sentence_similarity/gensen_config.json",
+            base_data_path="../../data",
         ),
     )
+
+    results = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict["results"]
+    expected = {"0": {"0": 1, "1": 0.95}, "1": {"0": 0.95, "1": 1}}
+
+    for key, value in expected.items():
+        for k, v in value.items():
+            assert results[key][k] == pytest.approx(v, abs=ABS_TOL_PEARSONS)
