@@ -1,7 +1,6 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
-import sys
 import pytest
 import papermill as pm
 import scrapbook as sb
@@ -32,6 +31,7 @@ def baseline_results():
         "Doc2vec Cosine with Stop Words": 0.4498543211602068,
     }
 
+
 @pytest.mark.integration
 @pytest.mark.azureml
 def test_similarity_embeddings_baseline_runs(notebooks, baseline_results):
@@ -40,6 +40,7 @@ def test_similarity_embeddings_baseline_runs(notebooks, baseline_results):
     results = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict["results"]
     for key, value in baseline_results.items():
         assert results[key] == pytest.approx(value, abs=ABS_TOL)
+
 
 @pytest.mark.usefixtures("teardown_service")
 @pytest.mark.integration
@@ -64,6 +65,7 @@ def test_automl_local_runs(notebooks,
     result = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict["pearson_correlation"]
     assert result == pytest.approx(0.5, abs=ABS_TOL)
 
+
 @pytest.mark.gpu
 @pytest.mark.integration
 def test_gensen_local(notebooks):
@@ -85,3 +87,28 @@ def test_gensen_local(notebooks):
     for key, value in expected.items():
         for k, v in value.items():
             assert results[key][k] == pytest.approx(v, abs=ABS_TOL_PEARSONS)
+
+
+@pytest.mark.notebooks
+@pytest.mark.azureml
+def test_similarity_gensen_azureml_runs(notebooks):
+    notebook_path = notebooks["gensen_azureml"]
+    pm.execute_notebook(
+        notebook_path,
+        OUTPUT_NOTEBOOK,
+        parameters=dict(
+            CACHE_DIR="./tests/integration/temp",
+            AZUREML_CONFIG_PATH="./tests/integration/.azureml",
+            UTIL_NLP_PATH="",
+            MAX_EPOCH=1,
+            TRAIN_SCRIPT="./scenarios/sentence_similarity/gensen_train.py",
+            CONFIG_PATH="./scenarios/sentence_similarity/gensen_config.json",
+            MAX_TOTAL_RUNS=1,
+            MAX_CONCURRENT_RUNS=1,
+        ),
+    )
+    result = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict
+    assert result["best_val_loss"] > 0
+    assert result["learning_rate"] >= 0.0001
+    assert result["learning_rate"] <= 0.001
+
