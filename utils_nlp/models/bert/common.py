@@ -25,17 +25,17 @@ from torch.utils.data import (
 BERT_MAX_LEN = 512
 
 
-class Language(Enum):
+class Language(str, Enum):
     """An enumeration of the supported pretrained models and languages."""
 
-    ENGLISH = "bert-base-uncased"
-    ENGLISHCASED = "bert-base-cased"
-    ENGLISHLARGE = "bert-large-uncased"
-    ENGLISHLARGECASED = "bert-large-cased"
-    ENGLISHLARGEWWM = "bert-large-uncased-whole-word-masking"
-    ENGLISHLARGECASEDWWM = "bert-large-cased-whole-word-masking"
-    CHINESE = "bert-base-chinese"
-    MULTILINGUAL = "bert-base-multilingual-cased"
+    ENGLISH : str = "bert-base-uncased"
+    ENGLISHCASED : str = "bert-base-cased"
+    ENGLISHLARGE : str = "bert-large-uncased"
+    ENGLISHLARGECASED : str = "bert-large-cased"
+    ENGLISHLARGEWWM : str = "bert-large-uncased-whole-word-masking"
+    ENGLISHLARGECASEDWWM : str = "bert-large-cased-whole-word-masking"
+    CHINESE : str = "bert-base-chinese"
+    MULTILINGUAL : str = "bert-base-multilingual-cased"
 
 
 class Tokenizer:
@@ -51,7 +51,7 @@ class Tokenizer:
                 Defaults to ".".
         """
         self.tokenizer = BertTokenizer.from_pretrained(
-            language.value, do_lower_case=to_lower, cache_dir=cache_dir
+            language, do_lower_case=to_lower, cache_dir=cache_dir
         )
         self.language = language
 
@@ -168,6 +168,74 @@ class Tokenizer:
         input_mask = [[min(1, x) for x in y] for y in tokens]
         return tokens, input_mask, token_type_ids
 
+    def preprocess_encoder_tokens(self, tokens, max_len=BERT_MAX_LEN):
+        """Preprocessing of input tokens:
+            - add BERT sentence markers ([CLS] and [SEP])
+            - map tokens to token indices in the BERT vocabulary
+            - pad and truncate sequences
+            - create an input_mask
+            - create token type ids, aka. segment ids
+
+        Args:
+            tokens (list): List of token lists to preprocess.
+            max_len (int, optional): Maximum number of tokens
+                            (documents will be truncated or padded).
+                            Defaults to 512.
+        Returns:
+            tuple: A tuple containing the following four lists
+                list of preprocesssed token lists
+                list of input id lists
+                list of input mask lists
+                list of token type id lists
+        """
+        if max_len > BERT_MAX_LEN:
+            print(
+                "setting max_len to max allowed tokens: {}".format(
+                    BERT_MAX_LEN
+                )
+            )
+            max_len = BERT_MAX_LEN
+
+        if isinstance(tokens[0][0], str):
+            tokens = [x[0 : max_len - 2] + ["[SEP]"] for x in tokens]
+            token_type_ids = None
+        else:
+            # get tokens for each sentence [[t00, t01, ...] [t10, t11,... ]]
+            tokens = [
+                self._truncate_seq_pair(sentence[0], sentence[1], max_len - 3)
+                for sentence in tokens
+            ]
+
+            # construct token_type_ids
+            # [[0, 0, 0, 0, ... 0, 1, 1, 1, ... 1], [0, 0, 0, ..., 1, 1, ]
+            token_type_ids = [
+                [[i] * len(sentence) for i, sentence in enumerate(example)]
+                for example in tokens
+            ]
+            # merge sentences
+            tokens = [
+                [token for sentence in example for token in sentence]
+                for example in tokens
+            ]
+            # prefix with [0] for [CLS]
+            token_type_ids = [
+                [0] + [i for sentence in example for i in sentence]
+                for example in token_type_ids
+            ]
+            # pad sequence
+            token_type_ids = [
+                x + [0] * (max_len - len(x)) for x in token_type_ids
+            ]
+
+        tokens = [["[CLS]"] + x for x in tokens]
+        # convert tokens to indices
+        input_ids = [self.tokenizer.convert_tokens_to_ids(x) for x in tokens]
+        # pad sequence
+        input_ids = [x + [0] * (max_len - len(x)) for x in input_ids]
+        # create input mask
+        input_mask = [[min(1, x) for x in y] for y in input_ids]
+        return tokens, input_ids, input_mask, token_type_ids
+        
     def tokenize_ner(
         self,
         text,

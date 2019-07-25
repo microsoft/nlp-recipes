@@ -52,7 +52,7 @@ class BERTTokenClassifier:
         self.cache_dir = cache_dir
 
         self.model = BertForTokenClassification.from_pretrained(
-            language.value, cache_dir=cache_dir, num_labels=num_labels
+            language, cache_dir=cache_dir, num_labels=num_labels
         )
 
     def _get_optimizer(

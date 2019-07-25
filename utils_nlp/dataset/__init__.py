@@ -8,7 +8,7 @@ nltk.download("punkt", quiet=True)
 nltk.download("stopwords", quiet=True)
 
 
-class Split(Enum):
-    TRAIN = "train"
-    DEV = "dev"
-    TEST = "test"
+class Split(str, Enum):
+    TRAIN : str = "train"
+    DEV : str = "dev"
+    TEST : str = "test"
