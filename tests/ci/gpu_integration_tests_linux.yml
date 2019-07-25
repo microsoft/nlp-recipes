@@ -41,12 +41,12 @@ jobs:
   - bash: |
       source activate integration_gpu
       pytest --durations=0 tests/smoke -m "smoke and gpu" --junitxml=junit/test-smoke-test.xml
-    displayName: 'Run Unit tests'
+    displayName: 'Run smoke tests'
 
   - bash: |
       source activate integration_gpu
       pytest --durations=0 tests/integration -m "integration and gpu" --junitxml=junit/test-integration-test.xml
-    displayName: 'Run Unit tests'
+    displayName: 'Run integration tests'
 
   - bash: |
       echo Remove Conda Environment
