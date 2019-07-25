@@ -34,7 +34,7 @@ def baseline_results():
     }
 
 
-@pytest.mark.notebooks
+@pytest.mark.integration
 def test_similarity_embeddings_baseline_runs(notebooks, baseline_results):
     notebook_path = notebooks["similarity_embeddings_baseline"]
     pm.execute_notebook(notebook_path, OUTPUT_NOTEBOOK)
