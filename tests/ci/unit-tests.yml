@@ -37,11 +37,10 @@ jobs:
   
   - bash:
       source activate nlp &&
-      conda install -y -c conda-forge ipykernel;
-      conda list;
-      # python -m ipykernel install --user --name nlp --display-name "nlp";
-      conda install -y -c anaconda pytest;
-      pytest --durations=0 tests/unit --junitxml=junit/test-unittest.xml;
+      conda install -y -c conda-forge ipykerne &&
+      conda list &&
+      conda install -y -c anaconda pytest &&
+      pytest --durations=0 tests/unit --junitxml=junit/test-unittest.xml 
     displayName: 'Run Unit tests'
 
   - task: PublishTestResults@2
