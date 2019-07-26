@@ -1,20 +1,20 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
-from collections import namedtuple
+import logging
 
 import horovod.torch as hvd
 import numpy as np
-import torch.utils.data.distributed
 import torch.nn as nn
-from tqdm import tqdm
-
+import torch.utils.data.distributed
 from pytorch_pretrained_bert.modeling import BertForSequenceClassification
 from pytorch_pretrained_bert.optimization import BertAdam
+from tqdm import tqdm
 
 from utils_nlp.bert.common import Language
 from utils_nlp.bert.common import get_dataset_multiple_files
 from utils_nlp.pytorch.device_utils import get_device, move_to_device
 
+logger = logging.getLogger(__name__)
 hvd.init()
 torch.manual_seed(42)
 
@@ -56,21 +56,20 @@ class BERTSequenceDistClassifier:
         )
 
     def fit(
-            self,
-            input_dir_path,
-            num_gpus=None,
-            num_epochs=1,
-            batch_size=32,
-            lr=2e-5,
-            warmup_proportion=None,
-            verbose=True,
-            fp16_allreduce=False,
+        self,
+        input_files,
+        num_gpus=None,
+        num_epochs=1,
+        batch_size=32,
+        lr=2e-5,
+        warmup_proportion=None,
+        verbose=True,
+        fp16_allreduce=False,
     ):
         """fine-tunes the bert classifier using the given training data.
 
         args:
-            input_dir_path(str, required): path to the directory containing the list of training
-                                           files.
+            input_files(list, required): list of paths to the training data files.
             num_gpus (int, optional): the number of gpus to use.
                                       if none is specified, all available gpus
                                       will be used. defaults to none.
@@ -86,7 +85,7 @@ class BERTSequenceDistClassifier:
             fp16_allreduce(bool, optional)L if true, use fp16 compression during allreduce
         """
 
-        train_dataset = get_dataset_multiple_files(input_dir_path)
+        train_dataset = get_dataset_multiple_files(input_files)
         train_sampler = torch.utils.data.distributed.DistributedSampler(
             train_dataset, num_replicas=hvd.size(), rank=hvd.rank()
         )
@@ -98,7 +97,13 @@ class BERTSequenceDistClassifier:
         )
 
         device = get_device("cpu" if num_gpus == 0 else "gpu")
-        self.model = move_to_device(self.model, device, num_gpus)
+        self.model.cuda()
+
+        hvd.broadcast_parameters(self.model.state_dict(), root_rank=0)
+        # hvd.broadcast_optimizer_state(optimizer, root_rank=0)
+
+        # define loss function
+        loss_func = nn.CrossEntropyLoss().to(device)
 
         # define optimizer and model parameters
         param_optimizer = list(self.model.named_parameters())
@@ -126,17 +131,16 @@ class BERTSequenceDistClassifier:
         num_train_optimization_steps = num_batches * num_epochs
 
         if warmup_proportion is None:
-            optimizer = BertAdam(optimizer_grouped_parameters, lr=lr)
+            optimizer = BertAdam(
+                optimizer_grouped_parameters, lr=lr * hvd.size()
+            )
         else:
             optimizer = BertAdam(
                 optimizer_grouped_parameters,
-                lr=lr,
+                lr=lr * hvd.size(),
                 t_total=num_train_optimization_steps,
                 warmup=warmup_proportion,
             )
-
-        hvd.broadcast_parameters(self.model.state_dict(), root_rank=0)
-        hvd.broadcast_optimizer_state(optimizer, root_rank=0)
 
         # Horovod: (optional) compression algorithm.
         compression = (
@@ -149,14 +153,13 @@ class BERTSequenceDistClassifier:
             named_parameters=self.model.named_parameters(),
             compression=compression,
         )
-        # define loss function
-        loss_func = nn.CrossEntropyLoss().to(device)
 
         # Horovod: set epoch to sampler for shuffling.
         for epoch in range(num_epochs):
             self.model.train()
             train_sampler.set_epoch(epoch)
             for batch_idx, (tokens, mask, target) in enumerate(train_loader):
+
                 if torch.cuda.is_available():
                     tokens, mask, target = (
                         tokens.cuda(),
@@ -168,11 +171,9 @@ class BERTSequenceDistClassifier:
                 output = self.model(
                     input_ids=tokens, attention_mask=mask, labels=None
                 )
-
                 loss = loss_func(output, target).mean()
                 loss.backward()
                 optimizer.step()
-
                 if verbose and (batch_idx % ((num_batches // 10) + 1)) == 0:
                     # Horovod: use train_sampler to determine the number of examples in
                     # this worker's partition.
@@ -190,12 +191,12 @@ class BERTSequenceDistClassifier:
         torch.cuda.empty_cache()
 
     def predict(
-            self, input_dir_path, num_gpus=None, batch_size=32, probabilities=False
+        self, input_files, num_gpus=None, batch_size=32, probabilities=False
     ):
         """Scores the given set of train files and returns the predicted classes.
 
         Args:
-            input_dir_path: Path to folder containing test files.
+            input_files(list, required): list of paths to the test data files.
             num_gpus (int, optional): The number of gpus to use.
                                       If None is specified, all available GPUs
                                       will be used. Defaults to None.
@@ -208,12 +209,11 @@ class BERTSequenceDistClassifier:
                 a dictionary with classes, target labels, probabilities) if probabilities is True.
         """
 
-        test_dataset = get_dataset_multiple_files(input_dir_path)
+        test_dataset = get_dataset_multiple_files(input_files)
 
         # Horovod: use DistributedSampler to partition the test data.
-        test_sampler = torch.utils.data.distributed.DistributedSampler(
-            test_dataset, num_replicas=hvd.size(), rank=hvd.rank()
-        )
+        test_sampler = torch.utils.data.sampler.SequentialSampler(
+            test_dataset)
 
         test_loader = torch.utils.data.DataLoader(
             test_dataset,
@@ -242,7 +242,7 @@ class BERTSequenceDistClassifier:
                         input_ids=tokens, attention_mask=mask, labels=None
                     )
                 preds.append(p_batch.cpu())
-                labels_test.append(target.cuda())
+                labels_test.append(target.cpu())
                 if i % batch_size == 0:
                     pbar.update(batch_size)
 
@@ -250,9 +250,12 @@ class BERTSequenceDistClassifier:
         labels_test = np.concatenate(labels_test)
 
         if probabilities:
-            return {"Predictions": preds.argmax(axis=1),
-                    "Target": labels_test,
-                    "classes probabilities": nn.Softmax(dim=1)(torch.Tensor(preds)).numpy()
-                    }
+            return {
+                "Predictions": preds.argmax(axis=1),
+                "Target": labels_test,
+                "classes probabilities": nn.Softmax(dim=1)(
+                    torch.Tensor(preds)
+                ).numpy(),
+            }
         else:
             return preds.argmax(axis=1), labels_test

@@ -15,6 +15,7 @@ from collections import Iterable
 from enum import Enum
 
 import torch
+import pandas as pd
 from pytorch_pretrained_bert.tokenization import BertTokenizer
 from torch.utils.data import (
     DataLoader,
@@ -24,6 +25,7 @@ from torch.utils.data import (
     TensorDataset,
     ConcatDataset,
 )
+from utils_nlp.pytorch.device_utils import get_device
 from tqdm import tqdm
 
 # Max supported sequence length
@@ -45,7 +47,7 @@ class Language(str, Enum):
 
 class Tokenizer:
     def __init__(
-        self, language=Language.ENGLISH, to_lower=False, cache_dir="."
+            self, language=Language.ENGLISH, to_lower=False, cache_dir="."
     ):
         """Initializes the underlying pretrained BERT tokenizer.
 
@@ -134,7 +136,7 @@ class Tokenizer:
             max_len = BERT_MAX_LEN
 
         if isinstance(tokens[0][0], str):
-            tokens = [x[0 : max_len - 2] + ["[SEP]"] for x in tokens]
+            tokens = [x[0: max_len - 2] + ["[SEP]"] for x in tokens]
             token_type_ids = None
         else:
             # get tokens for each sentence [[t00, t01, ...] [t10, t11,... ]]
@@ -242,12 +244,12 @@ class Tokenizer:
         return tokens, input_ids, input_mask, token_type_ids
         
     def tokenize_ner(
-        self,
-        text,
-        max_len=BERT_MAX_LEN,
-        labels=None,
-        label_map=None,
-        trailing_piece_tag="X",
+            self,
+            text,
+            max_len=BERT_MAX_LEN,
+            labels=None,
+            label_map=None,
+            trailing_piece_tag="X",
     ):
         """
         Tokenize and preprocesses input word lists, involving the following steps
@@ -416,11 +418,11 @@ class Tokenizer:
 
 
 def create_data_loader(
-    input_ids,
-    input_mask,
-    label_ids=None,
-    sample_method="random",
-    batch_size=32,
+        input_ids,
+        input_mask,
+        label_ids=None,
+        sample_method="random",
+        batch_size=32,
 ):
     """
     Create a dataloader for sampling and serving data batches.
@@ -487,17 +489,21 @@ class TextDataset(Dataset):
         """
         self._filename = filename
         self._total_data = (
-            int(
-                subprocess.check_output(
-                    "wc -l " + filename, shell=True
-                ).split()[0]
-            )
-            - 1
+                int(
+                    subprocess.check_output(
+                        "wc -l " + filename, shell=True
+                    ).split()[0]
+                )
+                - 1
         )
 
     def __len__(self):
         """Denotes the total number of samples in the file."""
         return self._total_data
+
+    @staticmethod
+    def _cast(row):
+        return [int(x.strip()) for x in row]
 
     def __getitem__(self, index):
         """
@@ -512,25 +518,28 @@ class TextDataset(Dataset):
         """
         line = linecache.getline(self._filename, index + 1)
         row = next(csv.reader([line]))
-        return row[0], row[1], row[2]
+
+        tokens = self._cast(row[0][1:-1].split(","))
+        mask = self._cast(row[1][1:-1].split(","))
+
+        return (
+            torch.tensor(tokens, dtype=torch.long),
+            torch.tensor(mask, dtype=torch.long),
+            torch.tensor(int(row[2]), dtype=torch.long),
+        )
 
 
-def get_dataset_multiple_files(path):
-    """ Get dataset from csv files in a directory
+def get_dataset_multiple_files(files):
+    """ Get dataset from multiple files
 
     Args:
-        path: Path to the directory containing files.
+        files(list): List of paths to the files.
 
     Returns:
 
         torch.utils.data.Dataset : A combined dataset of all files in the directory.
 
     """
-    files = list(
-        map(
-            lambda x: path + x,
-            (filter(lambda x: x.endswith("csv"), os.listdir(path))),
-        )
-    )
-    datasets = list(map(lambda x: TextDataset(x), files))
+    df = pd.read_csv(files[0])
+    datasets = [TextDataset(x) for x in files]
     return ConcatDataset(datasets)
