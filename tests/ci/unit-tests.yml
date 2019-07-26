@@ -10,7 +10,7 @@ trigger: none
 
 jobs:
 
-- job: unit_tests_cpu public agent
+- job: unit_tests_cpu_public_agent
   timeoutInMinutes: 120
 
   pool:
@@ -68,7 +68,7 @@ jobs:
       echo "##vso[task.prependpath]/data/anaconda/bin"&&
       conda env list
     displayName: Add Conda to PATH
-    
+
   - task: ComponentGovernanceComponentDetection@0
     inputs:
       scanType: 'Register'
