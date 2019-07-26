@@ -5,49 +5,10 @@ import os
 import pytest
 
 from utils_nlp.dataset.url_utils import maybe_download
-from utils_nlp.dataset.msrpc import load_pandas_df
-import utils_nlp.dataset.wikigold as wg
-import utils_nlp.dataset.xnli as xnli
+from utils_nlp.dataset import msrpc
+from utils_nlp.dataset import wikigold
+from utils_nlp.dataset import xnli 
 from utils_nlp.dataset.ner_utils import preprocess_conll
-
-
-def test_maybe_download():
-    # ToDo: Change this url when repo goes public.
-    file_url = (
-        "https://raw.githubusercontent.com/Microsoft/Recommenders/"
-        "master/LICENSE"
-    )
-    filepath = "license.txt"
-    assert not os.path.exists(filepath)
-    filepath = maybe_download(file_url, "license.txt", expected_bytes=1162)
-    assert os.path.exists(filepath)
-    os.remove(filepath)
-    with pytest.raises(IOError):
-        filepath = maybe_download(file_url, "license.txt", expected_bytes=0)
-
-
-def test_load_pandas_df_msrpc():
-    with pytest.raises(Exception):
-        load_pandas_df(dataset_type="Dummy")
-
-
-def test_wikigold(tmp_path):
-    wg_sentence_count = 1841
-    wg_test_percentage = 0.5
-    wg_test_sentence_count = round(wg_sentence_count * wg_test_percentage)
-    wg_train_sentence_count = wg_sentence_count - wg_test_sentence_count
-
-    downloaded_file = os.path.join(tmp_path, "wikigold.conll.txt")
-    assert not os.path.exists(downloaded_file)
-
-    train_df, test_df = wg.load_train_test_dfs(
-        tmp_path, test_percentage=wg_test_percentage
-    )
-
-    assert os.path.exists(downloaded_file)
-
-    assert train_df.shape == (wg_train_sentence_count, 2)
-    assert test_df.shape == (wg_test_sentence_count, 2)
 
 
 @pytest.fixture
@@ -115,6 +76,45 @@ def ner_utils_test_data(scope="module"):
     }
 
 
+def test_maybe_download():
+    # ToDo: Change this url when repo goes public.
+    file_url = (
+        "https://raw.githubusercontent.com/Microsoft/Recommenders/"
+        "master/LICENSE"
+    )
+    filepath = "license.txt"
+    assert not os.path.exists(filepath)
+    filepath = maybe_download(file_url, "license.txt", expected_bytes=1162)
+    assert os.path.exists(filepath)
+    os.remove(filepath)
+    with pytest.raises(IOError):
+        filepath = maybe_download(file_url, "license.txt", expected_bytes=0)
+
+
+def test_msrpc():
+    with pytest.raises(Exception):
+        msrpc.load_pandas_df(dataset_type="Dummy")
+
+
+def test_wikigold(tmp_path):
+    wg_sentence_count = 1841
+    wg_test_percentage = 0.5
+    wg_test_sentence_count = round(wg_sentence_count * wg_test_percentage)
+    wg_train_sentence_count = wg_sentence_count - wg_test_sentence_count
+
+    downloaded_file = os.path.join(tmp_path, "wikigold.conll.txt")
+    assert not os.path.exists(downloaded_file)
+
+    train_df, test_df = wikigold.load_train_test_dfs(
+        tmp_path, test_percentage=wg_test_percentage
+    )
+
+    assert os.path.exists(downloaded_file)
+
+    assert train_df.shape == (wg_train_sentence_count, 2)
+    assert test_df.shape == (wg_test_sentence_count, 2)
+
+
 def test_ner_utils(ner_utils_test_data):
     output = preprocess_conll(ner_utils_test_data["input"])
     assert output == ner_utils_test_data["expected_output"]
@@ -125,3 +125,14 @@ def test_xnli(tmp_path):
     # minutes to download
     dev_df = xnli.load_pandas_df(local_cache_path=tmp_path)
     assert dev_df.shape == (2490, 2)
+
+
+def test_snli(tmp_path):
+    df_train = snli.load_pandas_df(local_cache_path=tmp_path, file_split=Split.TRAIN)
+    assert df_train.shape == (550152, 14)
+    df_test = snli.load_pandas_df(local_cache_path=tmp_path, file_split=Split.TEST)
+    assert df_test.shape == (10000, 14)
+    df_dev = snli.load_pandas_df(local_cache_path=tmp_path, file_split=Split.DEV)
+    assert df_dev.shape == (10000, 14)
+
+
