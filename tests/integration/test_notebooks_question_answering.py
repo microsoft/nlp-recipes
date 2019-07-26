@@ -54,7 +54,7 @@ def test_bidaf_quickstart(notebooks,
     assert result == "Bi-Directional Attention Flow"
 
 
-@pytest.mark.notebooks
+@pytest.mark.integration
 @pytest.mark.gpu
 def test_bert_qa_runs(notebooks):
     notebook_path = notebooks["bert_qa_trainer"]
