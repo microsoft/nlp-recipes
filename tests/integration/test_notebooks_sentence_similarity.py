@@ -46,8 +46,8 @@ def test_similarity_embeddings_baseline_runs(notebooks, baseline_results):
         assert results[key] == pytest.approx(value, abs=ABS_TOL)
 
 
-@pytest.mark.notebooks
 @pytest.mark.gpu
+@pytest.mark.integration
 def test_similarity_senteval_local_runs(notebooks, gensen_senteval_results):
     notebook_path = notebooks["senteval_local"]
     pm.execute_notebook(
@@ -63,7 +63,7 @@ def test_similarity_senteval_local_runs(notebooks, gensen_senteval_results):
             assert out[key][task] == result
 
 
-@pytest.mark.notebooks
+@pytest.mark.integration
 @pytest.mark.azureml
 def test_similarity_senteval_azureml_runs(notebooks, gensen_senteval_results):
     notebook_path = notebooks["senteval_azureml"]
@@ -87,8 +87,8 @@ def test_similarity_senteval_azureml_runs(notebooks, gensen_senteval_results):
     )
 
 
-@pytest.mark.notebooks
 @pytest.mark.gpu
+@pytest.mark.integration
 def test_gensen_local(notebooks):
     notebook_path = notebooks["gensen_local"]
     pm.execute_notebook(

@@ -40,12 +40,12 @@ jobs:
 
   - bash: |
       source activate integration_cpu
-      pytest --durations=0 tests/smoke -m "smoke and not gpu" --junitxml=junit/test-smoke-test.xml
+      pytest --durations=0 tests/smoke -m "smoke and not gpu and not azureml" --junitxml=junit/test-smoke-test.xml
     displayName: 'Run smoke tests'
 
   - bash: |
       source activate integration_cpu
-      pytest --durations=0 tests/integration -m "integration and not gpu" --junitxml=junit/test-integration-test.xml
+      pytest --durations=0 tests/integration -m "integration and not gpu and not azureml" --junitxml=junit/test-integration-test.xml
     displayName: 'Run integration tests'
 
   - bash: |
