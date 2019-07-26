@@ -5,7 +5,7 @@ import sys
 import pytest
 import papermill as pm
 import scrapbook as sb
-from tests.notebooks_common import OUTPUT_NOTEBOOK
+from tests.notebooks_common import OUTPUT_NOTEBOOK, KERNEL_NAME
 
 sys.path.append("../../")
 ABS_TOL = 0.2
@@ -37,7 +37,7 @@ def baseline_results():
 @pytest.mark.integration
 def test_similarity_embeddings_baseline_runs(notebooks, baseline_results):
     notebook_path = notebooks["similarity_embeddings_baseline"]
-    pm.execute_notebook(notebook_path, OUTPUT_NOTEBOOK)
+    pm.execute_notebook(notebook_path, OUTPUT_NOTEBOOK, kernel_name=KERNEL_NAME)
     results = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict["results"]
     for key, value in baseline_results.items():
         assert results[key] == pytest.approx(value, abs=ABS_TOL)
@@ -50,6 +50,7 @@ def test_gensen_local(notebooks):
     pm.execute_notebook(
         notebook_path,
         OUTPUT_NOTEBOOK,
+        kernel_name=KERNEL_NAME,
         parameters=dict(
             max_epoch=1,
             config_filepath="../../scenarios/sentence_similarity/gensen_config.json",
