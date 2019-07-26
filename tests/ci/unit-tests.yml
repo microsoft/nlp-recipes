@@ -37,10 +37,8 @@ jobs:
   
   - bash:
       source activate nlp &&
-      conda env list &&
-      ls -R /opt/conda &&
-      ls -R /etc;
       conda install -y -c conda-forge ipykernel;
+      conda list;
       python -m ipykernel install --user --name nlp --display-name "nlp";
       conda install -y -c anaconda pytest;
       pytest --durations=0 tests/unit --junitxml=junit/test-unittest.xml;
@@ -63,7 +61,8 @@ jobs:
 - job: unit_tests_gpu
     
   pool:
-    name: "nlptestmachine"
+    vmImage: 'ubuntu-16.04'
+    # name: "nlptestmachine"
   
   steps:
   
