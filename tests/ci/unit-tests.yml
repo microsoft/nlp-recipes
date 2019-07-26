@@ -10,7 +10,7 @@ trigger: none
 
 jobs:
 
-- job: unit_tests_cpu
+- job: unit_tests_cpu public agent
   timeoutInMinutes: 120
 
   pool:
@@ -37,7 +37,6 @@ jobs:
   
   - bash:
       source activate nlp &&
-      conda install -y -c conda-forge ipykerne &&
       conda list &&
       conda install -y -c anaconda pytest &&
       pytest --durations=0 tests/unit --junitxml=junit/test-unittest.xml 
@@ -69,29 +68,7 @@ jobs:
       echo "##vso[task.prependpath]/data/anaconda/bin"&&
       conda env list
     displayName: Add Conda to PATH
-  
-  - bash:
-      python tools/generate_conda_file.py &&
-      conda env create -n nlp_cpu -f nlp_cpu.yaml &&
-    displayName: 'Creating Conda Environment with dependencies'
-  
-  - bash:
-      source activate nlp_cpu &&
-      pytest tests/unit -m "notebooks and not gpu" --junitxml=junit/test-unitttest.xml
-    displayName: 'Run Unit tests'
-  
-  - bash:
-        echo Remove Conda Environment
-        conda remove -n nlp_cpu --all -q --force -y
-        echo Done Cleanup
-    displayName: 'Cleanup Task'
-    condition: always()
-  
-  - task: PublishTestResults@2
-    inputs:
-      testResultsFiles: '**/test-unitttest.xml'
-      testRunTitle: 'Test results for PyTest'
-  
+    
   - task: ComponentGovernanceComponentDetection@0
     inputs:
       scanType: 'Register'
