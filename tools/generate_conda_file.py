@@ -13,6 +13,8 @@
 
 import argparse
 import textwrap
+from sys import platform
+
 
 HELP_MSG = """
 To create the conda environment:
@@ -80,7 +82,13 @@ PIP_BASE = {
     "seqeval": "seqeval>=0.0.12",
 }
 
-PIP_GPU = {"horovod": "horovod>=0.16.1"}
+PIP_GPU = {}
+
+PIP_DARWIN = {"horovod": "horovod>=0.16.1"}
+
+PIP_LINUX = {"horovod": "horovod>=0.16.1"}
+
+PIP_WIN32 = {}
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -114,6 +122,18 @@ if __name__ == "__main__":
     if args.gpu:
         conda_packages.update(CONDA_GPU)
         pip_packages.update(PIP_GPU)
+
+    # check for os platform support
+    if platform == "darwin":
+        pip_packages.update(PIP_DARWIN)
+    elif platform.startswith("linux"):
+        pip_packages.update(PIP_LINUX)
+    elif platform == "win32":
+        pip_packages.update(PIP_WIN32)
+    else:
+        raise Exception(
+            "Unsupported platform, must be Windows, Linux, or macOS"
+        )
 
     # write out yaml file
     conda_file = "{}.yaml".format(conda_env)

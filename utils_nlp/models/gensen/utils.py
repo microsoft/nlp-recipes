@@ -393,7 +393,7 @@ class NLIIterator(DataIterator):
             test(torch.Tensor): Testing dataset.
             vocab_size(int): The size of the vocabulary.
             lowercase(bool): If lowercase the dataset.
-            vocab(list): The list of the vocabulary.
+            vocab(Union[bytes,str): The list of the vocabulary.
         """
         self.seed = seed
         self.train = train
