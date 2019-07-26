@@ -9,6 +9,7 @@ from utils_nlp.dataset import msrpc
 from utils_nlp.dataset import wikigold
 from utils_nlp.dataset import xnli
 from utils_nlp.dataset import snli
+from utils_nlp.dataset import Split
 from utils_nlp.dataset.ner_utils import preprocess_conll
 
 
