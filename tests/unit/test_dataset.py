@@ -7,7 +7,7 @@ import pytest
 from utils_nlp.dataset.url_utils import maybe_download
 from utils_nlp.dataset import msrpc
 from utils_nlp.dataset import wikigold
-from utils_nlp.dataset import xnli 
+from utils_nlp.dataset import xnli
 from utils_nlp.dataset.ner_utils import preprocess_conll
 
 
@@ -123,16 +123,21 @@ def test_ner_utils(ner_utils_test_data):
 def test_xnli(tmp_path):
     # only test for the dev df as the train dataset takes several
     # minutes to download
-    dev_df = xnli.load_pandas_df(local_cache_path=tmp_path)
+    dev_df = xnli.load_pandas_df(local_cache_path=tmp_path, file_split="dev")
     assert dev_df.shape == (2490, 2)
 
 
 def test_snli(tmp_path):
-    df_train = snli.load_pandas_df(local_cache_path=tmp_path, file_split=Split.TRAIN)
+    df_train = snli.load_pandas_df(
+        local_cache_path=tmp_path, file_split=Split.TRAIN
+    )
     assert df_train.shape == (550152, 14)
-    df_test = snli.load_pandas_df(local_cache_path=tmp_path, file_split=Split.TEST)
+    df_test = snli.load_pandas_df(
+        local_cache_path=tmp_path, file_split=Split.TEST
+    )
     assert df_test.shape == (10000, 14)
-    df_dev = snli.load_pandas_df(local_cache_path=tmp_path, file_split=Split.DEV)
+    df_dev = snli.load_pandas_df(
+        local_cache_path=tmp_path, file_split=Split.DEV
+    )
     assert df_dev.shape == (10000, 14)
-
 

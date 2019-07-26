@@ -5,6 +5,7 @@ import os
 import pytest
 
 from utils_nlp.dataset import msrpc
+from utils_nlp.dataset import xnli
 
 
 @pytest.mark.smoke
@@ -20,3 +21,11 @@ def test_msrpc_load_df(tmp_path):
     df_train = msrpc.load_pandas_df(
         local_cache_path=tmp_path, dataset_type="train"
     )
+
+
+@pytest.mark.smoke
+def test_xnli(tmp_path):
+    df_train = xnli.load_pandas_df(
+        local_cache_path=tmp_path, file_split="train"
+    )
+    assert df_train.shape == (392702, 2)
