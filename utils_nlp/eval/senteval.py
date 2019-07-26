@@ -11,18 +11,17 @@ class SentEvalRunner:
             path_to_senteval (str, optional): Path to the SentEval source code.
         """
         self.path_to_senteval = path_to_senteval
-        self.params_senteval = {}
+        self.transfer_data_path = os.path.join(self.path_to_senteval, "data")
+        self.params_senteval = {"task_path": self.transfer_data_path}
 
-    def set_transfer_data_path(self, relative_path):
+    def set_transfer_data_path(self, path):
         """Set the datapath that contains the datasets for the SentEval transfer tasks
         
         Args:
-            relative_path (str): Relative datapath
+            path (str): Path to transfer task datasets
         """
-        self.transfer_data_path = os.path.join(
-            self.path_to_senteval, relative_path
-        )
-        self.params_senteval["task_path"] = self.transfer_data_path
+        self.transfer_data_path = path
+        self.params_senteval["task_path"] = path
 
     def set_transfer_tasks(self, task_list):
         """Set the transfer tasks to use for evaluation
@@ -36,7 +35,7 @@ class SentEvalRunner:
         """Set the model to evaluate"""
         self.params_senteval["model"] = model
 
-    def set_params(self, params):
+    def append_params(self, params):
         self.params_senteval = dict(self.params_senteval, **params)
 
         classifying_tasks = {
