@@ -30,9 +30,6 @@ Depending on the type of NLP system and the notebook that needs to be run, there
 * Miniconda or Anaconda with Python version >= 3.6. 
     * This is pre-installed on Azure DSVM such that one can run the following steps directly. To setup on your local machine, [Miniconda](https://docs.conda.io/en/latest/miniconda.html) is a quick way to get started.
     * It is recommended to update conda to the latest version: `conda update -n base -c defaults conda`
-* CUDA Toolkit >=9.2 (for GPU machines only)
-    * On Windows: Download and install [toolkit](https://developer.nvidia.com/cuda-toolkit)
-    * On Linux: *conda install cudatoolkit>=9.2*
 
 
 ### Dependencies Setup
@@ -52,7 +49,7 @@ You can specify the environment name as well with the flag `-n`.
 Click on the following menus to see how to install the Python GPU environment:
 
 <details>
-<summary><strong><em>Python GPU environment</em></strong></summary>
+<summary><strong><em>Python GPU environment on Linux, MacOS</em></strong></summary>
 
 Assuming that you have a GPU machine, to install the Python GPU environment, which by default installs the CPU environment:
 
@@ -62,6 +59,28 @@ Assuming that you have a GPU machine, to install the Python GPU environment, whi
 
 </details>
 
+<details>
+<summary><strong><em>Python GPU environment on Windows</em></strong></summary>
+
+Assuming that you have an Azure GPU DSVM machine, here are the steps to setup the Python GPU environment:
+1. Make sure you have CUDA Toolkit installed. You can run the command below in your terminal and you should see information printed out about your Cuda.
+
+         nvcc --version
+    
+    If not, you can download the CUDA Toolkit and install from here: [CUDA Toolkit](https://developer.nvidia.com/cuda-toolkit)
+
+2. Create yaml file for enviroment setup. 
+
+        cd nlp
+        python tools/generate_conda_file.py --gpu
+    
+    Open the new file `nlp_gpu.yaml` created in your folder, check if the `cudatoolkit` package has consitant version as the CUDA Toolkit in your system. For example, if you download CUDA Toolkit 10.1, your `nlp_gpu.yaml` should have `cudatoolkit>=10`. Make necessary changes on the version and save the file.
+
+3. Installs the GPU environment.
+
+        conda env create -n nlp_gpu -f nlp_gpu.yaml 
+
+</details>
 
 ### Register Conda Environment in DSVM JupyterHub
 
