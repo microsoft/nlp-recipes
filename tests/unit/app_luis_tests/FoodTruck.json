@@ -1,0 +1,548 @@
+{
+  "luis_schema_version": "2.1.0",
+  "versionId": "0.1",
+  "name": "FoodTruck",
+  "desc": "Take orders for food truck. ",
+  "culture": "en-us",
+  "intents": [
+    {
+      "name": "None"
+    },
+    {
+      "name": "OrderBurger"
+    },
+    {
+      "name": "OrderEspressoDrink"
+    },
+    {
+      "name": "OrderPho"
+    },
+    {
+      "name": "OrderRamen"
+    },
+    {
+      "name": "OrderSandwich"
+    },
+    {
+      "name": "OrderTea"
+    }
+  ],
+  "entities": [
+    {
+      "name": "Burger",
+      "children": [
+        "Hamburger",
+        "Cheeseburger",
+        "VeggieBurger"
+      ]
+    },
+    {
+      "name": "Cake",
+      "children": [
+        "ChocolateCake",
+        "AngelCake",
+        "CheeseCake"
+      ]
+    },
+    {
+      "name": "EspressoDrink",
+      "children": [
+        "Cappucino",
+        "Americano",
+        "Latte",
+        "Doppio",
+        "Breve"
+      ]
+    },
+    {
+      "name": "FryType",
+      "children": [
+        "SweetPotatoFries",
+        "GarlicFries",
+        "RegularFries",
+        "CurlyFries"
+      ]
+    },
+    {
+      "name": "GrilledCheese",
+      "children": [
+        "AmericanGrilledCheese",
+        "CheddarGrilledCheese"
+      ]
+    },
+    {
+      "name": "IceCream",
+      "children": [
+        "StrawberryIceCream",
+        "ChocolateIceCream",
+        "VanillaIceCream"
+      ]
+    },
+    {
+      "name": "Milkshake",
+      "children": [
+        "StrawberryShake",
+        "ChocolateShake",
+        "VanillaShake"
+      ]
+    },
+    {
+      "name": "Name"
+    },
+    {
+      "name": "OtherSandwich",
+      "children": [
+        "PhillyCheesesteak",
+        "MeatballSub",
+        "Sub",
+        "MonteCristo",
+        "ClubSandwich"
+      ]
+    },
+    {
+      "name": "Pastrami",
+      "children": [
+        "PastramiOnRye",
+        "Reuben"
+      ]
+    },
+    {
+      "name": "Pho",
+      "children": [
+        "MeatballPho",
+        "BrisketPho",
+        "SteakPho"
+      ]
+    },
+    {
+      "name": "Pizza",
+      "children": [
+        "MeatLoversPizza",
+        "VeggiePizza",
+        "CheesePizza",
+        "PepperoniPizza"
+      ]
+    },
+    {
+      "name": "Ramen",
+      "children": [
+        "ShioRamen",
+        "KitsuneRamen",
+        "ShoyuRamen"
+      ]
+    },
+    {
+      "name": "Salad",
+      "children": [
+        "Caesar",
+        "Garden"
+      ]
+    },
+    {
+      "name": "Soup",
+      "children": [
+        "TomatoSoup",
+        "ChickenSoup",
+        "BeefBarleySoup"
+      ]
+    },
+    {
+      "name": "Tea",
+      "children": [
+        "HerbalTea",
+        "GreenTea",
+        "BlackTea"
+      ]
+    }
+  ],
+  "composites": [
+    {
+      "name": "BurgerOrder",
+      "children": [
+        "number",
+        "Burger"
+      ]
+    },
+    {
+      "name": "CakeOrder",
+      "children": [
+        "number",
+        "Cake"
+      ]
+    },
+    {
+      "name": "EspressoDrinkOrder",
+      "children": [
+        "number",
+        "EspressoDrink"
+      ]
+    },
+    {
+      "name": "GrilledCheeseOrder",
+      "children": [
+        "number",
+        "GrilledCheese"
+      ]
+    },
+    {
+      "name": "IceCreamOrder",
+      "children": [
+        "IceCream",
+        "number"
+      ]
+    },
+    {
+      "name": "MilkshakeOrder",
+      "children": [
+        "number",
+        "Milkshake"
+      ]
+    },
+    {
+      "name": "OtherSandwichOrder",
+      "children": [
+        "number",
+        "OtherSandwich"
+      ]
+    },
+    {
+      "name": "PastramiSandwichOrder",
+      "children": [
+        "Pastrami",
+        "number"
+      ]
+    },
+    {
+      "name": "PhoOrder",
+      "children": [
+        "number",
+        "Pho"
+      ]
+    },
+    {
+      "name": "PizzaOrder",
+      "children": [
+        "number",
+        "Pizza"
+      ]
+    },
+    {
+      "name": "RamenOrder",
+      "children": [
+        "number",
+        "Ramen"
+      ]
+    },
+    {
+      "name": "SaladOrder",
+      "children": [
+        "number",
+        "Salad"
+      ]
+    },
+    {
+      "name": "SoupOrder",
+      "children": [
+        "number",
+        "Soup"
+      ]
+    },
+    {
+      "name": "TeaOrder",
+      "children": [
+        "number",
+        "Tea"
+      ]
+    }
+  ],
+  "closedLists": [],
+  "bing_entities": [
+    "datetimeV2",
+    "number"
+  ],
+  "model_features": [],
+  "regex_features": [],
+  "utterances": [
+    {
+      "text": "turn on the light",
+      "intent": "None",
+      "entities": []
+    },
+    {
+      "text": "drive me home",
+      "intent": "None",
+      "entities": []
+    },
+    {
+      "text": "one espresso",
+      "intent": "OrderEspressoDrink",
+      "entities": [
+        {
+          "entity": "EspressoDrink",
+          "startPos": 4,
+          "endPos": 11
+        }
+      ]
+    },
+    {
+      "text": "i want a hoagie",
+      "intent": "OrderSandwich",
+      "entities": []
+    },
+    {
+      "text": "get me a hamburger with no onion",
+      "intent": "OrderBurger",
+      "entities": [
+        {
+          "entity": "Burger::Hamburger",
+          "startPos": 9,
+          "endPos": 17
+        }
+      ]
+    },
+    {
+      "text": "i'd like a burger with ketchup and pickles",
+      "intent": "OrderBurger",
+      "entities": [
+        {
+          "entity": "Burger::Hamburger",
+          "startPos": 11,
+          "endPos": 16
+        }
+      ]
+    },
+    {
+      "text": "order a philly cheesesteak",
+      "intent": "OrderSandwich",
+      "entities": [
+        {
+          "entity": "OtherSandwich",
+          "startPos": 8,
+          "endPos": 25
+        }
+      ]
+    },
+    {
+      "text": "i want a pastrami on rye",
+      "intent": "OrderSandwich",
+      "entities": [
+        {
+          "entity": "Pastrami::PastramiOnRye",
+          "startPos": 9,
+          "endPos": 23
+        }
+      ]
+    },
+    {
+      "text": "i want to order a reuben",
+      "intent": "OrderSandwich",
+      "entities": [
+        {
+          "entity": "OtherSandwich",
+          "startPos": 18,
+          "endPos": 23
+        }
+      ]
+    },
+    {
+      "text": "get me a grilled cheese",
+      "intent": "OrderSandwich",
+      "entities": [
+        {
+          "entity": "GrilledCheese",
+          "startPos": 9,
+          "endPos": 22
+        }
+      ]
+    },
+    {
+      "text": "i want to order a sub",
+      "intent": "OrderSandwich",
+      "entities": []
+    },
+    {
+      "text": "a sub sandwich please",
+      "intent": "OrderSandwich",
+      "entities": [
+        {
+          "entity": "OtherSandwich::Sub",
+          "startPos": 2,
+          "endPos": 13
+        }
+      ]
+    },
+    {
+      "text": "i want to order pho",
+      "intent": "OrderPho",
+      "entities": []
+    },
+    {
+      "text": "i want to order ramen",
+      "intent": "OrderPho",
+      "entities": []
+    },
+    {
+      "text": "i'd like a black tea",
+      "intent": "OrderTea",
+      "entities": [
+        {
+          "entity": "Tea::BlackTea",
+          "startPos": 11,
+          "endPos": 19
+        }
+      ]
+    },
+    {
+      "text": "one green tea",
+      "intent": "OrderTea",
+      "entities": [
+        {
+          "entity": "Tea::GreenTea",
+          "startPos": 4,
+          "endPos": 12
+        }
+      ]
+    },
+    {
+      "text": "i'd like one herbal tea",
+      "intent": "OrderTea",
+      "entities": [
+        {
+          "entity": "Tea::HerbalTea",
+          "startPos": 13,
+          "endPos": 22
+        }
+      ]
+    },
+    {
+      "text": "order me two shio ramens",
+      "intent": "OrderRamen",
+      "entities": [
+        {
+          "entity": "Ramen",
+          "startPos": 13,
+          "endPos": 23
+        }
+      ]
+    },
+    {
+      "text": "two americanos",
+      "intent": "OrderEspressoDrink",
+      "entities": [
+        {
+          "entity": "EspressoDrink::Americano",
+          "startPos": 4,
+          "endPos": 13
+        }
+      ]
+    },
+    {
+      "text": "two lattes",
+      "intent": "OrderEspressoDrink",
+      "entities": [
+        {
+          "entity": "EspressoDrink::Latte",
+          "startPos": 4,
+          "endPos": 9
+        }
+      ]
+    },
+    {
+      "text": "one capuccino",
+      "intent": "OrderEspressoDrink",
+      "entities": [
+        {
+          "entity": "EspressoDrink::Cappucino",
+          "startPos": 4,
+          "endPos": 12
+        }
+      ]
+    },
+    {
+      "text": "one doppio",
+      "intent": "OrderEspressoDrink",
+      "entities": [
+        {
+          "entity": "EspressoDrink::Doppio",
+          "startPos": 4,
+          "endPos": 9
+        }
+      ]
+    },
+    {
+      "text": "get me 5 hamburgers",
+      "intent": "OrderBurger",
+      "entities": [
+        {
+          "entity": "Burger",
+          "startPos": 9,
+          "endPos": 18
+        },
+        {
+          "entity": "BurgerOrder",
+          "startPos": 7,
+          "endPos": 18
+        }
+      ]
+    },
+    {
+      "text": "tomorrow at 12:15 deliver 5 pho to lobby",
+      "intent": "OrderPho",
+      "entities": [
+        {
+          "entity": "Pho",
+          "startPos": 28,
+          "endPos": 30
+        },
+        {
+          "entity": "PhoOrder",
+          "startPos": 26,
+          "endPos": 30
+        }
+      ]
+    },
+    {
+      "text": "sent three meatball pho to the 5th floor tomorrow at 4pm",
+      "intent": "OrderPho",
+      "entities": [
+        {
+          "entity": "Pho::MeatballPho",
+          "startPos": 11,
+          "endPos": 22
+        }
+      ]
+    },
+    {
+      "text": "1 order of meatball pho for bob jones",
+      "intent": "OrderPho",
+      "entities": [
+        {
+          "entity": "Name",
+          "startPos": 28,
+          "endPos": 36
+        },
+        {
+          "entity": "Pho::MeatballPho",
+          "startPos": 11,
+          "endPos": 22
+        }
+      ]
+    },
+    {
+      "text": "jim walker wants pho delivered at 3pm",
+      "intent": "OrderPho",
+      "entities": [
+        {
+          "entity": "Name",
+          "startPos": 0,
+          "endPos": 9
+        },
+        {
+          "entity": "Pho",
+          "startPos": 17,
+          "endPos": 19
+        }
+      ]
+    }
+  ]
+}
