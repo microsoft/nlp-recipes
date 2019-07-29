@@ -6,6 +6,7 @@ import papermill as pm
 import scrapbook as sb
 from tests.notebooks_common import OUTPUT_NOTEBOOK, KERNEL_NAME
 
+
 ABS_TOL = 0.2
 ABS_TOL_PEARSONS = 0.05
 
@@ -99,7 +100,7 @@ def test_similarity_gensen_azureml_runs(notebooks):
         parameters=dict(
             CACHE_DIR="./tests/integration/temp",
             AZUREML_CONFIG_PATH="./tests/integration/.azureml",
-            UTIL_NLP_PATH="",
+            UTIL_NLP_PATH="./utils_nlp",
             MAX_EPOCH=1,
             TRAIN_SCRIPT="./scenarios/sentence_similarity/gensen_train.py",
             CONFIG_PATH="./scenarios/sentence_similarity/gensen_config.json",
@@ -108,7 +109,7 @@ def test_similarity_gensen_azureml_runs(notebooks):
         ),
     )
     result = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict
-    assert result["best_val_loss"] > 0
+    assert result["min_val_loss"] > 5
     assert result["learning_rate"] >= 0.0001
     assert result["learning_rate"] <= 0.001
 

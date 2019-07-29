@@ -634,13 +634,6 @@ if __name__ == "__main__":
         help="Limit training to specified number of epochs.",
     )
 
-    parser.add_argument(
-        "--max_epoch",
-        type=int,
-        default=None,
-        help="Limit training to specified number of epochs.",
-    )
-
     args = parser.parse_args()
     data_path = args.data_folder
     lr = args.learning_rate
