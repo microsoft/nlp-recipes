@@ -1,0 +1,30 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License.
+#
+
+# Pull request against these branches will trigger this build
+pr: none
+#- master
+#- staging
+trigger: none
+
+jobs:
+ 
+- job: unit_tests_gpu
+    
+  pool:
+    # vmImage: 'ubuntu-16.04'
+    name: "nlptestmachine"
+  
+  steps:
+  
+  - bash:
+      echo "##vso[task.prependpath]/data/anaconda/bin"&&
+      conda env list
+    displayName: Add Conda to PATH
+
+  - task: ComponentGovernanceComponentDetection@0
+    inputs:
+      scanType: 'Register'
+      verbosity: 'Verbose'
+      alertWarningLevel: 'High'
