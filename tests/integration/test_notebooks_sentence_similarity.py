@@ -7,7 +7,6 @@ import papermill as pm
 import scrapbook as sb
 from tests.notebooks_common import OUTPUT_NOTEBOOK, KERNEL_NAME
 
-sys.path.append("../../")
 ABS_TOL = 0.2
 ABS_TOL_PEARSONS = 0.05
 
@@ -53,8 +52,8 @@ def test_gensen_local(notebooks):
         kernel_name=KERNEL_NAME,
         parameters=dict(
             max_epoch=1,
-            config_filepath="../../scenarios/sentence_similarity/gensen_config.json",
-            base_data_path="../../data",
+            config_filepath="scenarios/sentence_similarity/gensen_config.json",
+            base_data_path="data",
         ),
     )
 
