@@ -2,77 +2,69 @@
 # Licensed under the MIT License.
 
 import os
-
+from azureml.core.authentication import AzureCliAuthentication
+from azureml.core.authentication import InteractiveLoginAuthentication
+from azureml.core.authentication import AuthenticationException
 from azureml.core import Workspace
+
+def get_auth():
+    """ 
+    Method to get the correct Azure ML Authentication type
+    
+    Always start with CLI Authentication and if it fails, fall back 
+    to interactive login
+    """
+    try:
+        auth_type = AzureCliAuthentication()
+        auth_type.get_authentication_header()
+    except AuthenticationException:
+        auth_type = InteractiveLoginAuthentication()
+    return auth_type
 
 
 def get_or_create_workspace(
-    config_path=None,
-    subscription_id=None,
-    resource_group=None,
-    workspace_name=None,
-    workspace_region=None,
-):
-    """Get or create AzureML Workspace this will save the config to the path specified for later use
-
-    Args:
-        config_path (str): optional directory to look for / store config.json file (defaults to current directory)
-        subscription_id (str): subscription id
-        resource_group (str): resource group
-        workspace_name (str): workspace name
-        workspace_region (str): region
-
-    Returns:
-        Workspace
+    config_path = None,
+    subscription_id = None,
+    resource_group = None,
+    workspace_name = None,
+    workspace_region = None
+    ) -> Workspace:
     """
+    Returns workspace if one exists already with the name
+    otherwise creates a new one.
 
-    # use environment variables if needed
-    if subscription_id is None:
-        subscription_id = os.getenv("SUBSCRIPTION_ID")
-    if resource_group is None:
-        resource_group = os.getenv("RESOURCE_GROUP")
-    if workspace_name is None:
-        workspace_name = os.getenv("WORKSPACE_NAME")
-    if workspace_region is None:
-        workspace_region = os.getenv("WORKSPACE_REGION")
-
-    # define fallback options in order to try
-    options = [
-        (
-            Workspace,
-            dict(
-                subscription_id=subscription_id,
-                resource_group=resource_group,
-                workspace_name=workspace_name,
-            ),
-        ),
-        (Workspace.from_config, dict(path=config_path)),
-        (
-            Workspace.create,
-            dict(
-                subscription_id=subscription_id,
-                resource_group=resource_group,
-                name=workspace_name,
-                location=workspace_region,
-                create_resource_group=True,
-                exist_ok=True,
-            ),
-        ),
-    ]
-
-    for function, kwargs in options:
-        try:
-            ws = function(**kwargs)
-            break
-        except Exception:
-            continue
-    else:
-        raise ValueError(
-            "Failed to get or create AzureML Workspace with the configuration information provided"
+    Args
+    config_path: optional directory to look for / store config.json file (defaults to current directory)
+    subscription_id: Azure subscription id
+    resource_group: Azure resource group to create workspace and related resources  
+    workspace_name: name of azure ml workspace  
+    workspace_region: region for workspace 
+    """
+    try:
+        # get existing azure ml workspace
+        ws = Workspace.get(
+            name=workspace_name,
+            subscription_id=subscription_id,
+            resource_group=resource_group,
+            auth=get_auth(),
         )
 
+    except:
+        # this call might take a minute or two.
+        print("Creating new workspace")
+        ws = Workspace.create(
+            name=workspace_name,
+            subscription_id=subscription_id,
+            resource_group=resource_group,
+            create_resource_group=True,
+            location=workspace_region,
+            auth=get_auth()
+            )
+
+    print(config_path)
     ws.write_config(path=config_path)
     return ws
+
 
 def log_metrics_scalar(value, run, name="", description=None):
     """Log scalar metric to the AzureML run

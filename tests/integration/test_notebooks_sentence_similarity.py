@@ -36,7 +36,6 @@ def baseline_results():
         "Doc2vec Cosine with Stop Words": 0.4498543211602068,
     }
 
-
 @pytest.mark.notebooks
 def test_similarity_embeddings_baseline_runs(notebooks, baseline_results):
     notebook_path = notebooks["similarity_embeddings_baseline"]
@@ -45,16 +44,25 @@ def test_similarity_embeddings_baseline_runs(notebooks, baseline_results):
     for key, value in baseline_results.items():
         assert results[key] == pytest.approx(value, abs=ABS_TOL)
 
-
+@pytest.mark.usefixtures("teardown_service")
 @pytest.mark.notebooks
-def test_automl_local_runs(notebooks):
+def test_automl_local_runs(notebooks,
+                           subscription_id,
+                           resource_group,
+                           workspace_name,
+                           workspace_region):
     notebook_path = notebooks["similarity_automl_local"]
+
     pm.execute_notebook(notebook_path,
                         OUTPUT_NOTEBOOK,
-                        parameters = {'automl_iterations': 5,
+                        parameters = {'automl_iterations': 2,
                                       'automl_iteration_timeout':7,
                                       'config_path': "tests/ci",
-                                      'web_service_name': "aci-automl-service"})
+                                      'webservice_name': "aci-test-service",
+                                      'subscription_id': subscription_id,
+                                      'resource_group': resource_group,
+                                      'workspace_name': workspace_name,
+                                      'workspace_region': workspace_region})
     result = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict["pearson_correlation"]
     assert result == pytest.approx(0.5, abs=ABS_TOL)
 

@@ -17,7 +17,8 @@ from tests.notebooks_common import path_notebooks
 
 from utils_nlp.models.bert.common import Language
 from utils_nlp.models.bert.common import Tokenizer as BERTTokenizer
-
+from utils_nlp.azureml import azureml_utils
+from azureml.core.webservice import AciWebservice, Webservice
 
 @pytest.fixture(scope="module")
 def notebooks():
@@ -57,6 +58,8 @@ def tmp(tmp_path_factory):
         yield td.name
     finally:
         td.cleanup()
+
+
 
 
 @pytest.fixture(scope="module")
@@ -167,6 +170,59 @@ def ner_test_data():
     }
 
 
+def pytest_addoption(parser):
+    parser.addoption("--subscription_id",
+                        help="Azure Subscription Id to create resources in")
+    parser.addoption("--resource_group",
+                        help="Name of the resource group")
+    parser.addoption("--workspace_name",
+                        help="Name of Azure ML Workspace")
+    parser.addoption("--workspace_region",
+                        help="Azure region to create the workspace in")
+
+@pytest.fixture(scope="module")
+def subscription_id(request):
+    return request.config.getoption("--subscription_id")
+
+
+@pytest.fixture(scope="module")
+def resource_group(request):
+    return request.config.getoption("--resource_group")
+
+
+@pytest.fixture(scope="module")
+def workspace_name(request):
+    return request.config.getoption("--workspace_name")
+
+
+@pytest.fixture(scope="module")
+def workspace_region(request):
+    return request.config.getoption("--workspace_region")
+
+
 @pytest.fixture()
 def bert_english_tokenizer():
     return BERTTokenizer(language=Language.ENGLISHCASED, to_lower=False)
+
+@pytest.fixture(scope="module")
+def teardown_service(subscription_id,
+                     resource_group,
+                     workspace_name,
+                     workspace_region):
+
+    yield
+    
+    #connect to workspace
+    ws = azureml_utils.get_or_create_workspace(
+        config_path="tests/ci",
+        subscription_id=subscription_id,
+        resource_group=resource_group,
+        workspace_name=workspace_name,
+        workspace_region=workspace_region,
+    )
+
+    #connect to aci_service
+    aci_service = Webservice(workspace=ws, name="aci-test-service")
+
+    #delete aci_service
+    aci_service.delete()
