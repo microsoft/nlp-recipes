@@ -14,7 +14,9 @@ import torch
 from sklearn.model_selection import StratifiedShuffleSplit
 from sklearn.metrics import classification_report
 
-from utils_nlp.models.bert.sequence_classification import BERTSequenceClassifier
+from utils_nlp.models.bert.sequence_classification import (
+    BERTSequenceClassifier,
+)
 from utils_nlp.models.bert.common import Language, Tokenizer
 from utils_nlp.common.timer import Timer
 
@@ -36,9 +38,10 @@ class BERTIntentClassifier:
         train_size=0.8,
         learning_rate=3e-5,
         warmup_proportion=None,
-        cache_dir="./temp"
+        cache_dir="./temp",
     ):
         """Initialize the classifier
+
         Args:
             language (Language, optional): The pretrained model's language.
                 efaults to Language.ENGLISH.
@@ -58,15 +61,30 @@ class BERTIntentClassifier:
                 training. Defaults to None. 
             cache_dir (str, optional): Location of BERT's cache directory.
                 Defaults to "./temp".
+
+        Returns:
+            None
+        
+        Raises:
+            PermissionError:  If the running process doesn't have permission to create the cache dir
+            Exception: If other unexpected errors occur during directory creation.
+            
         """
+
         if not os.path.isdir(cache_dir):
-            os.mkdir(cache_dir)
-        if not os.path.isdir(cache_dir):
-            raise Exception(
-                "Please check permission if you can create or access the cache dir {0}".format(
-                    cache_dir
+            try:
+                os.mkdir(cache_dir)
+            except PermissionError as error:
+                print(
+                    "Please check permission if you can create or access the cache dir {0}. Additonal error message: {1}".format(
+                        cache_dir, error
+                    )
                 )
-            )
+                raise
+            except:
+                print("Unexpected error:", sys.exc_info()[0])
+                raise
+
         self.cache_dir = cache_dir
         self.language = language
         self.to_lower = to_lower
@@ -89,9 +107,18 @@ class BERTIntentClassifier:
 
     def get_train_dataframe(self, luis_model_file):
         """ Prepare training dataframe from luis model file
+
         Args:
             luis_model_file (str): file path of the luis model file for training 
+
+        Returns:
+            dict: json object of the luis model
+            pandas.DataFrame: the training utterances and their labels
+            dict:  the file path to save the dictionary  which maps
+                the ids to categories from label encoder
+
         """
+
         luis_model = None
         with codecs.open(luis_model_file, "r", encoding="utf8") as fd:
             luis_model = json.load(fd)
@@ -113,13 +140,16 @@ class BERTIntentClassifier:
         return luis_model, train_df, id_to_category
 
     def load(self, model_file, id_to_category_file):
-        """ load saved SequenceClassifier model and the dictionary which maps 
+        """ Loads a saved SequenceClassifier model and a dictionary which maps 
         id to category from label encoder.
+
         Args:
             model_file (str): the file path of the SequenceClassifier model
             id_to_category_file (str): the file path of the the dictionary which maps
-                id to category from label encoder
+                ids to categories from label encoder
+
         """
+
         if torch.cuda.is_available():
             self.saved_model = torch.load(model_file)
             self.id_to_category = torch.load(id_to_category_file)
@@ -130,14 +160,17 @@ class BERTIntentClassifier:
             )
 
     def save(self, classifier_file, model_file=None, id_to_category_file=None):
-        """ saved the trained intent classifier model, and also saved the its corresponding
-             SequenceClassifier model and the dictionary which maps id to category from label encoder.
+        """ Saves the trained intent classifier model, and also saves the its corresponding
+             SequenceClassifier model and the dictionary which maps ids to categories from label encoder.
+
         Args:
             classifier_file (str): the file path to save the intent classifier instance
             model_file (str, optional): the file path to save the SequenceClassifier model
-            id_to_category_file (str, optional): the file path to save the the dictionary which maps
-                id to category from label encoder
+            id_to_category_file (str, optional): the file path to save the dictionary 
+                which maps ids to categories from label encoder
+
         """
+
         torch.save(self, classifier_file)
         if model_file:
             torch.save(self.saved_model, model_file)
@@ -146,9 +179,12 @@ class BERTIntentClassifier:
 
     def train(self, luis_model_file):
         """ Fine-tunes the BERT classifier using the given luis model file.
+
         Args:
             luis_model_file (str): file path of the luis model file for training.
+
         """
+
         self.saved_luis_model, self.train_df, self.id_to_category = self.get_train_dataframe(
             luis_model_file
         )
@@ -161,7 +197,7 @@ class BERTIntentClassifier:
             ):
                 df_train = self.train_df.iloc[train_index, :]
                 df_test = self.train_df.iloc[test_index, :]
-        else: #don't use split as the dataset can be really small
+        else:  # don't use split as the dataset can be really small
             df_train = self.train_df
             df_test = self.train_df
         tokens_train = self.tokenizer.tokenize(list(df_train["text"]))
@@ -209,8 +245,12 @@ class BERTIntentClassifier:
     def copy_for_predict(self, external_model):
         """copy an external intent classifier so predict function 
         can be updated from the source code.
+
         Args: 
-            external_model (obj): an trained instance of BERTIntentClassifier"""
+            external_model (obj): an trained instance of BERTIntentClassifier
+
+"""
+
         self.tokenizer = external_model.tokenizer
         self.num_gpus = external_model.num_gpus
         self.batch_size = external_model.batch_size
@@ -220,15 +260,17 @@ class BERTIntentClassifier:
 
     def predict(self, text):
         """ predict the intent of the text based on the trained model.
+
         Args:
             text (str):  the input text
+
         Returns:
             dict: a dictionary of the top scoring intent and also the intent ranking of 
                 all intents in the trained model with scores.
+
         """
-        tokens_test = self.tokenizer.tokenize(
-            list([text]),
-        )
+
+        tokens_test = self.tokenizer.tokenize(list([text]))
         tokens_test, mask_test, _ = self.tokenizer.preprocess_classification_tokens(
             tokens_test, self.max_len
         )
@@ -237,7 +279,7 @@ class BERTIntentClassifier:
             input_mask=mask_test,
             num_gpus=self.num_gpus,
             batch_size=self.batch_size,
-            probabilities=True
+            probabilities=True,
         )
         max_index = preds.classes[0]
         probabilities = preds.probabilities[0]
