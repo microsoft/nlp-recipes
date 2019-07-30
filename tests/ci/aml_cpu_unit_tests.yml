@@ -44,13 +44,21 @@ steps:
   displayName: 'Use Python 3.6'
 
 - script: | 
-   az login --service-principal -u $(ClientID) -p $(ClientSecret) --tenant $(TenantID)
+   az login --service-principal -u $(spidentity) -p $(spsecret) --tenant $(sptenant)
   displayName: 'Login to Azure'
 
-- template: env-setup.yml 
+- bash: |
+    echo "##vso[task.prependpath]/data/anaconda/bin"
+  displayName: Add Conda to PATH
+
+- script:
+     pip install paramiko==2.4.2 &&
+     pip install azureml-sdk &&
+     pip install azure-cli
+  displayName: 'install azureml-sdk'
 
 - script: 
-     python scripts/generate_conda_file.py --name reco 
+     python scripts/generate_conda_file.py --name nlp 
   displayName: ' generate_conda_file.py'
 
 - script: 
