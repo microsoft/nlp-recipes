@@ -58,7 +58,7 @@ steps:
   displayName: 'install azureml-sdk'
 
 - script: 
-     python scripts/generate_conda_file.py --name nlp 
+     python tools/generate_conda_file.py --name nlp 
   displayName: ' generate_conda_file.py'
 
 - script: 
