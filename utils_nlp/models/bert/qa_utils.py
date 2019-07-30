@@ -2,22 +2,33 @@
 # Licensed under the MIT License.
 
 import collections
+import json
+import math
+import logging
 
-RawResult = collections.namedtuple("RawResult",
-                                   ["unique_id", "start_logits", "end_logits"])
+logger = logging.getLogger(__name__)
 
-def postprocess_answers(all_examples, 
-                        all_features, 
-                        all_results, 
-                        do_lower_case,
-                        n_best_size=20,
-                        max_answer_length=30, 
-                        output_prediction_file="./qa_predictions.json",
-                        output_nbest_file="./nbest_predictions.json",                         
-                        unanswerable_exists=False, 
-                        output_null_log_odds_file=None, 
-                        null_score_diff_threshold=0.0,
-                        verbose_logging=False):
+from pytorch_transformers.tokenization_bert import BasicTokenizer
+
+QAResult = collections.namedtuple(
+    "QAResult", ["unique_id", "start_logits", "end_logits"]
+)
+
+
+def postprocess_answers(
+    all_examples,
+    all_features,
+    all_results,
+    do_lower_case,
+    n_best_size=20,
+    max_answer_length=30,
+    output_prediction_file="./qa_predictions.json",
+    output_nbest_file="./nbest_predictions.json",
+    unanswerable_exists=False,
+    output_null_log_odds_file=None,
+    null_score_diff_threshold=0.0,
+    verbose_logging=False,
+):
     """Write final predictions to the json file and log-odds of null if needed."""
     logger.info("Writing predictions to: %s" % (output_prediction_file))
     logger.info("Writing nbest to: %s" % (output_nbest_file))
@@ -25,7 +36,7 @@ def postprocess_answers(all_examples,
     example_index_to_features = collections.defaultdict(list)
     # Map unique features to the original doc-question-answer triplet
     # Each doc-question-answer triplet can have multiple features because the doc
-    # could be split into multiple spans 
+    # could be split into multiple spans
     for feature in all_features:
         example_index_to_features[feature.example_index].append(feature)
 
@@ -35,7 +46,14 @@ def postprocess_answers(all_examples,
 
     _PrelimPrediction = collections.namedtuple(
         "PrelimPrediction",
-        ["feature_index", "start_index", "end_index", "start_logit", "end_logit"])
+        [
+            "feature_index",
+            "start_index",
+            "end_index",
+            "start_logit",
+            "end_logit",
+        ],
+    )
 
     all_predictions = collections.OrderedDict()
     all_nbest_json = collections.OrderedDict()
@@ -48,7 +66,9 @@ def postprocess_answers(all_examples,
         # keep track of the minimum score of null start+end of position 0
         score_null = 1000000  # large and positive
         min_null_feature_index = 0  # the paragraph slice with min null score
-        null_start_logit = 0  # the start logit at the slice with min null score
+        null_start_logit = (
+            0
+        )  # the start logit at the slice with min null score
         null_end_logit = 0  # the end logit at the slice with min null score
         for (feature_index, feature) in enumerate(features):
             result = unique_id_to_result[feature.unique_id]
@@ -56,7 +76,9 @@ def postprocess_answers(all_examples,
             end_indexes = _get_best_indexes(result.end_logits, n_best_size)
             # if we could have irrelevant answers, get the min score of irrelevant
             if unanswerable_exists:
-                feature_null_score = result.start_logits[0] + result.end_logits[0]
+                feature_null_score = (
+                    result.start_logits[0] + result.end_logits[0]
+                )
                 if feature_null_score < score_null:
                     score_null = feature_null_score
                     min_null_feature_index = feature_index
@@ -75,7 +97,9 @@ def postprocess_answers(all_examples,
                         continue
                     if end_index not in feature.token_to_orig_map:
                         continue
-                    if not feature.token_is_max_context.get(start_index, False):
+                    if not feature.token_is_max_context.get(
+                        start_index, False
+                    ):
                         continue
                     if end_index < start_index:
                         continue
@@ -88,7 +112,9 @@ def postprocess_answers(all_examples,
                             start_index=start_index,
                             end_index=end_index,
                             start_logit=result.start_logits[start_index],
-                            end_logit=result.end_logits[end_index]))
+                            end_logit=result.end_logits[end_index],
+                        )
+                    )
         if unanswerable_exists:
             prelim_predictions.append(
                 _PrelimPrediction(
@@ -96,14 +122,18 @@ def postprocess_answers(all_examples,
                     start_index=0,
                     end_index=0,
                     start_logit=null_start_logit,
-                    end_logit=null_end_logit))
+                    end_logit=null_end_logit,
+                )
+            )
         prelim_predictions = sorted(
             prelim_predictions,
             key=lambda x: (x.start_logit + x.end_logit),
-            reverse=True)
+            reverse=True,
+        )
 
         _NbestPrediction = collections.namedtuple(
-            "NbestPrediction", ["text", "start_logit", "end_logit"])
+            "NbestPrediction", ["text", "start_logit", "end_logit"]
+        )
 
         seen_predictions = {}
         nbest = []
@@ -112,11 +142,15 @@ def postprocess_answers(all_examples,
                 break
             feature = features[pred.feature_index]
             if pred.start_index > 0:  # this is a non-null prediction
-                tok_tokens = feature.tokens[pred.start_index:(pred.end_index + 1)]
+                tok_tokens = feature.tokens[
+                    pred.start_index : (pred.end_index + 1)
+                ]
                 ## Why can't we use span tokens directly???
                 orig_doc_start = feature.token_to_orig_map[pred.start_index]
                 orig_doc_end = feature.token_to_orig_map[pred.end_index]
-                orig_tokens = example.doc_tokens[orig_doc_start:(orig_doc_end + 1)]
+                orig_tokens = example.doc_tokens[
+                    orig_doc_start : (orig_doc_end + 1)
+                ]
                 tok_text = " ".join(tok_tokens)
 
                 # De-tokenize WordPieces that have been split off.
@@ -128,7 +162,9 @@ def postprocess_answers(all_examples,
                 tok_text = " ".join(tok_text.split())
                 orig_text = " ".join(orig_tokens)
 
-                final_text = get_final_text(tok_text, orig_text, do_lower_case, verbose_logging)
+                final_text = get_final_text(
+                    tok_text, orig_text, do_lower_case, verbose_logging
+                )
                 if final_text in seen_predictions:
                     continue
 
@@ -141,7 +177,9 @@ def postprocess_answers(all_examples,
                 _NbestPrediction(
                     text=final_text,
                     start_logit=pred.start_logit,
-                    end_logit=pred.end_logit))
+                    end_logit=pred.end_logit,
+                )
+            )
         # if we didn't include the empty option in the n-best, include it
         if unanswerable_exists:
             if "" not in seen_predictions:
@@ -149,19 +187,26 @@ def postprocess_answers(all_examples,
                     _NbestPrediction(
                         text="",
                         start_logit=null_start_logit,
-                        end_logit=null_end_logit))
-                
+                        end_logit=null_end_logit,
+                    )
+                )
+
             # In very rare edge cases we could only have single null prediction.
             # So we just create a nonce prediction in this case to avoid failure.
-            if len(nbest)==1:
-                nbest.insert(0,
-                    _NbestPrediction(text="empty", start_logit=0.0, end_logit=0.0))
+            if len(nbest) == 1:
+                nbest.insert(
+                    0,
+                    _NbestPrediction(
+                        text="empty", start_logit=0.0, end_logit=0.0
+                    ),
+                )
 
         # In very rare edge cases we could have no valid predictions. So we
         # just create a nonce prediction in this case to avoid failure.
         if not nbest:
             nbest.append(
-                _NbestPrediction(text="empty", start_logit=0.0, end_logit=0.0))
+                _NbestPrediction(text="empty", start_logit=0.0, end_logit=0.0)
+            )
 
         assert len(nbest) >= 1
 
@@ -187,17 +232,20 @@ def postprocess_answers(all_examples,
         assert len(nbest_json) >= 1
 
         if not unanswerable_exists:
-            all_predictions[example.qas_id] = nbest_json[0]["text"]
+            all_predictions[example.qa_id] = nbest_json[0]["text"]
         else:
             # predict "" iff the null score - the score of best non-null > threshold
-            score_diff = score_null - best_non_null_entry.start_logit - (
-                best_non_null_entry.end_logit)
-            scores_diff_json[example.qas_id] = score_diff
+            score_diff = (
+                score_null
+                - best_non_null_entry.start_logit
+                - (best_non_null_entry.end_logit)
+            )
+            scores_diff_json[example.qa_id] = score_diff
             if score_diff > null_score_diff_threshold:
-                all_predictions[example.qas_id] = ""
+                all_predictions[example.qa_id] = ""
             else:
-                all_predictions[example.qas_id] = best_non_null_entry.text
-        all_nbest_json[example.qas_id] = nbest_json
+                all_predictions[example.qa_id] = best_non_null_entry.text
+        all_nbest_json[example.qa_id] = nbest_json
 
     with open(output_prediction_file, "w") as writer:
         writer.write(json.dumps(all_predictions, indent=4) + "\n")
@@ -205,13 +253,14 @@ def postprocess_answers(all_examples,
     with open(output_nbest_file, "w") as writer:
         writer.write(json.dumps(all_nbest_json, indent=4) + "\n")
 
-    if unanswerable_exists: 
+    if unanswerable_exists:
         if not output_null_log_odds_file:
             output_null_log_odds_file = "./unanswerable_probs.json"
         with open(output_null_log_odds_file, "w") as writer:
             writer.write(json.dumps(scores_diff_json, indent=4) + "\n")
 
     return all_predictions
+
 
 def get_final_text(pred_text, orig_text, do_lower_case, verbose_logging=False):
     """Project the tokenized prediction back to the original text."""
@@ -264,7 +313,8 @@ def get_final_text(pred_text, orig_text, do_lower_case, verbose_logging=False):
     if start_position == -1:
         if verbose_logging:
             logger.info(
-                "Unable to find text: '%s' in '%s'" % (pred_text, orig_text))
+                "Unable to find text: '%s' in '%s'" % (pred_text, orig_text)
+            )
         return orig_text
     end_position = start_position + len(pred_text) - 1
 
@@ -273,8 +323,11 @@ def get_final_text(pred_text, orig_text, do_lower_case, verbose_logging=False):
 
     if len(orig_ns_text) != len(tok_ns_text):
         if verbose_logging:
-            logger.info("Length not equal after stripping spaces: '%s' vs '%s'",
-                        orig_ns_text, tok_ns_text)
+            logger.info(
+                "Length not equal after stripping spaces: '%s' vs '%s'",
+                orig_ns_text,
+                tok_ns_text,
+            )
         return orig_text
 
     # We then project the characters in `pred_text` back to `orig_text` using
@@ -305,13 +358,15 @@ def get_final_text(pred_text, orig_text, do_lower_case, verbose_logging=False):
             logger.info("Couldn't map end position")
         return orig_text
 
-    output_text = orig_text[orig_start_position:(orig_end_position + 1)]
+    output_text = orig_text[orig_start_position : (orig_end_position + 1)]
     return output_text
 
 
 def _get_best_indexes(logits, n_best_size):
     """Get the n-best logits from a list."""
-    index_and_score = sorted(enumerate(logits), key=lambda x: x[1], reverse=True)
+    index_and_score = sorted(
+        enumerate(logits), key=lambda x: x[1], reverse=True
+    )
 
     best_indexes = []
     for i in range(len(index_and_score)):
