@@ -86,60 +86,60 @@ jobs:
     condition: succeededOrFailed()
   
   jobs:
-- job: Integration_gpu
-  displayName: 'Integration gpu'
-  timeoutInMinutes: 300
-  
-  pool:
-   vmImage: 'ubuntu-16.04'
-
-  variables:
-  - name  : 'testfolder'
-    value : './tests/integration'
-  - name  : 'clustername'
-    value : 'nlp-gpu'
-  - name  : 'vmsize'
-    value : 'STANDARD_NC6'
-  - name  : 'dockerproc'
-    value : 'gpu'
-  - name  : 'expname'
-    value : 'gpu_unit_tests'
-
-  steps:
-
-  - task: UsePythonVersion@0
-    inputs:
-      versionSpec: '3.6'
-      architecture: 'x64'
-    displayName: 'Use Python 3.6'
-  
-  - script: | 
-     az login --service-principal -u $(spidentity) -p $(spsecret) --tenant $(sptenant)
-     
-    displayName: 'Login to Azure'
-  
-  - bash: |
-      echo "##vso[task.prependpath]/data/anaconda/bin"
-    displayName: Add Conda to PATH
-  
-  - script: 
-       pip install azureml-sdk &&
-       pip install azure-cli &&
-       pip install --upgrade azureml-sdk[cli]
-    displayName: 'pip install'
+  - job: Integration_gpu
+    displayName: 'Integration gpu'
+    timeoutInMinutes: 300
     
-  - script: 
-       python tools/generate_conda_file.py --gpu --name nlp 
-    displayName: ' generate_conda_file.py'
+    pool:
+     vmImage: 'ubuntu-16.04'
   
-  - script: 
-      python tests/ci/submit_azureml_pytest.py --subid $(SubscriptionID) --testfolder $(testfolder) --testmarkers $(testmarkers) --clustername $(clustername) --expname $(expname) --dockerproc $(dockerproc) --junitxml $(junitxml) --reponame $(reponame) --branch $(Build.SourceBranchName)
-    displayName: 'submit_azureml_pytest'
+    variables:
+    - name  : 'testfolder'
+      value : './tests/integration'
+    - name  : 'clustername'
+      value : 'nlp-gpu'
+    - name  : 'vmsize'
+      value : 'STANDARD_NC6'
+    - name  : 'dockerproc'
+      value : 'gpu'
+    - name  : 'expname'
+      value : 'gpu_unit_tests'
   
-  - task: PublishTestResults@2
-    displayName: 'Publish Test Results **/test-*.xml'
-    inputs:
-      testResultsFiles: '**/test-*.xml'
-      failTaskOnFailedTests: true
-    condition: succeededOrFailed()
+    steps:
   
+    - task: UsePythonVersion@0
+      inputs:
+        versionSpec: '3.6'
+        architecture: 'x64'
+      displayName: 'Use Python 3.6'
+    
+    - script: | 
+       az login --service-principal -u $(spidentity) -p $(spsecret) --tenant $(sptenant)
+       
+      displayName: 'Login to Azure'
+    
+    - bash: |
+        echo "##vso[task.prependpath]/data/anaconda/bin"
+      displayName: Add Conda to PATH
+    
+    - script: 
+         pip install azureml-sdk &&
+         pip install azure-cli &&
+         pip install --upgrade azureml-sdk[cli]
+      displayName: 'pip install'
+      
+    - script: 
+         python tools/generate_conda_file.py --gpu --name nlp 
+      displayName: ' generate_conda_file.py'
+    
+    - script: 
+        python tests/ci/submit_azureml_pytest.py --subid $(SubscriptionID) --testfolder $(testfolder) --testmarkers $(testmarkers) --clustername $(clustername) --expname $(expname) --dockerproc $(dockerproc) --junitxml $(junitxml) --reponame $(reponame) --branch $(Build.SourceBranchName)
+      displayName: 'submit_azureml_pytest'
+    
+    - task: PublishTestResults@2
+      displayName: 'Publish Test Results **/test-*.xml'
+      inputs:
+        testResultsFiles: '**/test-*.xml'
+        failTaskOnFailedTests: true
+      condition: succeededOrFailed()
+    
