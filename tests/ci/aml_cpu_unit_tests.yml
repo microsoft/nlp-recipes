@@ -14,11 +14,11 @@ variables:
 - name  : 'maxnodes'
   value : 4
 - name  : 'reponame'
-  value : 'Recommenders'
+  value : 'nlp'
 - name  : 'branch'
   value : 'TestJobs'
 - name  : 'clustername'
-  value : 'reco-cpu-test2'
+  value : 'nlp_cpu'
 - name  : 'vmsize'
   value : 'STANDARD_D3_V2'
 - name  : 'dockerproc'
