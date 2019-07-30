@@ -31,15 +31,15 @@ jobs:
   
   - bash:
       python tools/generate_conda_file.py;
-      conda env create -n nlp -f nlp_cpu.yaml;
+      conda env create -n nlp_cpu -f nlp_cpu.yaml;
       conda env list
     displayName: 'Creating Conda Environment with dependencies'
   
   - bash:
-      source activate nlp &&
+      source activate nlp_cpu &&
       conda list &&
       conda install -y -c anaconda pytest &&
-      pytest --durations=0 tests/unit --junitxml=junit/test-unittest.xml 
+      pytest tests/unit "not notebooks and not gpu" --junitxml=junit/test-unittest.xml 
     displayName: 'Run Unit tests'
 
   - task: PublishTestResults@2
@@ -59,8 +59,7 @@ jobs:
 - job: unit_tests_gpu
     
   pool:
-    vmImage: 'ubuntu-16.04'
-    # name: "nlptestmachine"
+    name: "nlpagentpool"
   
   steps:
   
@@ -68,7 +67,23 @@ jobs:
       echo "##vso[task.prependpath]/data/anaconda/bin"&&
       conda env list
     displayName: Add Conda to PATH
-
+  
+  - bash: |
+      python tools/generate_conda_file.py --gpu &&
+      conda env create -n nlp_gpu -f nlp_gpu.yaml &&
+      ls -al
+    displayName: 'Creating Conda Environment with dependencies'
+  
+  - bash: |
+      source activate nlp_gpu &&
+      pytest tests/unit -m "not notebooks and gpu" --junitxml=junit/test-unitttest.xml
+    displayName: 'Run Unit tests'
+    
+  - task: PublishTestResults@2
+    inputs:
+      testResultsFiles: '**/test-unitttest.xml'
+      testRunTitle: 'Test results for PyTest'
+  
   - task: ComponentGovernanceComponentDetection@0
     inputs:
       scanType: 'Register'
