@@ -30,44 +30,47 @@ trigger: none
 pr:
 - staging 
 - master
+
+jobs:
+- job: "Unit tests cpu"
+  timeoutInMinutes: 120
+
+  pool:
+   vmImage: 'ubuntu-16.04'
   
-pool:
- vmImage: 'ubuntu-16.04'
-timeoutInMinutes: 120
-
-steps:
-
-- task: UsePythonVersion@0
-  inputs:
-    versionSpec: '3.6'
-    architecture: 'x64'
-  displayName: 'Use Python 3.6'
-
-- script: | 
-   az login --service-principal -u $(spidentity) -p $(spsecret) --tenant $(sptenant)
-  displayName: 'Login to Azure'
-
-- bash: |
-    echo "##vso[task.prependpath]/data/anaconda/bin"
-  displayName: Add Conda to PATH
-
-- script:
-     pip install paramiko==2.4.2 &&
-     pip install azureml-sdk &&
-     pip install azure-cli
-  displayName: 'install azureml-sdk'
-
-- script: 
-     python tools/generate_conda_file.py --name nlp 
-  displayName: ' generate_conda_file.py'
-
-- script: 
-    python tests/ci/submit_azureml_pytest.py --subid $(SubscriptionID) --testfolder $(testfolder) --testmarkers $(testmarkers) --clustername $(clustername) --expname $(expname) --dockerproc $(dockerproc) --junitxml $(junitxml) --reponame $(reponame) --branch $(Build.SourceBranchName)
-  displayName: 'submit_azureml_pytest'
-
-- task: PublishTestResults@2
-  displayName: 'Publish Test Results **/test-*.xml'
-  inputs:
-    testResultsFiles: '**/test-*.xml'
-    failTaskOnFailedTests: true
-  condition: succeededOrFailed()
+  steps:
+  
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: '3.6'
+      architecture: 'x64'
+    displayName: 'Use Python 3.6'
+  
+  - script: | 
+     az login --service-principal -u $(spidentity) -p $(spsecret) --tenant $(sptenant)
+    displayName: 'Login to Azure'
+  
+  - bash: |
+      echo "##vso[task.prependpath]/data/anaconda/bin"
+    displayName: Add Conda to PATH
+  
+  - script:
+       pip install paramiko==2.4.2 &&
+       pip install azureml-sdk &&
+       pip install azure-cli
+    displayName: 'install azureml-sdk'
+  
+  - script: 
+       python tools/generate_conda_file.py --name nlp 
+    displayName: ' generate_conda_file.py'
+  
+  - script: 
+      python tests/ci/submit_azureml_pytest.py --subid $(SubscriptionID) --testfolder $(testfolder) --testmarkers $(testmarkers) --clustername $(clustername) --expname $(expname) --dockerproc $(dockerproc) --junitxml $(junitxml) --reponame $(reponame) --branch $(Build.SourceBranchName)
+    displayName: 'submit_azureml_pytest'
+  
+  - task: PublishTestResults@2
+    displayName: 'Publish Test Results **/test-*.xml'
+    inputs:
+      testResultsFiles: '**/test-*.xml'
+      failTaskOnFailedTests: true
+    condition: succeededOrFailed()
