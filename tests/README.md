@@ -53,15 +53,15 @@ Smoke tests make sure that the system works and are executed just before the int
 
 For executing the Python smoke tests:
 
-    pytest tests/smoke -m "smoke and not gpu and not azureml"
+    pytest --durations=0 tests/smoke -m "smoke and not gpu and not azureml"
 
 For executing the Python GPU smoke tests:
 
-    pytest tests/smoke -m "smoke and gpu and not azureml"
+    pytest --durations=0 tests/smoke -m "smoke and gpu and not azureml"
 
 For executing the AzureML smoke tests:
 
-    pytest tests/smoke -m "azureml"
+    pytest --durations=0 tests/smoke -m "azureml"
 
 </details>
 
@@ -74,15 +74,15 @@ Integration tests make sure that the program results are acceptable
 
 For executing the Python integration tests:
 
-    pytest tests/integration -m "integration and not gpu and not azureml"
+    pytest --durations=0 tests/integration -m "integration and not gpu and not azureml"
 
 For executing the Python GPU integration tests:
 
-    pytest tests/integration -m "integration and gpu and not azureml"
+    pytest --durations=0 tests/integration -m "integration and gpu and not azureml"
 
 For executing the AzureML integration tests:
 
-    pytest tests/smoke -m "azureml"
+    pytest --durations=0 tests/smoke -m "azureml"
 
 </details>
 
