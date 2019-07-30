@@ -28,7 +28,8 @@ trigger: none
 pr: none
 
 jobs:
-- job: Smoke
+- job: Smoke_gpu
+  timeoutInMinutes: 180
   displayName: 'Smoke gpu'
   
   pool:
@@ -85,9 +86,9 @@ jobs:
     condition: succeededOrFailed()
   
   jobs:
-- job: Integration
-  timeoutInMinutes: 300
+- job: Integration_gpu
   displayName: 'Integration gpu'
+  timeoutInMinutes: 300
   
   pool:
    vmImage: 'ubuntu-16.04'
