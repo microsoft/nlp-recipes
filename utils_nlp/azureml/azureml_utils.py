@@ -7,7 +7,8 @@ from azureml.core.authentication import InteractiveLoginAuthentication
 from azureml.core.authentication import AuthenticationException
 from azureml.core import Workspace
 from azureml.exceptions import WorkspaceException
-
+from azureml.core.compute import ComputeTarget, AmlCompute
+from azureml.core.compute_target import ComputeTargetException
 
 def get_auth():
     """
@@ -73,7 +74,20 @@ def get_or_create_workspace(
         ws.write_config(path=config_path)
     return ws
 
+def get_or_create_amlcompute(
+    workspace,
+    compute_name,
+    vm_size="STANDARD_NC6",
+    max_nodes=1,
+    idle_seconds_before_scaledown=120,
+    verbose=False,
+):
+    try:
+        if verbose:
+            print("Found compute target: {}".format(compute_name))
+        compute_target = ComputeTarget(workspace=workspace, name=compute_name)
 
+<<<<<<< HEAD
 def log_metrics_scalar(value, run, name="", description=None):
     """Log scalar metric to the AzureML run
 
@@ -128,3 +142,18 @@ def get_output_files(run, output_path, file_names=None):
         dest = os.path.join(output_path, f.split("/")[-1])
         print("Downloading file {} to {}...".format(f, dest))
         run.download_file(f, dest)
+=======
+    except ComputeTargetException:
+        if verbose:
+            print("Creating new compute target: {}".format(compute_name))
+
+        compute_config = AmlCompute.provisioning_configuration(
+            vm_size=vm_size,
+            max_nodes=max_nodes,
+            idle_seconds_before_scaledown=idle_seconds_before_scaledown,
+        )
+        compute_target = ComputeTarget.create(ws, compute_name, compute_config)
+        compute_target.wait_for_completion(show_output=verbose)
+
+    return compute_target
+>>>>>>> pipeline nb

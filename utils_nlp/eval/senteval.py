@@ -1,39 +1,78 @@
 import os
 import sys
+import itertools
 import pandas as pd
+from collections import OrderedDict
+from copy import deepcopy
 
 
-class SentEvalRunner:
-    def __init__(self, path_to_senteval="."):
-        """Wrapper class interfacing with the original implementation of SentEval
-        
-        Args:
-            path_to_senteval (str, optional): Path to the SentEval source code.
-        """
-        self.path_to_senteval = path_to_senteval
-        self.transfer_data_path = os.path.join(self.path_to_senteval, "data")
-        self.params_senteval = {"task_path": self.transfer_data_path}
+class SentEvalConfig:
+    def __init__(
+        self,
+        path=".",
+        model=None,
+        prepare_func=None,
+        batcher_func=None,
+        transfer_tasks=None,
+        params={}
+    ):
+        self.path = path
+        self.params_senteval = params
+        self.transfer_data_path = "{}/data".format(self.path)
+        self.model = model
+        self.prepare_func = prepare_func
+        self.batcher_func = batcher_func
+        self.transfer_tasks = transfer_tasks
 
-    def set_transfer_data_path(self, path):
-        """Set the datapath that contains the datasets for the SentEval transfer tasks
-        
-        Args:
-            path (str): Path to transfer task datasets
-        """
-        self.transfer_data_path = path
-        self.params_senteval["task_path"] = path
+    @property
+    def path(self):
+        return self._path
 
-    def set_transfer_tasks(self, task_list):
-        """Set the transfer tasks to use for evaluation
-        
-        Args:
-            task_list (list(str)): List of downstream transfer tasks
-        """
-        self.transfer_tasks = task_list
+    @path.setter
+    def path(self, path):
+        self._path = path
 
-    def set_model(self, model):
-        """Set the model to evaluate"""
+    @property
+    def transfer_data_path(self):
+        return self._transfer_data_path
+
+    @transfer_data_path.setter
+    def transfer_data_path(self, transfer_data_path):
+        self._transfer_data_path = transfer_data_path
+        self.params_senteval["task_path"] = transfer_data_path
+
+    @property
+    def transfer_tasks(self):
+        return self._transfer_tasks
+
+    @transfer_tasks.setter
+    def transfer_tasks(self, transfer_tasks):
+        self._transfer_tasks = transfer_tasks
+
+    @property
+    def model(self):
+        return self._model
+
+    @model.setter
+    def model(self, model):
+        self._model = model
         self.params_senteval["model"] = model
+
+    @property
+    def prepare_func(self):
+        return self._prepare_func
+
+    @prepare_func.setter
+    def prepare_func(self, prepare_func):
+        self._prepare_func = prepare_func
+
+    @property
+    def batcher_func(self):
+        return self._batcher_func
+
+    @batcher_func.setter
+    def batcher_func(self, batcher_func):
+        self._batcher_func = batcher_func
 
     def append_params(self, params):
         self.params_senteval = dict(self.params_senteval, **params)
@@ -78,26 +117,35 @@ class SentEvalRunner:
             except ValueError as ve:
                 print(ve)
 
-    def run(self, batcher_func, prepare_func):
-        """Run the SentEval engine on the model on the transfer tasks
-        
-        Args:
-            batcher_func (function): Function required by SentEval that transforms a batch of text sentences into 
-                                     sentence embeddings
-            prepare_func (function): Function that sees the whole dataset of each task and can thus construct the word 
-                                     vocabulary, the dictionary of word vectors, etc
-        
-        Returns:
-            dict: Dictionary of results
-        """
-        sys.path.insert(0, self.path_to_senteval)
-        import senteval
 
-        se = senteval.engine.SE(
-            self.params_senteval, batcher_func, prepare_func
-        )
+def log_mean(
+    results, transfer_tasks=[], selected_metrics=[], round_decimals=3
+):
+    """Log the means of selected metrics of the transfer tasks
+    
+    Args:
+        results (dict): Results from the SentEval evaluation engine
+        selected_metrics (list(str), optional): List of metric names
+        round_decimals (int, optional): Number of decimal digits to round to; defaults to 3
+    
+    Returns:
+        pd.DataFrame table of formatted results
+    """
+    data = []
+    for task in transfer_tasks:
+        if "all" in results[task]:
+            row = [
+                results[task]["all"][metric]["mean"]
+                for metric in selected_metrics
+            ]
+        else:
+            row = [results[task][metric] for metric in selected_metrics]
+        data.append(row)
+    table = pd.DataFrame(
+        data=data, columns=selected_metrics, index=transfer_tasks
+    )
+    return table.round(round_decimals)
 
-        return se.eval(self.transfer_tasks)
 
     def log_mean(self, results, selected_metrics=[], round_decimals=3):
         """Log the means of selected metrics of the transfer tasks

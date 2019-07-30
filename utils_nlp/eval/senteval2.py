@@ -9,19 +9,27 @@ from copy import deepcopy
 class SentEvalConfig:
     def __init__(
         self,
-        path_to_senteval=".",
+        path=".",
         model=None,
         prepare_func=None,
         batcher_func=None,
         transfer_tasks=None,
     ):
-        self.path_to_senteval = path_to_senteval
+        self.path = path
         self.params_senteval = {}
-        self.transfer_data_path = os.path.join(self.path_to_senteval, "data")
+        self.transfer_data_path = os.path.join(self.path, "data")
         self.model = model
         self.prepare_func = prepare_func
         self.batcher_func = batcher_func
         self.transfer_tasks = transfer_tasks
+
+    @property
+    def path(self):
+        return self._path
+
+    @path.setter
+    def path(self, path):
+        self._path = path
 
     @property
     def transfer_data_path(self):
@@ -109,44 +117,44 @@ class SentEvalConfig:
                 print(ve)
 
 
-class ExperimentRunner:
-    def __init__(self, senteval_config, experiment_parameters={}):
-        self.senteval_config = senteval_config
-        self.experiment_parameters = experiment_parameters
+# class ExperimentRunner:
+#     def __init__(self, senteval_config, experiment_parameters={}):
+#         self.senteval_config = senteval_config
+#         self.experiment_parameters = experiment_parameters
 
-    def run(self, senteval_config):
-        sys.path.insert(0, senteval_config.path_to_senteval)
-        import senteval
+#     def run(self, senteval_config):
+#         sys.path.insert(0, senteval_config.path_to_senteval)
+#         import senteval
 
-        se = senteval.engine.SE(
-            senteval_config.params_senteval, senteval_config.batcher_func, senteval_config.prepare_func
-        )
+#         se = senteval.engine.SE(
+#             senteval_config.params_senteval, senteval_config.batcher_func, senteval_config.prepare_func
+#         )
 
-        return se.eval(senteval_config.transfer_tasks)
+#         return se.eval(senteval_config.transfer_tasks)
 
-    def run_all(self):
-        all_metrics = []
+#     def run_all(self):
+#         all_metrics = []
 
-        for p in list(
-            itertools.product(*list(self.experiment_parameters.values()))
-        ):
-            exp_params = dict(zip(self.experiment_parameters.keys(), p))
-            experiment = deepcopy(self.senteval_config)
-            experiment.append_params(exp_params)
-            for k,v in exp_params.items():
-                setattr(experiment.model, k, v)
+#         for p in list(
+#             itertools.product(*list(self.experiment_parameters.values()))
+#         ):
+#             exp_params = dict(zip(self.experiment_parameters.keys(), p))
+#             experiment = deepcopy(self.senteval_config)
+#             experiment.append_params(exp_params)
+#             for k,v in exp_params.items():
+#                 setattr(experiment.model, k, v)
 
-            results = self.run(experiment)
-            eval_metrics = log_mean(
-                results,
-                experiment.transfer_tasks,
-                selected_metrics=["pearson", "spearman"],
-            )
-            for k,v in exp_params.items():
-                eval_metrics[k] = v
-            all_metrics.append(eval_metrics)
+#             results = self.run(experiment)
+#             eval_metrics = log_mean(
+#                 results,
+#                 experiment.transfer_tasks,
+#                 selected_metrics=["pearson", "spearman"],
+#             )
+#             for k,v in exp_params.items():
+#                 eval_metrics[k] = v
+#             all_metrics.append(eval_metrics)
 
-        return pd.concat(all_metrics, ignore_index=True)
+#         return pd.concat(all_metrics, ignore_index=True)
 
 
 def log_mean(
