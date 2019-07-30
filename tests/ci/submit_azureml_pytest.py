@@ -31,7 +31,7 @@ Example:
     >>> python tests/ci/refac.py --clustername 'cluster-d3-v2'
                                  --subid '12345678-9012-3456-abcd-123456789012'
                                  --pr '666'
-                                 --reponame 'Recommenders'
+                                 --reponame 'nlp'
                                  --branch 'staging'
 """
 import argparse
@@ -298,14 +298,14 @@ def create_arg_parser():
     parser.add_argument(
         "--rg",
         action="store",
-        default="recommender",
+        default="nlpbp_project_resources",
         help="Azure Resource Group",
     )
     # AzureML workspace Name
     parser.add_argument(
         "--wsname",
         action="store",
-        default="RecoWS",
+        default="nlpbp-test-ws",
         help="AzureML workspace name",
     )
     # AzureML clustername
@@ -336,12 +336,10 @@ def create_arg_parser():
         default="123456",
         help="Azure Subscription ID",
     )
-    # ./reco.yaml is created in the azure devops pipeline.
-    # Not recommended to change this.
     parser.add_argument(
         "--condafile",
         action="store",
-        default="./reco.yaml",
+        default="./nlp.yaml",
         help="file with environment variables",
     )
     # AzureML experiment name
@@ -357,7 +355,7 @@ def create_arg_parser():
     parser.add_argument(
         "--reponame",
         action="store",
-        default="--reponame MyGithubRepo",
+        default="MyGithubRepo",
         help="GitHub repo being tested",
     )
     # github branch, stored in AzureML experiment for info purposes

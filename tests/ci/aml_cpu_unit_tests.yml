@@ -15,8 +15,6 @@ variables:
   value : 4
 - name  : 'reponame'
   value : 'nlp'
-- name  : 'branch'
-  value : 'TestJobs'
 - name  : 'clustername'
   value : 'nlp_cpu'
 - name  : 'vmsize'
@@ -62,7 +60,7 @@ steps:
   displayName: ' generate_conda_file.py'
 
 - script: 
-    python tests/ci/submit_azureml_pytest.py --subid $(SubscriptionID) --testfolder $(testfolder) --testmarkers $(testmarkers) --clustername $(clustername) --expname $(expname) --dockerproc $(dockerproc) --junitxml $(junitxml) --reponame $(reponame) --branch $(branch)
+    python tests/ci/submit_azureml_pytest.py --subid $(SubscriptionID) --testfolder $(testfolder) --testmarkers $(testmarkers) --clustername $(clustername) --expname $(expname) --dockerproc $(dockerproc) --junitxml $(junitxml) --reponame $(reponame) --branch $(Build.SourceBranchName)
   displayName: 'submit_azureml_pytest'
 
 - task: PublishTestResults@2
