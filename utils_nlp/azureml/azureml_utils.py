@@ -97,3 +97,25 @@ def log_metrics_table(df, run, name="", description=None, as_scalar=False):
 
     else:
         run.log_table(name, df.to_dict(), description)
+
+
+def get_output_files(run, output_path, file_names=None):
+    """
+    #ToDo Add docstring
+    Args:
+        file_names:
+        run:
+        output_path:
+
+    Returns:
+
+    """
+    os.makedirs(output_path, exist_ok=True)
+
+    if file_names is None:
+        file_names = run.get_file_names()
+
+    for f in file_names:
+        dest = os.path.join(output_path, f.split("/")[-1])
+        print("Downloading file {} to {}...".format(f, dest))
+        run.download_file(f, dest)

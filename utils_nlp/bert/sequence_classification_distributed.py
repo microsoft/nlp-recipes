@@ -5,6 +5,7 @@ import logging
 import horovod.torch as hvd
 import numpy as np
 import torch.nn as nn
+import mlflow
 import torch.utils.data.distributed
 from pytorch_pretrained_bert.modeling import BertForSequenceClassification
 from pytorch_pretrained_bert.optimization import BertAdam
@@ -212,8 +213,7 @@ class BERTSequenceDistClassifier:
         test_dataset = get_dataset_multiple_files(input_files)
 
         # Horovod: use DistributedSampler to partition the test data.
-        test_sampler = torch.utils.data.sampler.SequentialSampler(
-            test_dataset)
+        test_sampler = torch.utils.data.sampler.SequentialSampler(test_dataset)
 
         test_loader = torch.utils.data.DataLoader(
             test_dataset,
