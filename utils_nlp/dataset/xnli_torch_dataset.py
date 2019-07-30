@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from utils_nlp.bert.common import Language, Tokenizer
+from utils_nlp.models.bert.common import Language, Tokenizer
 from torch.utils import data
 from utils_nlp.dataset.xnli import load_pandas_df
 from sklearn.preprocessing import LabelEncoder
@@ -40,8 +40,10 @@ class XnliDataset(data.Dataset):
             language=language,
         )
 
-        #data_used_count = round(DATA_USED_PERCENT * df.shape[0])
-        #df = df.loc[:data_used_count]
+        # if file_split == TRAIN_FILE_SPLIT:
+        #     data_used_count = round(DATA_USED_PERCENT * df.shape[0])
+        #     df = df.loc[:data_used_count]
+
         self.df = df
 
         print("===================df length===================", len(self.df))
@@ -68,10 +70,6 @@ class XnliDataset(data.Dataset):
             train_labels = label_encoder.fit_transform(df[LABEL_COL])
             self.label_encoder = label_encoder
             self.labels = np.array(train_labels)
-            print("================= labels =====================")
-            print(self.labels)
-            print("================= unique labels =====================")
-            print(np.unique(self.labels))
 
         if file_split == TEST_FILE_SPLIT:
             # use the label_encoder passed when you create the test dataset
