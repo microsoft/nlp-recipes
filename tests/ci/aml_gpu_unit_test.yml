@@ -2,13 +2,13 @@
 # Licensed under the MIT License.
 #
 variables:
-- group: AML-config
+- group: AzureKeyVaultSecrets
 - name  : 'test'
   value : 'tests/ci/run_pytest.py'
 - name  : 'testfolder'
   value : './tests/unit'
 - name  : 'testmarkers'
-  value : '"not notebooks and not spark and not gpu"'
+  value : '"not notebooks and not spark and gpu"'
 - name  : 'junitxml'
   value : 'reports/test-unit.xml'
 - name  : 'maxnodes'
@@ -16,14 +16,13 @@ variables:
 - name  : 'reponame'
   value : 'nlp'
 - name  : 'clustername'
-  #underscores not allowed, only letters, digits and - char
-  value : 'nlp-cpu'
+  value : 'nlp-gpu'
 - name  : 'vmsize'
-  value : 'STANDARD_D3_V2'
+  value : 'STANDARD_NC6'
 - name  : 'dockerproc'
-  value : 'cpu'
+  value : 'gpu'
 - name  : 'expname'
-  value : 'cpu_unit_tests'
+  value : 'gpu_unit_tests'
 
 trigger: none
 
@@ -43,21 +42,22 @@ steps:
   displayName: 'Use Python 3.6'
 
 - script: | 
-   az login --service-principal -u $(spidentity) -p $(spsecret) --tenant $(sptenant)
+   az login --service-principal -u $(ClientID) -p $(ClientSecret) --tenant $(TenantID)
+   
   displayName: 'Login to Azure'
 
 - bash: |
     echo "##vso[task.prependpath]/data/anaconda/bin"
   displayName: Add Conda to PATH
 
-- script:
-     pip install paramiko==2.4.2 &&
-     pip install azureml-sdk &&
-     pip install azure-cli
-  displayName: 'install azureml-sdk'
-
 - script: 
-     python tools/generate_conda_file.py --name nlp 
+     pip install azureml-sdk &&
+     pip install azure-cli &&
+     pip install --upgrade azureml-sdk[cli]
+  displayName: 'pip install'
+  
+- script: 
+     python scripts/generate_conda_file.py --gpu --name reco 
   displayName: ' generate_conda_file.py'
 
 - script: 
