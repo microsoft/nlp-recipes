@@ -6,7 +6,7 @@ variables:
 - name  : 'test'
   value : 'tests/ci/run_pytest.py'
 - name  : 'testmarkers'
-  value : '"not notebooks and not spark and gpu"'
+  value : '"not notebooks and not spark and not gpu"'
 - name  : 'junitxml'
   value : 'reports/test-unit.xml'
 - name  : 'maxnodes'
@@ -42,11 +42,11 @@ jobs:
   - name  : 'clustername'
     value : 'nlp-gpu'
   - name  : 'vmsize'
-    value : 'STANDARD_NC6'
+    value : 'STANDARD_D3_V2'
   - name  : 'dockerproc'
-    value : 'gpu'
+    value : 'cpu'
   - name  : 'expname'
-    value : 'gpu_unit_tests'
+    value : 'cpu_unit_tests'
 
   steps:
 
@@ -72,7 +72,7 @@ jobs:
     displayName: 'pip install'
     
   - script: 
-       python tools/generate_conda_file.py --gpu --name nlp 
+       python tools/generate_conda_file.py --name nlp 
     displayName: ' generate_conda_file.py'
   
   - script: 
@@ -100,11 +100,11 @@ jobs:
   - name  : 'clustername'
     value : 'nlp-gpu'
   - name  : 'vmsize'
-    value : 'STANDARD_NC6'
+    value : 'STANDARD_D3_V2'
   - name  : 'dockerproc'
-    value : 'gpu'
+    value : 'cpu'
   - name  : 'expname'
-    value : 'gpu_unit_tests'
+    value : 'cpu_unit_tests'
 
   steps:
 
@@ -130,7 +130,7 @@ jobs:
     displayName: 'pip install'
     
   - script: 
-       python tools/generate_conda_file.py --gpu --name nlp 
+       python tools/generate_conda_file.py --name nlp 
     displayName: ' generate_conda_file.py'
   
   - script: 
