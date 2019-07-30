@@ -91,6 +91,8 @@ PIP_LINUX = {"horovod": "horovod>=0.16.1"}
 
 PIP_WIN32 = {}
 
+CONDA_WIN32 = {"pytorch": "pytorch==1.0.0", "cudatoolkit": "cuda90"}
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description=textwrap.dedent(
@@ -130,6 +132,7 @@ if __name__ == "__main__":
     elif platform.startswith("linux"):
         pip_packages.update(PIP_LINUX)
     elif platform == "win32":
+        conda_packages.update(CONDA_WIN32)
         pip_packages.update(PIP_WIN32)
     else:
         raise Exception(

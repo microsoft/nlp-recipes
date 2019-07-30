@@ -63,21 +63,15 @@ Assuming that you have a GPU machine, to install the Python GPU environment, whi
 <summary><strong><em>Python GPU environment on Windows</em></strong></summary>
 
 Assuming that you have an Azure GPU DSVM machine, here are the steps to setup the Python GPU environment:
-1. Make sure you have CUDA Toolkit installed. You can run the command below in your terminal and you should see information printed out about your Cuda.
+1. Make sure you have CUDA Toolkit version 9.0 above installed on your Windows machine. You can run the command below in your terminal to check.
 
          nvcc --version
-    
-    If not, you can download the CUDA Toolkit and install from here: [CUDA Toolkit](https://developer.nvidia.com/cuda-toolkit)
+    If you don't have CUDA Toolkit or don't have the right version, please download it from here: [CUDA Toolkit](https://developer.nvidia.com/cuda-toolkit)
 
-2. Create yaml file for enviroment setup. 
+2. Install the GPU environment.
 
         cd nlp
         python tools/generate_conda_file.py --gpu
-    
-    Open the new file `nlp_gpu.yaml` created in your folder, check if the `cudatoolkit` package has consitant version as the CUDA Toolkit in your system. For example, if you download CUDA Toolkit 10.1, your `nlp_gpu.yaml` should have `cudatoolkit>=10`. Make necessary changes on the version and save the file.
-
-3. Installs the GPU environment.
-
         conda env create -n nlp_gpu -f nlp_gpu.yaml 
 
 </details>
