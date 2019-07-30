@@ -32,7 +32,7 @@ pr:
 - master
 
 jobs:
-- job: "Unit-test-cpu"
+- job: "Unit_test_cpu"
   timeoutInMinutes: 120
 
   pool:

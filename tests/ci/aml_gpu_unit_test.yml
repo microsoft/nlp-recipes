@@ -31,7 +31,7 @@ pr:
 - master
 
 jobs:
-- job: "Unit-test-gpu"
+- job: "Unit_test_gpu"
   timeoutInMinutes: 180
   
   pool:
