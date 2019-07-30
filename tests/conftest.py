@@ -32,6 +32,9 @@ def notebooks():
         "embedding_trainer": os.path.join(
             folder_notebooks, "embeddings", "embedding_trainer.ipynb"
         ),
+        "bert_qa_trainer": os.path.join(
+            folder_notebooks, "question_answering", "pretrained-BERT-SQuAD-deep-dive-aml.ipynb"
+        ),
         "similarity_automl_local": os.path.join(
             folder_notebooks, "sentence_similarity", "automl_local_deployment_aci.ipynb"
         ),
@@ -58,8 +61,6 @@ def tmp(tmp_path_factory):
         yield td.name
     finally:
         td.cleanup()
-
-
 
 
 @pytest.fixture(scope="module")
@@ -211,7 +212,7 @@ def teardown_service(subscription_id,
                      workspace_region):
 
     yield
-    
+
     #connect to workspace
     ws = azureml_utils.get_or_create_workspace(
         config_path="tests/ci",
