@@ -1,5 +1,7 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License.
 
-import re
+
 import codecs
 import json
 import logging
@@ -21,18 +23,42 @@ logger = logging.getLogger(__name__)
 
 
 class BERTIntentClassifier:
+    """intent classifier which trains on luis model file """
+
     def __init__(
         self,
-        language,
+        language=Language.ENGLISH,
         to_lower=False,
-        num_epochs=10,
         max_seq_length=100,
+        num_gpus=None,
+        num_epochs=5,
         batch_size=16,
         train_size=0.8,
         learning_rate=3e-5,
-        cache_dir="./temp",
-        num_gpus=None,
+        warmup_proportion=None,
+        cache_dir="./temp"
     ):
+        """Initialize the classifier
+        Args:
+            language (Language, optional): The pretrained model's language.
+                efaults to Language.ENGLISH.
+            to_lower (boolean, optional):  Whether to lower case the input
+            max_seq_length (int, optional): the maximum length for input text data 
+                in training and prediction 
+            num_gpus (int, optional): The number of gpus to use.
+                If None is specified, all available GPUs will be used. Defaults to None.
+            num_epochs (int, optional): Number of training epochs.
+                Defaults to 1.
+            batch_size (int, optional): Training batch size. Defaults to 32.
+            train_size (float, optional): portion of the input training data used for training,
+                use 1.0 if all data needs for training.
+            learning (float): Learning rate of the Adam optimizer. Defaults to 2e-5.
+            warmup_proportion (float, optional): Proportion of training to
+                perform linear learning rate warmup for. E.g., 0.1 = 10% of
+                training. Defaults to None. 
+            cache_dir (str, optional): Location of BERT's cache directory.
+                Defaults to "./temp".
+        """
         if not os.path.isdir(cache_dir):
             os.mkdir(cache_dir)
         if not os.path.isdir(cache_dir):
@@ -51,7 +77,8 @@ class BERTIntentClassifier:
         self.num_epochs = num_epochs
 
         self.train_size = train_size
-
+        self.learning_rate = learning_rate
+        self.warmup_proportion = warmup_proportion
         self.saved_model = None
         self.id_to_category = None
         self.saved_luis_model = None
@@ -61,6 +88,10 @@ class BERTIntentClassifier:
         )
 
     def get_train_dataframe(self, luis_model_file):
+        """ Prepare training dataframe from luis model file
+        Args:
+            luis_model_file (str): file path of the luis model file for training 
+        """
         luis_model = None
         with codecs.open(luis_model_file, "r", encoding="utf8") as fd:
             luis_model = json.load(fd)
@@ -82,6 +113,13 @@ class BERTIntentClassifier:
         return luis_model, train_df, id_to_category
 
     def load(self, model_file, id_to_category_file):
+        """ load saved SequenceClassifier model and the dictionary which maps 
+        id to category from label encoder.
+        Args:
+            model_file (str): the file path of the SequenceClassifier model
+            id_to_category_file (str): the file path of the the dictionary which maps
+                id to category from label encoder
+        """
         if torch.cuda.is_available():
             self.saved_model = torch.load(model_file)
             self.id_to_category = torch.load(id_to_category_file)
@@ -92,6 +130,14 @@ class BERTIntentClassifier:
             )
 
     def save(self, classifier_file, model_file=None, id_to_category_file=None):
+        """ saved the trained intent classifier model, and also saved the its corresponding
+             SequenceClassifier model and the dictionary which maps id to category from label encoder.
+        Args:
+            classifier_file (str): the file path to save the intent classifier instance
+            model_file (str, optional): the file path to save the SequenceClassifier model
+            id_to_category_file (str, optional): the file path to save the the dictionary which maps
+                id to category from label encoder
+        """
         torch.save(self, classifier_file)
         if model_file:
             torch.save(self.saved_model, model_file)
@@ -99,6 +145,10 @@ class BERTIntentClassifier:
             torch.save(self.id_to_category, id_to_category_file)
 
     def train(self, luis_model_file):
+        """ Fine-tunes the BERT classifier using the given luis model file.
+        Args:
+            luis_model_file (str): file path of the luis model file for training.
+        """
         self.saved_luis_model, self.train_df, self.id_to_category = self.get_train_dataframe(
             luis_model_file
         )
@@ -135,6 +185,7 @@ class BERTIntentClassifier:
                 num_gpus=self.num_gpus,
                 num_epochs=self.num_epochs,
                 batch_size=self.batch_size,
+                warmup_proportion=self.warmup_proportion,
                 verbose=True,
             )
         logger.info("[Training time: {:.3f} hrs]".format(t.interval / 3600))
@@ -156,6 +207,10 @@ class BERTIntentClassifier:
         self.saved_model = classifier
 
     def copy_for_predict(self, external_model):
+        """copy an external intent classifier so predict function 
+        can be updated from the source code.
+        Args: 
+            external_model (obj): an trained instance of BERTIntentClassifier"""
         self.tokenizer = external_model.tokenizer
         self.num_gpus = external_model.num_gpus
         self.batch_size = external_model.batch_size
@@ -163,7 +218,14 @@ class BERTIntentClassifier:
         self.saved_model = external_model.saved_model
         self.saved_luis_model = external_model.saved_luis_model
 
-    def predict(self, text, progress=True):
+    def predict(self, text):
+        """ predict the intent of the text based on the trained model.
+        Args:
+            text (str):  the input text
+        Returns:
+            dict: a dictionary of the top scoring intent and also the intent ranking of 
+                all intents in the trained model with scores.
+        """
         tokens_test = self.tokenizer.tokenize(
             list([text]),
         )

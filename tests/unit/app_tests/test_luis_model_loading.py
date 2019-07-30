@@ -8,7 +8,7 @@ import pytest
 from utils_nlp.apps.luis.utterance import Utterance
 from utils_nlp.dataset.url_utils import maybe_download
 
-URL = "https://raw.githubusercontent.com/microsoft/LUIS-Samples/master/examples/example-app-models/custom/FoodTruck.json"
+URL = "https://raw.githubusercontent.com/microsoft/LUIS-Samples/master/examples/example-app-models/custom/HomeAutomation.json"
 FILE_NAME = URL.split("/")[-1]
 
 

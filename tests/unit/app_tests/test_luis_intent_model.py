@@ -24,8 +24,8 @@ def luis_model_file(tmpdir):
 def test_bert_intent_model_training(luis_model_file):
     print(luis_model_file)
     language = Language.ENGLISHCASED
-    # choose num_train_epoch 1 to train fast
-    classifier = BERTIntentClassifier(language=language, num_epochs=1, batch_size = 8, train_size=1.0)
+    # choose num_train_epoch 2 to train fast
+    classifier = BERTIntentClassifier(language=language, num_epochs=2, batch_size = 8, train_size=1.0)
     classifier.train(luis_model_file)
     classifier.save(CLASSIFIER_FILE_NAME)
 
