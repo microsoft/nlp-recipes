@@ -16,7 +16,8 @@ variables:
 - name  : 'reponame'
   value : 'nlp'
 - name  : 'clustername'
-  value : 'nlp_cpu'
+  #underscores not allowed
+  value : 'nlp-cpu'
 - name  : 'vmsize'
   value : 'STANDARD_D3_V2'
 - name  : 'dockerproc'
