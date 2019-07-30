@@ -72,6 +72,9 @@ def notebooks():
         "tc_bert_azureml": os.path.join(
             folder_notebooks, "text_classification", "tc_bert_azureml.ipynb"
         ),
+        "bert_senteval": os.path.join(
+            folder_notebooks, "sentence_similarity", "bert_senteval.ipynb"
+        ),
         "tc_mnli_bert": os.path.join(
             folder_notebooks, "text_classification", "tc_mnli_bert.ipynb"
         ),
