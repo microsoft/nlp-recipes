@@ -25,9 +25,7 @@ schedules:
 
 trigger: none
 
-pr:
-- staging 
-- master
+pr: none
 
 jobs:
 - job: Smoke
