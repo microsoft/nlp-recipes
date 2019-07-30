@@ -85,11 +85,14 @@ PIP_BASE = {
 
 PIP_GPU = {}
 
-PIP_DARWIN = {"horovod": "horovod>=0.16.1"}
+PIP_DARWIN = {}
+PIP_DARWIN_GPU = {"horovod": "horovod>=0.16.1"}
 
-PIP_LINUX = {"horovod": "horovod>=0.16.1"}
+PIP_LINUX = {}
+PIP_LINUX_GPU = {"horovod": "horovod>=0.16.1"}
 
 PIP_WIN32 = {}
+PIP_WIN32_GPU = {}
 
 CONDA_WIN32 = {"pytorch": "pytorch==1.0.0", "cudatoolkit": "cuda90"}
 
@@ -122,22 +125,26 @@ if __name__ == "__main__":
     # update conda and pip packages based on flags provided
     conda_packages = CONDA_BASE
     pip_packages = PIP_BASE
-    if args.gpu:
-        conda_packages.update(CONDA_GPU)
-        pip_packages.update(PIP_GPU)
 
     # check for os platform support
     if platform == "darwin":
         pip_packages.update(PIP_DARWIN)
+        PIP_GPU.update(PIP_DARWIN_GPU)
     elif platform.startswith("linux"):
         pip_packages.update(PIP_LINUX)
+        PIP_GPU.update(PIP_LINUX_GPU)
     elif platform == "win32":
         conda_packages.update(CONDA_WIN32)
         pip_packages.update(PIP_WIN32)
+        PIP_GPU.update(PIP_WIN32_GPU)
     else:
         raise Exception(
             "Unsupported platform, must be Windows, Linux, or macOS"
         )
+
+    if args.gpu:
+        conda_packages.update(CONDA_GPU)
+        pip_packages.update(PIP_GPU)
 
     # write out yaml file
     conda_file = "{}.yaml".format(conda_env)
