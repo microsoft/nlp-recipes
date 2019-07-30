@@ -2,7 +2,7 @@
 # Licensed under the MIT License.
 #
 variables:
-- group: AzureKeyVaultSecrets
+- group: AML-config
 - name  : 'test'
   value : 'tests/ci/run_pytest.py'
 - name  : 'testfolder'
@@ -42,7 +42,7 @@ steps:
   displayName: 'Use Python 3.6'
 
 - script: | 
-   az login --service-principal -u $(ClientID) -p $(ClientSecret) --tenant $(TenantID)
+   az login --service-principal -u $(spidentity) -p $(spsecret) --tenant $(sptenant)
    
   displayName: 'Login to Azure'
 
