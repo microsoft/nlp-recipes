@@ -1,19 +1,14 @@
 # NLP Scenarios
 
-This folder contains examples and best practices, written in Jupyter notebooks, for building Natural Language Processing systems for different scenarios.
+This folder contains examples and best practices, written in Jupyter notebooks, for building Natural Language Processing systems for the following scenarios.
 
-## Summary
 
-The following is a summary of the scenarios covered in the best practice notebooks. Each scenario is demonstrated in one or more Jupyter notebook examples that make use of the core code base of models and utilities.
-
-| Scenario                 | Applications                                 |  Models |
-|---| ------------------------ | ------------------- |
-|[Text Classification](text_classification)      |Topic Classification|BERT|
-|[Named Entity Recognition](named_entity_recognition) |Wikipedia NER                                              |BERT|
-|[Entailment](./entailment)|XNLI Natural Language Inference|BERT|
-|[Question Answering](question_answering) |SQuAD                                              | BiDAF|
-|[Sentence Similarity](sentence_similarity)      |STS Benchmark                         |Representation: TF-IDF, Word Embeddings, Doc Embeddings<br>Metrics: Cosine Similarity, Word Mover's Distance|
-|[Embeddings](embeddings)| Custom Embeddings Training|Word2Vec<br>fastText<br>GloVe|
+- [Text Classification](text_classification)
+- [Named Entity Recognition](named_entity_recognition)
+- [Entailment](entailment)
+- [Question Answering](question_answering)
+- [Sentence Similarity](sentence_similarity)
+- [Embeddings](embeddings)
 
 ## Azure-enhanced notebooks
 
