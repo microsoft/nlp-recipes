@@ -55,6 +55,7 @@ def test_bidaf_quickstart(notebooks,
 
 
 @pytest.mark.integration
+@pytest.mark.azureml
 @pytest.mark.gpu
 def test_bert_qa_runs(notebooks):
     notebook_path = notebooks["bert_qa_trainer"]
