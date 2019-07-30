@@ -50,6 +50,9 @@ def notebooks():
         "gensen_local": os.path.join(
             folder_notebooks, "sentence_similarity", "gensen_local.ipynb"
         ),
+        "gensen_azureml": os.path.join(
+            folder_notebooks, "sentence_similarity", "gensen_aml_deep_dive.ipynb"
+        ),
     }
     return paths
 
