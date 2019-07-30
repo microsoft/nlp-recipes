@@ -36,7 +36,8 @@ def baseline_results():
         "Doc2vec Cosine with Stop Words": 0.4498543211602068,
     }
 
-@pytest.mark.notebooks
+@pytest.mark.integration
+@pytest.mark.azureml
 def test_similarity_embeddings_baseline_runs(notebooks, baseline_results):
     notebook_path = notebooks["similarity_embeddings_baseline"]
     pm.execute_notebook(notebook_path, OUTPUT_NOTEBOOK)
@@ -45,7 +46,8 @@ def test_similarity_embeddings_baseline_runs(notebooks, baseline_results):
         assert results[key] == pytest.approx(value, abs=ABS_TOL)
 
 @pytest.mark.usefixtures("teardown_service")
-@pytest.mark.notebooks
+@pytest.mark.integration
+@pytest.mark.azureml
 def test_automl_local_runs(notebooks,
                            subscription_id,
                            resource_group,

@@ -9,7 +9,8 @@ from tests.notebooks_common import OUTPUT_NOTEBOOK
 
 ABS_TOL = 0.2
 
-@pytest.mark.notebooks
+@pytest.mark.integration
+@pytest.mark.azureml
 def test_bidaf_deep_dive(notebooks,
                          subscription_id,
                          resource_group,
@@ -32,7 +33,8 @@ def test_bidaf_deep_dive(notebooks,
     assert result == pytest.approx(0.5, abs=ABS_TOL)
 
 @pytest.mark.usefixtures("teardown_service")
-@pytest.mark.notebooks
+@pytest.mark.integration
+@pytest.mark.azureml
 def test_bidaf_quickstart(notebooks,
                           subscription_id,
                            resource_group,
