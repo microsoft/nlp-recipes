@@ -2,19 +2,18 @@ import json
 import logging
 import os
 
-import sys
-sys.path.append("./nlpbp")
 from pytorch_pretrained_bert.tokenization import BasicTokenizer
 import torch
 
 
+from utils_nlp.apps.luis.entity import Entity
 from utils_nlp.apps.luis.utterance import Utterance
 from utils_nlp.models.bert.token_classification import (
     BERTTokenClassifier,
     postprocess_token_labels,
 )
+
 from utils_nlp.models.bert.common import Language, Tokenizer
-from utils_nlp.apps.luis.entity import Entity
 from sklearn.metrics import classification_report
 from sklearn_crfsuite.metrics import flat_classification_report, sequence_accuracy_score
 
@@ -22,6 +21,18 @@ from sklearn_crfsuite.metrics import flat_classification_report, sequence_accura
 logger = logging.getLogger(__name__)
 
 def convert_luis_example_to_tokens_tags(example, basic_tokenizer):
+    """ Converts the text in the example to tokens and its tags in IOB format
+    
+    Args:
+        example (Utterance): the LUIS training example to be converted
+        basic_tokenizer (BasicTokenizer): tokenizer to tokenize the text in the example
+    
+    Returns:
+        List of string: a list of tokens
+        List of string: a list of tags of the token in IOB format 
+    
+    """
+
     tags = []
     tokens = []
     if len(example.entities) == 0:
@@ -65,11 +76,17 @@ def convert_luis_example_to_tokens_tags(example, basic_tokenizer):
 
 
 def get_token_span(tokens, text):
+    """  Get the spans of tokens in the text
+    
+    Args:
+        tokens (list of string): the tokens in the text
+        text   (string): the string in which the tokens's spans need to locate from 
+
+    Returns:
+        list of dict: a dict contains the text, start postion and end position of a token
+
     """
-       tokenize a input utterance, and get the span and POS for each token
-    """
-    # tokens = tokenization([text])
-    #text = text.lower()
+
     offset, length = 0, 0
     result = []
     point = 0
@@ -99,27 +116,8 @@ def get_token_span(tokens, text):
     return result
 
 
-def make_trailing_tags_explicit(tags, trailing_piece_tag="X"):
-    """['O', 'B-ContactName', 'X', 'X', 'O']
-     =>['O', 'B-ContactName', 'B-ContactName', 'B-ContactName', 'O'] 
-    """
-    new_tags = []
-    #if tags[0] == trailing_piece_tag:
-    #    raise Exception(
-    #        "the start of a tag sequence should not be a trailing piece tag"
-    #    )
-    last_tag = tags[0]
-    new_tags.append(last_tag)
-    for i in range(1, len(tags)):
-        if tags[i] == trailing_piece_tag:
-            new_tags.append(last_tag)
-        else:
-            last_tag = tags[i]
-            new_tags.append(last_tag)
-    return new_tags
-
-
 def remove_ib_from_tag(tags):
+    """ Removes the "B-" and "I-" from the tags"""
     new_tags = []
     for i in tags:
         splitted = i.split("-")
@@ -130,18 +128,27 @@ def remove_ib_from_tag(tags):
     return new_tags
 
 def convert_to_luis_entity_format(text, tokens, tags):
-    """
-        merge the adjacent tokens to a single entity in the returned entity list
-        if these adjacent tokens have the same tag
-    tokens
-    [{'endPos': 3, 'startPos': 0, 'token': 'Call'},
-      {'endPos': 8, 'startPos': 6, 'token': 'Amy'},
-      {'endPos': 11, 'startPos': 10, 'token': 'Hu'}]
-    taggs
-    ['O', 'Contact.Name', 'Contact.Name']
-    return result
-    [{'endPos': 11, 'startPos': 6, 'token': 'Amy Hu'}]
+    """ Merges the adjacent tokens with the same type of entity to a single entity 
+        in the returned entity list. 
+        Example: tokens: 
+        [{'endPos': 3, 'startPos': 0, 'token': 'Call'},
+        {'endPos': 8, 'startPos': 6, 'token': 'Amy'},
+        {'endPos': 11, 'startPos': 10, 'token': 'Hu'}]
+        tags:
+        ['O', 'Contact.Name', 'Contact.Name']
+        return result
+        [{'endPos': 11, 'startPos': 6, 'token': 'Amy Hu'}]
+   
+    Args:
+        text (string): the test text for which the entity list is generated.
+        tokens (list of dict): a list of tokens with tags provided together
+        tags (list of string): tags for the tokens
+
+    Returns:
+        list of dict: entities in LUIS data format
+
    """
+
     result = []
     i = 0
     start = 0
@@ -174,6 +181,9 @@ RANDOM_SEED = 42
 torch.manual_seed(RANDOM_SEED)
 
 class BERTEntityExtractor:
+    """entity extractor which trains on LUIS model file and provide prediction
+        in LUIS entity format as in LUIS model file """
+
     def __init__(
         self,
         language=Language.ENGLISHCASED,
@@ -185,6 +195,25 @@ class BERTEntityExtractor:
         cache_dir='./temp',
         num_gpus=None
     ):
+        """ Initialize the entity extractor.
+
+        Args:
+            language (Language, optional): The pretrained model's language.
+                    defaults to Language.ENGLISHCASED.
+            do_lower_case (boolean, optional):  Whether to lower case the input
+            max_seq_length (int, optional): the maximum length for input text data 
+                    in training and prediction 
+            batch_size (int, optional): Training batch size. Defaults to 16.
+            learning_rate (float): Learning rate of the Adam optimizer. Defaults to 3e-5.
+            cache_dir (str, optional): Location of BERT's cache directory.
+                    Defaults to "./temp".
+            num_gpus (int, optional): The number of gpus to use.
+                    If None is specified, all available GPUs will be used. Defaults to None.
+           
+        Returns:
+            None 
+        """
+    
         if not os.path.isdir(cache_dir):
             os.mkdir(cache_dir)
         if not os.path.isdir(cache_dir):
@@ -212,8 +241,17 @@ class BERTEntityExtractor:
         self.tokenizer = Tokenizer(
             language=self.language, to_lower=self.do_lower_case, cache_dir=self.cache_dir
         )
-
+    
     def save(self, extractor_file, model_file=None, label_map_file=None):
+        """ Saves the trained entity extractor model, and also saves the its corresponding
+             BERTTokenClassifier model and the dictionary which maps ids to categories from label encoder.
+        Args:
+            extractor_file (str): the file path to save the trained entity extractor instance
+            model_file (str, optional): the file path to save the BERTTokenClassifier model
+            label_map_file (str, optional): the file path to save the dictionary 
+                which maps ids to categories from label encoder
+        """
+
         torch.save(self, extractor_file)
         if model_file:
             torch.save(self.saved_model, model_file)
@@ -221,6 +259,16 @@ class BERTEntityExtractor:
             torch.save(self.label_map, label_map_file)
 
     def load(self, model_file, label_map_file):
+        """ Loads a saved BERTTokenClassifier model and a dictionary which maps 
+        id to category from label encoder.
+
+        Args:
+            model_file (str): the file path of the BERTTokenClassifier model
+            label_map_file (str): the file path of the the dictionary which maps
+                ids to categories from label encoder
+
+        """
+
         if torch.cuda.is_available():
             self.saved_model = torch.load(model_file)
             self.label_map = torch.load(label_map_file)
@@ -229,6 +277,17 @@ class BERTEntityExtractor:
             self.label_map = torch.load(label_map_file, location='cpu')
 
     def prepare_training_data(self, luis_model_file):
+        """ Prepares training dataframe from luis model file
+
+        Args:
+            luis_model_file (str): file path of the luis model file for training 
+
+        Returns:
+            list of object: list of Utterance objects extracted from the luis model
+            list of list of string: list of token list for all the utterances 
+            list of list of string: list of tag list for all the utterances 
+
+        """
         # load utterance
         with open(luis_model_file, "r") as luis_fd:
             luis_model = json.load(luis_fd)
@@ -251,6 +310,12 @@ class BERTEntityExtractor:
         return utterances, tokens_list, tags_list
 
     def train(self, luis_model_file):
+        """ Fine-tunes the BERT classifier using the given luis model file.
+
+        Args:
+            luis_model_file (str): file path of the luis model file for training.
+
+        """
         utterances, tokens_list, tags_list = self.prepare_training_data(luis_model_file)
         train_text = []
         train_labels = []
@@ -320,6 +385,13 @@ class BERTEntityExtractor:
         self.label_map = label_map
 
     def copy_for_predict(self, external_model):
+        """copy an external entity classifier so predict function 
+        can be updated from the source code.
+        
+        Args: 
+            external_model (obj): an trained instance of BERTEntityExtractor
+        """
+
         self.tokenizer = external_model.tokenizer 
         self.saved_model = external_model.saved_model
         self.label_map = external_model.label_map
@@ -327,13 +399,15 @@ class BERTEntityExtractor:
         self.saved_luis_model = external_model.saved_luis_model
 
     def predict(self, text, progress=True):
+        """ predict the entities in the text based on the trained model.
+        Args:
+            text (str):  the input text
+        Returns:
+            list: a list of entity objects 
+        """
+
         # save the position of each token
-        # TODO: disable progress bar in tokenizer.tokenize()
         basic_tokenizer = BasicTokenizer(do_lower_case=False)
-        #raw_tokens = self.tokenizer.tokenize(
-        #        [text],
-        #        #progress=progress,
-        #        )[0]
         raw_tokens = basic_tokenizer.tokenize(text)
         logger.debug("test example:{}".format(text))
         logger.debug("raw tokens: {}".format(raw_tokens))

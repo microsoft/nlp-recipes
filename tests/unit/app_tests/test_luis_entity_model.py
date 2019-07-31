@@ -42,4 +42,3 @@ def test_bert_intent_model_predict(tmpdir):
     assert result[0].entity ==  "Color"
     assert result[0].start_pos ==  16
     assert result[0].end_pos ==  16 + len("green") -1
-
