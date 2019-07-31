@@ -213,16 +213,27 @@ class BERTEntityExtractor:
            
         Returns:
             None 
+
+        Raises:
+            PermissionError:  If the running process doesn't have permission to create the cache dir
+            Exception: If other unexpected errors occur during directory creation.
+
         """
-    
+
         if not os.path.isdir(cache_dir):
-            os.mkdir(cache_dir)
-        if not os.path.isdir(cache_dir):
-            raise Exception(
-                "Please check permission if you can create or access the cache dir {0}".format(
-                    cache_dir
+            try:
+                os.mkdir(cache_dir)
+            except PermissionError as error:
+                print(
+                    "Please check permission if you can create or access the cache dir {0}. Additonal error message: {1}".format(
+                        cache_dir, error
+                    )
                 )
-            )
+                raise
+            except:
+                print("Unexpected error:", sys.exc_info()[0])
+                raise
+ 
         self.cache_dir = cache_dir
         self.language = language
         self.do_lower_case = do_lower_case
