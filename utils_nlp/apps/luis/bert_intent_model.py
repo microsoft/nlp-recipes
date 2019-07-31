@@ -35,7 +35,7 @@ class BERTIntentClassifier:
         num_gpus=None,
         num_epochs=5,
         batch_size=16,
-        train_size=0.8,
+        train_size=1.0,
         learning_rate=3e-5,
         warmup_proportion=None,
         cache_dir="./temp",
@@ -44,18 +44,18 @@ class BERTIntentClassifier:
 
         Args:
             language (Language, optional): The pretrained model's language.
-                efaults to Language.ENGLISH.
+                defaults to Language.ENGLISH.
             to_lower (boolean, optional):  Whether to lower case the input
             max_seq_length (int, optional): the maximum length for input text data 
                 in training and prediction 
             num_gpus (int, optional): The number of gpus to use.
                 If None is specified, all available GPUs will be used. Defaults to None.
             num_epochs (int, optional): Number of training epochs.
-                Defaults to 1.
-            batch_size (int, optional): Training batch size. Defaults to 32.
+                Defaults to 5.
+            batch_size (int, optional): Training batch size. Defaults to 16.
             train_size (float, optional): portion of the input training data used for training,
                 use 1.0 if all data needs for training.
-            learning (float): Learning rate of the Adam optimizer. Defaults to 2e-5.
+            learning rate (float): Learning rate of the Adam optimizer. Defaults to 3e-5.
             warmup_proportion (float, optional): Proportion of training to
                 perform linear learning rate warmup for. E.g., 0.1 = 10% of
                 training. Defaults to None. 
