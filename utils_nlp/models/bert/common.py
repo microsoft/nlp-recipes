@@ -8,14 +8,12 @@
 
 import csv
 import linecache
-import os
 import subprocess
 import warnings
 from collections import Iterable
 from enum import Enum
 
 import torch
-import pandas as pd
 from pytorch_pretrained_bert.tokenization import BertTokenizer
 from torch.utils.data import (
     DataLoader,
@@ -25,7 +23,6 @@ from torch.utils.data import (
     TensorDataset,
     ConcatDataset,
 )
-from utils_nlp.pytorch.device_utils import get_device
 from tqdm import tqdm
 
 # Max supported sequence length
@@ -35,20 +32,18 @@ BERT_MAX_LEN = 512
 class Language(str, Enum):
     """An enumeration of the supported pretrained models and languages."""
 
-    ENGLISH : str = "bert-base-uncased"
-    ENGLISHCASED : str = "bert-base-cased"
-    ENGLISHLARGE : str = "bert-large-uncased"
-    ENGLISHLARGECASED : str = "bert-large-cased"
-    ENGLISHLARGEWWM : str = "bert-large-uncased-whole-word-masking"
-    ENGLISHLARGECASEDWWM : str = "bert-large-cased-whole-word-masking"
-    CHINESE : str = "bert-base-chinese"
-    MULTILINGUAL : str = "bert-base-multilingual-cased"
+    ENGLISH: str = "bert-base-uncased"
+    ENGLISHCASED: str = "bert-base-cased"
+    ENGLISHLARGE: str = "bert-large-uncased"
+    ENGLISHLARGECASED: str = "bert-large-cased"
+    ENGLISHLARGEWWM: str = "bert-large-uncased-whole-word-masking"
+    ENGLISHLARGECASEDWWM: str = "bert-large-cased-whole-word-masking"
+    CHINESE: str = "bert-base-chinese"
+    MULTILINGUAL: str = "bert-base-multilingual-cased"
 
 
 class Tokenizer:
-    def __init__(
-            self, language=Language.ENGLISH, to_lower=False, cache_dir="."
-    ):
+    def __init__(self, language=Language.ENGLISH, to_lower=False, cache_dir="."):
         """Initializes the underlying pretrained BERT tokenizer.
 
         Args:
@@ -76,10 +71,7 @@ class Tokenizer:
         if isinstance(text[0], str):
             return [self.tokenizer.tokenize(x) for x in tqdm(text)]
         else:
-            return [
-                [self.tokenizer.tokenize(x) for x in sentences]
-                for sentences in tqdm(text)
-            ]
+            return [[self.tokenizer.tokenize(x) for x in sentences] for sentences in tqdm(text)]
 
     def _truncate_seq_pair(self, tokens_a, tokens_b, max_length):
         """Truncates a sequence pair in place to the maximum length."""
@@ -128,15 +120,11 @@ class Tokenizer:
                 list of token type id lists
         """
         if max_len > BERT_MAX_LEN:
-            print(
-                "setting max_len to max allowed tokens: {}".format(
-                    BERT_MAX_LEN
-                )
-            )
+            print("setting max_len to max allowed tokens: {}".format(BERT_MAX_LEN))
             max_len = BERT_MAX_LEN
 
         if isinstance(tokens[0][0], str):
-            tokens = [x[0: max_len - 2] + ["[SEP]"] for x in tokens]
+            tokens = [x[0 : max_len - 2] + ["[SEP]"] for x in tokens]
             token_type_ids = None
         else:
             # get tokens for each sentence [[t00, t01, ...] [t10, t11,... ]]
@@ -148,23 +136,16 @@ class Tokenizer:
             # construct token_type_ids
             # [[0, 0, 0, 0, ... 0, 1, 1, 1, ... 1], [0, 0, 0, ..., 1, 1, ]
             token_type_ids = [
-                [[i] * len(sentence) for i, sentence in enumerate(example)]
-                for example in tokens
+                [[i] * len(sentence) for i, sentence in enumerate(example)] for example in tokens
             ]
             # merge sentences
-            tokens = [
-                [token for sentence in example for token in sentence]
-                for example in tokens
-            ]
+            tokens = [[token for sentence in example for token in sentence] for example in tokens]
             # prefix with [0] for [CLS]
             token_type_ids = [
-                [0] + [i for sentence in example for i in sentence]
-                for example in token_type_ids
+                [0] + [i for sentence in example for i in sentence] for example in token_type_ids
             ]
             # pad sequence
-            token_type_ids = [
-                x + [0] * (max_len - len(x)) for x in token_type_ids
-            ]
+            token_type_ids = [x + [0] * (max_len - len(x)) for x in token_type_ids]
 
         tokens = [["[CLS]"] + x for x in tokens]
         # convert tokens to indices
@@ -196,11 +177,7 @@ class Tokenizer:
                 list of token type id lists
         """
         if max_len > BERT_MAX_LEN:
-            print(
-                "setting max_len to max allowed tokens: {}".format(
-                    BERT_MAX_LEN
-                )
-            )
+            print("setting max_len to max allowed tokens: {}".format(BERT_MAX_LEN))
             max_len = BERT_MAX_LEN
 
         if isinstance(tokens[0][0], str):
@@ -216,23 +193,16 @@ class Tokenizer:
             # construct token_type_ids
             # [[0, 0, 0, 0, ... 0, 1, 1, 1, ... 1], [0, 0, 0, ..., 1, 1, ]
             token_type_ids = [
-                [[i] * len(sentence) for i, sentence in enumerate(example)]
-                for example in tokens
+                [[i] * len(sentence) for i, sentence in enumerate(example)] for example in tokens
             ]
             # merge sentences
-            tokens = [
-                [token for sentence in example for token in sentence]
-                for example in tokens
-            ]
+            tokens = [[token for sentence in example for token in sentence] for example in tokens]
             # prefix with [0] for [CLS]
             token_type_ids = [
-                [0] + [i for sentence in example for i in sentence]
-                for example in token_type_ids
+                [0] + [i for sentence in example for i in sentence] for example in token_type_ids
             ]
             # pad sequence
-            token_type_ids = [
-                x + [0] * (max_len - len(x)) for x in token_type_ids
-            ]
+            token_type_ids = [x + [0] * (max_len - len(x)) for x in token_type_ids]
 
         tokens = [["[CLS]"] + x for x in tokens]
         # convert tokens to indices
@@ -242,14 +212,9 @@ class Tokenizer:
         # create input mask
         input_mask = [[min(1, x) for x in y] for y in input_ids]
         return tokens, input_ids, input_mask, token_type_ids
-        
+
     def tokenize_ner(
-            self,
-            text,
-            max_len=BERT_MAX_LEN,
-            labels=None,
-            label_map=None,
-            trailing_piece_tag="X",
+        self, text, max_len=BERT_MAX_LEN, labels=None, label_map=None, trailing_piece_tag="X"
     ):
         """
         Tokenize and preprocesses input word lists, involving the following steps
@@ -307,18 +272,12 @@ class Tokenizer:
             return isinstance(obj, Iterable) and not isinstance(obj, str)
 
         if max_len > BERT_MAX_LEN:
-            warnings.warn(
-                "setting max_len to max allowed tokens: {}".format(
-                    BERT_MAX_LEN
-                )
-            )
+            warnings.warn("setting max_len to max allowed tokens: {}".format(BERT_MAX_LEN))
             max_len = BERT_MAX_LEN
 
         if not _is_iterable_but_not_string(text):
             # The input text must be an non-string Iterable
-            raise ValueError(
-                "Input text must be an iterable and not a string."
-            )
+            raise ValueError("Input text must be an iterable and not a string.")
         else:
             # If the input text is a single list of words, convert it to
             # list of lists for later iteration
@@ -326,9 +285,7 @@ class Tokenizer:
                 text = [text]
         if labels is not None:
             if not _is_iterable_but_not_string(labels):
-                raise ValueError(
-                    "labels must be an iterable and not a string."
-                )
+                raise ValueError("labels must be an iterable and not a string.")
             else:
                 if not _is_iterable_but_not_string(labels[0]):
                     labels = [labels]
@@ -391,10 +348,7 @@ class Tokenizer:
             new_labels += label_padding
 
             trailing_token_mask_all.append(
-                [
-                    True if label != trailing_piece_tag else False
-                    for label in new_labels
-                ]
+                [True if label != trailing_piece_tag else False for label in new_labels]
             )
 
             if label_map:
@@ -407,22 +361,13 @@ class Tokenizer:
             label_ids_all.append(label_ids)
 
         if label_available:
-            return (
-                input_ids_all,
-                input_mask_all,
-                trailing_token_mask_all,
-                label_ids_all,
-            )
+            return (input_ids_all, input_mask_all, trailing_token_mask_all, label_ids_all)
         else:
             return input_ids_all, input_mask_all, trailing_token_mask_all, None
 
 
 def create_data_loader(
-        input_ids,
-        input_mask,
-        label_ids=None,
-        sample_method="random",
-        batch_size=32,
+    input_ids, input_mask, label_ids=None, sample_method="random", batch_size=32
 ):
     """
     Create a dataloader for sampling and serving data batches.
@@ -452,9 +397,7 @@ def create_data_loader(
 
     if label_ids:
         label_ids_tensor = torch.tensor(label_ids, dtype=torch.long)
-        tensor_data = TensorDataset(
-            input_ids_tensor, input_mask_tensor, label_ids_tensor
-        )
+        tensor_data = TensorDataset(input_ids_tensor, input_mask_tensor, label_ids_tensor)
     else:
         tensor_data = TensorDataset(input_ids_tensor, input_mask_tensor)
 
@@ -464,13 +407,10 @@ def create_data_loader(
         sampler = SequentialSampler(tensor_data)
     else:
         raise ValueError(
-            "Invalid sample_method value, accepted values are: "
-            "random and sequential."
+            "Invalid sample_method value, accepted values are: " "random and sequential."
         )
 
-    dataloader = DataLoader(
-        tensor_data, sampler=sampler, batch_size=batch_size
-    )
+    dataloader = DataLoader(tensor_data, sampler=sampler, batch_size=batch_size)
 
     return dataloader
 
@@ -489,12 +429,7 @@ class TextDataset(Dataset):
         """
         self._filename = filename
         self._total_data = (
-                int(
-                    subprocess.check_output(
-                        "wc -l " + filename, shell=True
-                    ).split()[0]
-                )
-                - 1
+            int(subprocess.check_output("wc -l " + filename, shell=True).split()[0]) - 1
         )
 
     def __len__(self):
@@ -540,6 +475,5 @@ def get_dataset_multiple_files(files):
         torch.utils.data.Dataset : A combined dataset of all files in the directory.
 
     """
-    df = pd.read_csv(files[0])
     datasets = [TextDataset(x) for x in files]
     return ConcatDataset(datasets)
