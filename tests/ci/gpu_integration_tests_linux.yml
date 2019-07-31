@@ -3,7 +3,8 @@
 
 
 # More info on scheduling: https://docs.microsoft.com/en-us/azure/devops/pipelines/build/triggers?view=azure-devops&tabs=yaml#scheduled-triggers
-# NOTE: this is commented since as of July 2019, DevOps has a bug in the scheduler
+# Implementing the scheduler from the dashboard
+# Uncomment in case it wants to be done from using the yml
 #schedules:
 #- cron: "56 11 * * *"
 #  displayName: Daily computation of nightly builds
@@ -13,10 +14,10 @@
 #  always: true
 
 
-# Pull request against these branches will trigger this build
-pr:
-- master
+# no PR builds
+pr: none
 
+# no CI trigger
 trigger: none
 
 jobs:
