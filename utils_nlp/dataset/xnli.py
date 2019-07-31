@@ -1,12 +1,8 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
-"""XNLI dataset utils
-https://www.nyu.edu/projects/bowman/xnli/
-"""
 
 import os
-
 import pandas as pd
 
 from utils_nlp.dataset.url_utils import extract_zip, maybe_download
@@ -16,8 +12,10 @@ URL_XNLI = "https://www.nyu.edu/projects/bowman/xnli/XNLI-1.0.zip"
 URL_XNLI_MT = "https://www.nyu.edu/projects/bowman/xnli/XNLI-MT-1.0.zip"
 
 
-def load_pandas_df(local_cache_path="./", file_split="dev", language="zh"):
+def load_pandas_df(local_cache_path=".", file_split="dev", language="zh"):
     """Downloads and extracts the dataset files.
+
+    Utilities information can be found `on this link <https://www.nyu.edu/projects/bowman/xnli/>`_.
 
     Args:
         local_cache_path (str, optional): Path to store the data.
@@ -70,10 +68,26 @@ def load_pandas_df(local_cache_path="./", file_split="dev", language="zh"):
         lines = f.read().splitlines()
 
     line_list = [line.split("\t") for line in lines]
+
     # Remove the column name row
     line_list.pop(0)
     if file_split != "train":
         line_list = [line for line in line_list if line[0] == language]
+
+    valid_lines = [
+        True if line[sentence_1_index] and line[sentence_2_index] else False
+        for line in line_list
+    ]
+    total_line_count = len(line_list)
+    line_list = [line for line, valid in zip(line_list, valid_lines) if valid]
+    valid_line_count = len(line_list)
+
+    if valid_line_count != total_line_count:
+        print(
+            "{} invalid lines removed.".format(
+                total_line_count - valid_line_count
+            )
+        )
 
     label_list = [convert_to_unicode(line[label_index]) for line in line_list]
     old_contradict_label = convert_to_unicode("contradictory")
