@@ -2,21 +2,21 @@ import json
 import logging
 import os
 
+import sys
+sys.path.append("./nlpbp")
 from pytorch_pretrained_bert.tokenization import BasicTokenizer
 import torch
 
 
-from utils_nlp.apps.luis..utterance import Utterance
-#from module.util import get_token_span, put_tokens_with_tags
+from utils_nlp.apps.luis.utterance import Utterance
 from utils_nlp.models.bert.token_classification import (
     BERTTokenClassifier,
     postprocess_token_labels,
 )
 from utils_nlp.models.bert.common import Language, Tokenizer
-
+from utils_nlp.apps.luis.entity import Entity
 from sklearn.metrics import classification_report
 from sklearn_crfsuite.metrics import flat_classification_report, sequence_accuracy_score
-
 
 
 logger = logging.getLogger(__name__)
@@ -241,12 +241,10 @@ class BERTEntityExtractor:
 
         tokens_list = []
         tags_list = []
-        bt = BasicTokenizer()
-        for i in utterances:
-            logger.debug(i.text)
-            tokens, tags = split_to_tokens_tags(i, bt)
-            logger.debug(tokens)
-            logger.debug(tags)
+        basic_tokenizer = BasicTokenizer(do_lower_case=False)
+        for utterance in utterances:
+            logger.debug(utterance.text)
+            tokens, tags = convert_luis_example_to_tokens_tags(utterance, basic_tokenizer)
             tokens_list.append(tokens)
             tags_list.append(tags)
             logger.debug(tokens)
@@ -332,10 +330,12 @@ class BERTEntityExtractor:
     def predict(self, text, progress=True):
         # save the position of each token
         # TODO: disable progress bar in tokenizer.tokenize()
-        raw_tokens = self.tokenizer.tokenize(
-                [text],
-                #progress=progress,
-                )[0]
+        basic_tokenizer = BasicTokenizer(do_lower_case=False)
+        #raw_tokens = self.tokenizer.tokenize(
+        #        [text],
+        #        #progress=progress,
+        #        )[0]
+        raw_tokens = basic_tokenizer.tokenize(text)
         logger.debug("test example:{}".format(text))
         logger.debug("raw tokens: {}".format(raw_tokens))
         tokens_dict = get_token_span(raw_tokens, text)
@@ -355,8 +355,6 @@ class BERTEntityExtractor:
         else:
             num_gpus = 0
 
-        # TODO: disable progress bar in model.predict()
-        # TODO: other debug messages output here too
         prediction = self.saved_model.predict(
             token_ids=test_token_ids,
             input_mask=test_input_mask,
@@ -364,14 +362,14 @@ class BERTEntityExtractor:
             batch_size=self.batch_size,
             probabilities=True,
             num_gpus = num_gpus,
-            #progress=progress,
         )
         pred_label_ids = prediction.classes
         pred_label_prob = prediction.probabilities[0]
         pred_tags_no_padding = postprocess_token_labels(
-            pred_label_ids, test_input_mask, self.label_map
+            pred_label_ids, test_input_mask, self.label_map, remove_trailing_word_pieces=True,
+            trailing_token_mask=test_trailing_token_mask
         )
-        logger.debug("predcted tags: {}".format(pred_tags_no_padding))
+        logger.debug("predicted tags: {}".format(pred_tags_no_padding))
 
         # post processing
         pred_tags_without_trailing = make_trailing_tags_explicit(
