@@ -15,7 +15,6 @@ from utils_nlp.models.bert.token_classification import (
 from utils_nlp.models.bert.common import Language, Tokenizer
 
 from sklearn.metrics import classification_report
-from sklearn_crfsuite.metrics import flat_classification_report, sequence_accuracy_score
 
 
 logger = logging.getLogger(__name__)
