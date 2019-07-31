@@ -58,7 +58,7 @@ class BERTSequenceDistClassifier:
     def fit(
         self,
         input_files,
-        num_gpus=None,
+        num_gpus=1,
         num_epochs=1,
         batch_size=32,
         lr=2e-5,
@@ -96,7 +96,7 @@ class BERTSequenceDistClassifier:
             **self.kwargs
         )
 
-        device = get_device("cpu" if num_gpus == 0 else "gpu")
+        device = get_device()
         self.model.cuda()
 
         hvd.broadcast_parameters(self.model.state_dict(), root_rank=0)
@@ -191,7 +191,7 @@ class BERTSequenceDistClassifier:
         torch.cuda.empty_cache()
 
     def predict(
-        self, input_files, num_gpus=None, batch_size=32, probabilities=False
+        self, input_files, num_gpus=1, batch_size=32, probabilities=False
     ):
         """Scores the given set of train files and returns the predicted classes.
 
@@ -221,7 +221,7 @@ class BERTSequenceDistClassifier:
             **self.kwargs
         )
 
-        device = get_device("cpu" if num_gpus == 0 else "gpu")
+        device = get_device()
         self.model = move_to_device(self.model, device, num_gpus)
         self.model.eval()
         preds = []
