@@ -5,8 +5,6 @@ variables:
 - group: AML-config
 - name  : 'test'
   value : 'tests/ci/run_pytest.py'
-- name  : 'testmarkers'
-  value : '"not notebooks and not gpu"'
 - name  : 'junitxml'
   value : 'reports/test-unit.xml'
 - name  : 'maxnodes'
@@ -37,6 +35,8 @@ jobs:
    vmImage: 'ubuntu-16.04'
 
   variables:
+  - name  : 'testmarkers'
+    value : '"smoke and not gpu and not azureml"'
   - name  : 'testfolder'
     value : './tests/smoke'
   - name  : 'clustername'
@@ -95,6 +95,8 @@ jobs:
    vmImage: 'ubuntu-16.04'
 
   variables:
+  - name  : 'testmarkers'
+    value : '"integration and not gpu and not azureml"'
   - name  : 'testfolder'
     value : './tests/integration'
   - name  : 'clustername'
