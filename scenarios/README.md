@@ -26,8 +26,8 @@ The Azure products featured in the notebooks include:
   * Scaling up and out on Azure Machine Learning Compute
   * Deploying a web service to both Azure Container Instance and Azure Kubernetes Service
 
-* [Azure Kubernetes Service](https://docs.microsoft.com/en-us/azure/machine-learning/service/how-to-deploy-and-where#aks) - You can use Azure Machine Learning service to host your classification model in a web service deployment on Azure Kubernetes Service (AKS). AKS is good for high-scale production deployments and provides autoscaling, and fast response times.
+* [Azure Kubernetes Service](https://docs.microsoft.com/en-us/azure/machine-learning/service/how-to-deploy-and-where#aks) - You can use Azure Machine Learning service to host your model in a web service deployment on Azure Kubernetes Service (AKS). AKS is good for high-scale production deployments and provides autoscaling, and fast response times.
 
-* [Azure Container Instance](https://docs.microsoft.com/en-us/azure/machine-learning/service/how-to-deploy-and-where#aci)- You can use Azure Machine Learning service to host your classification model in a web service deployment on Azure Container Instance (ACI). ACI is good for low scale, CPU-based workloads.
+* [Azure Container Instance](https://docs.microsoft.com/en-us/azure/machine-learning/service/how-to-deploy-and-where#aci)- You can use Azure Machine Learning service to host your model in a web service deployment on Azure Container Instance (ACI). ACI is good for low scale, CPU-based workloads.
 
 There may be other Azure service or products used in the notebooks. Introduction and/or reference of those will be provided in the notebooks.
