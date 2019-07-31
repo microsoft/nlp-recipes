@@ -50,7 +50,6 @@ def get_generator(
     local_cache_path=".",
     file_split="train",
     block_size=10e6,
-    random_seed=None,
     batch_size=10e6,
     num_batches=None,
 ):
@@ -81,9 +80,7 @@ def get_generator(
 
     loader = DaskJSONLoader(
         os.path.join(local_cache_path, DATA_FILES[file_split]),
-        block_size=block_size,
-        random_seed=random_seed,
-    )
+        block_size=block_size,)
 
     return loader.get_sequential_batches(
         batch_size=int(batch_size), num_batches=num_batches
