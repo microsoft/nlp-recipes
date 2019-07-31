@@ -95,8 +95,8 @@ jobs:
   - name  : 'expname'
     value : 'gpu_unit_tests'
 
-    pool:
-     vmImage: 'ubuntu-16.04'
+  pool:
+    vmImage: 'ubuntu-16.04'
   
   steps:
   
