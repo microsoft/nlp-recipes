@@ -29,7 +29,7 @@ pr:
 
 jobs:
 - job: Smoke
-  displayName: 'Smoke gpu'
+  displayName: 'Smoke cpu'
   
   pool:
    vmImage: 'ubuntu-16.04'
@@ -40,7 +40,7 @@ jobs:
   - name  : 'testfolder'
     value : './tests/smoke'
   - name  : 'clustername'
-    value : 'nlp-gpu'
+    value : 'nlp-cpu'
   - name  : 'vmsize'
     value : 'STANDARD_D3_V2'
   - name  : 'dockerproc'
@@ -84,12 +84,13 @@ jobs:
     inputs:
       testResultsFiles: '**/test-*.xml'
       failTaskOnFailedTests: true
+      testRunTitle: 'AzureML nightly cpu smoke tests'
     condition: succeededOrFailed()
   
   jobs:
 - job: Integration
   timeoutInMinutes: 300
-  displayName: 'Integration gpu'
+  displayName: 'Integration cpu'
   
   pool:
    vmImage: 'ubuntu-16.04'
@@ -100,7 +101,7 @@ jobs:
   - name  : 'testfolder'
     value : './tests/integration'
   - name  : 'clustername'
-    value : 'nlp-gpu'
+    value : 'nlp-cpu'
   - name  : 'vmsize'
     value : 'STANDARD_D3_V2'
   - name  : 'dockerproc'
@@ -144,5 +145,6 @@ jobs:
     inputs:
       testResultsFiles: '**/test-*.xml'
       failTaskOnFailedTests: true
+      testRunTitle: 'AzureML nightly cpu integration tests'
     condition: succeededOrFailed()
   

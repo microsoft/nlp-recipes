@@ -75,6 +75,7 @@ jobs:
     inputs:
       testResultsFiles: '**/test-*.xml'
       failTaskOnFailedTests: true
+      testRunTitle: 'AzureML notebooks cpu unit tests'
     condition: succeededOrFailed()
 
 - job: "NB_gpu_unit_test"
@@ -133,4 +134,5 @@ jobs:
     inputs:
       testResultsFiles: '**/test-*.xml'
       failTaskOnFailedTests: true
+      testRunTitle: 'AzureML notebooks gpu unit tests'
     condition: succeededOrFailed()

@@ -83,6 +83,7 @@ jobs:
     inputs:
       testResultsFiles: '**/test-*.xml'
       failTaskOnFailedTests: true
+      testRunTitle: 'AzureML nightly gpu smoke tests'
     condition: succeededOrFailed()
   
 - job: Integration_gpu
@@ -142,5 +143,6 @@ jobs:
     inputs:
       testResultsFiles: '**/test-*.xml'
       failTaskOnFailedTests: true
+      testRunTitle: 'AzureML nightly gpu integration tests'
     condition: succeededOrFailed()
   

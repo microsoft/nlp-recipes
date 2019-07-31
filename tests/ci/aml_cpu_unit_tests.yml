@@ -73,4 +73,5 @@ jobs:
     inputs:
       testResultsFiles: '**/test-*.xml'
       failTaskOnFailedTests: true
+      testRunTitle: 'AzureML cpu unit tests'
     condition: succeededOrFailed()

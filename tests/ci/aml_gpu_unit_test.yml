@@ -55,6 +55,8 @@ jobs:
     displayName: Add Conda to PATH
   
   - script: 
+       ls -al;
+       rm 
        pip install azureml-sdk &&
        pip install azure-cli &&
        pip install --upgrade azureml-sdk[cli]
@@ -73,5 +75,6 @@ jobs:
     inputs:
       testResultsFiles: '**/test-*.xml'
       failTaskOnFailedTests: true
+      testRunTitle: 'AzureML gpu unit tests'
     condition: succeededOrFailed()
   
