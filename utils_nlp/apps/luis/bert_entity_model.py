@@ -129,7 +129,7 @@ def remove_ib_from_tag(tags):
             new_tags.append(splitted[0])
     return new_tags
 
-def put_tokens_with_tags(text, tokens, tags):
+def convert_to_luis_entity_format(text, tokens, tags):
     """
         merge the adjacent tokens to a single entity in the returned entity list
         if these adjacent tokens have the same tag
@@ -142,7 +142,6 @@ def put_tokens_with_tags(text, tokens, tags):
     return result
     [{'endPos': 11, 'startPos': 6, 'token': 'Amy Hu'}]
    """
-
     result = []
     i = 0
     start = 0
@@ -365,27 +364,20 @@ class BERTEntityExtractor:
         )
         pred_label_ids = prediction.classes
         pred_label_prob = prediction.probabilities[0]
-        pred_tags_no_padding = postprocess_token_labels(
+        pred_tags = postprocess_token_labels(
             pred_label_ids, test_input_mask, self.label_map, remove_trailing_word_pieces=True,
             trailing_token_mask=test_trailing_token_mask
         )
-        logger.debug("predicted tags: {}".format(pred_tags_no_padding))
+        logger.debug("predicted tags: {}".format(pred_tags[0]))
 
-        # post processing
-        pred_tags_without_trailing = make_trailing_tags_explicit(
-            pred_tags_no_padding[0]
-        )
-
-        pred_tags_without_trailing = remove_ib_from_tag(
-            # pred_tags_no_padding[0]
-            pred_tags_without_trailing
-        )
-        logger.debug("merged tags: {}".format(pred_tags_without_trailing))
+        pred_tags_without_ib = remove_ib_from_tag(pred_tags[0])
+            
+        logger.debug("merged tags: {}".format(pred_tags_without_ib))
         tags_dict = []
-        for i in range(len(pred_tags_without_trailing)):
+        for i in range(len(pred_tags_without_ib)):
             tags_dict.append(
-                {"tag": pred_tags_without_trailing[i], "confidence": pred_label_prob[i]}
+                {"tag": pred_tags_without_ib[i], "confidence": pred_label_prob[i]}
             )
-        simple_entities = put_tokens_with_tags(text, tokens_dict, tags_dict)
+        simple_entities = convert_to_luis_entity_format(text, tokens_dict, tags_dict)
         logger.debug("simple entities: {}".format(simple_entities))
         return simple_entities
