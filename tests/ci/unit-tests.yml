@@ -56,25 +56,3 @@ jobs:
       verbosity: 'Verbose'
       alertWarningLevel: 'High'
   
-- job: unit_tests_gpu
-    
-  pool:
-    name: "nlpagentpool"
-  
-  steps:
-  
-  - bash:
-      echo "##vso[task.prependpath]/data/anaconda/bin"&&
-      conda env list
-    displayName: Add Conda to PATH
-  
-  - task: PublishTestResults@2
-    inputs:
-      testResultsFiles: '**/test-unitttest.xml'
-      testRunTitle: 'Test results for PyTest'
-  
-  - task: ComponentGovernanceComponentDetection@0
-    inputs:
-      scanType: 'Register'
-      verbosity: 'Verbose'
-      alertWarningLevel: 'High'
