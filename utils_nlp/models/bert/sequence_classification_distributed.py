@@ -5,12 +5,14 @@ import logging
 import horovod.torch as hvd
 import numpy as np
 import torch.nn as nn
+from torch.utils.data import TensorDataset
 import torch.utils.data.distributed
 from pytorch_pretrained_bert.modeling import BertForSequenceClassification
 from pytorch_pretrained_bert.optimization import BertAdam
 from tqdm import tqdm
 
 from utils_nlp.models.bert.common import Language
+
 from utils_nlp.models.bert.common import get_dataset_multiple_files
 from utils_nlp.common.pytorch_utils import get_device, move_to_device
 
@@ -57,7 +59,10 @@ class BERTSequenceDistClassifier:
 
     def fit(
         self,
-        input_files,
+        token_ids,
+        input_mask,
+        labels,
+        token_type_ids=None,
         num_gpus=None,
         num_epochs=1,
         batch_size=32,
@@ -85,7 +90,27 @@ class BERTSequenceDistClassifier:
             fp16_allreduce(bool, optional)L if true, use fp16 compression during allreduce
         """
 
-        train_dataset = get_dataset_multiple_files(input_files)
+        token_ids_tensor = torch.tensor(token_ids, dtype=torch.long)
+        input_mask_tensor = torch.tensor(input_mask, dtype=torch.long)
+        labels_tensor = torch.tensor(labels, dtype=torch.long)
+
+        if token_type_ids:
+            token_type_ids_tensor = torch.tensor(
+                token_type_ids, dtype=torch.long
+            )
+            train_dataset = TensorDataset(
+                token_ids_tensor,
+                input_mask_tensor,
+                token_type_ids_tensor,
+                labels_tensor,
+            )
+        else:
+            train_dataset = TensorDataset(
+                token_ids_tensor, input_mask_tensor, labels_tensor
+            )
+
+        # train_dataset = get_dataset_multiple_files(input_files)
+
         train_sampler = torch.utils.data.distributed.DistributedSampler(
             train_dataset, num_replicas=hvd.size(), rank=hvd.rank()
         )
@@ -158,20 +183,36 @@ class BERTSequenceDistClassifier:
         for epoch in range(num_epochs):
             self.model.train()
             train_sampler.set_epoch(epoch)
-            for batch_idx, (tokens, mask, target) in enumerate(train_loader):
+            #for batch_idx, (tokens, mask, target) in enumerate(train_loader):
+            for batch_idx, batch in enumerate(train_loader):
 
-                if torch.cuda.is_available():
-                    tokens, mask, target = (
-                        tokens.cuda(),
-                        mask.cuda(),
-                        target.cuda(),
+                if token_type_ids:
+                    x_batch, mask_batch, token_type_ids_batch, y_batch = tuple(
+                        t.to(device) for t in batch
+                    )
+                else:
+                    token_type_ids_batch = None
+                    x_batch, mask_batch, y_batch = tuple(
+                        t.to(device) for t in batch
                     )
 
+                # if torch.cuda.is_available():
+                #     tokens, mask, target = (
+                #         tokens.cuda(),
+                #         mask.cuda(),
+                #         target.cuda(),
+                #     )
+
                 optimizer.zero_grad()
+                # output = self.model(
+                #     input_ids=tokens, attention_mask=mask, labels=None
+                # )
+
                 output = self.model(
-                    input_ids=tokens, attention_mask=mask, labels=None
+                    input_ids=x_batch, attention_mask=mask_batch, labels=None
                 )
-                loss = loss_func(output, target).mean()
+
+                loss = loss_func(output, y_batch).mean()
                 loss.backward()
                 optimizer.step()
                 if verbose and (batch_idx % ((num_batches // 10) + 1)) == 0:
@@ -190,8 +231,15 @@ class BERTSequenceDistClassifier:
         # empty cache
         torch.cuda.empty_cache()
 
+## @Janhavi : do you need sequence sampler ?
     def predict(
-        self, input_files, num_gpus=None, batch_size=32, probabilities=False
+        self,
+        token_ids,
+        input_mask,
+        token_type_ids=None,
+        num_gpus=None,
+        batch_size=32,
+        probabilities=False,
     ):
         """Scores the given set of train files and returns the predicted classes.
 
@@ -209,17 +257,32 @@ class BERTSequenceDistClassifier:
                 a dictionary with classes, target labels, probabilities) if probabilities is True.
         """
 
-        test_dataset = get_dataset_multiple_files(input_files)
+        # test_dataset = get_dataset_multiple_files(input_files)
+
+        token_ids_tensor = torch.tensor(token_ids, dtype=torch.long)
+        input_mask_tensor = torch.tensor(input_mask, dtype=torch.long)
+
+        if token_type_ids:
+            token_type_ids_tensor = torch.tensor(
+                token_type_ids, dtype=torch.long
+            )
+            test_dataset = TensorDataset(
+                token_ids_tensor, input_mask_tensor, token_type_ids_tensor
+            )
+        else:
+            test_dataset = TensorDataset(token_ids_tensor, input_mask_tensor)
 
         # Horovod: use DistributedSampler to partition the test data.
-        test_sampler = torch.utils.data.sampler.SequentialSampler(test_dataset)
+        # test_sampler = torch.utils.data.sampler.SequentialSampler(test_dataset)
+        #
+        # test_loader = torch.utils.data.DataLoader(
+        #     test_dataset,
+        #     batch_size=batch_size,
+        #     sampler=test_sampler,
+        #     **self.kwargs
+        # )
 
-        test_loader = torch.utils.data.DataLoader(
-            test_dataset,
-            batch_size=batch_size,
-            sampler=test_sampler,
-            **self.kwargs
-        )
+        test_loader = torch.utils.data.DataLoader(test_dataset)
 
         device = get_device("cpu" if num_gpus == 0 else "gpu")
         self.model = move_to_device(self.model, device, num_gpus)
