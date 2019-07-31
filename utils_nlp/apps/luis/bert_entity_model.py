@@ -12,8 +12,8 @@ from utils_nlp.models.bert.token_classification import (
     BERTTokenClassifier,
     postprocess_token_labels,
 )
-
 from utils_nlp.models.bert.common import Language, Tokenizer
+
 from sklearn.metrics import classification_report
 from sklearn_crfsuite.metrics import flat_classification_report, sequence_accuracy_score
 
@@ -118,6 +118,7 @@ def get_token_span(tokens, text):
 
 def remove_ib_from_tag(tags):
     """ Removes the "B-" and "I-" from the tags"""
+
     new_tags = []
     for i in tags:
         splitted = i.split("-")
@@ -299,6 +300,7 @@ class BERTEntityExtractor:
 
         tokens_list = []
         tags_list = []
+
         basic_tokenizer = BasicTokenizer(do_lower_case=False)
         for utterance in utterances:
             logger.debug(utterance.text)
@@ -316,6 +318,7 @@ class BERTEntityExtractor:
             luis_model_file (str): file path of the luis model file for training.
 
         """
+
         utterances, tokens_list, tags_list = self.prepare_training_data(luis_model_file)
         train_text = []
         train_labels = []
