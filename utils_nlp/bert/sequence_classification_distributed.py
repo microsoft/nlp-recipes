@@ -5,7 +5,6 @@ import logging
 import horovod.torch as hvd
 import numpy as np
 import torch.nn as nn
-import mlflow
 import torch.utils.data.distributed
 from pytorch_pretrained_bert.modeling import BertForSequenceClassification
 from pytorch_pretrained_bert.optimization import BertAdam
