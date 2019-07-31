@@ -25,7 +25,7 @@ def test_bert_entity_model_training(luis_model_file):
     print(luis_model_file)
     language = Language.ENGLISHCASED
     # choose num_train_epoch 2 to train fast
-    extractor = BERTEntityExtractor(language=language, num_epochs=2, batch_size = 8)
+    extractor = BERTEntityExtractor(language=language, num_train_epochs=2, batch_size = 8)
     extractor.train(luis_model_file)
     extractor.save(EXTRACTOR_FILE_NAME)
 
@@ -37,9 +37,9 @@ def test_bert_intent_model_predict(tmpdir):
         extractor = torch.load(EXTRACTOR_FILE_NAME)
     else:
         extractor = torch.load(EXTRACTOR_FILE_NAME, map_location='cpu')
-    result = extractor.predict("turn living room lights to green")
+    result = extractor.predict("turn  lights to green")
     assert len(result) > 0
-    assert result[0].entity ==  "ContentName"
-    assert result[0].start_pos ==  27
-    assert result[0].entity ==  27 + len("green") -1
+    assert result[0].entity ==  "Color"
+    assert result[0].start_pos ==  16
+    assert result[0].end_pos ==  16 + len("green") -1
 
