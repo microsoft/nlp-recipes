@@ -55,8 +55,6 @@ jobs:
     displayName: Add Conda to PATH
   
   - script:
-       ls -al;
-       rm __init__.py;
        pip install paramiko==2.4.2 &&
        pip install azureml-sdk &&
        pip install azure-cli
