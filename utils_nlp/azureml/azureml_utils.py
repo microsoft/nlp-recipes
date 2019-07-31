@@ -101,13 +101,12 @@ def log_metrics_table(df, run, name="", description=None, as_scalar=False):
 
 def get_output_files(run, output_path, file_names=None):
     """
-    #ToDo Add docstring
     Args:
-        file_names:
-        run:
-        output_path:
+        file_names(list): Names of the files to download.
+        run(azureml.core.run.Run): Run object of the run.
+        output_path(str): Path to download the output files.
 
-    Returns:
+    Returns: None
 
     """
     os.makedirs(output_path, exist_ok=True)
