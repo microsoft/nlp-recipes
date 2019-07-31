@@ -87,7 +87,6 @@ jobs:
       testRunTitle: 'AzureML nightly cpu smoke tests'
     condition: succeededOrFailed()
   
-  jobs:
 - job: Integration
   timeoutInMinutes: 300
   displayName: 'Integration cpu'
