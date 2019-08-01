@@ -20,6 +20,14 @@ class BERTSequenceClassifier:
     """BERT-based sequence classifier"""
 
     def __init__(self, language=Language.ENGLISH, num_labels=2, cache_dir="."):
+
+        """
+
+        Args:
+            language: Language passed to pre-trained BERT model to pick the appropriate model
+            num_labels: number of unique labels in train dataset
+            cache_dir: cache_dir to load pre-trained BERT model. Defaults to "."
+        """
         if num_labels < 2:
             raise ValueError("Number of labels should be at least 2.")
 
@@ -64,7 +72,16 @@ class BERTSequenceClassifier:
         num_gpus=0,
         rank=0,
     ):
+        """
+            fine-tunes the bert classifier using the given training data
+        Args:
+            train_loader(torch DataLoader): Torch Dataloader created from Torch Dataset
+            bert_optimizer(optimizer): optimizer can be BERTAdam for local and Dsitributed if Horovod
+            num_epochs(int): the number of epochs to run
+            num_gpus(int): the number of gpus
+            rank(int, optional): If running on horovod then rank is passed
 
+        """
         # define loss function
         device = get_device("cpu" if num_gpus == 0 else "gpu")
 
@@ -146,7 +163,22 @@ class BERTSequenceClassifier:
     def predict(
         self, test_loader, num_gpus=None, batch_size=32, probabilities=False
     ):
+        """
 
+        Args:
+            test_loader(torch Dataloader): Torch Dataloader created from Torch Dataset
+            num_gpus (int, optional): The number of gpus to use.
+                                      If None is specified, all available GPUs
+                                      will be used. Defaults to None.
+            batch_size (int, optional): Scoring batch size. Defaults to 32.
+            probabilities (bool, optional):
+                If True, the predicted probability distribution
+                is also returned. Defaults to False.
+
+        Returns:
+            1darray, dict(1darray, 1darray, ndarray): Predicted classes and target labels or
+                a dictionary with classes, target labels, probabilities) if probabilities is True.
+        """
         device = get_device("cpu" if num_gpus == 0 else "gpu")
         print("device", device)
         self.model = move_to_device(self.model, device, num_gpus)
