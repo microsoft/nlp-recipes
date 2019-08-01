@@ -14,6 +14,7 @@ ABS_TOL = 0.1
 
 @pytest.mark.integration
 @pytest.mark.azureml
+@pytest.mark.gpu
 def test_tc_bert_azureml(
     notebooks, subscription_id, resource_group, workspace_name, workspace_region, cluster_name, tmp
 ):
