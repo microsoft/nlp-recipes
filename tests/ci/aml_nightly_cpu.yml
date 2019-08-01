@@ -100,7 +100,7 @@ jobs:
   - name  : 'testfolder'
     value : './tests/integration'
   - name  : 'junitxml'
-    value : 'reports/test-unit.xml'
+    value : 'reports/test-int.xml'
   - name  : 'clustername'
     value : 'nlp-cpu'
   - name  : 'vmsize'
