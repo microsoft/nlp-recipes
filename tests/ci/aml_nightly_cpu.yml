@@ -5,8 +5,6 @@ variables:
 - group: AML-config
 - name  : 'test'
   value : 'tests/ci/run_pytest.py'
-- name  : 'junitxml'
-  value : 'reports/test-unit.xml'
 - name  : 'maxnodes'
   value : 4
 - name  : 'reponame'
@@ -39,6 +37,8 @@ jobs:
     value : '"smoke and not gpu and not azureml"'
   - name  : 'testfolder'
     value : './tests/smoke'
+  - name  : 'junitxml'
+    value : 'reports/test-smoke.xml'  
   - name  : 'clustername'
     value : 'nlp-cpu'
   - name  : 'vmsize'
@@ -99,6 +99,8 @@ jobs:
     value : '"integration and not gpu and not azureml"'
   - name  : 'testfolder'
     value : './tests/integration'
+  - name  : 'junitxml'
+    value : 'reports/test-unit.xml'
   - name  : 'clustername'
     value : 'nlp-cpu'
   - name  : 'vmsize'
