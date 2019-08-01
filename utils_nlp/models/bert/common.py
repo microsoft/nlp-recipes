@@ -22,7 +22,7 @@ from torch.utils.data import (
     TensorDataset,
 )
 
-from utils_nlp.models.bert.qa_utils import QAFeatures
+from utils_nlp.models.bert.qa_utils import QAFeatures, QAExample
 
 # Max supported sequence length
 BERT_MAX_LEN = 512
@@ -350,9 +350,6 @@ class Tokenizer:
         doc_stride=128,
         qa_id=None,
         is_impossible=None):
-
-        _QAExample = namedtuple('QAExample', ['qa_id', 'doc_tokens', 'question_text', 
-            'orig_answer_text', 'start_position', 'end_position', 'is_impossible'])
         
         _DocSpan = namedtuple("DocSpan", ["start", "length"])
     
@@ -495,13 +492,13 @@ class Tokenizer:
                             end_position = -1
                     
                     qa_examples.append(
-                        _QAExample(qa_id=q_id, 
-                                   doc_tokens=d_tokens, 
-                                   question_text = q_text, 
-                                   orig_answer_text=t, 
-                                   start_position=start_position, 
-                                   end_position=end_position, 
-                                   is_impossible=impossible))
+                        QAExample(qa_id=q_id, 
+                                  doc_tokens=d_tokens, 
+                                  question_text = q_text, 
+                                  orig_answer_text=t, 
+                                  start_position=start_position, 
+                                  end_position=end_position, 
+                                  is_impossible=impossible))
 
         cls_token = '[CLS]'
         sep_token = '[SEP]'

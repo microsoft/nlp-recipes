@@ -12,11 +12,10 @@ logger = logging.getLogger(__name__)
 
 from pytorch_transformers.tokenization_bert import BasicTokenizer
 
-QAResult = collections.namedtuple(
-    "QAResult", ["unique_id", "start_logits", "end_logits"]
-)
+QAExample = collections.namedtuple('QAExample', ['qa_id', 'doc_tokens', 'question_text', 
+    'orig_answer_text', 'start_position', 'end_position', 'is_impossible'])
 
-QAFeatures = namedtuple(
+QAFeatures = collections.namedtuple(
     'QAFeatures', 
     ['unique_id', 
     'example_index', 
@@ -30,6 +29,9 @@ QAFeatures = namedtuple(
     'end_position', 
     'paragraph_len'])
 
+QAResult = collections.namedtuple(
+    "QAResult", ["unique_id", "start_logits", "end_logits"]
+)
 
 
 def postprocess_answers(
@@ -417,23 +419,26 @@ def _compute_softmax(scores):
     return probs
 
 
-
 ## Evaluation utilities
-def evaluate_qa(data_file, pred_file, na_prob_file=None, na_prob_thresh=0, out_file=None):
-    with data_file as f:
-        dataset_json = json.load(f)
-        dataset = dataset_json['data']
-    with pred_file as f:
-        preds = json.load(f)
-    if na_prob_file:
-        with open(na_prob_file) as f:
-            na_probs = json.load(f)
-    else:
-        na_probs = {k: 0.0 for k in preds}    
-    qid_to_has_ans = make_qid_to_has_ans(dataset)  # maps qid to True/False
+def evaluate_qa(qa_ids, actuals, preds, na_probs=None, na_prob_thresh=0, out_file=None):
+    # with open(data_file) as f:
+    #     dataset_json = json.load(f)
+    #     dataset = dataset_json['data']
+    # with open(pred_file) as f:
+    #     preds = json.load(f)
+    # if na_prob_file:
+    #     with open(na_prob_file) as f:
+    #         na_probs = json.load(f)
+    # else:
+    #     na_probs = {k: 0.0 for k in preds} 
+
+    if na_probs is None:
+        na_probs = {k: 0.0 for k in preds}
+
+    qid_to_has_ans = {qa_id: bool(ans) for (qa_id, ans) in zip(qa_ids, actuals)}
     has_ans_qids = [k for k, v in qid_to_has_ans.items() if v]
     no_ans_qids = [k for k, v in qid_to_has_ans.items() if not v]
-    exact_raw, f1_raw = get_raw_scores(dataset, preds)
+    exact_raw, f1_raw = get_raw_scores(qa_ids, actuals, preds)
     exact_thresh = apply_no_ans_threshold(exact_raw, na_probs, qid_to_has_ans,
                                           na_prob_thresh)
     f1_thresh = apply_no_ans_threshold(f1_raw, na_probs, qid_to_has_ans,
@@ -452,14 +457,6 @@ def evaluate_qa(data_file, pred_file, na_prob_file=None, na_prob_thresh=0, out_f
     else:
         print(json.dumps(out_eval, indent=2))
     return out_eval
-
-def make_qid_to_has_ans(dataset):
-    qid_to_has_ans = {}
-    for article in dataset:
-        for p in article['paragraphs']:
-            for qa in p['qas']:
-                qid_to_has_ans[qa['id']] = bool(qa['answers'])
-    return qid_to_has_ans
 
 def normalize_answer(s):
     """Lower text and remove punctuation, articles and extra whitespace."""
@@ -497,25 +494,21 @@ def compute_f1(a_gold, a_pred):
     f1 = (2 * precision * recall) / (precision + recall)
     return f1
 
-def get_raw_scores(dataset, preds):
+def get_raw_scores(qa_ids, actuals, preds):
     exact_scores = {}
     f1_scores = {}
-    for article in dataset:
-        for p in article['paragraphs']:
-            for qa in p['qas']:
-                qid = qa['id']
-                gold_answers = [a['text'] for a in qa['answers']
-                                if normalize_answer(a['text'])]
-                if not gold_answers:
-                  # For unanswerable questions, only correct answer is empty string
-                    gold_answers = ['']
-                if qid not in preds:
-                    print('Missing prediction for %s' % qid)
-                    continue
-                a_pred = preds[qid]
-                # Take max over all gold answers
-                exact_scores[qid] = max(compute_exact(a, a_pred) for a in gold_answers)
-                f1_scores[qid] = max(compute_f1(a, a_pred) for a in gold_answers)
+
+    for qa_id, gold_answers in zip(qa_ids, actuals):
+        if not gold_answers:
+            # For unanswerable questions, only correct answer is empty string
+            gold_answers = ['']
+        if qid not in preds:
+            print('Missing prediction for %s' % qid)
+            continue
+        a_pred = preds[qid]
+        # Take max over all gold answers
+        exact_scores[qid] = max(compute_exact(a, a_pred) for a in gold_answers)
+        f1_scores[qid] = max(compute_f1(a, a_pred) for a in gold_answers)
     return exact_scores, f1_scores
 
 def apply_no_ans_threshold(scores, na_probs, qid_to_has_ans, na_prob_thresh):

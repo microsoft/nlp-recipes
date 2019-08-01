@@ -40,9 +40,11 @@ def load_pandas_df(local_cache_path=".", squad_version="v1.1", file_split="train
                 answer_offset = None
                 orig_answer_text = None
                 is_impossible = False
-                if file_split == "train":
-                    if squad_version == "v2.0":
+
+                if squad_version == "v2.0":
                         is_impossible = qa["is_impossible"]
+
+                if file_split == "train":
                     if (len(qa["answers"]) != 1) and (not is_impossible):
                         raise ValueError(
                             "For training, each question should have exactly 1 answer.")
@@ -52,13 +54,22 @@ def load_pandas_df(local_cache_path=".", squad_version="v1.1", file_split="train
                         answer_offset = answer["answer_start"]
                     else:
                         orig_answer_text = ""
+                else:
+                    orig_answer_text = []
+                    answer_offset = []
+                    if not is_impossible:
+                        for answer in qa["answers"]:
+                            orig_answer_text.append(answer["text"])
+                            answer_offset.append(answer["answer_start"])
+                    else：
+                        orig_answer_text = ""
             
-            paragraph_text_list.append(paragraph_text)
-            question_text_list.append(question_text)
-            answer_start_list.append(answer_offset)
-            answer_text_list.append(orig_answer_text)
-            qa_id_list.append(qas_id)
-            is_impossible_list.append(is_impossible)
+                paragraph_text_list.append(paragraph_text)
+                question_text_list.append(question_text)
+                answer_start_list.append(answer_offset)
+                answer_text_list.append(orig_answer_text)
+                qa_id_list.append(qas_id)
+                is_impossible_list.append(is_impossible)
 
     output_df = pd.DataFrame({"doc_text": paragraph_text_list, 
                               "question_text": question_text_list,
