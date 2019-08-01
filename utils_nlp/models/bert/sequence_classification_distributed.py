@@ -13,7 +13,7 @@ from tqdm import tqdm
 
 from utils_nlp.models.bert.common import Language
 
-#from utils_nlp.models.bert.common import get_dataset_multiple_files
+from utils_nlp.models.bert.common import get_dataset_multiple_files
 from utils_nlp.common.pytorch_utils import get_device, move_to_device
 
 logger = logging.getLogger(__name__)
@@ -59,11 +59,11 @@ class BERTSequenceDistClassifier:
 
     def fit(
         self,
-        input_files= None,
         token_ids,
         input_mask,
         labels,
         token_type_ids=None,
+        input_files=None,
         num_gpus=None,
         num_epochs=1,
         batch_size=32,
@@ -99,7 +99,7 @@ class BERTSequenceDistClassifier:
         """
 
         if input_files is not None:
-            #train_dataset = get_dataset_multiple_files(input_files)
+            train_dataset = get_dataset_multiple_files(input_files)
         else:
             token_ids_tensor = torch.tensor(token_ids, dtype=torch.long)
             input_mask_tensor = torch.tensor(input_mask, dtype=torch.long)
@@ -219,7 +219,7 @@ class BERTSequenceDistClassifier:
                     print(
                         "Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}".format(
                             epoch,
-                            batch_idx * len(tokens),
+                            batch_idx * len(x_batch),
                             len(train_sampler),
                             100.0 * batch_idx / len(train_loader),
                             loss.item(),
@@ -231,10 +231,10 @@ class BERTSequenceDistClassifier:
 
     def predict(
         self,
-        input_files = None,
         token_ids,
         input_mask,
         token_type_ids=None,
+        input_files=None,
         num_gpus=None,
         batch_size=32,
         probabilities=False,
@@ -262,7 +262,7 @@ class BERTSequenceDistClassifier:
         """
 
         if input_files is not None:
-            #test_dataset = get_dataset_multiple_files(input_files)
+            test_dataset = get_dataset_multiple_files(input_files)
 
         else:
             token_ids_tensor = torch.tensor(token_ids, dtype=torch.long)
