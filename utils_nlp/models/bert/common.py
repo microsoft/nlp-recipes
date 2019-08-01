@@ -22,6 +22,8 @@ from torch.utils.data import (
     TensorDataset,
 )
 
+from utils_nlp.models.bert.qa_utils import QAFeatures
+
 # Max supported sequence length
 BERT_MAX_LEN = 512
 
@@ -673,21 +675,6 @@ class Tokenizer:
                 unique_id += 1
 
         return features, qa_examples
-
-
-QAFeatures = namedtuple(
-    'QAFeatures', 
-    ['unique_id', 
-    'example_index', 
-    'tokens', 
-    'token_to_orig_map', 
-    'token_is_max_context', 
-    'input_ids', 
-    'input_mask', 
-    'segment_ids', 
-    'start_position',
-    'end_position', 
-    'paragraph_len'])
 
 
 def create_data_loader(
