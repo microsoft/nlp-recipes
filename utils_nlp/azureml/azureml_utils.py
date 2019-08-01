@@ -1,12 +1,6 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
-# Copyright (c) Microsoft Corporation. All rights reserved.
-# Licensed under the MIT License.
-
-# Copyright (c) Microsoft Corporation. All rights reserved.
-# Licensed under the MIT License.
-
 import os
 from azureml.core.authentication import AzureCliAuthentication
 from azureml.core.authentication import InteractiveLoginAuthentication
@@ -36,17 +30,20 @@ def get_or_create_workspace(
     resource_group=None,
     workspace_name=None,
     workspace_region=None,
-) -> Workspace:
+):
     """
-    Returns workspace if one exists already with the name
-    otherwise creates a new one.
+    Method to get or create workspace.
 
-    Args
-    config_path: optional directory to look for / store config.json file (defaults to current directory)
-    subscription_id: Azure subscription id
-    resource_group: Azure resource group to create workspace and related resources
-    workspace_name: name of azure ml workspace
-    workspace_region: region for workspace
+    Args:
+        config_path: optional directory to look for / store config.json file (defaults to current directory)
+        subscription_id: Azure subscription id
+        resource_group: Azure resource group to create workspace and related resources
+        workspace_name: name of azure ml workspace
+        workspace_region: region for workspace
+
+    Returns:
+        obj: AzureML workspace if one exists already with the name otherwise creates a new one.
+
     """
 
     try:
@@ -112,6 +109,8 @@ def log_metrics_table(df, run, name="", description=None, as_scalar=False):
 
 def get_output_files(run, output_path, file_names=None):
     """
+    Method to get the output files from an AzureML output directory.
+
     Args:
         file_names(list): Names of the files to download.
         run(azureml.core.run.Run): Run object of the run.
