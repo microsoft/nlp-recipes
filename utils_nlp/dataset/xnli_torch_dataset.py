@@ -8,7 +8,7 @@ from sklearn.preprocessing import LabelEncoder
 MAX_SEQ_LENGTH = 128
 TEXT_COL = "text"
 LABEL_COL = "label"
-#DATA_USED_PERCENT = 0.0025
+# DATA_USED_PERCENT = 0.0025
 TRAIN_FILE_SPLIT = "train"
 TEST_FILE_SPLIT = "test"
 VALIDATION_FILE_SPLIT = "dev"
@@ -27,7 +27,19 @@ class XnliDataset(data.Dataset):
         to_lowercase=TO_LOWER_CASE,
         tok_language=TOK_ENGLISH,
     ):
-
+        """
+            Load the dataset here
+        Args:
+            file_split (str, optional):The subset to load.
+                                       One of: {"train", "dev", "test"}
+                                       Defaults to "train".
+            cache_dir (str, optional):Path to store the data.
+                                      Defaults to "./".
+            language(str):Language required to load which xnli file (eg - "en", "zh")
+            to_lowercase(bool):flag to convert samples in dataset to lowercase
+            tok_language(Language, optional): language (Language, optional): The pretrained model's language.
+                                              Defaults to Language.ENGLISH.
+        """
         self.file_split = file_split
         self.cache_dir = cache_dir
         self.language = language
@@ -40,13 +52,12 @@ class XnliDataset(data.Dataset):
             language=language,
         )
 
+        # to test on a subset
         # if file_split == TRAIN_FILE_SPLIT:
         #     data_used_count = round(DATA_USED_PERCENT * df.shape[0])
         #     df = df.loc[:data_used_count]
 
         self.df = df
-
-        print("===================df length===================", len(self.df))
 
         print("Create a tokenizer...")
         tokenizer = Tokenizer(
@@ -76,10 +87,11 @@ class XnliDataset(data.Dataset):
             self.labels = df[LABEL_COL]
 
     def __len__(self):
+        """ Denotes the total number of samples """
         return len(self.df)
 
     def __getitem__(self, index):
-
+        """ Generates one sample of data """
         token_ids = self.token_ids[index]
         input_mask = self.input_mask[index]
         token_type_ids = self.token_type_ids[index]
