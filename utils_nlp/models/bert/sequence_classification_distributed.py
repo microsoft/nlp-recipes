@@ -184,7 +184,7 @@ class BERTSequenceClassifier:
         torch.save(model_to_save.state_dict(), output_model_file)
         model_to_save.config.to_json_file(output_config_file)
 
-    def train(
+    def fit(
         self,
         train_loader,
         epoch,
@@ -200,13 +200,14 @@ class BERTSequenceClassifier:
         Method to fine-tune the bert classifier using the given training data
 
         Args:
-            epoch:
-            lr:
-            warmup_proportion:
-            use_distributed:
-            fp16_allreduce:
+            epoch(int): Current epoch number of training.
+            lr (float): learning rate of the adam optimizer. defaults to 2e-5.
+            warmup_proportion (float, optional): proportion of training to
+                perform linear learning rate warmup for. e.g., 0.1 = 10% of
+                training. defaults to none.
+            fp16_allreduce(bool): if true, use fp16 compression during allreduce
             num_train_optimization_steps:
-            train_loader(torch DataLoader): Torch Dataloader created from Torch Dataset
+            train_loader(torch.DataLoader): Torch Dataloader created from Torch Dataset
             bert_optimizer(optimizer): optimizer can be BERTAdam for local and Dsitributed if Horovod
             num_epochs(int): the number of epochs to run
             num_gpus(int): the number of gpus
