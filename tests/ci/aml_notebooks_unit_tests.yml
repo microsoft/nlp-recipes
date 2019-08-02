@@ -64,7 +64,7 @@ jobs:
     displayName: 'install azureml-sdk'
   
   - script: 
-       python tools/generate_conda_file.py --name nlp 
+       python tools/generate_conda_file.py --name nlp && 
        du -a .
     displayName: ' generate_conda_file.py'
   
