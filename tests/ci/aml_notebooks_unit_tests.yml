@@ -59,11 +59,13 @@ jobs:
   - script:
        pip install paramiko==2.4.2 &&
        pip install azureml-sdk &&
-       pip install azure-cli
+       pip install azure-cli &&
+       ls -lR .
     displayName: 'install azureml-sdk'
   
   - script: 
        python tools/generate_conda_file.py --name nlp 
+       du -a .
     displayName: ' generate_conda_file.py'
   
   - script: 
@@ -118,11 +120,13 @@ jobs:
   - script:
        pip install paramiko==2.4.2 &&
        pip install azureml-sdk &&
-       pip install azure-cli
+       pip install azure-cli &&
+       ls -lR .
     displayName: 'install azureml-sdk'
   
   - script: 
-       python tools/generate_conda_file.py --name nlp 
+       python tools/generate_conda_file.py --name nlp &&
+       du -a .
     displayName: ' generate_conda_file.py'
   
   - script: 
