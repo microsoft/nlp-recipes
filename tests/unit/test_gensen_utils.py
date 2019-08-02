@@ -48,7 +48,7 @@ def test_gensen_preprocess(tmp_path):
     ]
     path = gensen_preprocess(df, df, df, tmp_path)
     assert os.path.isdir(path) is True
-    assert os.listdir(path) == expected_files
+    assert set(os.listdir(path)) == set(expected_files)
 
 
 def test_data_iterator():
