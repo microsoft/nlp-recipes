@@ -498,7 +498,7 @@ def get_raw_scores(qa_ids, actuals, preds):
     exact_scores = {}
     f1_scores = {}
 
-    for qa_id, gold_answers in zip(qa_ids, actuals):
+    for qid, gold_answers in zip(qa_ids, actuals):
         if not gold_answers:
             # For unanswerable questions, only correct answer is empty string
             gold_answers = ['']

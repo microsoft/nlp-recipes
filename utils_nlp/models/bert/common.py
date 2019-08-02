@@ -339,10 +339,10 @@ class Tokenizer:
             return input_ids_all, input_mask_all, trailing_token_mask_all, None
 
     def tokenize_qa(
-        self, 
-        doc_text, 
-        question_text, 
-        answer_start, 
+        self,
+        doc_text,
+        question_text,
+        answer_start,
         answer_text,
         is_training,
         max_query_length=64,
@@ -350,9 +350,9 @@ class Tokenizer:
         doc_stride=128,
         qa_id=None,
         is_impossible=None):
-        
+
         _DocSpan = namedtuple("DocSpan", ["start", "length"])
-    
+
         def _is_whitespace(c):
             if c == " " or c == "\t" or c == "\r" or c == "\n" or ord(c) == 0x202F:
                 return True
@@ -432,7 +432,7 @@ class Tokenizer:
                     best_span_index = span_index
 
             return cur_span_index == best_span_index
-        
+
 
         if qa_id is None:
             qa_id = list(range(len(question_text)))
@@ -456,7 +456,7 @@ class Tokenizer:
                         d_tokens[-1] += c
                     prev_is_whitespace = False
                 char_to_word_offset.append(len(d_tokens) - 1)
-            
+
             if _is_iterable_but_not_string(a_start):
                 if len(a_start) != len(a_text):
                     raise Exception("The lengths of answer starts and answer texts are different.")
@@ -465,40 +465,40 @@ class Tokenizer:
             else:
                 a_start = [a_start]
                 a_text = [a_text]
-                
-                for s, t in zip(a_start, a_text):
-                    start_position = None
-                    end_position = None
-                    if is_training:
-                        if not impossible:
-                            answer_length = len(t)
-                            start_position = char_to_word_offset[s]
-                            end_position = char_to_word_offset[s + answer_length - 1]
-                            # Only add answers where the text can be exactly recovered from the
-                            # document. If this CAN'T happen it's likely due to weird Unicode
-                            # stuff so we will just skip the example.
-                            #
-                            # Note that this means for training mode, every example is NOT
-                            # guaranteed to be preserved.
-                            actual_text = " ".join(d_tokens[start_position:(end_position + 1)])
-                            cleaned_answer_text = " ".join(
-                                whitespace_tokenize(t))
-                            if actual_text.find(cleaned_answer_text) == -1:
-                                logger.warning("Could not find answer: '%s' vs. '%s'",
-                                            actual_text, cleaned_answer_text)
-                                continue
-                        else:
-                            start_position = -1
-                            end_position = -1
-                    
-                    qa_examples.append(
-                        QAExample(qa_id=q_id, 
-                                  doc_tokens=d_tokens, 
-                                  question_text = q_text, 
-                                  orig_answer_text=t, 
-                                  start_position=start_position, 
-                                  end_position=end_position, 
-                                  is_impossible=impossible))
+
+            for s, t in zip(a_start, a_text):
+                start_position = None
+                end_position = None
+                if is_training:
+                    if not impossible:
+                        answer_length = len(t)
+                        start_position = char_to_word_offset[s]
+                        end_position = char_to_word_offset[s + answer_length - 1]
+                        # Only add answers where the text can be exactly recovered from the
+                        # document. If this CAN'T happen it's likely due to weird Unicode
+                        # stuff so we will just skip the example.
+                        #
+                        # Note that this means for training mode, every example is NOT
+                        # guaranteed to be preserved.
+                        actual_text = " ".join(d_tokens[start_position:(end_position + 1)])
+                        cleaned_answer_text = " ".join(
+                            whitespace_tokenize(t))
+                        if actual_text.find(cleaned_answer_text) == -1:
+                            logger.warning("Could not find answer: '%s' vs. '%s'",
+                                        actual_text, cleaned_answer_text)
+                            continue
+                    else:
+                        start_position = -1
+                        end_position = -1
+
+                qa_examples.append(
+                    QAExample(qa_id=q_id,
+                                doc_tokens=d_tokens,
+                                question_text = q_text,
+                                orig_answer_text=t,
+                                start_position=start_position,
+                                end_position=end_position,
+                                is_impossible=impossible))
 
         cls_token = '[CLS]'
         sep_token = '[SEP]'

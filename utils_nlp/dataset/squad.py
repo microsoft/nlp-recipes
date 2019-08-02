@@ -61,7 +61,7 @@ def load_pandas_df(local_cache_path=".", squad_version="v1.1", file_split="train
                         for answer in qa["answers"]:
                             orig_answer_text.append(answer["text"])
                             answer_offset.append(answer["answer_start"])
-                    else：
+                    else:
                         orig_answer_text = ""
             
                 paragraph_text_list.append(paragraph_text)

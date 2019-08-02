@@ -19,6 +19,8 @@ from torch.utils.data import (
     TensorDataset,
 )
 
+from tensorboardX import SummaryWriter
+
 from pytorch_transformers import AdamW, WarmupLinearSchedule
 from pytorch_transformers.modeling_bert import (
     BertConfig,
@@ -63,6 +65,7 @@ class BERTQAExtractor:
         max_grad_norm=1.0,
         model_output_dir=None,
     ):
+        tb_writer = SummaryWriter()
         device = get_device(
             "cpu" if num_gpus == 0 or not torch.cuda.is_available() else "gpu"
         )
