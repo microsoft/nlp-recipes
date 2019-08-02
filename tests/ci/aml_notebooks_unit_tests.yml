@@ -85,7 +85,7 @@ jobs:
 
   variables:
   - name  : 'testmarkers'
-    value : '"not notebooks and gpu and not azureml"'
+    value : '"notebooks and gpu and not azureml"'
   - name  : 'junitxml'
     value : 'reports/test-unit-nbgpu.xml'
   - name  : 'clustername'
