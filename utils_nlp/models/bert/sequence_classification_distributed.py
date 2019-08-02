@@ -5,6 +5,7 @@
 # https://github.com/huggingface/pytorch-pretrained-BERT/blob/master/examples/run_classifier.py
 
 import os
+import warnings
 
 import numpy as np
 import torch.nn as nn
@@ -16,11 +17,22 @@ from tqdm import tqdm
 from utils_nlp.common.pytorch_utils import get_device, move_to_device
 from utils_nlp.models.bert.common import Language
 
+try:
+    import horovod.torch as hvd
+except ImportError:
+    raise warnings.warn("No Horovod found! Can't do distributed training..")
+
 
 class BERTSequenceClassifier:
     """BERT-based sequence classifier"""
 
-    def __init__(self, language=Language.ENGLISH, num_labels=2, cache_dir="."):
+    def __init__(
+        self,
+        language=Language.ENGLISH,
+        num_labels=2,
+        cache_dir=".",
+        use_distributed=False,
+    ):
 
         """
 
@@ -35,6 +47,7 @@ class BERTSequenceClassifier:
         self.language = language
         self.num_labels = num_labels
         self.cache_dir = cache_dir
+        self.use_distributed = use_distributed
 
         # create classifier
         self.model = BertForSequenceClassification.from_pretrained(
@@ -65,12 +78,18 @@ class BERTSequenceClassifier:
         self.name_parameters = self.model.named_parameters()
         self.state_dict = self.model.state_dict()
 
+        if use_distributed:
+            hvd.init()
+            if torch.cuda.is_available():
+                torch.cuda.set_device(hvd.local_rank())
+            else:
+                warnings.warn("No GPU available! Using CPU.")
+
     def create_optimizer(
         self,
         num_train_optimization_steps,
         lr=2e-5,
         fp16_allreduce=False,
-        use_distributed=False,
         warmup_proportion=None,
     ):
 
@@ -84,22 +103,13 @@ class BERTSequenceClassifier:
                 perform linear learning rate warmup for. e.g., 0.1 = 10% of
                 training. defaults to none.
             fp16_allreduce(bool, optional)L if true, use fp16 compression during allreduce
-            use_distributed(bool): Use distributed optimizer from horovod.
 
         Returns:
             pytorch_pretrained_bert.optimization.BertAdam  : A BertAdam optimizer with user
             specified config.
 
         """
-        if use_distributed:
-            import horovod.torch as hvd
-
-            hvd.init()
-            if torch.cuda.is_available():
-                torch.cuda.set_device(hvd.local_rank())
-            else:
-                print("No GPU available! Using CPU.")
-
+        if self.use_distributed:
             lr = lr * hvd.size()
 
         if warmup_proportion is None:
@@ -112,7 +122,7 @@ class BERTSequenceClassifier:
                 warmup=warmup_proportion,
             )
 
-        if use_distributed:
+        if self.use_distributed:
             compression = (
                 hvd.Compression.fp16
                 if fp16_allreduce
@@ -126,16 +136,12 @@ class BERTSequenceClassifier:
 
         return optimizer
 
-    @staticmethod
-    def create_data_loader(
-        dataset, use_distributed=False, batch_size=32, **kwargs
-    ):
+    def create_data_loader(self, dataset, batch_size=32, **kwargs):
         """
         Method to create a data loader for a given Tensor dataset.
 
         Args:
             dataset(torch.utils.data.Dataset): A Tensor dataset.
-            use_distributed(bool): Use distributed sampler for the data loader.
             batch_size(int): Batch size.
 
         Returns:
@@ -143,10 +149,7 @@ class BERTSequenceClassifier:
 
         """
 
-        if use_distributed:
-            import horovod.torch as hvd
-
-            hvd.init()
+        if self.use_distributed:
             train_sampler = torch.utils.data.distributed.DistributedSampler(
                 dataset, num_replicas=hvd.size(), rank=hvd.rank()
             )
@@ -191,7 +194,6 @@ class BERTSequenceClassifier:
         lr=2e-5,
         warmup_proportion=None,
         fp16_allreduce=False,
-        use_distributed=False,
         num_train_optimization_steps=10,
     ):
         """
@@ -217,7 +219,6 @@ class BERTSequenceClassifier:
                 lr=lr,
                 warmup_proportion=warmup_proportion,
                 fp16_allreduce=fp16_allreduce,
-                use_distributed=use_distributed,
             )
 
         # define loss function
@@ -225,6 +226,9 @@ class BERTSequenceClassifier:
 
         if device:
             self.model.cuda()
+
+        if self.use_distributed:
+            hvd.broadcast_parameters(self.model.state_dict(), root_rank=0)
 
         loss_func = nn.CrossEntropyLoss().to(device)
 
@@ -245,7 +249,7 @@ class BERTSequenceClassifier:
             mask_batch = data["input_mask"]
             mask_batch = mask_batch.cuda()
 
-            if data["token_type_ids"] is not None:
+            if "token_type_ids" in data and data["token_type_ids"] is not None:
                 token_type_ids_batch = data["token_type_ids"]
                 token_type_ids_batch = token_type_ids_batch.cuda()
 
@@ -267,8 +271,12 @@ class BERTSequenceClassifier:
 
             if batch_idx % num_print == 0:
                 print(
-                    "epoch:{}/{}; batch:{}; loss:{:.6f}".format(
-                        epoch, num_epochs, batch_idx + 1, loss.data
+                    "Train Epoch: {}/{} ({:.0f}%) \t Batch:{} \tLoss: {:.6f}".format(
+                        epoch,
+                        num_epochs,
+                        100.0 * batch_idx / len(train_loader),
+                        batch_idx + 1,
+                        loss.item(),
                     )
                 )
 
@@ -309,7 +317,7 @@ class BERTSequenceClassifier:
             y_batch = data["labels"]
 
             token_type_ids_batch = None
-            if data["token_type_ids"] is not None:
+            if "token_type_ids" in data and data["token_type_ids"] is not None:
                 token_type_ids_batch = data["token_type_ids"]
                 token_type_ids_batch = token_type_ids_batch.cuda()
 
@@ -335,4 +343,4 @@ class BERTSequenceClassifier:
                 ).numpy(),
             }
         else:
-            return preds.argmax(axis=1)
+            return preds.argmax(axis=1), test_labels
