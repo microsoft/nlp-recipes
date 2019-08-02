@@ -300,48 +300,50 @@ class BERTSequenceClassifier:
             1darray, dict(1darray, 1darray, ndarray): Predicted classes and target labels or
                 a dictionary with classes, target labels, probabilities) if probabilities is True.
         """
-        device = get_device("cpu" if num_gpus == 0 else "gpu")
-        self.model = move_to_device(self.model, device, num_gpus)
 
-        # score
-        self.model.eval()
+        if hvd.rank() == 0:
+            device = get_device("cpu" if num_gpus == 0 else "gpu")
+            self.model = move_to_device(self.model, device, num_gpus)
 
-        preds = []
-        test_labels = []
-        for i, data in enumerate(tqdm(test_loader, desc="Iteration")):
-            x_batch = data["token_ids"]
-            x_batch = x_batch.cuda()
+            # score
+            self.model.eval()
 
-            mask_batch = data["input_mask"]
-            mask_batch = mask_batch.cuda()
+            preds = []
+            test_labels = []
+            for i, data in enumerate(tqdm(test_loader, desc="Iteration")):
+                x_batch = data["token_ids"]
+                x_batch = x_batch.cuda()
 
-            y_batch = data["labels"]
+                mask_batch = data["input_mask"]
+                mask_batch = mask_batch.cuda()
 
-            token_type_ids_batch = None
-            if "token_type_ids" in data and data["token_type_ids"] is not None:
-                token_type_ids_batch = data["token_type_ids"]
-                token_type_ids_batch = token_type_ids_batch.cuda()
+                y_batch = data["labels"]
 
-            with torch.no_grad():
-                p_batch = self.model(
-                    input_ids=x_batch,
-                    token_type_ids=token_type_ids_batch,
-                    attention_mask=mask_batch,
-                    labels=None,
-                )
-            preds.append(p_batch.cpu())
-            test_labels.append(y_batch)
+                token_type_ids_batch = None
+                if "token_type_ids" in data and data["token_type_ids"] is not None:
+                    token_type_ids_batch = data["token_type_ids"]
+                    token_type_ids_batch = token_type_ids_batch.cuda()
 
-        preds = np.concatenate(preds)
-        test_labels = np.concatenate(test_labels)
+                with torch.no_grad():
+                    p_batch = self.model(
+                        input_ids=x_batch,
+                        token_type_ids=token_type_ids_batch,
+                        attention_mask=mask_batch,
+                        labels=None,
+                    )
+                preds.append(p_batch.cpu())
+                test_labels.append(y_batch)
 
-        if probabilities:
-            return {
-                "Predictions": preds.argmax(axis=1),
-                "Target": test_labels,
-                "classes probabilities": nn.Softmax(dim=1)(
-                    torch.Tensor(preds)
-                ).numpy(),
-            }
-        else:
-            return preds.argmax(axis=1), test_labels
+            preds = np.concatenate(preds)
+            test_labels = np.concatenate(test_labels)
+
+            if probabilities:
+                return {
+                    "Predictions": preds.argmax(axis=1),
+                    "Target": test_labels,
+                    "classes probabilities": nn.Softmax(dim=1)(
+                        torch.Tensor(preds)
+                    ).numpy(),
+                }
+            else:
+                return preds.argmax(axis=1), test_labels
