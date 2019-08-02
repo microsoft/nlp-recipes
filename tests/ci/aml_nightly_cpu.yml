@@ -46,7 +46,7 @@ jobs:
   - name  : 'dockerproc'
     value : 'cpu'
   - name  : 'expname'
-    value : 'cpu_unit_tests'
+    value : 'cpu_nightly_tests'
 
   steps:
 

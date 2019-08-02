@@ -38,6 +38,8 @@ jobs:
     value : '"smoke and gpu and not azureml"'
   - name  : 'testfolder'
     value : './tests/smoke'
+  - name  : 'junitxml'
+    value : 'reports/test-smoke.xml'
   - name  : 'clustername'
     value : 'nlp-gpu'
   - name  : 'vmsize'
@@ -45,7 +47,7 @@ jobs:
   - name  : 'dockerproc'
     value : 'gpu'
   - name  : 'expname'
-    value : 'gpu_unit_tests'
+    value : 'gpu_nightly_tests'
 
   steps:
 
@@ -61,17 +63,21 @@ jobs:
     displayName: 'Login to Azure'
   
   - bash: |
-      echo "##vso[task.prependpath]/data/anaconda/bin"
+      echo "##vso[task.prependpath]/data/anaconda/bin";
+      conda env list
     displayName: Add Conda to PATH
   
   - script: 
        pip install azureml-sdk &&
        pip install azure-cli &&
-       pip install --upgrade azureml-sdk[cli]
+       pip install --upgrade azureml-sdk[cli];
+       ls -al &&
+       ls -R
     displayName: 'pip install'
     
   - script: 
-       python tools/generate_conda_file.py --gpu --name nlp 
+       python tools/generate_conda_file.py --gpu --name nlp;
+       du -a .
     displayName: ' generate_conda_file.py'
   
   - script: 
@@ -98,6 +104,8 @@ jobs:
     value : '"integration and gpu and not azureml"'
   - name  : 'testfolder'
     value : './tests/integration'
+  - name  : 'junitxml'
+    value : 'reports/test-int.xml'
   - name  : 'clustername'
     value : 'nlp-gpu'
   - name  : 'vmsize'
