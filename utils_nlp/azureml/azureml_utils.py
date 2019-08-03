@@ -77,15 +77,34 @@ def get_or_create_workspace(
 def get_or_create_amlcompute(
     workspace,
     compute_name,
-    vm_size="STANDARD_NC6",
-    max_nodes=1,
-    idle_seconds_before_scaledown=120,
+    vm_size="",
+    min_nodes=0,
+    max_nodes=None,
+    idle_seconds_before_scaledown=None,
     verbose=False,
 ):
+    """Get or create AmlCompute as the compute target. If a cluster of the same name is found, attach it and rescale
+       accordingly. Otherwise, create a new cluster.
+    
+    Args:
+        workspace (Workspace): workspace
+        compute_name (str): name
+        vm_size (str, optional): vm size
+        min_nodes (int, optional): minimum number of nodes in cluster
+        max_nodes (None, optional): maximum number of nodes in cluster
+        idle_seconds_before_scaledown (None, optional): how long to wait before the cluster autoscales down
+        verbose (bool, optional): if true, print logs
+    """
     try:
         if verbose:
             print("Found compute target: {}".format(compute_name))
+
         compute_target = ComputeTarget(workspace=workspace, name=compute_name)
+        if len(compute_target.list_nodes()) < min_nodes:
+            if verbose:
+                print("Rescaling to {} nodes".format(min_nodes))
+            compute_target.update(min_nodes=min_nodes)
+            compute_target.wait_for_completion(show_output=verbose)
 
 <<<<<<< HEAD
 def log_metrics_scalar(value, run, name="", description=None):
@@ -149,6 +168,7 @@ def get_output_files(run, output_path, file_names=None):
 
         compute_config = AmlCompute.provisioning_configuration(
             vm_size=vm_size,
+            min_nodes=min_nodes,
             max_nodes=max_nodes,
             idle_seconds_before_scaledown=idle_seconds_before_scaledown,
         )

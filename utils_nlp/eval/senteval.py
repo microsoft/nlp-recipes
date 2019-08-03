@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License.
+
 import os
 import sys
 import itertools
@@ -7,75 +10,40 @@ from copy import deepcopy
 
 
 class SentEvalConfig:
+
+    """Object to store static properties of senteval experiments
+    
+    Attributes:
+        model_params (dict): model parameters that stay consistent across all runs
+        senteval_params (dict): senteval parameters that stay consistent across all runs
+    
+    """
+    
     def __init__(
         self,
-        path=".",
-        model=None,
-        prepare_func=None,
-        batcher_func=None,
-        transfer_tasks=None,
-        params={}
+        model_params,
+        senteval_params,
     ):
-        self.path = path
-        self.params_senteval = params
-        self.transfer_data_path = "{}/data".format(self.path)
-        self.model = model
-        self.prepare_func = prepare_func
-        self.batcher_func = batcher_func
-        self.transfer_tasks = transfer_tasks
+        """Summary
+        
+        Args:
+            model_params (dict): model parameters that stay consistent across all runs
+            senteval_params (dict): senteval parameters that stay consistent across all runs
+        """
+        self.model_params = model_params
+        self.senteval_params = senteval_params
 
     @property
-    def path(self):
-        return self._path
+    def model_params(self):
+        return self._model_params
 
-    @path.setter
-    def path(self, path):
-        self._path = path
+    @model_params.setter
+    def model_params(self, model_params):
+        self._model_params = model_params
 
-    @property
-    def transfer_data_path(self):
-        return self._transfer_data_path
-
-    @transfer_data_path.setter
-    def transfer_data_path(self, transfer_data_path):
-        self._transfer_data_path = transfer_data_path
-        self.params_senteval["task_path"] = transfer_data_path
-
-    @property
-    def transfer_tasks(self):
-        return self._transfer_tasks
-
-    @transfer_tasks.setter
-    def transfer_tasks(self, transfer_tasks):
-        self._transfer_tasks = transfer_tasks
-
-    @property
-    def model(self):
-        return self._model
-
-    @model.setter
-    def model(self, model):
-        self._model = model
-        self.params_senteval["model"] = model
-
-    @property
-    def prepare_func(self):
-        return self._prepare_func
-
-    @prepare_func.setter
-    def prepare_func(self, prepare_func):
-        self._prepare_func = prepare_func
-
-    @property
-    def batcher_func(self):
-        return self._batcher_func
-
-    @batcher_func.setter
-    def batcher_func(self, batcher_func):
-        self._batcher_func = batcher_func
-
-    def append_params(self, params):
-        self.params_senteval = dict(self.params_senteval, **params)
+    def append_senteval_params(self, params):
+        """Util to append any params to senteval_params after initialization"""
+        self.senteval_params = dict(self.senteval_params, **params)
 
         classifying_tasks = {
             "MR",
@@ -92,7 +60,7 @@ class SentEvalConfig:
 
         if any(t in classifying_tasks for t in self.transfer_tasks):
             try:
-                a = "classifier" in self.params_senteval
+                a = "classifier" in self.senteval_params
                 if not a:
                     raise ValueError(
                         "Include param['classifier'] to run task {}".format(t)
@@ -106,7 +74,7 @@ class SentEvalConfig:
                             "tenacity",
                             "epoch_size",
                         )
-                        in self.params_senteval["classifier"].keys()
+                        in self.senteval_params["classifier"].keys()
                     )
                     if not b:
                         raise ValueError(
@@ -116,59 +84,3 @@ class SentEvalConfig:
                         )
             except ValueError as ve:
                 print(ve)
-
-
-def log_mean(
-    results, transfer_tasks=[], selected_metrics=[], round_decimals=3
-):
-    """Log the means of selected metrics of the transfer tasks
-    
-    Args:
-        results (dict): Results from the SentEval evaluation engine
-        selected_metrics (list(str), optional): List of metric names
-        round_decimals (int, optional): Number of decimal digits to round to; defaults to 3
-    
-    Returns:
-        pd.DataFrame table of formatted results
-    """
-    data = []
-    for task in transfer_tasks:
-        if "all" in results[task]:
-            row = [
-                results[task]["all"][metric]["mean"]
-                for metric in selected_metrics
-            ]
-        else:
-            row = [results[task][metric] for metric in selected_metrics]
-        data.append(row)
-    table = pd.DataFrame(
-        data=data, columns=selected_metrics, index=transfer_tasks
-    )
-    return table.round(round_decimals)
-
-
-    def log_mean(self, results, selected_metrics=[], round_decimals=3):
-        """Log the means of selected metrics of the transfer tasks
-        
-        Args:
-            results (dict): Results from the SentEval evaluation engine
-            selected_metrics (list(str), optional): List of metric names
-            round_decimals (int, optional): Number of decimal digits to round to; defaults to 3
-        
-        Returns:
-            pd.DataFrame table of formatted results
-        """
-        data = []
-        for task in self.transfer_tasks:
-            if "all" in results[task]:
-                row = [
-                    results[task]["all"][metric]["mean"]
-                    for metric in selected_metrics
-                ]
-            else:
-                row = [results[task][metric] for metric in selected_metrics]
-            data.append(row)
-        table = pd.DataFrame(
-            data=data, columns=selected_metrics, index=self.transfer_tasks
-        )
-        return table.round(round_decimals)
