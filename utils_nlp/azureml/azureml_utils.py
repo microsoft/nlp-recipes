@@ -101,10 +101,10 @@ def get_or_create_amlcompute(
             print("Found compute target: {}".format(compute_name))
 
         compute_target = ComputeTarget(workspace=workspace, name=compute_name)
-        if len(compute_target.list_nodes()) < min_nodes:
+        if len(compute_target.list_nodes()) < max_nodes:
             if verbose:
-                print("Rescaling to {} nodes".format(min_nodes))
-            compute_target.update(min_nodes=min_nodes)
+                print("Rescaling to {} nodes".format(max_nodes))
+            compute_target.update(max_nodes=max_nodes)
             compute_target.wait_for_completion(show_output=verbose)
 
     except ComputeTargetException:
