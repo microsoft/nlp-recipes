@@ -8,7 +8,7 @@ from sklearn.preprocessing import LabelEncoder
 MAX_SEQ_LENGTH = 128
 TEXT_COL = "text"
 LABEL_COL = "label"
-DATA_USED_PERCENT = 0.0025
+#DATA_USED_PERCENT = 0.0025
 TRAIN_FILE_SPLIT = "train"
 TEST_FILE_SPLIT = "test"
 VALIDATION_FILE_SPLIT = "dev"
@@ -53,9 +53,9 @@ class XnliDataset(data.Dataset):
         )
 
         # to test on a subset
-        if file_split == TRAIN_FILE_SPLIT:
-            data_used_count = round(DATA_USED_PERCENT * df.shape[0])
-            df = df.loc[:data_used_count]
+        # if file_split == TRAIN_FILE_SPLIT:
+        #     data_used_count = round(DATA_USED_PERCENT * df.shape[0])
+        #     df = df.loc[:data_used_count]
 
         self.df = df
 
