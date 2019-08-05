@@ -565,7 +565,7 @@ def train(config, data_folder, learning_rate=0.0001, max_epoch=None):
                     )
 
                     logging.info(
-                        "Average time per mininbatch : %.5f"
+                        "Average time per minibatch : %.5f"
                         % (np.mean(mbatch_times))
                     )
                     mlflow.log_metric(
@@ -594,6 +594,8 @@ def train(config, data_folder, learning_rate=0.0001, max_epoch=None):
                         max_epoch=max_epoch,
                     )
                     if training_complete:
+                        mlflow.log_metric("min_val_loss", float(min_val_loss))
+                        mlflow.log_metric("learning_rate", learning_rate)
                         break
 
                     logging.info("Evaluating on NLI")
@@ -637,5 +639,6 @@ if __name__ == "__main__":
     lr = args.learning_rate
 
     config_file_path = args.config
+    max_epoch = args.max_epoch
     config_obj = read_config(config_file_path)
-    train(config_obj, data_path, lr)
+    train(config_obj, data_path, lr, max_epoch)

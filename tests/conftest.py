@@ -60,6 +60,9 @@ def notebooks():
         "entailment_multinli_bert": os.path.join(
             folder_notebooks, "entailment", "entailment_multinli_bert.ipynb"
         ),
+        "gensen_azureml": os.path.join(
+            folder_notebooks, "sentence_similarity", "gensen_aml_deep_dive.ipynb"
+        ),
     }
     return paths
 
