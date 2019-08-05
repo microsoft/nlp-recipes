@@ -12,6 +12,8 @@ def test_entailment_multinli_bert(notebooks):
     pm.execute_notebook(
         notebook_path,
         OUTPUT_NOTEBOOK,
-        parameters={"QUICK_RUN": True},
+        parameters={"TRAIN_DATA_USED_PERCENT": 0.001, 
+                    "DEV_DATA_USED_PERCENT": 0.01,
+                    "NUM_EPOCHS": 1},
         kernel_name=KERNEL_NAME,
     )
