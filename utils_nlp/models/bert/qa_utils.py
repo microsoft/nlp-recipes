@@ -1,6 +1,10 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
+# This script reuses some code from
+# https://github.com/huggingface/pytorch-transformers/blob/master/examples/utils_squad.py
+# https://github.com/huggingface/pytorch-transformers/blob/master/examples/utils_squad_evaluate.py
+
 import collections
 import json
 import math
@@ -12,22 +16,35 @@ logger = logging.getLogger(__name__)
 
 from pytorch_transformers.tokenization_bert import BasicTokenizer
 
-QAExample = collections.namedtuple('QAExample', ['qa_id', 'doc_tokens', 'question_text', 
-    'orig_answer_text', 'start_position', 'end_position', 'is_impossible'])
+QAExample = collections.namedtuple(
+    "QAExample",
+    [
+        "qa_id",
+        "doc_tokens",
+        "question_text",
+        "orig_answer_text",
+        "start_position",
+        "end_position",
+        "is_impossible",
+    ],
+)
 
 QAFeatures = collections.namedtuple(
-    'QAFeatures', 
-    ['unique_id', 
-    'example_index', 
-    'tokens', 
-    'token_to_orig_map', 
-    'token_is_max_context', 
-    'input_ids', 
-    'input_mask', 
-    'segment_ids', 
-    'start_position',
-    'end_position', 
-    'paragraph_len'])
+    "QAFeatures",
+    [
+        "unique_id",
+        "example_index",
+        "tokens",
+        "token_to_orig_map",
+        "token_is_max_context",
+        "input_ids",
+        "input_mask",
+        "segment_ids",
+        "start_position",
+        "end_position",
+        "paragraph_len",
+    ],
+)
 
 QAResult = collections.namedtuple(
     "QAResult", ["unique_id", "start_logits", "end_logits"]
@@ -35,9 +52,9 @@ QAResult = collections.namedtuple(
 
 
 def postprocess_answers(
+    all_results,
     all_examples,
     all_features,
-    all_results,
     do_lower_case,
     n_best_size=20,
     max_answer_length=30,
@@ -76,10 +93,13 @@ def postprocess_answers(
     )
 
     all_predictions = collections.OrderedDict()
+    all_probs = collections.OrderedDict()
     all_nbest_json = collections.OrderedDict()
     scores_diff_json = collections.OrderedDict()
 
     for (example_index, example) in enumerate(all_examples):
+        # get all the features belong to the same example,
+        # i.e. paragaraph/question pair.
         features = example_index_to_features[example_index]
 
         prelim_predictions = []
@@ -96,6 +116,10 @@ def postprocess_answers(
             end_indexes = _get_best_indexes(result.end_logits, n_best_size)
             # if we could have irrelevant answers, get the min score of irrelevant
             if unanswerable_exists:
+                # The first element of the start end end logits is the
+                # probability of predicting the [CLS] token as the start and
+                # end positions of the answer, which means the answer is
+                # empty.
                 feature_null_score = (
                     result.start_logits[0] + result.end_logits[0]
                 )
@@ -145,6 +169,9 @@ def postprocess_answers(
                     end_logit=null_end_logit,
                 )
             )
+
+        # Sort by the sum of the start and end logits in ascending order,
+        # so that the first element is the most probable answer
         prelim_predictions = sorted(
             prelim_predictions,
             key=lambda x: (x.start_logit + x.end_logit),
@@ -232,11 +259,12 @@ def postprocess_answers(
 
         total_scores = []
         best_non_null_entry = None
-        for entry in nbest:
+        for ie, entry in enumerate(nbest):
             total_scores.append(entry.start_logit + entry.end_logit)
             if not best_non_null_entry:
                 if entry.text:
                     best_non_null_entry = entry
+                    best_non_null_entry_index = ie
 
         probs = _compute_softmax(total_scores)
 
@@ -249,10 +277,14 @@ def postprocess_answers(
             output["end_logit"] = entry.end_logit
             nbest_json.append(output)
 
+            if entry.text == "":
+                null_prediction_index = i
+
         assert len(nbest_json) >= 1
 
         if not unanswerable_exists:
             all_predictions[example.qa_id] = nbest_json[0]["text"]
+            all_probs[example.qa_id] = nbest_json[0]["probability"]
         else:
             # predict "" iff the null score - the score of best non-null > threshold
             score_diff = (
@@ -263,8 +295,11 @@ def postprocess_answers(
             scores_diff_json[example.qa_id] = score_diff
             if score_diff > null_score_diff_threshold:
                 all_predictions[example.qa_id] = ""
+                ## TODO: double check this
+                all_probs[example.qa_id] = probs[null_prediction_index]
             else:
                 all_predictions[example.qa_id] = best_non_null_entry.text
+                all_probs[example.qa_id] = probs[best_non_null_entry_index]
         all_nbest_json[example.qa_id] = nbest_json
 
     with open(output_prediction_file, "w") as writer:
@@ -275,11 +310,11 @@ def postprocess_answers(
 
     if unanswerable_exists:
         if not output_null_log_odds_file:
-            output_null_log_odds_file = "./unanswerable_probs.json"
+            output_null_log_odds_file = "./null_odds.json"
         with open(output_null_log_odds_file, "w") as writer:
             writer.write(json.dumps(scores_diff_json, indent=4) + "\n")
 
-    return all_predictions
+    return all_predictions, all_probs, nbest_json
 
 
 def get_final_text(pred_text, orig_text, do_lower_case, verbose_logging=False):
@@ -420,7 +455,9 @@ def _compute_softmax(scores):
 
 
 ## Evaluation utilities
-def evaluate_qa(qa_ids, actuals, preds, na_probs=None, na_prob_thresh=0, out_file=None):
+def evaluate_qa(
+    qa_ids, actuals, preds, na_probs=None, na_prob_thresh=0, out_file=None
+):
     # with open(data_file) as f:
     #     dataset_json = json.load(f)
     #     dataset = dataset_json['data']
@@ -430,54 +467,72 @@ def evaluate_qa(qa_ids, actuals, preds, na_probs=None, na_prob_thresh=0, out_fil
     #     with open(na_prob_file) as f:
     #         na_probs = json.load(f)
     # else:
-    #     na_probs = {k: 0.0 for k in preds} 
+    #     na_probs = {k: 0.0 for k in preds}
 
     if na_probs is None:
         na_probs = {k: 0.0 for k in preds}
 
-    qid_to_has_ans = {qa_id: bool(ans) for (qa_id, ans) in zip(qa_ids, actuals)}
+    qid_to_has_ans = {
+        qa_id: bool(ans) for (qa_id, ans) in zip(qa_ids, actuals)
+    }
     has_ans_qids = [k for k, v in qid_to_has_ans.items() if v]
     no_ans_qids = [k for k, v in qid_to_has_ans.items() if not v]
     exact_raw, f1_raw = get_raw_scores(qa_ids, actuals, preds)
-    exact_thresh = apply_no_ans_threshold(exact_raw, na_probs, qid_to_has_ans,
-                                          na_prob_thresh)
-    f1_thresh = apply_no_ans_threshold(f1_raw, na_probs, qid_to_has_ans,
-                                       na_prob_thresh)
+    exact_thresh = apply_no_ans_threshold(
+        exact_raw, na_probs, qid_to_has_ans, na_prob_thresh
+    )
+    f1_thresh = apply_no_ans_threshold(
+        f1_raw, na_probs, qid_to_has_ans, na_prob_thresh
+    )
     out_eval = make_eval_dict(exact_thresh, f1_thresh)
     if has_ans_qids:
-        has_ans_eval = make_eval_dict(exact_thresh, f1_thresh, qid_list=has_ans_qids)
-        merge_eval(out_eval, has_ans_eval, 'HasAns')
+        has_ans_eval = make_eval_dict(
+            exact_thresh, f1_thresh, qid_list=has_ans_qids
+        )
+        merge_eval(out_eval, has_ans_eval, "HasAns")
     if no_ans_qids:
-        no_ans_eval = make_eval_dict(exact_thresh, f1_thresh, qid_list=no_ans_qids)
-        merge_eval(out_eval, no_ans_eval, 'NoAns')
+        no_ans_eval = make_eval_dict(
+            exact_thresh, f1_thresh, qid_list=no_ans_qids
+        )
+        merge_eval(out_eval, no_ans_eval, "NoAns")
 
     if out_file:
-        with open(out_file, 'w') as f:
+        with open(out_file, "w") as f:
             json.dump(out_eval, f)
     else:
         print(json.dumps(out_eval, indent=2))
     return out_eval
 
+
 def normalize_answer(s):
     """Lower text and remove punctuation, articles and extra whitespace."""
+
     def remove_articles(text):
-        regex = re.compile(r'\b(a|an|the)\b', re.UNICODE)
-        return re.sub(regex, ' ', text)
+        regex = re.compile(r"\b(a|an|the)\b", re.UNICODE)
+        return re.sub(regex, " ", text)
+
     def white_space_fix(text):
-        return ' '.join(text.split())
+        return " ".join(text.split())
+
     def remove_punc(text):
         exclude = set(string.punctuation)
-        return ''.join(ch for ch in text if ch not in exclude)
+        return "".join(ch for ch in text if ch not in exclude)
+
     def lower(text):
         return text.lower()
+
     return white_space_fix(remove_articles(remove_punc(lower(s))))
 
+
 def get_tokens(s):
-    if not s: return []
+    if not s:
+        return []
     return normalize_answer(s).split()
+
 
 def compute_exact(a_gold, a_pred):
     return int(normalize_answer(a_gold) == normalize_answer(a_pred))
+
 
 def compute_f1(a_gold, a_pred):
     gold_toks = get_tokens(a_gold)
@@ -494,6 +549,7 @@ def compute_f1(a_gold, a_pred):
     f1 = (2 * precision * recall) / (precision + recall)
     return f1
 
+
 def get_raw_scores(qa_ids, actuals, preds):
     exact_scores = {}
     f1_scores = {}
@@ -501,15 +557,16 @@ def get_raw_scores(qa_ids, actuals, preds):
     for qid, gold_answers in zip(qa_ids, actuals):
         if not gold_answers:
             # For unanswerable questions, only correct answer is empty string
-            gold_answers = ['']
+            gold_answers = [""]
         if qid not in preds:
-            print('Missing prediction for %s' % qid)
+            print("Missing prediction for %s" % qid)
             continue
         a_pred = preds[qid]
         # Take max over all gold answers
         exact_scores[qid] = max(compute_exact(a, a_pred) for a in gold_answers)
         f1_scores[qid] = max(compute_f1(a, a_pred) for a in gold_answers)
     return exact_scores, f1_scores
+
 
 def apply_no_ans_threshold(scores, na_probs, qid_to_has_ans, na_prob_thresh):
     new_scores = {}
@@ -521,26 +578,31 @@ def apply_no_ans_threshold(scores, na_probs, qid_to_has_ans, na_prob_thresh):
             new_scores[qid] = s
     return new_scores
 
+
 def make_eval_dict(exact_scores, f1_scores, qid_list=None):
     if not qid_list:
         total = len(exact_scores)
-        return collections.OrderedDict([
-            ('exact', 100.0 * sum(exact_scores.values()) / total),
-            ('f1', 100.0 * sum(f1_scores.values()) / total),
-            ('total', total),
-        ])
+        return collections.OrderedDict(
+            [
+                ("exact", 100.0 * sum(exact_scores.values()) / total),
+                ("f1", 100.0 * sum(f1_scores.values()) / total),
+                ("total", total),
+            ]
+        )
     else:
         total = len(qid_list)
-        return collections.OrderedDict([
-            ('exact', 100.0 * sum(exact_scores[k] for k in qid_list) / total),
-            ('f1', 100.0 * sum(f1_scores[k] for k in qid_list) / total),
-            ('total', total),
-        ])
+        return collections.OrderedDict(
+            [
+                (
+                    "exact",
+                    100.0 * sum(exact_scores[k] for k in qid_list) / total,
+                ),
+                ("f1", 100.0 * sum(f1_scores[k] for k in qid_list) / total),
+                ("total", total),
+            ]
+        )
+
 
 def merge_eval(main_eval, new_eval, prefix):
     for k in new_eval:
-        main_eval['%s_%s' % (prefix, k)] = new_eval[k]
-
-
-
-
+        main_eval["%s_%s" % (prefix, k)] = new_eval[k]

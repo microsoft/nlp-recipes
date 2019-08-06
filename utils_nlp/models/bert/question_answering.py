@@ -3,8 +3,6 @@
 
 # This script reuses some code from
 # https://github.com/huggingface/pytorch-transformers/blob/067923d3267325f525f4e46f357360c191ba562e/examples/run_squad.py
-# https://github.com/huggingface/pytorch-transformers/blob/067923d3267325f525f4e46f357360c191ba562e/examples/utils_squad.py
-# https://github.com/huggingface/pytorch-transformers/blob/067923d3267325f525f4e46f357360c191ba562e/examples/utils_squad_evaluate.py
 
 
 import os
@@ -19,7 +17,7 @@ from torch.utils.data import (
     TensorDataset,
 )
 
-from tensorboardX import SummaryWriter
+# from tensorboardX import SummaryWriter
 
 from pytorch_transformers import AdamW, WarmupLinearSchedule
 from pytorch_transformers.modeling_bert import (
@@ -65,7 +63,7 @@ class BERTQAExtractor:
         max_grad_norm=1.0,
         model_output_dir=None,
     ):
-        tb_writer = SummaryWriter()
+        # tb_writer = SummaryWriter()
         device = get_device(
             "cpu" if num_gpus == 0 or not torch.cuda.is_available() else "gpu"
         )
@@ -134,7 +132,7 @@ class BERTQAExtractor:
         )
 
         global_step = 0
-        tr_loss, logging_loss = 0.0, 0.0
+        tr_loss = 0.0
         self.model.zero_grad()
         train_iterator = trange(int(num_epochs), desc="Epoch")
         for _ in train_iterator:
@@ -171,23 +169,23 @@ class BERTQAExtractor:
                 self.model.zero_grad()
                 global_step += 1
 
-                if global_step % 50 == 0:
-                    tb_writer.add_scalar(
-                        "lr", scheduler.get_lr()[0], global_step
-                    )
-                    tb_writer.add_scalar(
-                        "loss", (tr_loss - logging_loss) / 50, global_step
-                    )
-                    logging_loss = tr_loss
+                # if global_step % 50 == 0:
+                #     tb_writer.add_scalar(
+                #         "lr", scheduler.get_lr()[0], global_step
+                #     )
+                #     tb_writer.add_scalar(
+                #         "loss", (tr_loss - logging_loss) / 50, global_step
+                #     )
+                #     logging_loss = tr_loss
 
-            epoch_iterator.close()
-        train_iterator.close()
+        #     epoch_iterator.close()
+        # train_iterator.close()
 
         logger.info(
-            " global_step = %s, average loss = %s", global_step, tr_loss
+            " global_step = %s, average loss = %s",
+            global_step,
+            tr_loss / global_step,
         )
-
-        print("Average training loss: {}".format(tr_loss / global_step))
 
         if model_output_dir:
             if not os.path.exists(model_output_dir):
@@ -204,9 +202,7 @@ class BERTQAExtractor:
             model_to_save.save_pretrained(model_output_dir)
         torch.cuda.empty_cache()
 
-    def predict(
-        self, features, num_gpus=None, batch_size=32, probabilities=False
-    ):
+    def predict(self, features, num_gpus=None, batch_size=32):
 
         device = get_device(
             "cpu" if num_gpus == 0 or not torch.cuda.is_available() else "gpu"

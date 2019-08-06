@@ -12,8 +12,12 @@ import warnings
 from collections import Iterable, namedtuple
 import torch
 from tqdm import tqdm
+import logging
 
-from pytorch_transformers.tokenization_bert import BertTokenizer, whitespace_tokenize
+from pytorch_transformers.tokenization_bert import (
+    BertTokenizer,
+    whitespace_tokenize,
+)
 
 from torch.utils.data import (
     DataLoader,
@@ -26,6 +30,8 @@ from utils_nlp.models.bert.qa_utils import QAFeatures, QAExample
 
 # Max supported sequence length
 BERT_MAX_LEN = 512
+
+logger = logging.getLogger(__name__)
 
 
 class Language(Enum):
@@ -225,9 +231,6 @@ class Tokenizer:
                     argument is not provided, the value of this is None.
         """
 
-        def _is_iterable_but_not_string(obj):
-            return isinstance(obj, Iterable) and not isinstance(obj, str)
-
         if max_len > BERT_MAX_LEN:
             warnings.warn(
                 "setting max_len to max allowed tokens: {}".format(
@@ -349,20 +352,22 @@ class Tokenizer:
         max_len=BERT_MAX_LEN,
         doc_stride=128,
         qa_id=None,
-        is_impossible=None):
-
-        _DocSpan = namedtuple("DocSpan", ["start", "length"])
-
+        is_impossible=None,
+    ):
         def _is_whitespace(c):
-            if c == " " or c == "\t" or c == "\r" or c == "\n" or ord(c) == 0x202F:
+            if (
+                c == " "
+                or c == "\t"
+                or c == "\r"
+                or c == "\n"
+                or ord(c) == 0x202F
+            ):
                 return True
             return False
 
-        def _is_iterable_but_not_string(obj):
-            return isinstance(obj, Iterable) and not isinstance(obj, str)
-
-        def _improve_answer_span(doc_tokens, input_start, input_end, tokenizer,
-                                orig_answer_text):
+        def _improve_answer_span(
+            doc_tokens, input_start, input_end, tokenizer, orig_answer_text
+        ):
             """Returns tokenized answer spans that better match the annotated answer."""
 
             # We first project character-based annotations to
@@ -391,7 +396,7 @@ class Tokenizer:
 
             for new_start in range(input_start, input_end + 1):
                 for new_end in range(input_end, new_start - 1, -1):
-                    text_span = " ".join(doc_tokens[new_start:(new_end + 1)])
+                    text_span = " ".join(doc_tokens[new_start : (new_end + 1)])
                     if text_span == tok_answer_text:
                         return (new_start, new_end)
 
@@ -426,13 +431,15 @@ class Tokenizer:
                     continue
                 num_left_context = position - doc_span.start
                 num_right_context = end - position
-                score = min(num_left_context, num_right_context) + 0.01 * doc_span.length
+                score = (
+                    min(num_left_context, num_right_context)
+                    + 0.01 * doc_span.length
+                )
                 if best_score is None or score > best_score:
                     best_score = score
                     best_span_index = span_index
 
             return cur_span_index == best_span_index
-
 
         if qa_id is None:
             qa_id = list(range(len(question_text)))
@@ -441,8 +448,14 @@ class Tokenizer:
             is_impossible = [False] * len(question_text)
 
         qa_examples = []
-        for d_text, q_text, a_start, a_text, q_id, impossible in \
-            zip(doc_text, question_text, answer_start, answer_text, qa_id, is_impossible):
+        for d_text, q_text, a_start, a_text, q_id, impossible in zip(
+            doc_text,
+            question_text,
+            answer_start,
+            answer_text,
+            qa_id,
+            is_impossible,
+        ):
             d_tokens = []
             char_to_word_offset = []
             prev_is_whitespace = True
@@ -457,11 +470,17 @@ class Tokenizer:
                     prev_is_whitespace = False
                 char_to_word_offset.append(len(d_tokens) - 1)
 
+            # "a_start" and "a_text" can be lists when the question has
+            # multiple answers, but it's only allowed for testing data.
             if _is_iterable_but_not_string(a_start):
                 if len(a_start) != len(a_text):
-                    raise Exception("The lengths of answer starts and answer texts are different.")
-                if len(a_start) > 1 and is_training and not impossible:
-                    raise Exception("For training, each question should have exactly 1 answer.")
+                    raise Exception(
+                        "The lengths of answer starts and answer texts are different."
+                    )
+                if len(a_start) != 1 and is_training and not impossible:
+                    raise Exception(
+                        "For training, each question should have exactly 1 answer."
+                    )
             else:
                 a_start = [a_start]
                 a_text = [a_text]
@@ -473,43 +492,56 @@ class Tokenizer:
                     if not impossible:
                         answer_length = len(t)
                         start_position = char_to_word_offset[s]
-                        end_position = char_to_word_offset[s + answer_length - 1]
+                        end_position = char_to_word_offset[
+                            s + answer_length - 1
+                        ]
                         # Only add answers where the text can be exactly recovered from the
                         # document. If this CAN'T happen it's likely due to weird Unicode
                         # stuff so we will just skip the example.
                         #
                         # Note that this means for training mode, every example is NOT
                         # guaranteed to be preserved.
-                        actual_text = " ".join(d_tokens[start_position:(end_position + 1)])
-                        cleaned_answer_text = " ".join(
-                            whitespace_tokenize(t))
+                        actual_text = " ".join(
+                            d_tokens[start_position : (end_position + 1)]
+                        )
+                        cleaned_answer_text = " ".join(whitespace_tokenize(t))
                         if actual_text.find(cleaned_answer_text) == -1:
-                            logger.warning("Could not find answer: '%s' vs. '%s'",
-                                        actual_text, cleaned_answer_text)
+                            logger.warning(
+                                "Could not find answer: '%s' vs. '%s'",
+                                actual_text,
+                                cleaned_answer_text,
+                            )
                             continue
                     else:
                         start_position = -1
                         end_position = -1
 
                 qa_examples.append(
-                    QAExample(qa_id=q_id,
-                                doc_tokens=d_tokens,
-                                question_text = q_text,
-                                orig_answer_text=t,
-                                start_position=start_position,
-                                end_position=end_position,
-                                is_impossible=impossible))
+                    QAExample(
+                        qa_id=q_id,
+                        doc_tokens=d_tokens,
+                        question_text=q_text,
+                        orig_answer_text=t,
+                        start_position=start_position,
+                        end_position=end_position,
+                        is_impossible=impossible,
+                    )
+                )
 
-        cls_token = '[CLS]'
-        sep_token = '[SEP]'
+        cls_token = "[CLS]"
+        sep_token = "[SEP]"
         pad_token = 0
         sequence_a_segment_id = 0
         sequence_b_segment_id = 1
         cls_token_segment_id = 0
         pad_token_segment_id = 0
         cls_token_at_end = False
-        mask_padding_with_zero=True
+        mask_padding_with_zero = True
 
+        # unique_id identified unique feature/label pairs. It's different
+        # from qa_id in that each qa_example can be broken down into
+        # multiple feature samples if the paragraph length is longer than
+        # maximum sequence length allowed
         unique_id = 1000000000
         features = []
         for (example_index, example) in enumerate(qa_examples):
@@ -517,8 +549,9 @@ class Tokenizer:
 
             if len(query_tokens) > max_query_length:
                 query_tokens = query_tokens[0:max_query_length]
-
+            # map word-piece tokens to original tokens
             tok_to_orig_index = []
+            # map original tokens to corresponding word-piece tokens
             orig_to_tok_index = []
             all_doc_tokens = []
             for (i, token) in enumerate(example.doc_tokens):
@@ -536,12 +569,23 @@ class Tokenizer:
             if is_training and not example.is_impossible:
                 tok_start_position = orig_to_tok_index[example.start_position]
                 if example.end_position < len(example.doc_tokens) - 1:
-                    tok_end_position = orig_to_tok_index[example.end_position + 1] - 1
+                    # +1: move the the token after the ending token in
+                    # original tokens
+                    # -1, moves one step back
+                    # these two operations ensures word piece is covered
+                    # when it's part of the original ending token.
+                    tok_end_position = (
+                        orig_to_tok_index[example.end_position + 1] - 1
+                    )
                 else:
                     tok_end_position = len(all_doc_tokens) - 1
                 (tok_start_position, tok_end_position) = _improve_answer_span(
-                    all_doc_tokens, tok_start_position, tok_end_position, self.tokenizer,
-                    example.orig_answer_text)
+                    all_doc_tokens,
+                    tok_start_position,
+                    tok_end_position,
+                    self.tokenizer,
+                    example.orig_answer_text,
+                )
 
             # The -3 accounts for [CLS], [SEP] and [SEP]
             max_tokens_for_doc = max_len - len(query_tokens) - 3
@@ -549,7 +593,7 @@ class Tokenizer:
             # We can have documents that are longer than the maximum sequence length.
             # To deal with this we do a sliding window approach, where we take chunks
             # of the up to our max length with a stride of `doc_stride`.
-
+            _DocSpan = namedtuple("DocSpan", ["start", "length"])
             doc_spans = []
             start_offset = 0
             while start_offset < len(all_doc_tokens):
@@ -567,8 +611,10 @@ class Tokenizer:
                 token_is_max_context = {}
                 segment_ids = []
 
-                # p_mask: mask with 1 for token than cannot be in the answer (0 for token which can be in an answer)
+                # p_mask: mask with 1 for token than cannot be in the answer
+                # (0 for token which can be in an answer)
                 # Original TF implem also keep the classification token (set to 0) (not sure why...)
+                ## TODO: Should we set p_mask = 1 for cls token?
                 p_mask = []
 
                 # CLS token at the beginning
@@ -579,10 +625,14 @@ class Tokenizer:
                     cls_index = 0
 
                 # Query
-                for token in query_tokens:
-                    tokens.append(token)
-                    segment_ids.append(sequence_a_segment_id)
-                    p_mask.append(1)
+                # for token in query_tokens:
+                #     tokens.append(token)
+                #     segment_ids.append(sequence_a_segment_id)
+                #     p_mask.append(1)
+
+                tokens += query_tokens
+                segment_ids += [sequence_a_segment_id] * len(query_tokens)
+                p_mask += [1] * len(query_tokens)
 
                 # SEP token
                 tokens.append(sep_token)
@@ -592,10 +642,15 @@ class Tokenizer:
                 # Paragraph
                 for i in range(doc_span.length):
                     split_token_index = doc_span.start + i
-                    token_to_orig_map[len(tokens)] = tok_to_orig_index[split_token_index]
+                    token_to_orig_map[len(tokens)] = tok_to_orig_index[
+                        split_token_index
+                    ]
 
-                    is_max_context = _check_is_max_context(doc_spans, doc_span_index,
-                                                        split_token_index)
+                    ## TODO: maybe this can be improved to compute
+                    # is_max_context for each token only once.
+                    is_max_context = _check_is_max_context(
+                        doc_spans, doc_span_index, split_token_index
+                    )
                     token_is_max_context[len(tokens)] = is_max_context
                     tokens.append(all_doc_tokens[split_token_index])
                     segment_ids.append(sequence_b_segment_id)
@@ -612,20 +667,32 @@ class Tokenizer:
                     tokens.append(cls_token)
                     segment_ids.append(cls_token_segment_id)
                     p_mask.append(0)
-                    cls_index = len(tokens) - 1  # Index of classification token
+                    cls_index = (
+                        len(tokens) - 1
+                    )  # Index of classification token
 
                 input_ids = self.tokenizer.convert_tokens_to_ids(tokens)
 
                 # The mask has 1 for real tokens and 0 for padding tokens. Only real
                 # tokens are attended to.
-                input_mask = [1 if mask_padding_with_zero else 0] * len(input_ids)
+                input_mask = [1 if mask_padding_with_zero else 0] * len(
+                    input_ids
+                )
 
                 # Zero-pad up to the sequence length.
-                while len(input_ids) < max_len:
-                    input_ids.append(pad_token)
-                    input_mask.append(0 if mask_padding_with_zero else 1)
-                    segment_ids.append(pad_token_segment_id)
-                    p_mask.append(1)
+                # while len(input_ids) < max_len:
+                #     input_ids.append(pad_token)
+                #     input_mask.append(0 if mask_padding_with_zero else 1)
+                #     segment_ids.append(pad_token_segment_id)
+                #     p_mask.append(1)
+
+                if len(input_ids) < max_len:
+                    pad_token_length = max_len - len(input_ids)
+                    pad_mask = 0 if mask_padding_with_zero else 1
+                    input_ids += [pad_token] * pad_token_length
+                    input_mask += [pad_mask] * pad_token_length
+                    segment_ids += [pad_token_segment_id] * pad_token_length
+                    p_mask += [1] * pad_token_length
 
                 assert len(input_ids) == max_len
                 assert len(input_mask) == max_len
@@ -640,17 +707,25 @@ class Tokenizer:
                     doc_start = doc_span.start
                     doc_end = doc_span.start + doc_span.length - 1
                     out_of_span = False
-                    if not (tok_start_position >= doc_start and
-                            tok_end_position <= doc_end):
+                    if not (
+                        tok_start_position >= doc_start
+                        and tok_end_position <= doc_end
+                    ):
                         out_of_span = True
                     if out_of_span:
                         start_position = 0
                         end_position = 0
                         span_is_impossible = True
                     else:
+                        # +1 for [CLS] token
+                        # +1 for [SEP] toekn
                         doc_offset = len(query_tokens) + 2
-                        start_position = tok_start_position - doc_start + doc_offset
-                        end_position = tok_end_position - doc_start + doc_offset
+                        start_position = (
+                            tok_start_position - doc_start + doc_offset
+                        )
+                        end_position = (
+                            tok_end_position - doc_start + doc_offset
+                        )
 
                 if is_training and span_is_impossible:
                     start_position = cls_index
@@ -668,10 +743,16 @@ class Tokenizer:
                         segment_ids=segment_ids,
                         paragraph_len=paragraph_len,
                         start_position=start_position,
-                        end_position=end_position))
+                        end_position=end_position,
+                    )
+                )
                 unique_id += 1
 
         return features, qa_examples
+
+
+def _is_iterable_but_not_string(obj):
+    return isinstance(obj, Iterable) and not isinstance(obj, str)
 
 
 def create_data_loader(
