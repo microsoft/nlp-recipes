@@ -53,8 +53,7 @@ def test_gensen_preprocess(tmp_path):
 
 def test_data_iterator():
     sentences = ["it is a lovely day", "the weather is great outside.", ]
-    expected_vocab = []
-    [expected_vocab.extend(s.split(" ")) for s in sentences]
+    expected_vocab = ["it", "is", "a", "lovely", "day", "the", "weather", "is", "great", "outside."]
 
     vocab_size = 10
     di = DataIterator()
