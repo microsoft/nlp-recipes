@@ -28,21 +28,30 @@ def notebooks():
 
     # Path for the notebooks
     paths = {
-        "similarity_embeddings_baseline": os.path.join(
-            folder_notebooks, "sentence_similarity", "baseline_deep_dive.ipynb"
-        ),
         "embedding_trainer": os.path.join(
             folder_notebooks, "embeddings", "embedding_trainer.ipynb"
         ),
-        "bert_qa_trainer": os.path.join(
-            folder_notebooks,
-            "question_answering",
-            "pretrained-BERT-SQuAD-deep-dive-aml.ipynb",
+        "similarity_embeddings_baseline": os.path.join(
+            folder_notebooks, "sentence_similarity", "baseline_deep_dive.ipynb"
+        ),
+        "bert_encoder": os.path.join(
+            folder_notebooks, "sentence_similarity", "bert_encoder.ipynb"
+        ),
+        "gensen_local": os.path.join(
+            folder_notebooks, "sentence_similarity", "gensen_local.ipynb"
+        ),
+        "gensen_azureml": os.path.join(
+            folder_notebooks, "sentence_similarity", "gensen_aml_deep_dive.ipynb"
         ),
         "similarity_automl_local": os.path.join(
             folder_notebooks,
             "sentence_similarity",
             "automl_local_deployment_aci.ipynb",
+        ),
+        "bert_qa_trainer": os.path.join(
+            folder_notebooks,
+            "question_answering",
+            "pretrained-BERT-SQuAD-deep-dive-aml.ipynb",
         ),
         "bidaf_deep_dive": os.path.join(
             folder_notebooks, "question_answering", "bidaf_aml_deep_dive.ipynb"
@@ -52,17 +61,8 @@ def notebooks():
             "question_answering",
             "question_answering_system_bidaf_quickstart.ipynb",
         ),
-        "bert_encoder": os.path.join(
-            folder_notebooks, "sentence_similarity", "bert_encoder.ipynb"
-        ),
-        "gensen_local": os.path.join(
-            folder_notebooks, "sentence_similarity", "gensen_local.ipynb"
-        ),
         "entailment_multinli_bert": os.path.join(
             folder_notebooks, "entailment", "entailment_multinli_bert.ipynb"
-        ),
-        "gensen_azureml": os.path.join(
-            folder_notebooks, "sentence_similarity", "gensen_aml_deep_dive.ipynb"
         ),
         "tc_bert_azureml": os.path.join(
             folder_notebooks, "text_classification", "tc_bert_azureml.ipynb"
