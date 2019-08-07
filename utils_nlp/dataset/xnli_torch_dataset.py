@@ -40,6 +40,7 @@ class XnliDataset(data.Dataset):
             to_lowercase(bool):flag to convert samples in dataset to lowercase
             tok_language(Language, optional): language (Language, optional): The pretrained model's language.
                                               Defaults to Language.ENGLISH.
+            data_percent_used(float, optional): Data used to create Torch Dataset.Defaults to "1.0" which is 100% data
         """
         self.file_split = file_split
         self.cache_dir = cache_dir
