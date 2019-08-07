@@ -48,6 +48,11 @@ def notebooks():
             "sentence_similarity",
             "automl_local_deployment_aci.ipynb",
         ),
+        "automl_with_pipelines_deployment_aks": os.path.join(
+            folder_notebooks,
+            "sentence_similarity",
+            "automl_with_pipelines_deployment_aks.ipynb",
+        ),        
         "bert_qa_trainer": os.path.join(
             folder_notebooks,
             "question_answering",
