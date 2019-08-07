@@ -18,7 +18,8 @@ from tests.notebooks_common import path_notebooks
 from utils_nlp.models.bert.common import Language
 from utils_nlp.models.bert.common import Tokenizer as BERTTokenizer
 from utils_nlp.azureml import azureml_utils
-from azureml.core.webservice import AciWebservice, Webservice
+from azureml.core.webservice import Webservice
+
 
 @pytest.fixture(scope="module")
 def notebooks():
@@ -33,22 +34,31 @@ def notebooks():
             folder_notebooks, "embeddings", "embedding_trainer.ipynb"
         ),
         "bert_qa_trainer": os.path.join(
-            folder_notebooks, "question_answering", "pretrained-BERT-SQuAD-deep-dive-aml.ipynb"
+            folder_notebooks,
+            "question_answering",
+            "pretrained-BERT-SQuAD-deep-dive-aml.ipynb",
         ),
         "similarity_automl_local": os.path.join(
-            folder_notebooks, "sentence_similarity", "automl_local_deployment_aci.ipynb"
+            folder_notebooks,
+            "sentence_similarity",
+            "automl_local_deployment_aci.ipynb",
         ),
         "bidaf_deep_dive": os.path.join(
             folder_notebooks, "question_answering", "bidaf_aml_deep_dive.ipynb"
         ),
         "bidaf_quickstart": os.path.join(
-            folder_notebooks, "question_answering", "question_answering_system_bidaf_quickstart.ipynb"
+            folder_notebooks,
+            "question_answering",
+            "question_answering_system_bidaf_quickstart.ipynb",
         ),
         "bert_encoder": os.path.join(
             folder_notebooks, "sentence_similarity", "bert_encoder.ipynb"
         ),
         "gensen_local": os.path.join(
             folder_notebooks, "sentence_similarity", "gensen_local.ipynb"
+        ),
+        "entailment_multinli_bert": os.path.join(
+            folder_notebooks, "entailment", "entailment_multinli_bert.ipynb"
         ),
         "gensen_azureml": os.path.join(
             folder_notebooks, "sentence_similarity", "gensen_aml_deep_dive.ipynb"
@@ -175,14 +185,16 @@ def ner_test_data():
 
 
 def pytest_addoption(parser):
-    parser.addoption("--subscription_id",
-                        help="Azure Subscription Id to create resources in")
-    parser.addoption("--resource_group",
-                        help="Name of the resource group")
-    parser.addoption("--workspace_name",
-                        help="Name of Azure ML Workspace")
-    parser.addoption("--workspace_region",
-                        help="Azure region to create the workspace in")
+    parser.addoption(
+        "--subscription_id",
+        help="Azure Subscription Id to create resources in",
+    )
+    parser.addoption("--resource_group", help="Name of the resource group")
+    parser.addoption("--workspace_name", help="Name of Azure ML Workspace")
+    parser.addoption(
+        "--workspace_region", help="Azure region to create the workspace in"
+    )
+
 
 @pytest.fixture(scope="module")
 def subscription_id(request):
@@ -208,15 +220,15 @@ def workspace_region(request):
 def bert_english_tokenizer():
     return BERTTokenizer(language=Language.ENGLISHCASED, to_lower=False)
 
+
 @pytest.fixture(scope="module")
-def teardown_service(subscription_id,
-                     resource_group,
-                     workspace_name,
-                     workspace_region):
+def teardown_service(
+    subscription_id, resource_group, workspace_name, workspace_region
+):
 
     yield
 
-    #connect to workspace
+    # connect to workspace
     ws = azureml_utils.get_or_create_workspace(
         config_path="tests/ci",
         subscription_id=subscription_id,
@@ -225,8 +237,8 @@ def teardown_service(subscription_id,
         workspace_region=workspace_region,
     )
 
-    #connect to aci_service
+    # connect to aci_service
     aci_service = Webservice(workspace=ws, name="aci-test-service")
 
-    #delete aci_service
+    # delete aci_service
     aci_service.delete()
