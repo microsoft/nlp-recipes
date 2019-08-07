@@ -4,7 +4,8 @@
 
 # This script reuses some code from
 # https://github.com/huggingface/pytorch-transformers/blob/master/examples/utils_glue.py
-
+from enum import Enum
+from pytorch_transformers import XLNetTokenizer
 
 class Language(Enum):
     """An enumeration of the supported pretrained models and languages."""
@@ -14,7 +15,7 @@ class Language(Enum):
 
 class Tokenizer:
     def __init__(
-        self, language=Language.ENGLISH
+        self, language=Language.ENGLISHCASED
     ):
         """Initializes the underlying pretrained XLNet tokenizer.
 
@@ -25,17 +26,26 @@ class Tokenizer:
         self.tokenizer = XLNetTokenizer.from_pretrained(language.value)
         self.language = language
 
-    def preprocess_classification_tokens(self, examples, labels, label_list, max_seq_len):
+    def preprocess_classification_tokens(self, examples, max_seq_length):
         features = []
         cls_token = self.tokenizer.cls_token
         sep_token = self.tokenizer.sep_token
         cls_token_segment_id=2
         pad_on_left=True
         pad_token_segment_id=4
+        sequence_a_segment_id=0
+        cls_token_at_end=True
+        mask_padding_with_zero=True
+        pad_token=0
+        
+        list_input_ids = []
+        list_input_mask = []
+        list_segment_ids = []
+        
         
         for (ex_index, example) in enumerate(examples):
 
-            tokens_a = tokenizer.tokenize(example)
+            tokens_a = self.tokenizer.tokenize(example)
 
             if len(tokens_a) > max_seq_length - 2:
                 tokens_a = tokens_a[:(max_seq_length - 2)]
@@ -50,7 +60,7 @@ class Tokenizer:
                 tokens = [cls_token] + tokens
                 segment_ids = [cls_token_segment_id] + segment_ids
 
-            input_ids = tokenizer.convert_tokens_to_ids(tokens)
+            input_ids = self.tokenizer.convert_tokens_to_ids(tokens)
 
 
             # The mask has 1 for real tokens and 0 for padding tokens. Only real
@@ -71,8 +81,10 @@ class Tokenizer:
             assert len(input_ids) == max_seq_length
             assert len(input_mask) == max_seq_length
             assert len(segment_ids) == max_seq_length
+          
+            list_input_ids.append(input_ids)
+            list_input_mask.append(input_mask)
+            list_segment_ids.append(segment_ids)
 
-            label_id = labels[ex_index]
-
-            features.append({"input_ids":input_ids,"input_mask":input_mask,"segment_ids":segment_ids,"label_id":label_id})
-        return features
+#             features.append({"input_ids":input_ids,"input_mask":input_mask,"segment_ids":segment_ids,"label_id":label_id})
+        return list_input_ids, list_input_mask, list_segment_ids

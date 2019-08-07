@@ -1,7 +1,8 @@
 import numpy as np
+from collections import namedtuple
 import torch
 import torch.nn as nn
-from pytorch_transformers import (WEIGHTS_NAME, XLNetConfig,XLNetForSequenceClassification,XLNetTokenizer)
+from pytorch_transformers import (WEIGHTS_NAME,XLNetConfig,XLNetForSequenceClassification)
 from tqdm import tqdm
 from torch.utils.data import (
     DataLoader,
@@ -11,11 +12,13 @@ from torch.utils.data import (
 )
 from pytorch_transformers import AdamW, WarmupLinearSchedule
 from utils_nlp.common.pytorch_utils import get_device, move_to_device
+from utils_nlp.models.xlnet.common import Language
+import random
 
 class XLNetSequenceClassifier:
     """XLNet-based sequence classifier"""
     
-    def __init__(self, language='xlnet-base-cased', num_labels=5, cache_dir='.'):
+    def __init__(self, language=Language.ENGLISHCASED, num_labels=5, cache_dir='.'):
         """Initializes the classifier and the underlying pretrained model.
         
         Args:
@@ -35,9 +38,7 @@ class XLNetSequenceClassifier:
         self.cache_dir = cache_dir
         
         #create classifier
-        self.config = XLNetConfig.from_pretrained(
-            self.language, cache_dir=cache_dir, num_labels=num_labels
-        )
+        self.config = XLNetConfig.from_pretrained(self.language.value, num_labels=num_labels)
         self.model = XLNetForSequenceClassification(self.config)
         
     def fit(
@@ -50,9 +51,10 @@ class XLNetSequenceClassifier:
         num_epochs=1,
         batch_size=8,
         lr=5e-5,
-        adam_eps=1e-8
+        adam_eps=1e-8,
         warmup_steps=0,
         weight_decay=0.0,
+        max_grad_norm=1.0,
         verbose=True,
     ):
         """Fine-tunes the XLNet classifier using the given training data.
@@ -108,30 +110,15 @@ class XLNetSequenceClassifier:
         num_train_optimization_steps = num_batches * num_epochs
         
         optimizer = AdamW(optimizer_grouped_parameters, lr=lr, eps=adam_eps)
-        scheduler = WarmupLinearSchedule(optimizer, warmup_steps=warmup_steps, t_total=num_train_optimization_st eps)
+        scheduler = WarmupLinearSchedule(optimizer, warmup_steps=warmup_steps, t_total=num_train_optimization_steps)
         
         global_step = 0
         tr_loss, logging_loss = 0.0, 0.0
         self.model.train()
         optimizer.zero_grad()
-#        data_iterator = trange(int(num_train_epoch), desc="Epoch", disable=False)
         for epoch in range(num_epochs):
-#            epoch_iterator = tqdm(train_dataloader, desc="Iteration", disable=False)
-#            for step, batch in enumerate(epoch_iterator):
             for step in range(num_batches):
-
-#                 batch = tuple(t.to(device) for t in batch)
-#                 inputs = {'input_ids':      batch[0],
-#                           'attention_mask': batch[1],
-#                           'token_type_ids': batch[2],
-#                           'labels':         batch[3]}
-#                 outputs = self.model(
-#                     inputs["input_ids"],
-#                     attention_mask = inputs["attention_mask"],
-#                     token_type_ids=inputs["token_type_ids"],
-#                     labels=inputs["labels"]
-#                 )
-                
+              
                  # get random batch
                 start = int(random.random() * num_examples)
                 end = start + batch_size
@@ -161,7 +148,7 @@ class XLNetSequenceClassifier:
                 loss = outputs[0]  # model outputs are always tuple in pytorch-transformers
 
                 loss.backward()
-#                torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_grad_norm)
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_grad_norm)
 
                 tr_loss += loss.item()
                 scheduler.step()  # Update learning rate schedule
@@ -172,7 +159,7 @@ class XLNetSequenceClassifier:
                 global_step += 1
                 
                 if verbose:
-                    if i % ((num_batches // 10) + 1) == 0:
+                    if step % ((num_batches // 10) + 1) == 0:
                         print(
                             "epoch:{}/{}; batch:{}->{}/{}; loss:{:.6f}".format(
                                 epoch + 1,
@@ -184,15 +171,7 @@ class XLNetSequenceClassifier:
                             )
                         )
 
-#                 if max_steps > 0 and global_step > max_steps:
-#                     epoch_iterator.close()
-#                     break
-#             if max_steps > 0 and global_step > max_steps:
-#                 train_iterator.close()
-#                 break
-
         # empty cache
-#        del [batch, inputs]
         del [x_batch, y_batch, mask_batch, token_type_ids_batch]
         torch.cuda.empty_cache()
         
@@ -254,18 +233,18 @@ class XLNetSequenceClassifier:
                         input_ids=x_batch,
                         token_type_ids=token_type_ids_batch,
                         attention_mask=mask_batch,
-                        labels=None,
+                        labels=None
                     )
-                    preds.append(pred_batch.cpu())
+                    preds.append(pred_batch[0].cpu())
                     if i % batch_size == 0:
-                    pbar.update(batch_size)
-                    
-                    preds = np.concatenate(preds)
-                    
-                    if probabilities:
-                        return namedtuple("Predictions", "classes probabilities")(
-                            preds.argmax(axis=1),
-                            nn.Softmax(dim=1)(torch.Tensor(preds)).numpy(),
-                        )
-                    else:
-                        return preds.argmax(axis=1)
+                        pbar.update(batch_size)
+
+            preds = np.concatenate(preds)
+                       
+            if probabilities:
+                return namedtuple("Predictions", "classes probabilities")(
+                    preds.argmax(axis=1),
+                    nn.Softmax(dim=1)(torch.Tensor(preds)).numpy(),
+                )
+            else:
+                return preds.argmax(axis=1)
