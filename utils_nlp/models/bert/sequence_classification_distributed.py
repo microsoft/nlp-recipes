@@ -5,12 +5,14 @@ import logging
 import horovod.torch as hvd
 import numpy as np
 import torch.nn as nn
+from torch.utils.data import TensorDataset
 import torch.utils.data.distributed
 from pytorch_pretrained_bert.modeling import BertForSequenceClassification
 from pytorch_pretrained_bert.optimization import BertAdam
 from tqdm import tqdm
 
 from utils_nlp.models.bert.common import Language
+
 from utils_nlp.models.bert.common import get_dataset_multiple_files
 from utils_nlp.common.pytorch_utils import get_device, move_to_device
 
@@ -57,6 +59,10 @@ class BERTSequenceDistClassifier:
 
     def fit(
         self,
+        token_ids,
+        input_mask,
+        labels,
+        token_type_ids=None,
         input_files,
         num_gpus=1,
         num_epochs=1,
@@ -70,6 +76,13 @@ class BERTSequenceDistClassifier:
 
         args:
             input_files(list, required): list of paths to the training data files.
+            token_ids (list): List of training token id lists.
+            input_mask (list): List of input mask lists.
+            labels (list): List of training labels.
+            token_type_ids (list, optional): List of lists. Each sublist
+                contains segment ids indicating if the token belongs to
+                the first sentence(0) or second sentence(1). Only needed
+                for two-sentence tasks.
             num_gpus (int, optional): the number of gpus to use.
                                       if none is specified, all available gpus
                                       will be used. defaults to none.
@@ -85,7 +98,28 @@ class BERTSequenceDistClassifier:
             fp16_allreduce(bool, optional)L if true, use fp16 compression during allreduce
         """
 
-        train_dataset = get_dataset_multiple_files(input_files)
+        if input_files is not None:
+            train_dataset = get_dataset_multiple_files(input_files)
+        else:
+            token_ids_tensor = torch.tensor(token_ids, dtype=torch.long)
+            input_mask_tensor = torch.tensor(input_mask, dtype=torch.long)
+            labels_tensor = torch.tensor(labels, dtype=torch.long)
+
+            if token_type_ids:
+                token_type_ids_tensor = torch.tensor(
+                    token_type_ids, dtype=torch.long
+                )
+                train_dataset = TensorDataset(
+                    token_ids_tensor,
+                    input_mask_tensor,
+                    token_type_ids_tensor,
+                    labels_tensor,
+                )
+            else:
+                train_dataset = TensorDataset(
+                    token_ids_tensor, input_mask_tensor, labels_tensor
+                )
+
         train_sampler = torch.utils.data.distributed.DistributedSampler(
             train_dataset, num_replicas=hvd.size(), rank=hvd.rank()
         )
@@ -158,20 +192,25 @@ class BERTSequenceDistClassifier:
         for epoch in range(num_epochs):
             self.model.train()
             train_sampler.set_epoch(epoch)
-            for batch_idx, (tokens, mask, target) in enumerate(train_loader):
+            for batch_idx, batch in enumerate(train_loader):
 
-                if torch.cuda.is_available():
-                    tokens, mask, target = (
-                        tokens.cuda(),
-                        mask.cuda(),
-                        target.cuda(),
+                if token_type_ids:
+                    x_batch, mask_batch, token_type_ids_batch, y_batch = tuple(
+                        t.to(device) for t in batch
+                    )
+                else:
+                    token_type_ids_batch = None
+                    x_batch, mask_batch, y_batch = tuple(
+                        t.to(device) for t in batch
                     )
 
                 optimizer.zero_grad()
+
                 output = self.model(
-                    input_ids=tokens, attention_mask=mask, labels=None
+                    input_ids=x_batch, attention_mask=mask_batch, labels=None
                 )
-                loss = loss_func(output, target).mean()
+
+                loss = loss_func(output, y_batch).mean()
                 loss.backward()
                 optimizer.step()
                 if verbose and (batch_idx % ((num_batches // 10) + 1)) == 0:
@@ -180,7 +219,7 @@ class BERTSequenceDistClassifier:
                     print(
                         "Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}".format(
                             epoch,
-                            batch_idx * len(tokens),
+                            batch_idx * len(x_batch),
                             len(train_sampler),
                             100.0 * batch_idx / len(train_loader),
                             loss.item(),
@@ -191,12 +230,23 @@ class BERTSequenceDistClassifier:
         torch.cuda.empty_cache()
 
     def predict(
-        self, input_files, num_gpus=1, batch_size=32, probabilities=False
+        self,
+        input_files = None,
+        token_ids,
+        input_mask,
+        token_type_ids=None,
+        input_files, num_gpus=1, batch_size=32, probabilities=False
     ):
         """Scores the given set of train files and returns the predicted classes.
 
         Args:
             input_files(list, required): list of paths to the test data files.
+            token_ids (list): List of training token lists.
+            input_mask (list): List of input mask lists.
+            token_type_ids (list, optional): List of lists. Each sublist
+                contains segment ids indicating if the token belongs to
+                the first sentence(0) or second sentence(1). Only needed
+                for two-sentence tasks.
             num_gpus (int, optional): The number of gpus to use.
                                       If None is specified, all available GPUs
                                       will be used. Defaults to None.
@@ -209,7 +259,22 @@ class BERTSequenceDistClassifier:
                 a dictionary with classes, target labels, probabilities) if probabilities is True.
         """
 
-        test_dataset = get_dataset_multiple_files(input_files)
+        if input_files is not None:
+            test_dataset = get_dataset_multiple_files(input_files)
+
+        else:
+            token_ids_tensor = torch.tensor(token_ids, dtype=torch.long)
+            input_mask_tensor = torch.tensor(input_mask, dtype=torch.long)
+
+            if token_type_ids:
+                token_type_ids_tensor = torch.tensor(
+                    token_type_ids, dtype=torch.long
+                )
+                test_dataset = TensorDataset(
+                    token_ids_tensor, input_mask_tensor, token_type_ids_tensor
+                )
+            else:
+                test_dataset = TensorDataset(token_ids_tensor, input_mask_tensor)
 
         # Horovod: use DistributedSampler to partition the test data.
         test_sampler = torch.utils.data.sampler.SequentialSampler(test_dataset)
