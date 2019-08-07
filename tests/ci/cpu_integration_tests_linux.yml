@@ -1,0 +1,62 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License.
+
+
+# More info on scheduling: https://docs.microsoft.com/en-us/azure/devops/pipelines/build/triggers?view=azure-devops&tabs=yaml#scheduled-triggers
+# Implementing the scheduler from the dashboard
+# Uncomment in case it wants to be done from using the yml
+#schedules:
+#- cron: "56 22 * * *"
+#  displayName: Daily computation of nightly builds
+#  branches:
+#    include:
+#    - master
+#  always: true
+
+
+# no PR builds
+pr: none
+
+# no CI trigger
+trigger: none
+
+jobs:
+- job: nightly
+  displayName : 'Nightly tests'
+  timeoutInMinutes: 180 # how long to run the job before automatically cancelling
+  pool:
+    name: nlpagentpool
+
+  steps:
+  - bash: |
+      echo "##vso[task.prependpath]/data/anaconda/bin"
+      conda env list
+    displayName: 'Add Conda to PATH'
+
+  # Conda creation can take around 10min
+  - bash: |
+      python tools/generate_conda_file.py 
+      conda env create -n integration_cpu -f nlp_cpu.yaml
+    displayName: 'Creating Conda Environment with dependencies'
+
+  - bash: |
+      source activate integration_cpu
+      pytest --durations=0 tests/smoke -m "smoke and not gpu and not azureml" --junitxml=junit/test-smoke-test.xml
+    displayName: 'Run smoke tests'
+
+  - bash: |
+      source activate integration_cpu
+      pytest --durations=0 tests/integration -m "integration and not gpu and not azureml" --junitxml=junit/test-integration-test.xml
+    displayName: 'Run integration tests'
+
+  - bash: |
+      echo Remove Conda Environment
+      conda remove -n integration_cpu --all -q --force -y
+      echo Done Cleanup
+    displayName: 'Cleanup Task'
+    condition: always()
+
+  - task: PublishTestResults@2
+    inputs:
+      testResultsFiles: '**/test-*-test.xml'
+      testRunTitle: 'Test results for PyTest'

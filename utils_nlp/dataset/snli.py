@@ -74,14 +74,14 @@ def _maybe_download_and_extract(zip_path, file_split, file_type):
         os.makedirs(dir_path)
 
     # format csv filename
-    file_name = "{0}_{1}.{2}".format(SNLI_FILE_PREFIX, file_split, file_type)
+    file_name = "{0}_{1}.{2}".format(SNLI_FILE_PREFIX, file_split.value, file_type)
     extract_path = os.path.join(dir_path, file_name)
 
     if not os.path.exists(extract_path):
-        download_snli(zip_path)
+        dpath = download_snli(zip_path)
         extract_snli(
             zip_path,
-            source_path=os.path.join(SNLI_DIRNAME, file_name),
+            source_path=SNLI_DIRNAME + "/" + file_name,
             dest_path=extract_path,
         )
 
@@ -156,8 +156,10 @@ def clean_cols(df):
 def clean_rows(df, label_col=LABEL_COL):
     """Drop badly formatted rows from the input dataframe
     
-    Args: df (pd.DataFrame): Input dataframe label_col (str): Name of label column. Defaults to
-    the standardized column name that is set after running the clean_col method.
+    Args:
+        df (pd.DataFrame): Input dataframe
+        label_col (str): Name of label column. 
+                         Defaults to the standardized column name that is set after running the clean_col method.  
     
     Returns:
         pd.DataFrame
@@ -167,6 +169,11 @@ def clean_rows(df, label_col=LABEL_COL):
 
     return snli_df
 
+def clean_df(df, label_col=LABEL_COL):
+    df = clean_cols(df)
+    df = clean_rows(df, label_col)
+
+    return df
 
 def load_azureml_df(
     local_cache_path=None, file_split=Split.TRAIN, file_type="txt"

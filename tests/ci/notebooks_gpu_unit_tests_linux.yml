@@ -6,39 +6,51 @@ pr:
 - master
 - staging
 
-pool:
-  name: "nlptestmachine"
+#Any commit to this branch will trigger the build.
+trigger:
+- staging
+- master
 
-steps:
+jobs:
+- job: notebooks_gpu_unit_tests_linux
+  timeoutInMinutes: 10 # how long to run the job before automatically cancelling
+  pool:
+    name: nlpagentpool
 
-- bash: |
-    echo "##vso[task.prependpath]/data/anaconda/bin"
-  displayName: Add Conda to PATH
+  steps:
+  - bash: |
+      echo "##vso[task.prependpath]/data/anaconda/bin"
+      conda env list
+    displayName: Add Conda to PATH
 
-- bash: |
-    python tools/generate_conda_file.py --gpu
-    conda env create -n nlp_gpu -f nlp_gpu.yaml
-  displayName: 'Creating Conda Environment with dependencies'
+# Uncomment if needed
+# Conda creation can take around 10min
+#  - bash: |
+#      python tools/generate_conda_file.py --gpu
+#      conda env create -n nlp_gpu -f nlp_gpu.yaml
+#    displayName: 'Creating Conda Environment with dependencies'
 
-- bash: |
-    source activate nlp_gpu
-    pytest tests/unit -m "notebooks and gpu" --junitxml=junit/test-unitttest.xml
-  displayName: 'Run Unit tests'
+  - bash: |
+      source activate nlp_gpu
+      pytest --durations=0 tests/unit -m "notebooks and gpu and not azureml" --junitxml=junit/test-unitttest.xml
+    displayName: 'Run Unit tests'
 
-- bash: |
-      echo Remove Conda Environment
-      conda remove -n nlp_gpu --all -q --force -y
-      echo Done Cleanup
-  displayName: 'Cleanup Task'
-  condition: always()
+# Uncomment if needed
+#  - bash: |
+#      echo Remove Conda Environment
+#      conda remove -n nlp_gpu --all -q --force -y
+#      echo Done Cleanup
+#    displayName: 'Cleanup Task'
+#    condition: always()
 
-- task: PublishTestResults@2
-  inputs:
-    testResultsFiles: '**/test-unitttest.xml'
-    testRunTitle: 'Test results for PyTest'
+  - task: PublishTestResults@2
+    inputs:
+      testResultsFiles: '**/test-unitttest.xml'
+      testRunTitle: 'Test results for PyTest'
 
-- task: ComponentGovernanceComponentDetection@0
-  inputs:
-    scanType: 'Register'
-    verbosity: 'Verbose'
-    alertWarningLevel: 'High'
+# Executed only once in notebook_cpu_unit_tests_linux
+#  - task: ComponentGovernanceComponentDetection@0
+#    inputs:
+#      scanType: 'Register'
+#      verbosity: 'Verbose'
+#      alertWarningLevel: 'High'
