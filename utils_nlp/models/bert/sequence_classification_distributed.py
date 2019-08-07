@@ -218,7 +218,7 @@ class BERTSequenceClassifier:
         """
 
         if bert_optimizer is None:
-            self.create_optimizer(
+            bert_optimizer = self.create_optimizer(
                 num_train_optimization_steps=num_train_optimization_steps,
                 lr=lr,
                 warmup_proportion=warmup_proportion,
