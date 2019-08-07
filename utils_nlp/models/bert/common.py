@@ -457,11 +457,13 @@ class TextDataset(Dataset):
         tokens = self._cast(row[0][1:-1].split(","))
         mask = self._cast(row[1][1:-1].split(","))
 
-        return (
-            torch.tensor(tokens, dtype=torch.long),
-            torch.tensor(mask, dtype=torch.long),
-            torch.tensor(int(row[2]), dtype=torch.long),
-        )
+        data = {
+            "token_ids": torch.tensor(tokens, dtype=torch.long),
+            "input_mask": torch.tensor(mask, dtype=torch.long),
+            "labels": torch.tensor(int(row[2]), dtype=torch.long),
+        }
+
+        return data
 
 
 def get_dataset_multiple_files(files):
