@@ -132,3 +132,4 @@ sentence-similarity/data/
 
 # AML Config
 aml_config/
+.azureml/
