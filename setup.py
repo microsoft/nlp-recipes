@@ -11,8 +11,8 @@ from os.path import basename, dirname, join, splitext
 
 from setuptools import find_packages, setup
 
-VERSION = __import__("__init__").VERSION
-
+__version__ = "2019.08"
+VERSION = __version__
 
 def read(*names, **kwargs):
     with io.open(
