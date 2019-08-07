@@ -234,47 +234,38 @@ class XLNetSequenceClassifier:
         
         with tqdm(total=len(token_ids)) as pbar:
             for i in range(0, len(token_ids), batch_size):
+                start = i
+                end = start + batch_size
+                x_batch = torch.tensor(
+                    token_ids[start:end], dtype=torch.long, device=device
+                )
+                mask_batch = torch.tensor(
+                    input_mask[start:end], dtype=torch.long, device=device
+                )
+
+                token_type_ids_batch = torch.tensor(
+                        token_type_ids[start:end],
+                        dtype=torch.long,
+                        device=device,
+                )
                 
-        
-        
-        
-        
-        
-        
-        
-        results = {}
-    eval_dataset = train_dataset
-    eval_batch_size = per_gpu_eval_batch_size
-    eval_sampler = SequentialSampler(eval_dataset)
-    eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=eval_batch_size)
-
-    eval_loss = 0.0
-    nb_eval_steps = 0
-    preds = None
-    out_label_ids = None
-    for batch in tqdm(eval_dataloader, desc="Evaluating"):
-        model.eval()
-        batch = tuple(t.to(device) for t in batch)
-
-        with torch.no_grad():
-            inputs = {'input_ids':      batch[0],
-                      'attention_mask': batch[1],
-                      'token_type_ids': batch[2],
-                      'labels':         batch[3]}
-            outputs = model(**inputs)
-            tmp_eval_loss, logits = outputs[:2]
-
-            eval_loss += tmp_eval_loss.mean().item()
-        nb_eval_steps += 1
-        if preds is None:
-            preds = logits.detach().cpu().numpy()
-            out_label_ids = inputs['labels'].detach().cpu().numpy()
-        else:
-            preds = np.append(preds, logits.detach().cpu().numpy(), axis=0)
-            out_label_ids = np.append(out_label_ids, inputs['labels'].detach().cpu().numpy(), axis=0)
-
-    eval_loss = eval_loss / nb_eval_steps
-    preds = np.argmax(preds, axis=1)
-    result = (preds==out_label_ids).mean()
-    results.update(result)
-    return results
+                with torch.no_grad():
+                    pred_batch = self.model(
+                        input_ids=x_batch,
+                        token_type_ids=token_type_ids_batch,
+                        attention_mask=mask_batch,
+                        labels=None,
+                    )
+                    preds.append(pred_batch.cpu())
+                    if i % batch_size == 0:
+                    pbar.update(batch_size)
+                    
+                    preds = np.concatenate(preds)
+                    
+                    if probabilities:
+                        return namedtuple("Predictions", "classes probabilities")(
+                            preds.argmax(axis=1),
+                            nn.Softmax(dim=1)(torch.Tensor(preds)).numpy(),
+                        )
+                    else:
+                        return preds.argmax(axis=1)
