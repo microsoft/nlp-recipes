@@ -3,27 +3,29 @@
 
 
 # This script reuses some code from
-# https://github.com/huggingface/pytorch-pretrained-BERT/blob/master/examples
-# /run_classifier.py
+# https://github.com/huggingface/pytorch-transformers/blob/master/examples
+# /run_glue.py
 
-
-from enum import Enum
+import csv
+import linecache
+import subprocess
 import warnings
 from collections import Iterable, namedtuple
 import torch
 from tqdm import tqdm
 import logging
 
-from pytorch_transformers.tokenization_bert import (
-    BertTokenizer,
-    whitespace_tokenize,
-)
+from pytorch_transformers.tokenization_bert import BertTokenizer, whitespace_tokenize
+
+from enum import Enum
 
 from torch.utils.data import (
     DataLoader,
+    Dataset,
     RandomSampler,
     SequentialSampler,
     TensorDataset,
+    ConcatDataset,
 )
 
 from utils_nlp.models.bert.qa_utils import QAFeatures, QAExample
@@ -34,23 +36,21 @@ BERT_MAX_LEN = 512
 logger = logging.getLogger(__name__)
 
 
-class Language(Enum):
+class Language(str, Enum):
     """An enumeration of the supported pretrained models and languages."""
 
-    ENGLISH = "bert-base-uncased"
-    ENGLISHCASED = "bert-base-cased"
-    ENGLISHLARGE = "bert-large-uncased"
-    ENGLISHLARGECASED = "bert-large-cased"
-    ENGLISHLARGEWWM = "bert-large-uncased-whole-word-masking"
-    ENGLISHLARGECASEDWWM = "bert-large-cased-whole-word-masking"
-    CHINESE = "bert-base-chinese"
-    MULTILINGUAL = "bert-base-multilingual-cased"
+    ENGLISH: str = "bert-base-uncased"
+    ENGLISHCASED: str = "bert-base-cased"
+    ENGLISHLARGE: str = "bert-large-uncased"
+    ENGLISHLARGECASED: str = "bert-large-cased"
+    ENGLISHLARGEWWM: str = "bert-large-uncased-whole-word-masking"
+    ENGLISHLARGECASEDWWM: str = "bert-large-cased-whole-word-masking"
+    CHINESE: str = "bert-base-chinese"
+    MULTILINGUAL: str = "bert-base-multilingual-cased"
 
 
 class Tokenizer:
-    def __init__(
-        self, language=Language.ENGLISH, to_lower=False, cache_dir="."
-    ):
+    def __init__(self, language=Language.ENGLISH, to_lower=False, cache_dir="."):
         """Initializes the underlying pretrained BERT tokenizer.
 
         Args:
@@ -60,7 +60,7 @@ class Tokenizer:
                 Defaults to ".".
         """
         self.tokenizer = BertTokenizer.from_pretrained(
-            language.value, do_lower_case=to_lower, cache_dir=cache_dir
+            language, do_lower_case=to_lower, cache_dir=cache_dir
         )
         self.language = language
 
@@ -78,10 +78,7 @@ class Tokenizer:
         if isinstance(text[0], str):
             return [self.tokenizer.tokenize(x) for x in tqdm(text)]
         else:
-            return [
-                [self.tokenizer.tokenize(x) for x in sentences]
-                for sentences in tqdm(text)
-            ]
+            return [[self.tokenizer.tokenize(x) for x in sentences] for sentences in tqdm(text)]
 
     def _truncate_seq_pair(self, tokens_a, tokens_b, max_length):
         """Truncates a sequence pair in place to the maximum length."""
@@ -90,6 +87,10 @@ class Tokenizer:
         # truncating an equal percent of tokens from each, since if one
         # sequence is very short then each token that's truncated likely
         # contains more information than a longer sequence.
+
+        if not tokens_b:
+            max_length += 1
+
         while True:
             total_length = len(tokens_a) + len(tokens_b)
             if total_length <= max_length:
@@ -100,7 +101,9 @@ class Tokenizer:
                 tokens_b.pop()
 
         tokens_a.append("[SEP]")
-        tokens_b.append("[SEP]")
+
+        if tokens_b:
+            tokens_b.append("[SEP]")
 
         return [tokens_a, tokens_b]
 
@@ -124,11 +127,7 @@ class Tokenizer:
                 list of token type id lists
         """
         if max_len > BERT_MAX_LEN:
-            print(
-                "setting max_len to max allowed tokens: {}".format(
-                    BERT_MAX_LEN
-                )
-            )
+            print("setting max_len to max allowed tokens: {}".format(BERT_MAX_LEN))
             max_len = BERT_MAX_LEN
 
         if isinstance(tokens[0][0], str):
@@ -144,23 +143,16 @@ class Tokenizer:
             # construct token_type_ids
             # [[0, 0, 0, 0, ... 0, 1, 1, 1, ... 1], [0, 0, 0, ..., 1, 1, ]
             token_type_ids = [
-                [[i] * len(sentence) for i, sentence in enumerate(example)]
-                for example in tokens
+                [[i] * len(sentence) for i, sentence in enumerate(example)] for example in tokens
             ]
             # merge sentences
-            tokens = [
-                [token for sentence in example for token in sentence]
-                for example in tokens
-            ]
+            tokens = [[token for sentence in example for token in sentence] for example in tokens]
             # prefix with [0] for [CLS]
             token_type_ids = [
-                [0] + [i for sentence in example for i in sentence]
-                for example in token_type_ids
+                [0] + [i for sentence in example for i in sentence] for example in token_type_ids
             ]
             # pad sequence
-            token_type_ids = [
-                x + [0] * (max_len - len(x)) for x in token_type_ids
-            ]
+            token_type_ids = [x + [0] * (max_len - len(x)) for x in token_type_ids]
 
         tokens = [["[CLS]"] + x for x in tokens]
         # convert tokens to indices
@@ -171,13 +163,65 @@ class Tokenizer:
         input_mask = [[min(1, x) for x in y] for y in tokens]
         return tokens, input_mask, token_type_ids
 
+    def preprocess_encoder_tokens(self, tokens, max_len=BERT_MAX_LEN):
+        """Preprocessing of input tokens:
+            - add BERT sentence markers ([CLS] and [SEP])
+            - map tokens to token indices in the BERT vocabulary
+            - pad and truncate sequences
+            - create an input_mask
+            - create token type ids, aka. segment ids
+
+        Args:
+            tokens (list): List of token lists to preprocess.
+            max_len (int, optional): Maximum number of tokens
+                            (documents will be truncated or padded).
+                            Defaults to 512.
+        Returns:
+            tuple: A tuple containing the following four lists
+                list of preprocesssed token lists
+                list of input id lists
+                list of input mask lists
+                list of token type id lists
+        """
+        if max_len > BERT_MAX_LEN:
+            print("setting max_len to max allowed tokens: {}".format(BERT_MAX_LEN))
+            max_len = BERT_MAX_LEN
+
+        if isinstance(tokens[0][0], str):
+            tokens = [x[0 : max_len - 2] + ["[SEP]"] for x in tokens]
+            token_type_ids = None
+        else:
+            # get tokens for each sentence [[t00, t01, ...] [t10, t11,... ]]
+            tokens = [
+                self._truncate_seq_pair(sentence[0], sentence[1], max_len - 3)
+                for sentence in tokens
+            ]
+
+            # construct token_type_ids
+            # [[0, 0, 0, 0, ... 0, 1, 1, 1, ... 1], [0, 0, 0, ..., 1, 1, ]
+            token_type_ids = [
+                [[i] * len(sentence) for i, sentence in enumerate(example)] for example in tokens
+            ]
+            # merge sentences
+            tokens = [[token for sentence in example for token in sentence] for example in tokens]
+            # prefix with [0] for [CLS]
+            token_type_ids = [
+                [0] + [i for sentence in example for i in sentence] for example in token_type_ids
+            ]
+            # pad sequence
+            token_type_ids = [x + [0] * (max_len - len(x)) for x in token_type_ids]
+
+        tokens = [["[CLS]"] + x for x in tokens]
+        # convert tokens to indices
+        input_ids = [self.tokenizer.convert_tokens_to_ids(x) for x in tokens]
+        # pad sequence
+        input_ids = [x + [0] * (max_len - len(x)) for x in input_ids]
+        # create input mask
+        input_mask = [[min(1, x) for x in y] for y in input_ids]
+        return tokens, input_ids, input_mask, token_type_ids
+
     def tokenize_ner(
-        self,
-        text,
-        max_len=BERT_MAX_LEN,
-        labels=None,
-        label_map=None,
-        trailing_piece_tag="X",
+        self, text, max_len=BERT_MAX_LEN, labels=None, label_map=None, trailing_piece_tag="X"
     ):
         """
         Tokenize and preprocesses input word lists, involving the following steps
@@ -232,18 +276,12 @@ class Tokenizer:
         """
 
         if max_len > BERT_MAX_LEN:
-            warnings.warn(
-                "setting max_len to max allowed tokens: {}".format(
-                    BERT_MAX_LEN
-                )
-            )
+            warnings.warn("setting max_len to max allowed tokens: {}".format(BERT_MAX_LEN))
             max_len = BERT_MAX_LEN
 
         if not _is_iterable_but_not_string(text):
             # The input text must be an non-string Iterable
-            raise ValueError(
-                "Input text must be an iterable and not a string."
-            )
+            raise ValueError("Input text must be an iterable and not a string.")
         else:
             # If the input text is a single list of words, convert it to
             # list of lists for later iteration
@@ -251,9 +289,7 @@ class Tokenizer:
                 text = [text]
         if labels is not None:
             if not _is_iterable_but_not_string(labels):
-                raise ValueError(
-                    "labels must be an iterable and not a string."
-                )
+                raise ValueError("labels must be an iterable and not a string.")
             else:
                 if not _is_iterable_but_not_string(labels[0]):
                     labels = [labels]
@@ -316,10 +352,7 @@ class Tokenizer:
             new_labels += label_padding
 
             trailing_token_mask_all.append(
-                [
-                    True if label != trailing_piece_tag else False
-                    for label in new_labels
-                ]
+                [True if label != trailing_piece_tag else False for label in new_labels]
             )
 
             if label_map:
@@ -332,12 +365,7 @@ class Tokenizer:
             label_ids_all.append(label_ids)
 
         if label_available:
-            return (
-                input_ids_all,
-                input_mask_all,
-                trailing_token_mask_all,
-                label_ids_all,
-            )
+            return (input_ids_all, input_mask_all, trailing_token_mask_all, label_ids_all)
         else:
             return input_ids_all, input_mask_all, trailing_token_mask_all, None
 
@@ -355,19 +383,11 @@ class Tokenizer:
         is_impossible=None,
     ):
         def _is_whitespace(c):
-            if (
-                c == " "
-                or c == "\t"
-                or c == "\r"
-                or c == "\n"
-                or ord(c) == 0x202F
-            ):
+            if c == " " or c == "\t" or c == "\r" or c == "\n" or ord(c) == 0x202F:
                 return True
             return False
 
-        def _improve_answer_span(
-            doc_tokens, input_start, input_end, tokenizer, orig_answer_text
-        ):
+        def _improve_answer_span(doc_tokens, input_start, input_end, tokenizer, orig_answer_text):
             """Returns tokenized answer spans that better match the annotated answer."""
 
             # We first project character-based annotations to
@@ -431,10 +451,7 @@ class Tokenizer:
                     continue
                 num_left_context = position - doc_span.start
                 num_right_context = end - position
-                score = (
-                    min(num_left_context, num_right_context)
-                    + 0.01 * doc_span.length
-                )
+                score = min(num_left_context, num_right_context) + 0.01 * doc_span.length
                 if best_score is None or score > best_score:
                     best_score = score
                     best_span_index = span_index
@@ -449,12 +466,7 @@ class Tokenizer:
 
         qa_examples = []
         for d_text, q_text, a_start, a_text, q_id, impossible in zip(
-            doc_text,
-            question_text,
-            answer_start,
-            answer_text,
-            qa_id,
-            is_impossible,
+            doc_text, question_text, answer_start, answer_text, qa_id, is_impossible
         ):
             d_tokens = []
             char_to_word_offset = []
@@ -474,13 +486,9 @@ class Tokenizer:
             # multiple answers, but it's only allowed for testing data.
             if _is_iterable_but_not_string(a_start):
                 if len(a_start) != len(a_text):
-                    raise Exception(
-                        "The lengths of answer starts and answer texts are different."
-                    )
+                    raise Exception("The lengths of answer starts and answer texts are different.")
                 if len(a_start) != 1 and is_training and not impossible:
-                    raise Exception(
-                        "For training, each question should have exactly 1 answer."
-                    )
+                    raise Exception("For training, each question should have exactly 1 answer.")
             else:
                 a_start = [a_start]
                 a_text = [a_text]
@@ -492,18 +500,14 @@ class Tokenizer:
                     if not impossible:
                         answer_length = len(t)
                         start_position = char_to_word_offset[s]
-                        end_position = char_to_word_offset[
-                            s + answer_length - 1
-                        ]
+                        end_position = char_to_word_offset[s + answer_length - 1]
                         # Only add answers where the text can be exactly recovered from the
                         # document. If this CAN'T happen it's likely due to weird Unicode
                         # stuff so we will just skip the example.
                         #
                         # Note that this means for training mode, every example is NOT
                         # guaranteed to be preserved.
-                        actual_text = " ".join(
-                            d_tokens[start_position : (end_position + 1)]
-                        )
+                        actual_text = " ".join(d_tokens[start_position : (end_position + 1)])
                         cleaned_answer_text = " ".join(whitespace_tokenize(t))
                         if actual_text.find(cleaned_answer_text) == -1:
                             logger.warning(
@@ -574,9 +578,7 @@ class Tokenizer:
                     # -1, moves one step back
                     # these two operations ensures word piece is covered
                     # when it's part of the original ending token.
-                    tok_end_position = (
-                        orig_to_tok_index[example.end_position + 1] - 1
-                    )
+                    tok_end_position = orig_to_tok_index[example.end_position + 1] - 1
                 else:
                     tok_end_position = len(all_doc_tokens) - 1
                 (tok_start_position, tok_end_position) = _improve_answer_span(
@@ -642,9 +644,7 @@ class Tokenizer:
                 # Paragraph
                 for i in range(doc_span.length):
                     split_token_index = doc_span.start + i
-                    token_to_orig_map[len(tokens)] = tok_to_orig_index[
-                        split_token_index
-                    ]
+                    token_to_orig_map[len(tokens)] = tok_to_orig_index[split_token_index]
 
                     ## TODO: maybe this can be improved to compute
                     # is_max_context for each token only once.
@@ -667,17 +667,13 @@ class Tokenizer:
                     tokens.append(cls_token)
                     segment_ids.append(cls_token_segment_id)
                     p_mask.append(0)
-                    cls_index = (
-                        len(tokens) - 1
-                    )  # Index of classification token
+                    cls_index = len(tokens) - 1  # Index of classification token
 
                 input_ids = self.tokenizer.convert_tokens_to_ids(tokens)
 
                 # The mask has 1 for real tokens and 0 for padding tokens. Only real
                 # tokens are attended to.
-                input_mask = [1 if mask_padding_with_zero else 0] * len(
-                    input_ids
-                )
+                input_mask = [1 if mask_padding_with_zero else 0] * len(input_ids)
 
                 # Zero-pad up to the sequence length.
                 # while len(input_ids) < max_len:
@@ -707,10 +703,7 @@ class Tokenizer:
                     doc_start = doc_span.start
                     doc_end = doc_span.start + doc_span.length - 1
                     out_of_span = False
-                    if not (
-                        tok_start_position >= doc_start
-                        and tok_end_position <= doc_end
-                    ):
+                    if not (tok_start_position >= doc_start and tok_end_position <= doc_end):
                         out_of_span = True
                     if out_of_span:
                         start_position = 0
@@ -720,12 +713,8 @@ class Tokenizer:
                         # +1 for [CLS] token
                         # +1 for [SEP] toekn
                         doc_offset = len(query_tokens) + 2
-                        start_position = (
-                            tok_start_position - doc_start + doc_offset
-                        )
-                        end_position = (
-                            tok_end_position - doc_start + doc_offset
-                        )
+                        start_position = tok_start_position - doc_start + doc_offset
+                        end_position = tok_end_position - doc_start + doc_offset
 
                 if is_training and span_is_impossible:
                     start_position = cls_index
@@ -756,11 +745,7 @@ def _is_iterable_but_not_string(obj):
 
 
 def create_data_loader(
-    input_ids,
-    input_mask,
-    label_ids=None,
-    sample_method="random",
-    batch_size=32,
+    input_ids, input_mask, label_ids=None, sample_method="random", batch_size=32
 ):
     """
     Create a dataloader for sampling and serving data batches.
@@ -790,9 +775,7 @@ def create_data_loader(
 
     if label_ids:
         label_ids_tensor = torch.tensor(label_ids, dtype=torch.long)
-        tensor_data = TensorDataset(
-            input_ids_tensor, input_mask_tensor, label_ids_tensor
-        )
+        tensor_data = TensorDataset(input_ids_tensor, input_mask_tensor, label_ids_tensor)
     else:
         tensor_data = TensorDataset(input_ids_tensor, input_mask_tensor)
 
@@ -802,12 +785,73 @@ def create_data_loader(
         sampler = SequentialSampler(tensor_data)
     else:
         raise ValueError(
-            "Invalid sample_method value, accepted values are: "
-            "random, sequential, and distributed"
+            "Invalid sample_method value, accepted values are: " "random and sequential."
         )
 
-    dataloader = DataLoader(
-        tensor_data, sampler=sampler, batch_size=batch_size
-    )
+    dataloader = DataLoader(tensor_data, sampler=sampler, batch_size=batch_size)
 
     return dataloader
+
+
+class TextDataset(Dataset):
+    """
+    Characterizes a dataset for PyTorch which can be used to load a file containing multiple rows
+    where each row is a training example.
+    """
+
+    def __init__(self, filename):
+        """
+        Initialization. We set the filename and number of lines in the file.
+        Args:
+            filename(str): Name of the file.
+        """
+        self._filename = filename
+        self._total_data = (
+            int(subprocess.check_output("wc -l " + filename, shell=True).split()[0]) - 1
+        )
+
+    def __len__(self):
+        """Denotes the total number of samples in the file."""
+        return self._total_data
+
+    @staticmethod
+    def _cast(row):
+        return [int(x.strip()) for x in row]
+
+    def __getitem__(self, index):
+        """
+        Generates one sample of data. We assume that the last column is label here. We use
+        linecache to load files lazily.
+
+        Args:
+            index(int): Index of the test case.
+
+        Returns(list, list, int): Returns the tokens, mask and label for a single item.
+
+        """
+        line = linecache.getline(self._filename, index + 1)
+        row = next(csv.reader([line]))
+
+        tokens = self._cast(row[0][1:-1].split(","))
+        mask = self._cast(row[1][1:-1].split(","))
+
+        return (
+            torch.tensor(tokens, dtype=torch.long),
+            torch.tensor(mask, dtype=torch.long),
+            torch.tensor(int(row[2]), dtype=torch.long),
+        )
+
+
+def get_dataset_multiple_files(files):
+    """ Get dataset from multiple files
+
+    Args:
+        files(list): List of paths to the files.
+
+    Returns:
+
+        torch.utils.data.Dataset : A combined dataset of all files in the directory.
+
+    """
+    datasets = [TextDataset(x) for x in files]
+    return ConcatDataset(datasets)

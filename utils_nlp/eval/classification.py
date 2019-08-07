@@ -8,6 +8,9 @@ from sklearn.metrics import (
     f1_score,
 )
 
+from numpy import corrcoef
+import pandas as pd
+
 
 def eval_classification(actual, predicted, round_decimals=4):
     """Returns common classification evaluation metrics.
@@ -32,3 +35,23 @@ def eval_classification(actual, predicted, round_decimals=4):
             f1_score(actual, predicted, average=None).round(round_decimals)
         ),
     }
+
+
+def compute_correlation_coefficients(x, y=None):
+    """
+    Compute Pearson product-moment correlation coefficients.
+
+    Args:
+        x: array_like
+            A 1-D or 2-D array containing multiple variables and observations.
+            Each row of `x` represents a variable, and each column a single
+            observation of all those variables.
+
+        y: array_like, optional
+            An additional set of variables and observations. `y` has the same
+            shape as `x`.
+
+    Returns:
+        pd.DataFrame : A pandas dataframe from the correlation coefficient matrix of the variables.
+    """
+    return pd.DataFrame(corrcoef(x, y))

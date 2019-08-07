@@ -1,19 +1,14 @@
 # NLP Scenarios
 
-This folder contains examples and best practices, written in Jupyter notebooks, for building Natural Language Processing systems for different scenarios.
+This folder contains examples and best practices, written in Jupyter notebooks, for building Natural Language Processing systems for the following scenarios.
 
-## Summary
 
-The following is a summary of the scenarios covered in the best practice notebooks. Each scenario is demonstrated in one or more Jupyter notebook examples that make use of the core code base of models and utilities.
-
-| Scenario                 | Applications                                 |  Models |
-|---| ------------------------ | ------------------- |
-|[Text Classification](text_classification)      |Topic Classification|BERT|
-|[Named Entity Recognition](named_entity_recognition) |Wikipedia NER                                              |BERT|
-|[Entailment](./entailment)|XNLI Natural Language Inference|BERT|
-|[Question Answering](question_answering) |SQuAD                                              | BiDAF|
-|[Sentence Similarity](sentence_similarity)      |STS Benchmark                         |Representation: TF-IDF, Word Embeddings, Doc Embeddings<br>Metrics: Cosine Similarity, Word Mover's Distance|
-|[Embeddings](embeddings)| Custom Embeddings Training|Word2Vec<br>fastText<br>GloVe|
+- [Text Classification](text_classification)
+- [Named Entity Recognition](named_entity_recognition)
+- [Entailment](entailment)
+- [Question Answering](question_answering)
+- [Sentence Similarity](sentence_similarity)
+- [Embeddings](embeddings)
 
 ## Azure-enhanced notebooks
 
@@ -31,8 +26,8 @@ The Azure products featured in the notebooks include:
   * Scaling up and out on Azure Machine Learning Compute
   * Deploying a web service to both Azure Container Instance and Azure Kubernetes Service
 
-* [Azure Kubernetes Service](https://docs.microsoft.com/en-us/azure/machine-learning/service/how-to-deploy-and-where#aks) - You can use Azure Machine Learning service to host your classification model in a web service deployment on Azure Kubernetes Service (AKS). AKS is good for high-scale production deployments and provides autoscaling, and fast response times.
+* [Azure Kubernetes Service](https://docs.microsoft.com/en-us/azure/machine-learning/service/how-to-deploy-and-where#aks) - You can use Azure Machine Learning service to host your model in a web service deployment on Azure Kubernetes Service (AKS). AKS is good for high-scale production deployments and provides autoscaling, and fast response times.
 
-* [Azure Container Instance](https://docs.microsoft.com/en-us/azure/machine-learning/service/how-to-deploy-and-where#aci)- You can use Azure Machine Learning service to host your classification model in a web service deployment on Azure Container Instance (ACI). ACI is good for low scale, CPU-based workloads.
+* [Azure Container Instance](https://docs.microsoft.com/en-us/azure/machine-learning/service/how-to-deploy-and-where#aci)- You can use Azure Machine Learning service to host your model in a web service deployment on Azure Container Instance (ACI). ACI is good for low scale, CPU-based workloads.
 
 There may be other Azure service or products used in the notebooks. Introduction and/or reference of those will be provided in the notebooks.

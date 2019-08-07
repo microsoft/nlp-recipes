@@ -50,9 +50,8 @@ def get_generator(
     local_cache_path=".",
     file_split="train",
     block_size=10e6,
-    random_seed=None,
-    num_batches=1000,
-    batch_size=1000,
+    batch_size=10e6,
+    num_batches=None,
 ):
     """ Downloads and extracts the dataset files and then returns a random batch generator that
     yields pandas dataframes.
@@ -81,10 +80,8 @@ def get_generator(
 
     loader = DaskJSONLoader(
         os.path.join(local_cache_path, DATA_FILES[file_split]),
-        block_size=block_size,
-        random_seed=random_seed,
-    )
+        block_size=block_size,)
 
-    return loader.get_random_batches(
-        num_batches=num_batches, batch_size=batch_size
+    return loader.get_sequential_batches(
+        batch_size=int(batch_size), num_batches=num_batches
     )
