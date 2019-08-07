@@ -33,6 +33,29 @@ def baseline_results():
     }
 
 
+@pytest.mark.gpu
+@pytest.mark.integration
+def test_gensen_local(notebooks):
+    notebook_path = notebooks["gensen_local"]
+    pm.execute_notebook(
+        notebook_path,
+        OUTPUT_NOTEBOOK,
+        kernel_name=KERNEL_NAME,
+        parameters=dict(
+            max_epoch=1,
+            config_filepath="scenarios/sentence_similarity/gensen_config.json",
+            base_data_path="data",
+        ),
+    )
+
+    results = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict["results"]
+    expected = {"0": {"0": 1, "1": 0.95}, "1": {"0": 0.95, "1": 1}}
+
+    for key, value in expected.items():
+        for k, v in value.items():
+            assert results[key][k] == pytest.approx(v, abs=ABS_TOL_PEARSONS)
+            
+
 @pytest.mark.integration
 @pytest.mark.azureml
 def test_similarity_embeddings_baseline_runs(notebooks, baseline_results):
@@ -67,30 +90,7 @@ def test_automl_local_runs(notebooks,
     assert result == pytest.approx(0.5, abs=ABS_TOL)
 
 
-@pytest.mark.gpu
 @pytest.mark.integration
-def test_gensen_local(notebooks):
-    notebook_path = notebooks["gensen_local"]
-    pm.execute_notebook(
-        notebook_path,
-        OUTPUT_NOTEBOOK,
-        kernel_name=KERNEL_NAME,
-        parameters=dict(
-            max_epoch=1,
-            config_filepath="scenarios/sentence_similarity/gensen_config.json",
-            base_data_path="data",
-        ),
-    )
-
-    results = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict["results"]
-    expected = {"0": {"0": 1, "1": 0.95}, "1": {"0": 0.95, "1": 1}}
-
-    for key, value in expected.items():
-        for k, v in value.items():
-            assert results[key][k] == pytest.approx(v, abs=ABS_TOL_PEARSONS)
-
-
-@pytest.mark.notebooks
 @pytest.mark.azureml
 def test_similarity_gensen_azureml_runs(notebooks):
     notebook_path = notebooks["gensen_azureml"]
