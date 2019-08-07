@@ -8,7 +8,7 @@ from sklearn.preprocessing import LabelEncoder
 MAX_SEQ_LENGTH = 128
 TEXT_COL = "text"
 LABEL_COL = "label"
-#DATA_USED_PERCENT = 0.0025
+DATA_PERCENT_USED = 1.0
 TRAIN_FILE_SPLIT = "train"
 TEST_FILE_SPLIT = "test"
 VALIDATION_FILE_SPLIT = "dev"
@@ -26,6 +26,7 @@ class XnliDataset(data.Dataset):
         language=LANGUAGE_ENGLISH,
         to_lowercase=TO_LOWER_CASE,
         tok_language=TOK_ENGLISH,
+        data_percent_used=DATA_PERCENT_USED,
     ):
         """
             Load the dataset here
@@ -45,24 +46,16 @@ class XnliDataset(data.Dataset):
         self.language = language
         self.to_lowercase = to_lowercase
         self.tok_language = tok_language
+        self.data_percent_used = data_percent_used
 
-        df = load_pandas_df(
-            local_cache_path=cache_dir,
-            file_split=file_split,
-            language=language,
-        )
+        df = load_pandas_df(local_cache_path=cache_dir, file_split=file_split, language=language)
 
-        # to test on a subset
-        # if file_split == TRAIN_FILE_SPLIT:
-        #     data_used_count = round(DATA_USED_PERCENT * df.shape[0])
-        #     df = df.loc[:data_used_count]
-
+        data_used_count = round(self.data_percent_used * df.shape[0])
+        df = df.loc[:data_used_count]
         self.df = df
 
         print("Create a tokenizer...")
-        tokenizer = Tokenizer(
-            language=tok_language, to_lower=to_lowercase, cache_dir=cache_dir
-        )
+        tokenizer = Tokenizer(language=tok_language, to_lower=to_lowercase, cache_dir=cache_dir)
         tokens = tokenizer.tokenize(df[TEXT_COL])
 
         print("Tokenize and preprocess text...")
