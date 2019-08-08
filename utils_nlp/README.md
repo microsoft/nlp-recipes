@@ -1,6 +1,6 @@
 # NLP Utilities
 
-This module (utils_nlp) contains functions to simplify common tasks used when developing and evaluating recommender systems. A short description of the sub-modules is provided below. For more details about what functions are available and how to use them, please review the doc-strings provided with the code.
+This module (utils_nlp) contains functions to simplify common tasks used when developing and evaluating NLP systems. A short description of the sub-modules is provided below. For more details about what functions are available and how to use them, please review the doc-strings provided with the code.
 
 ## Sub-Modules
 
@@ -29,7 +29,7 @@ This submodule contains high-level utilities for defining constants used in most
 Dataset includes helper functions for interacting with different datasets and formatting them appropriately as well as utilities for splitting data for training / testing.
 
 #### Data Loading
-There are dataloaders for several datasets of different types like Dask and CSV. For example, the snli module will allow you to load a dataframe in pandas from the SNLI dataset, with the option to set the number of rows to load in order to test algorithms and evaluate performance benchmarks.
+There are dataloaders for several datasets. For example, the snli module will allow you to load a dataframe in pandas from the SNLI dataset, with the option to set the number of rows to load in order to test algorithms and evaluate performance benchmarks. Information on the datasets used in the repo can be found [here](https://github.com/microsoft/nlp/tree/staging/utils_nlp/dataset#datasets).
 
 Most datasets may be split into `train`, `dev`, and `test`.
 
@@ -52,4 +52,4 @@ This includes:
 * Pytorch's conditional Gated Recurrent Unit (GRU)
 
 ### [Interpreter](interpreter)
-This Toolkit enables you to explain every hidden state in your model. It is a code implementation of the paper [Towards a Deep and Unified Understanding of Deep Neural Models in NLP](http://proceedings.mlr.press/v97/guan19a/guan19a.pdf)
+The interpreter submodule contains implementations to explain hidden states of models. It is a code implementation of the paper [Towards a Deep and Unified Understanding of Deep Neural Models in NLP](http://proceedings.mlr.press/v97/guan19a/guan19a.pdf).

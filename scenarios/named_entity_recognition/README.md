@@ -7,13 +7,14 @@ NLP tasks like question answering and text summarization.
 
 Named Entity Recognition (NER) is the task of detecting and classifying
 real-world objects mentioned in text. Common named entities include person
-names, locations, organizations, etc. The state-of-the art NER methods include
-combining Long Short-Term Memory neural network with Conditional Random Field
+names, locations, organizations, etc. The [state-of-the art](https://paperswithcode.com/task/named-entity-recognition-ner) NER methods include combining Long Short-Term Memory neural network with Conditional Random Field
 (LSTM-CRF) and pretrained language models like BERT.
 
 The figure below illustrates how BERT can be fine tuned for NER tasks. The input data is a list of tokens representing a sentence. In the training data, each token has an entity label. After fine tuning, the model predicts an entity label for each token in a given testing sentence.
 
-![Fine-tuned BERT for NER tasks](https://nlpbp.blob.core.windows.net/images/bert_architecture.png)
+<p align="center">
+  <img src="https://nlpbp.blob.core.windows.net/images/bert_architecture.png" alt=" Fine-tuned BERT for NER tasks"/>
+</p>
 
 ## Summary
 
