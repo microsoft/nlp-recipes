@@ -200,7 +200,6 @@ def teardown_service(
 
     # connect to workspace
     ws = azureml_utils.get_or_create_workspace(
-        config_path="tests/ci",
         subscription_id=subscription_id,
         resource_group=resource_group,
         workspace_name=workspace_name,
