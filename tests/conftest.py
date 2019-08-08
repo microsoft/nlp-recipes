@@ -15,8 +15,10 @@ from tempfile import TemporaryDirectory
 import pytest
 from tests.notebooks_common import path_notebooks
 
-from utils_nlp.models.bert.common import Language
+from utils_nlp.models.bert.common import Language as BERTLanguage
+from utils_nlp.models.xlnet.common import Language as XLNetLanguage
 from utils_nlp.models.bert.common import Tokenizer as BERTTokenizer
+from utils_nlp.models.xlnet.common import Tokenizer as XLNetTokenizer
 
 
 @pytest.fixture(scope="module")
@@ -154,4 +156,8 @@ def ner_test_data():
 
 @pytest.fixture()
 def bert_english_tokenizer():
-    return BERTTokenizer(language=Language.ENGLISHCASED, to_lower=False)
+    return BERTTokenizer(language=BERTLanguage.ENGLISHCASED, to_lower=False)
+
+@pytest.fixture()
+def xlnet_english_tokenizer():
+    return XLNetTokenizer(language=XLNetLanguage.ENGLISHCASED)
