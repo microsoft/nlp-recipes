@@ -6,6 +6,7 @@
 # https://github.com/huggingface/pytorch-transformers/blob/master/examples
 # /run_glue.py
 
+import os
 import csv
 import linecache
 import subprocess
@@ -63,6 +64,7 @@ class Tokenizer:
             language, do_lower_case=to_lower, cache_dir=cache_dir
         )
         self.language = language
+        self.cache_dir = cache_dir
 
     def tokenize(self, text):
         """Tokenizes a list of documents using a BERT tokenizer
@@ -373,14 +375,15 @@ class Tokenizer:
         self,
         doc_text,
         question_text,
-        answer_start,
-        answer_text,
         is_training,
+        qa_id,
+        answer_start=None,
+        answer_text=None,
         max_query_length=64,
         max_len=BERT_MAX_LEN,
         doc_stride=128,
-        qa_id=None,
         is_impossible=None,
+        cache_results=False,
     ):
         def _is_whitespace(c):
             if c == " " or c == "\t" or c == "\r" or c == "\n" or ord(c) == 0x202F:
@@ -458,11 +461,15 @@ class Tokenizer:
 
             return cur_span_index == best_span_index
 
-        if qa_id is None:
-            qa_id = list(range(len(question_text)))
-
         if is_impossible is None:
             is_impossible = [False] * len(question_text)
+
+        if is_training and (answer_start is None or answer_text is None):
+            raise Exception("answer_start and answer_text must be provided " "for training data.")
+
+        if not is_training:
+            answer_start = [-1] * len(doc_text)
+            answer_text = [""] * len(doc_text)
 
         qa_examples = []
         for d_text, q_text, a_start, a_text, q_id, impossible in zip(
@@ -482,55 +489,47 @@ class Tokenizer:
                     prev_is_whitespace = False
                 char_to_word_offset.append(len(d_tokens) - 1)
 
-            # "a_start" and "a_text" can be lists when the question has
-            # multiple answers, but it's only allowed for testing data.
             if _is_iterable_but_not_string(a_start):
-                if len(a_start) != len(a_text):
-                    raise Exception("The lengths of answer starts and answer texts are different.")
                 if len(a_start) != 1 and is_training and not impossible:
                     raise Exception("For training, each question should have exactly 1 answer.")
-            else:
-                a_start = [a_start]
-                a_text = [a_text]
+                a_start = a_start[0]
+                a_text = a_text[0]
 
-            for s, t in zip(a_start, a_text):
-                start_position = None
-                end_position = None
-                if is_training:
-                    if not impossible:
-                        answer_length = len(t)
-                        start_position = char_to_word_offset[s]
-                        end_position = char_to_word_offset[s + answer_length - 1]
-                        # Only add answers where the text can be exactly recovered from the
-                        # document. If this CAN'T happen it's likely due to weird Unicode
-                        # stuff so we will just skip the example.
-                        #
-                        # Note that this means for training mode, every example is NOT
-                        # guaranteed to be preserved.
-                        actual_text = " ".join(d_tokens[start_position : (end_position + 1)])
-                        cleaned_answer_text = " ".join(whitespace_tokenize(t))
-                        if actual_text.find(cleaned_answer_text) == -1:
-                            logger.warning(
-                                "Could not find answer: '%s' vs. '%s'",
-                                actual_text,
-                                cleaned_answer_text,
-                            )
-                            continue
-                    else:
-                        start_position = -1
-                        end_position = -1
+            start_position = None
+            end_position = None
+            if is_training:
+                if not impossible:
+                    answer_length = len(a_text)
+                    start_position = char_to_word_offset[a_start]
+                    end_position = char_to_word_offset[a_start + answer_length - 1]
+                    # Only add answers where the text can be exactly recovered from the
+                    # document. If this CAN'T happen it's likely due to weird Unicode
+                    # stuff so we will just skip the example.
+                    #
+                    # Note that this means for training mode, every example is NOT
+                    # guaranteed to be preserved.
+                    actual_text = " ".join(d_tokens[start_position : (end_position + 1)])
+                    cleaned_answer_text = " ".join(whitespace_tokenize(a_text))
+                    if actual_text.find(cleaned_answer_text) == -1:
+                        logger.warning(
+                            "Could not find answer: '%s' vs. '%s'", actual_text, cleaned_answer_text
+                        )
+                        continue
+                else:
+                    start_position = -1
+                    end_position = -1
 
-                qa_examples.append(
-                    QAExample(
-                        qa_id=q_id,
-                        doc_tokens=d_tokens,
-                        question_text=q_text,
-                        orig_answer_text=t,
-                        start_position=start_position,
-                        end_position=end_position,
-                        is_impossible=impossible,
-                    )
+            qa_examples.append(
+                QAExample(
+                    qa_id=q_id,
+                    doc_tokens=d_tokens,
+                    question_text=q_text,
+                    orig_answer_text=a_text,
+                    start_position=start_position,
+                    end_position=end_position,
+                    is_impossible=impossible,
                 )
+            )
 
         cls_token = "[CLS]"
         sep_token = "[SEP]"
@@ -627,11 +626,6 @@ class Tokenizer:
                     cls_index = 0
 
                 # Query
-                # for token in query_tokens:
-                #     tokens.append(token)
-                #     segment_ids.append(sequence_a_segment_id)
-                #     p_mask.append(1)
-
                 tokens += query_tokens
                 segment_ids += [sequence_a_segment_id] * len(query_tokens)
                 p_mask += [1] * len(query_tokens)
@@ -655,7 +649,6 @@ class Tokenizer:
                     tokens.append(all_doc_tokens[split_token_index])
                     segment_ids.append(sequence_b_segment_id)
                     p_mask.append(0)
-                paragraph_len = doc_span.length
 
                 # SEP token
                 tokens.append(sep_token)
@@ -676,12 +669,6 @@ class Tokenizer:
                 input_mask = [1 if mask_padding_with_zero else 0] * len(input_ids)
 
                 # Zero-pad up to the sequence length.
-                # while len(input_ids) < max_len:
-                #     input_ids.append(pad_token)
-                #     input_mask.append(0 if mask_padding_with_zero else 1)
-                #     segment_ids.append(pad_token_segment_id)
-                #     p_mask.append(1)
-
                 if len(input_ids) < max_len:
                     pad_token_length = max_len - len(input_ids)
                     pad_mask = 0 if mask_padding_with_zero else 1
@@ -723,19 +710,30 @@ class Tokenizer:
                 features.append(
                     QAFeatures(
                         unique_id=unique_id,
-                        example_index=example_index,
+                        # example_index=example_index,
+                        qa_id=example.qa_id,
                         tokens=tokens,
                         token_to_orig_map=token_to_orig_map,
                         token_is_max_context=token_is_max_context,
                         input_ids=input_ids,
                         input_mask=input_mask,
                         segment_ids=segment_ids,
-                        paragraph_len=paragraph_len,
                         start_position=start_position,
                         end_position=end_position,
                     )
                 )
                 unique_id += 1
+
+        if cache_results:
+            if is_training:
+                file_suffix = "_train"
+            else:
+                file_suffix = ""
+            features_file_name = os.path.join(self.cache_dir, "cached_features" + file_suffix)
+            example_file_name = os.path.join(self.cache_dir, "cached_examples" + file_suffix)
+
+            torch.save(features, features_file_name)
+            torch.save(qa_examples, example_file_name)
 
         return features, qa_examples
 
