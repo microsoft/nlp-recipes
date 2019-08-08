@@ -386,11 +386,11 @@ if __name__ == "__main__":
 
     if args.dockerproc == "cpu":
         from azureml.core.runconfig import DEFAULT_CPU_IMAGE
-
         docker_proc_type = DEFAULT_CPU_IMAGE
+    elif args.dockerproc == "gpucuda9":
+        docker_proc_type = "mcr.microsoft.com/azureml/base-gpu:intelmpi2018.3-cuda9.0-cudnn7-ubuntu16.04"
     else:
         from azureml.core.runconfig import DEFAULT_GPU_IMAGE
-
         docker_proc_type = DEFAULT_GPU_IMAGE
 
     cli_auth = AzureCliAuthentication()

@@ -20,7 +20,7 @@ variables:
 - name  : 'vmsize'
   value : 'STANDARD_NC6'
 - name  : 'dockerproc'
-  value : 'cpu'
+  value : 'gpucuda9'
 - name  : 'expname'
   value : 'gpu_unit_tests'
 
