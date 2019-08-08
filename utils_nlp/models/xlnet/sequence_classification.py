@@ -38,7 +38,7 @@ class XLNetSequenceClassifier:
         self.cache_dir = cache_dir
         
         #create classifier
-        self.config = XLNetConfig.from_pretrained(self.language.value, num_labels=num_labels)
+        self.config = XLNetConfig.from_pretrained(self.language.value, num_labels=num_labels, cache_dir=cache_dir)
         self.model = XLNetForSequenceClassification(self.config)
         
     def fit(
