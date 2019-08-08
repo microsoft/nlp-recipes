@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 from pytorch_transformers.tokenization_bert import BasicTokenizer
 
-QAExample = collections.namedtuple(
+QAExample_ = collections.namedtuple(
     "QAExample",
     [
         "qa_id",
@@ -29,11 +29,38 @@ QAExample = collections.namedtuple(
     ],
 )
 
-QAFeatures = collections.namedtuple(
+
+# create a wrapper class so that we can add docstrings
+class QAExample(QAExample_):
+    """
+    A data structure representing an unique document-question-answer triplet.
+
+    Args:
+        qa_id (int): An unique id identifying the document-question pair.
+            This is used to map prediction results to ground truth answers
+            during evaluation, because the data order is not preserved
+            during pre-processing and post-processing.
+        doc_tokens (list): White-space tokenized tokens of the document
+            text. This is used to generate the final answer based on
+            predicted start and end token indices during post-processing.
+        question_text (str): Text of the question.
+        orig_answer_text (str): Text of the ground truth answer if available.
+        start_position (int): Index of the starting token of the answer
+            span, if available.
+        end_position (int): Index of the ending token of the answer span,
+            if available.
+        is_impossible (bool): If the question is impossible to answer based
+            on the given document.
+    """
+
+    pass
+
+
+QAFeatures_ = collections.namedtuple(
     "QAFeatures",
     [
         "unique_id",
-        "example_index",
+        "qa_id",
         "tokens",
         "token_to_orig_map",
         "token_is_max_context",
@@ -42,13 +69,82 @@ QAFeatures = collections.namedtuple(
         "segment_ids",
         "start_position",
         "end_position",
-        "paragraph_len",
     ],
 )
 
-QAResult = collections.namedtuple(
-    "QAResult", ["unique_id", "start_logits", "end_logits"]
-)
+
+# create a wrapper class so that we can add docstrings
+class QAFeatures(QAFeatures_):
+    """
+    BERT-format features of an unique document span-question-answer triplet.
+
+    Args:
+        unique_id (int): An unique id identifying the
+            document-question-answer triplet.
+        example_index (int): Index of the unique QAExample from which this
+            feature instance is derived from. A single QAExample can derive
+            multiple QAFeatures if the document is too long and gets split
+            into multiple document spans. This index is used to group
+            QAResults belonging to the same document-question pair and
+            generate the final answer.
+        tokens (list): Concatenated question tokens and paragraph tokens.
+        token_to_orig_map (dict): A dictionary mapping token indices in the
+            document span back to the token indices in the original document
+            before document splitting.
+            This is needed during post-processing to generate the final
+            predicted answer.
+        token_is_max_context (list): List of booleans indicating whether a
+            token has the maximum context in teh current document span if it
+            appears in multiple document spans and gets multiple predicted
+            scores. We only want to consider the score with "maximum context".
+            "Maximum context" is defined as the *minimum* of its left and
+            right context.
+            For example:
+                Doc: the man went to the store and bought a gallon of milk
+                Span A: the man went to the
+                Span B: to the store and bought
+                Span C: and bought a gallon of
+
+            In the example the maximum context for 'bought' would be span C
+            since it has 1 left context and 3 right context, while span B
+            has 4 left context and 0 right context.
+            This is needed during post-processing to generate the final
+            predicted answer.
+        input_ids (list): List of numerical token indices corresponding to
+            the tokens.
+        input_mask (list): List of 1s and 0s indicating if a token is from
+            the input data or padded to conform to the maximum sequence
+            length. 1 for actual token and 0 for padded token.
+        segment_ids (list): List of 0s and 1s indicating if a token is from
+            the question text (0) or paragraph text (1).
+        start_position (int): Index of the starting token of the answer span.
+        end_position (int): Index of the ending token of the answer span.
+
+    """
+
+    pass
+
+
+# create a wrapper class so that we can add docstrings
+QAResult_ = collections.namedtuple("QAResult", ["unique_id", "start_logits", "end_logits"])
+
+
+class QAResult(QAResult_):
+    """
+    Question answering prediction result returned by BERTQAExtractor.predict.
+
+    Args:
+        unique_id: Unique id identifying the training/testing sample. It's
+            used to map the prediction result back to the QAFeatures
+            during postprocessing.
+        start_logits (list): List of logits for predicting each token being
+            the start of the answer span.
+        end__logits (list): List of logits for predicting each token being
+            the end of the answer span.
+
+    """
+
+    pass
 
 
 def postprocess_answers(
@@ -70,12 +166,14 @@ def postprocess_answers(
     logger.info("Writing predictions to: %s" % (output_prediction_file))
     logger.info("Writing nbest to: %s" % (output_nbest_file))
 
-    example_index_to_features = collections.defaultdict(list)
+    # example_index_to_features = collections.defaultdict(list)
+    qa_id_to_features = collections.defaultdict(list)
     # Map unique features to the original doc-question-answer triplet
     # Each doc-question-answer triplet can have multiple features because the doc
     # could be split into multiple spans
     for feature in all_features:
-        example_index_to_features[feature.example_index].append(feature)
+        # example_index_to_features[feature.example_index].append(feature)
+        qa_id_to_features[feature.qa_id].append(feature)
 
     unique_id_to_result = {}
     for result in all_results:
@@ -83,13 +181,7 @@ def postprocess_answers(
 
     _PrelimPrediction = collections.namedtuple(
         "PrelimPrediction",
-        [
-            "feature_index",
-            "start_index",
-            "end_index",
-            "start_logit",
-            "end_logit",
-        ],
+        ["feature_index", "start_index", "end_index", "start_logit", "end_logit"],
     )
 
     all_predictions = collections.OrderedDict()
@@ -98,17 +190,16 @@ def postprocess_answers(
     scores_diff_json = collections.OrderedDict()
 
     for (example_index, example) in enumerate(all_examples):
-        # get all the features belong to the same example,
+        # get all the features belonging to the same example,
         # i.e. paragaraph/question pair.
-        features = example_index_to_features[example_index]
+        # features = example_index_to_features[example_index]
+        features = qa_id_to_features[example.qa_id]
 
         prelim_predictions = []
         # keep track of the minimum score of null start+end of position 0
         score_null = 1000000  # large and positive
         min_null_feature_index = 0  # the paragraph slice with min null score
-        null_start_logit = (
-            0
-        )  # the start logit at the slice with min null score
+        null_start_logit = 0  # the start logit at the slice with min null score
         null_end_logit = 0  # the end logit at the slice with min null score
         for (feature_index, feature) in enumerate(features):
             result = unique_id_to_result[feature.unique_id]
@@ -120,9 +211,7 @@ def postprocess_answers(
                 # probability of predicting the [CLS] token as the start and
                 # end positions of the answer, which means the answer is
                 # empty.
-                feature_null_score = (
-                    result.start_logits[0] + result.end_logits[0]
-                )
+                feature_null_score = result.start_logits[0] + result.end_logits[0]
                 if feature_null_score < score_null:
                     score_null = feature_null_score
                     min_null_feature_index = feature_index
@@ -141,9 +230,7 @@ def postprocess_answers(
                         continue
                     if end_index not in feature.token_to_orig_map:
                         continue
-                    if not feature.token_is_max_context.get(
-                        start_index, False
-                    ):
+                    if not feature.token_is_max_context.get(start_index, False):
                         continue
                     if end_index < start_index:
                         continue
@@ -173,9 +260,7 @@ def postprocess_answers(
         # Sort by the sum of the start and end logits in ascending order,
         # so that the first element is the most probable answer
         prelim_predictions = sorted(
-            prelim_predictions,
-            key=lambda x: (x.start_logit + x.end_logit),
-            reverse=True,
+            prelim_predictions, key=lambda x: (x.start_logit + x.end_logit), reverse=True
         )
 
         _NbestPrediction = collections.namedtuple(
@@ -189,15 +274,10 @@ def postprocess_answers(
                 break
             feature = features[pred.feature_index]
             if pred.start_index > 0:  # this is a non-null prediction
-                tok_tokens = feature.tokens[
-                    pred.start_index : (pred.end_index + 1)
-                ]
-                ## Why can't we use span tokens directly???
+                tok_tokens = feature.tokens[pred.start_index : (pred.end_index + 1)]
                 orig_doc_start = feature.token_to_orig_map[pred.start_index]
                 orig_doc_end = feature.token_to_orig_map[pred.end_index]
-                orig_tokens = example.doc_tokens[
-                    orig_doc_start : (orig_doc_end + 1)
-                ]
+                orig_tokens = example.doc_tokens[orig_doc_start : (orig_doc_end + 1)]
                 tok_text = " ".join(tok_tokens)
 
                 # De-tokenize WordPieces that have been split off.
@@ -209,9 +289,7 @@ def postprocess_answers(
                 tok_text = " ".join(tok_text.split())
                 orig_text = " ".join(orig_tokens)
 
-                final_text = get_final_text(
-                    tok_text, orig_text, do_lower_case, verbose_logging
-                )
+                final_text = get_final_text(tok_text, orig_text, do_lower_case, verbose_logging)
                 if final_text in seen_predictions:
                     continue
 
@@ -222,9 +300,7 @@ def postprocess_answers(
 
             nbest.append(
                 _NbestPrediction(
-                    text=final_text,
-                    start_logit=pred.start_logit,
-                    end_logit=pred.end_logit,
+                    text=final_text, start_logit=pred.start_logit, end_logit=pred.end_logit
                 )
             )
         # if we didn't include the empty option in the n-best, include it
@@ -232,28 +308,19 @@ def postprocess_answers(
             if "" not in seen_predictions:
                 nbest.append(
                     _NbestPrediction(
-                        text="",
-                        start_logit=null_start_logit,
-                        end_logit=null_end_logit,
+                        text="", start_logit=null_start_logit, end_logit=null_end_logit
                     )
                 )
 
             # In very rare edge cases we could only have single null prediction.
             # So we just create a nonce prediction in this case to avoid failure.
             if len(nbest) == 1:
-                nbest.insert(
-                    0,
-                    _NbestPrediction(
-                        text="empty", start_logit=0.0, end_logit=0.0
-                    ),
-                )
+                nbest.insert(0, _NbestPrediction(text="empty", start_logit=0.0, end_logit=0.0))
 
         # In very rare edge cases we could have no valid predictions. So we
         # just create a nonce prediction in this case to avoid failure.
         if not nbest:
-            nbest.append(
-                _NbestPrediction(text="empty", start_logit=0.0, end_logit=0.0)
-            )
+            nbest.append(_NbestPrediction(text="empty", start_logit=0.0, end_logit=0.0))
 
         assert len(nbest) >= 1
 
@@ -288,9 +355,7 @@ def postprocess_answers(
         else:
             # predict "" iff the null score - the score of best non-null > threshold
             score_diff = (
-                score_null
-                - best_non_null_entry.start_logit
-                - (best_non_null_entry.end_logit)
+                score_null - best_non_null_entry.start_logit - (best_non_null_entry.end_logit)
             )
             scores_diff_json[example.qa_id] = score_diff
             if score_diff > null_score_diff_threshold:
@@ -314,7 +379,7 @@ def postprocess_answers(
         with open(output_null_log_odds_file, "w") as writer:
             writer.write(json.dumps(scores_diff_json, indent=4) + "\n")
 
-    return all_predictions, all_probs, nbest_json
+    return all_predictions, all_probs, all_nbest_json
 
 
 def get_final_text(pred_text, orig_text, do_lower_case, verbose_logging=False):
@@ -367,9 +432,7 @@ def get_final_text(pred_text, orig_text, do_lower_case, verbose_logging=False):
     start_position = tok_text.find(pred_text)
     if start_position == -1:
         if verbose_logging:
-            logger.info(
-                "Unable to find text: '%s' in '%s'" % (pred_text, orig_text)
-            )
+            logger.info("Unable to find text: '%s' in '%s'" % (pred_text, orig_text))
         return orig_text
     end_position = start_position + len(pred_text) - 1
 
@@ -379,9 +442,7 @@ def get_final_text(pred_text, orig_text, do_lower_case, verbose_logging=False):
     if len(orig_ns_text) != len(tok_ns_text):
         if verbose_logging:
             logger.info(
-                "Length not equal after stripping spaces: '%s' vs '%s'",
-                orig_ns_text,
-                tok_ns_text,
+                "Length not equal after stripping spaces: '%s' vs '%s'", orig_ns_text, tok_ns_text
             )
         return orig_text
 
@@ -419,9 +480,7 @@ def get_final_text(pred_text, orig_text, do_lower_case, verbose_logging=False):
 
 def _get_best_indexes(logits, n_best_size):
     """Get the n-best logits from a list."""
-    index_and_score = sorted(
-        enumerate(logits), key=lambda x: x[1], reverse=True
-    )
+    index_and_score = sorted(enumerate(logits), key=lambda x: x[1], reverse=True)
 
     best_indexes = []
     for i in range(len(index_and_score)):
@@ -455,45 +514,23 @@ def _compute_softmax(scores):
 
 
 ## Evaluation utilities
-def evaluate_qa(
-    qa_ids, actuals, preds, na_probs=None, na_prob_thresh=0, out_file=None
-):
-    # with open(data_file) as f:
-    #     dataset_json = json.load(f)
-    #     dataset = dataset_json['data']
-    # with open(pred_file) as f:
-    #     preds = json.load(f)
-    # if na_prob_file:
-    #     with open(na_prob_file) as f:
-    #         na_probs = json.load(f)
-    # else:
-    #     na_probs = {k: 0.0 for k in preds}
+def evaluate_qa(qa_ids, actuals, preds, na_probs=None, na_prob_thresh=0, out_file=None):
 
     if na_probs is None:
         na_probs = {k: 0.0 for k in preds}
 
-    qid_to_has_ans = {
-        qa_id: bool(ans) for (qa_id, ans) in zip(qa_ids, actuals)
-    }
+    qid_to_has_ans = {qa_id: bool(ans) for (qa_id, ans) in zip(qa_ids, actuals)}
     has_ans_qids = [k for k, v in qid_to_has_ans.items() if v]
     no_ans_qids = [k for k, v in qid_to_has_ans.items() if not v]
     exact_raw, f1_raw = get_raw_scores(qa_ids, actuals, preds)
-    exact_thresh = apply_no_ans_threshold(
-        exact_raw, na_probs, qid_to_has_ans, na_prob_thresh
-    )
-    f1_thresh = apply_no_ans_threshold(
-        f1_raw, na_probs, qid_to_has_ans, na_prob_thresh
-    )
+    exact_thresh = apply_no_ans_threshold(exact_raw, na_probs, qid_to_has_ans, na_prob_thresh)
+    f1_thresh = apply_no_ans_threshold(f1_raw, na_probs, qid_to_has_ans, na_prob_thresh)
     out_eval = make_eval_dict(exact_thresh, f1_thresh)
     if has_ans_qids:
-        has_ans_eval = make_eval_dict(
-            exact_thresh, f1_thresh, qid_list=has_ans_qids
-        )
+        has_ans_eval = make_eval_dict(exact_thresh, f1_thresh, qid_list=has_ans_qids)
         merge_eval(out_eval, has_ans_eval, "HasAns")
     if no_ans_qids:
-        no_ans_eval = make_eval_dict(
-            exact_thresh, f1_thresh, qid_list=no_ans_qids
-        )
+        no_ans_eval = make_eval_dict(exact_thresh, f1_thresh, qid_list=no_ans_qids)
         merge_eval(out_eval, no_ans_eval, "NoAns")
 
     if out_file:
@@ -593,10 +630,7 @@ def make_eval_dict(exact_scores, f1_scores, qid_list=None):
         total = len(qid_list)
         return collections.OrderedDict(
             [
-                (
-                    "exact",
-                    100.0 * sum(exact_scores[k] for k in qid_list) / total,
-                ),
+                ("exact", 100.0 * sum(exact_scores[k] for k in qid_list) / total),
                 ("f1", 100.0 * sum(f1_scores[k] for k in qid_list) / total),
                 ("total", total),
             ]

@@ -129,18 +129,6 @@ class BERTQAExtractor:
                 self.model.zero_grad()
                 global_step += 1
 
-                # if global_step % 50 == 0:
-                #     tb_writer.add_scalar(
-                #         "lr", scheduler.get_lr()[0], global_step
-                #     )
-                #     tb_writer.add_scalar(
-                #         "loss", (tr_loss - logging_loss) / 50, global_step
-                #     )
-                #     logging_loss = tr_loss
-
-        #     epoch_iterator.close()
-        # train_iterator.close()
-
         logger.info(" global_step = %s, average loss = %s", global_step, tr_loss / global_step)
 
         if model_output_dir:
@@ -168,6 +156,10 @@ class BERTQAExtractor:
         all_input_mask = torch.tensor([f.input_mask for f in features], dtype=torch.long)
         all_segment_ids = torch.tensor([f.segment_ids for f in features], dtype=torch.long)
 
+        # This index is used to find the original data sample each
+        # prediction comes from and add the unique_id to the prediction
+        # results.
+        # Don't use the unique_id directly because it could be string.
         all_example_index = torch.arange(all_input_ids.size(0), dtype=torch.long)
         test_dataset = TensorDataset(
             all_input_ids, all_input_mask, all_segment_ids, all_example_index
