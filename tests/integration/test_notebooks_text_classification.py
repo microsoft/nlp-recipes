@@ -24,7 +24,7 @@ def test_tc_bert_azureml(
     test_folder = os.path.join(tmp, "test")
 
     parameters = {
-        "config_path": "tests/ci",
+        "config_path": None,
         "subscription_id": subscription_id,
         "resource_group": resource_group,
         "workspace_name": workspace_name,

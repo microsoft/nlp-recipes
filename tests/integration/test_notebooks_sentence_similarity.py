@@ -33,6 +33,16 @@ def baseline_results():
     }
 
 
+
+@pytest.mark.integration
+def test_similarity_embeddings_baseline_runs(notebooks, baseline_results):
+    notebook_path = notebooks["similarity_embeddings_baseline"]
+    pm.execute_notebook(notebook_path, OUTPUT_NOTEBOOK, kernel_name=KERNEL_NAME)
+    results = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict["results"]
+    for key, value in baseline_results.items():
+        assert results[key] == pytest.approx(value, abs=ABS_TOL)
+
+        
 @pytest.mark.gpu
 @pytest.mark.integration
 def test_gensen_local(notebooks):
@@ -56,16 +66,6 @@ def test_gensen_local(notebooks):
             assert results[key][k] == pytest.approx(v, abs=ABS_TOL_PEARSONS)
             
 
-@pytest.mark.integration
-@pytest.mark.azureml
-def test_similarity_embeddings_baseline_runs(notebooks, baseline_results):
-    notebook_path = notebooks["similarity_embeddings_baseline"]
-    pm.execute_notebook(notebook_path, OUTPUT_NOTEBOOK, kernel_name=KERNEL_NAME)
-    results = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict["results"]
-    for key, value in baseline_results.items():
-        assert results[key] == pytest.approx(value, abs=ABS_TOL)
-
-
 @pytest.mark.usefixtures("teardown_service")
 @pytest.mark.integration
 @pytest.mark.azureml
@@ -78,9 +78,9 @@ def test_automl_local_runs(notebooks,
 
     pm.execute_notebook(notebook_path,
                         OUTPUT_NOTEBOOK,
-                        parameters = {'automl_iterations': 2,
+                        parameters = {'automl_iterations': 1,
                                       'automl_iteration_timeout':7,
-                                      'config_path': "tests/ci",
+                                      'config_path': None,
                                       'webservice_name': "aci-test-service",
                                       'subscription_id': subscription_id,
                                       'resource_group': resource_group,
