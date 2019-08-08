@@ -43,7 +43,7 @@ jobs:
       python tools/generate_conda_file.py --gpu
       conda env create -n nlp_gpu -f nlp_gpu.yaml
       pip install paramiko==2.4.2
-      source activate nl_gpu
+      source activate nlp_gpu
       conda env list
       echo Login Azure Account
       az login --service-principal -u $(spidentity) -p $(spsecret) --tenant $(sptenant)
@@ -51,7 +51,7 @@ jobs:
     displayName: 'Create and activate conda environment'
 
   - bash: |
-      source activate nl_gpu
+      source activate nlp_gpu
       pytest --durations=0 tests/integration -m "azureml" -q --subscription_id=$(subscriptionid) --resource_group=$(resource_group) --workspace_name=$(workspace_name) --workspace_region=$(workspace_region) --junitxml $(junitxml) 
     displayName: 'Run AzureML notebook tests'
   
