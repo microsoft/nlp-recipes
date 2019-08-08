@@ -7,6 +7,25 @@ import pandas as pd
 
 # Load the data from a directory
 
+# Extract datafile to the given directory
+def extract_data(file_path, directory):
+    """
+    Extract the data from file_path to to data_path
+    """        
+    data_path = os.path.join(os.getcwd(), directory, "aclImdb")
+
+
+    # Extract the data to the data folder
+    if not os.path.exists(data_path):
+        tar = tarfile.open(file_path)
+        tar.extractall(directory)
+        tar.close()
+    print("=====> Finish extracting")
+
+    # Return the path of dataset when done 
+    return data_path
+
+
 # Download the dataset and load into pandas dataframe
 def download_or_find(url, directory=".", filename="aclImdb.tar.gz"):
     """
@@ -25,19 +44,8 @@ def download_or_find(url, directory=".", filename="aclImdb.tar.gz"):
     print("=====> Begin downloading")
     file_path = maybe_download(url, filename, directory)
     print("=====> Done downloading")
-    
-    data_path = os.path.join(os.getcwd(), directory, "aclImdb")
-    
-    # Extract the data to the data folder
-    if not os.path.exists(data_path):
-        tar = tarfile.open(file_path)
-        tar.extractall(directory)
-        tar.close()
-    
-    # Return the path of dataset when done 
-    print("=====> Finish extracting")
-    return data_path
-    
+
+    return file_path
 
 # Load all files from a directory in a DataFrame.
 def load_directory_data(directory):
@@ -79,7 +87,9 @@ def download_and_load_datasets(force_download=False):
     
     URL = "http://ai.stanford.edu/~amaas/data/sentiment/aclImdb_v1.tar.gz"
     
-    dataset_path = download_or_find(URL, directory="data")
+    file_path = download_or_find(URL, directory="data")
+    
+    dataset_path = extract_data(file_path, directory="data")
 
     print("=============> Complete downloading")
     print("**** Dataset path: {}".format(dataset_path))
