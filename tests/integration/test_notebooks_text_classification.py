@@ -33,7 +33,7 @@ def test_tc_mnli_bert(notebooks, tmp):
     assert pytest.approx(result["accuracy"], 0.93, abs=ABS_TOL)
     assert pytest.approx(result["precision"], 0.93, abs=ABS_TOL)
     assert pytest.approx(result["recall"], 0.93, abs=ABS_TOL)
-    assert pytest.approx(result["f1-score"], 0.93, abs=ABS_TOL)
+    assert pytest.approx(result["f1"], 0.93, abs=ABS_TOL)
     
 
 @pytest.mark.integration
