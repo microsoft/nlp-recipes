@@ -38,18 +38,18 @@ def test_bidaf_deep_dive(notebooks,
 @pytest.mark.azureml
 def test_bidaf_quickstart(notebooks,
                           subscription_id,
-                           resource_group,
-                           workspace_name,
-                           workspace_region):
+                          resource_group,
+                          workspace_name,
+                          workspace_region):
     notebook_path = notebooks["bidaf_quickstart"]
     pm.execute_notebook(notebook_path,
                         OUTPUT_NOTEBOOK,
-                        parameters = {'config_path': "tests/ci",
-                                      'subscription_id': subscription_id,
-                                      'resource_group': resource_group,
-                                      'workspace_name': workspace_name,
-                                      'workspace_region': workspace_region,
-                                      'webservice_name': "aci-test-service"})
+                        parameters = {"config_path": None,
+                                      "subscription_id": subscription_id,
+                                      "resource_group": resource_group,
+                                      "workspace_name": workspace_name,
+                                      "workspace_region": workspace_region,
+                                      "webservice_name": "aci-test-service"})
     result = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict["answer"]
     assert result == "Bi-Directional Attention Flow"
 
@@ -57,13 +57,17 @@ def test_bidaf_quickstart(notebooks,
 @pytest.mark.integration
 @pytest.mark.azureml
 @pytest.mark.gpu
-def test_bert_qa_runs(notebooks):
+def test_bert_qa_runs(notebooks,
+                      subscription_id,
+                      resource_group,
+                      workspace_name,
+                      workspace_region):
     notebook_path = notebooks["bert_qa_trainer"]
     pm.execute_notebook(
         notebook_path,
         OUTPUT_NOTEBOOK,
         parameters=dict(
-            AZUREML_CONFIG_PATH="./tests/integration/.azureml",
+            AZUREML_CONFIG_PATH=None,
             DATA_FOLDER='./tests/integration/squad',
             PROJECT_FOLDER='./tests/integration/pytorch-transformers',
             EXPERIMENT_NAME='NLP-QA-BERT-deepdive',
@@ -77,6 +81,10 @@ def test_bert_qa_runs(notebooks):
             MAX_CONCURRENT_RUNS=1,
             TARGET_GRADIENT_STEPS=1,
             INIT_GRADIENT_STEPS=1,
+            subscription_id=subscription_id,
+            resource_group=resource_group,
+            workspace_name=workspace_name,
+            workspace_region=workspace_region
         ),
     )
     result = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict
