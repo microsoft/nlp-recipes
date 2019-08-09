@@ -21,7 +21,6 @@ from utils_nlp.azureml import azureml_utils
 from azureml.core.webservice import Webservice
 
 
-
 @pytest.fixture(scope="module")
 def notebooks():
     folder_notebooks = path_notebooks()
@@ -34,29 +33,19 @@ def notebooks():
         "similarity_embeddings_baseline": os.path.join(
             folder_notebooks, "sentence_similarity", "baseline_deep_dive.ipynb"
         ),
-        "bert_encoder": os.path.join(
-            folder_notebooks, "sentence_similarity", "bert_encoder.ipynb"
-        ),
-        "gensen_local": os.path.join(
-            folder_notebooks, "sentence_similarity", "gensen_local.ipynb"
-        ),
+        "bert_encoder": os.path.join(folder_notebooks, "sentence_similarity", "bert_encoder.ipynb"),
+        "gensen_local": os.path.join(folder_notebooks, "sentence_similarity", "gensen_local.ipynb"),
         "gensen_azureml": os.path.join(
             folder_notebooks, "sentence_similarity", "gensen_aml_deep_dive.ipynb"
         ),
         "similarity_automl_local": os.path.join(
-            folder_notebooks,
-            "sentence_similarity",
-            "automl_local_deployment_aci.ipynb",
+            folder_notebooks, "sentence_similarity", "automl_local_deployment_aci.ipynb"
         ),
         "automl_with_pipelines_deployment_aks": os.path.join(
-            folder_notebooks,
-            "sentence_similarity",
-            "automl_with_pipelines_deployment_aks.ipynb",
-        ),        
+            folder_notebooks, "sentence_similarity", "automl_with_pipelines_deployment_aks.ipynb"
+        ),
         "bert_qa_trainer": os.path.join(
-            folder_notebooks,
-            "question_answering",
-            "pretrained-BERT-SQuAD-deep-dive-aml.ipynb",
+            folder_notebooks, "question_answering", "pretrained-BERT-SQuAD-deep-dive-aml.ipynb"
         ),
         "bidaf_deep_dive": os.path.join(
             folder_notebooks, "question_answering", "bidaf_aml_deep_dive.ipynb"
@@ -76,7 +65,7 @@ def notebooks():
     return paths
 
 
-@pytest.fixture
+@pytest.fixture()
 def tmp(tmp_path_factory):
     td = TemporaryDirectory(dir=tmp_path_factory.getbasetemp())
     try:
@@ -187,14 +176,12 @@ def cluster_name(request):
 
 
 @pytest.fixture()
-def bert_english_tokenizer():
-    return BERTTokenizer(language=Language.ENGLISHCASED, to_lower=False)
+def bert_english_tokenizer(tmp_path):
+    return BERTTokenizer(language=Language.ENGLISHCASED, to_lower=False, cache_dir=tmp_path)
 
 
 @pytest.fixture(scope="module")
-def teardown_service(
-    subscription_id, resource_group, workspace_name, workspace_region
-):
+def teardown_service(subscription_id, resource_group, workspace_name, workspace_region):
 
     yield
 
