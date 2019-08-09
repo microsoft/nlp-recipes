@@ -27,13 +27,14 @@ logger = logging.getLogger(__name__)
 
 
 class BERTQAExtractor:
-    def __init__(self, language=Language.ENGLISH, cache_dir=".", fine_tuned_model=None):
+    def __init__(self, language=Language.ENGLISH, cache_dir=".", fine_tuned_model_path=None):
 
         self.language = language
         self.cache_dir = cache_dir
 
-        if fine_tuned_model:
-            self.model = BertForQuestionAnswering.from_pretrained(fine_tuned_model)
+        if fine_tuned_model_path:
+            config = BertConfig.from_pretrained(fine_tuned_model_path)
+            self.model = BertForQuestionAnswering.from_pretrained(fine_tuned_model_path, config=config)
         else:
             config = BertConfig.from_pretrained(language.value)
             self.model = BertForQuestionAnswering.from_pretrained(language.value, config=config)
@@ -100,8 +101,7 @@ class BERTQAExtractor:
         self.model.zero_grad()
         train_iterator = trange(int(num_epochs), desc="Epoch")
         for _ in train_iterator:
-            epoch_iterator = tqdm(train_dataloader, desc="Iteration")
-            for step, batch in enumerate(epoch_iterator):
+            for batch in tqdm(train_dataloader, desc="Iteration", mininterval=60):
                 self.model.train()
                 batch = tuple(t.to(device) for t in batch)
                 inputs = {
