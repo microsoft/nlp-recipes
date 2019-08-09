@@ -27,14 +27,14 @@ logger = logging.getLogger(__name__)
 
 
 class BERTQAExtractor:
-    def __init__(self, language=Language.ENGLISH, cache_dir=".", fine_tuned_model_path=None):
+    def __init__(self, language=Language.ENGLISH, cache_dir=".", load_from_cache=False):
 
         self.language = language
         self.cache_dir = cache_dir
 
-        if fine_tuned_model_path:
-            config = BertConfig.from_pretrained(fine_tuned_model_path)
-            self.model = BertForQuestionAnswering.from_pretrained(fine_tuned_model_path, config=config)
+        if load_from_cache:
+            config = BertConfig.from_pretrained(cache_dir)
+            self.model = BertForQuestionAnswering.from_pretrained(cache_dir, config=config)
         else:
             config = BertConfig.from_pretrained(language.value)
             self.model = BertForQuestionAnswering.from_pretrained(language.value, config=config)
@@ -48,7 +48,7 @@ class BERTQAExtractor:
         lr=2e-5,
         warmup_proportion=None,
         max_grad_norm=1.0,
-        model_output_dir=None,
+        cache_model=False,
     ):
         # tb_writer = SummaryWriter()
         device = get_device("cpu" if num_gpus == 0 or not torch.cuda.is_available() else "gpu")
@@ -131,17 +131,17 @@ class BERTQAExtractor:
 
         logger.info(" global_step = %s, average loss = %s", global_step, tr_loss / global_step)
 
-        if model_output_dir:
-            if not os.path.exists(model_output_dir):
-                os.makedirs(model_output_dir)
+        if cache_model:
+            if not os.path.exists(self.cache_dir):
+                os.makedirs(self.cache_dir)
 
-            logger.info("Saving model checkpoint to %s", model_output_dir)
+            logger.info("Saving model checkpoint to %s", self.cache_dir)
             # Save a trained model, configuration and tokenizer using `save_pretrained()`.
             # They can then be reloaded using `from_pretrained()`
             model_to_save = (
                 self.model.module if hasattr(self.model, "module") else self.model
             )  # Take care of distributed/parallel training
-            model_to_save.save_pretrained(model_output_dir)
+            model_to_save.save_pretrained(self.cache_dir)
         torch.cuda.empty_cache()
 
     def predict(self, features, num_gpus=None, batch_size=32):
