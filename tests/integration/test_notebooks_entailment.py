@@ -42,7 +42,7 @@ def test_entailment_bert_azureml(notebooks,
                                     'workspace_region': workspace_region},
                         kernel_name=KERNEL_NAME,)
 
-    with open("outputs/results_nc24.json", "r") as handle:
+    with open("outputs/results.json", "r") as handle:
         result_dict = json.load(handle)
         assert result_dict["weighted avg"]["f1-score"] > 0.5
 

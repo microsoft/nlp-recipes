@@ -23,10 +23,6 @@ except ImportError:
     raise warnings.warn("No Horovod found! Can't do distributed training..")
 
 
-# OUTPUT_BERT_MODEL_DICT = {""}
-# OUTPUT_CONFIG_DICT = {}
-
-
 class BERTSequenceClassifier:
     """BERT-based sequence classifier"""
 
