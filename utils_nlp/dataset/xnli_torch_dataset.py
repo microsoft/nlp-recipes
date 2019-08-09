@@ -16,6 +16,34 @@ CACHE_DIR = "./"
 LANGUAGE_ENGLISH = "en"
 TO_LOWER_CASE = False
 TOK_ENGLISH = Language.ENGLISH
+VALID_FILE_SPLIT = [TRAIN_FILE_SPLIT, VALIDATION_FILE_SPLIT, TEST_FILE_SPLIT]
+
+
+def _load_pandas_df(cache_dir, file_split, language, data_percent_used):
+    df = load_pandas_df(local_cache_path=cache_dir, file_split=file_split, language=language)
+    data_used_count = round(data_percent_used * df.shape[0])
+    df = df.loc[:data_used_count]
+    return df
+
+
+def _tokenize(tok_language, to_lowercase, cache_dir, df):
+    print("Create a tokenizer...")
+    tokenizer = Tokenizer(language=tok_language, to_lower=to_lowercase, cache_dir=cache_dir)
+    tokens = tokenizer.tokenize(df[TEXT_COL])
+
+    print("Tokenize and preprocess text...")
+    # tokenize
+    token_ids, input_mask, token_type_ids = tokenizer.preprocess_classification_tokens(
+        tokens, max_len=MAX_SEQ_LENGTH
+    )
+    return token_ids, input_mask, token_type_ids
+
+
+def _fit_train_labels(df):
+    label_encoder = LabelEncoder()
+    train_labels = label_encoder.fit_transform(df[LABEL_COL])
+    train_labels = np.array(train_labels)
+    return label_encoder, train_labels
 
 
 class XnliDataset(data.Dataset):
@@ -42,6 +70,9 @@ class XnliDataset(data.Dataset):
                                               Defaults to Language.ENGLISH.
             data_percent_used(float, optional): Data used to create Torch Dataset.Defaults to "1.0" which is 100% data
         """
+        if file_split not in VALID_FILE_SPLIT:
+            raise ValueError("The file split is not part of ", VALID_FILE_SPLIT)
+
         self.file_split = file_split
         self.cache_dir = cache_dir
         self.language = language
@@ -49,36 +80,25 @@ class XnliDataset(data.Dataset):
         self.tok_language = tok_language
         self.data_percent_used = data_percent_used
 
-        df = load_pandas_df(local_cache_path=cache_dir, file_split=file_split, language=language)
+        df = _load_pandas_df(self.cache_dir, self.file_split, self.language, self.data_percent_used)
 
-        data_used_count = round(self.data_percent_used * df.shape[0])
-        df = df.loc[:data_used_count]
         self.df = df
 
-        print("Create a tokenizer...")
-        tokenizer = Tokenizer(language=tok_language, to_lower=to_lowercase, cache_dir=cache_dir)
-        tokens = tokenizer.tokenize(df[TEXT_COL])
-
-        print("Tokenize and preprocess text...")
-        # tokenize
-        token_ids, input_mask, token_type_ids = tokenizer.preprocess_classification_tokens(
-            tokens, max_len=MAX_SEQ_LENGTH
+        token_ids, input_mask, token_type_ids = _tokenize(
+            tok_language, to_lowercase, cache_dir, self.df
         )
 
-        # preprocess
         self.token_ids = token_ids
         self.input_mask = input_mask
         self.token_type_ids = token_type_ids
 
         if file_split == TRAIN_FILE_SPLIT:
-            label_encoder = LabelEncoder()
-            train_labels = label_encoder.fit_transform(df[LABEL_COL])
+            label_encoder, train_labels = _fit_train_labels(self.df)
             self.label_encoder = label_encoder
-            self.labels = np.array(train_labels)
-
-        if file_split == TEST_FILE_SPLIT:
-            # use the label_encoder passed when you create the test dataset
-            self.labels = df[LABEL_COL]
+            self.labels = train_labels
+        else:
+            # use the label_encoder passed when you create the test/validate dataset
+            self.labels = self.df[LABEL_COL]
 
     def __len__(self):
         """ Denotes the total number of samples """

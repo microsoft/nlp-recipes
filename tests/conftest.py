@@ -69,6 +69,9 @@ def notebooks():
         "entailment_multinli_bert": os.path.join(
             folder_notebooks, "entailment", "entailment_multinli_bert.ipynb"
         ),
+        "entailment_bert_azureml": os.path.join(
+            folder_notebooks, "entailment", "entailment_xnli_bert_azureml.ipynb"
+        ),
         "tc_bert_azureml": os.path.join(
             folder_notebooks, "text_classification", "tc_bert_azureml.ipynb"
         ),

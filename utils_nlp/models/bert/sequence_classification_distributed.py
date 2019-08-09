@@ -23,15 +23,15 @@ except ImportError:
     raise warnings.warn("No Horovod found! Can't do distributed training..")
 
 
+# OUTPUT_BERT_MODEL_DICT = {""}
+# OUTPUT_CONFIG_DICT = {}
+
+
 class BERTSequenceClassifier:
     """BERT-based sequence classifier"""
 
     def __init__(
-            self,
-            language=Language.ENGLISH,
-            num_labels=2,
-            cache_dir=".",
-            use_distributed=False,
+        self, language=Language.ENGLISH, num_labels=2, cache_dir=".", use_distributed=False
     ):
 
         """
@@ -59,20 +59,10 @@ class BERTSequenceClassifier:
         no_decay = ["bias", "LayerNorm.bias", "LayerNorm.weight"]
         optimizer_grouped_parameters = [
             {
-                "params": [
-                    p
-                    for n, p in param_optimizer
-                    if not any(nd in n for nd in no_decay)
-                ],
+                "params": [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)],
                 "weight_decay": 0.01,
             },
-            {
-                "params": [
-                    p
-                    for n, p in param_optimizer
-                    if any(nd in n for nd in no_decay)
-                ]
-            },
+            {"params": [p for n, p in param_optimizer if any(nd in n for nd in no_decay)]},
         ]
         self.optimizer_params = optimizer_grouped_parameters
         self.name_parameters = self.model.named_parameters()
@@ -86,11 +76,7 @@ class BERTSequenceClassifier:
                 warnings.warn("No GPU available! Using CPU.")
 
     def create_optimizer(
-            self,
-            num_train_optimization_steps,
-            lr=2e-5,
-            fp16_allreduce=False,
-            warmup_proportion=None,
+        self, num_train_optimization_steps, lr=2e-5, fp16_allreduce=False, warmup_proportion=None
     ):
 
         """
@@ -123,15 +109,9 @@ class BERTSequenceClassifier:
             )
 
         if self.use_distributed:
-            compression = (
-                hvd.Compression.fp16
-                if fp16_allreduce
-                else hvd.Compression.none
-            )
+            compression = hvd.Compression.fp16 if fp16_allreduce else hvd.Compression.none
             optimizer = hvd.DistributedOptimizer(
-                optimizer,
-                named_parameters=self.model.named_parameters(),
-                compression=compression,
+                optimizer, named_parameters=self.model.named_parameters(), compression=compression
             )
 
         return optimizer
@@ -176,9 +156,7 @@ class BERTSequenceClassifier:
         os.makedirs(output_dir, exist_ok=True)
 
         # Save a trained model, configuration and tokenizer
-        model_to_save = (
-            self.model.module if hasattr(self.model, "module") else self.model
-        )
+        model_to_save = self.model.module if hasattr(self.model, "module") else self.model
 
         # If we save using the predefined names, we can load using `from_pretrained`
         output_model_file = "outputs/bert-large-uncased"
@@ -188,34 +166,38 @@ class BERTSequenceClassifier:
         model_to_save.config.to_json_file(output_config_file)
 
     def fit(
-            self,
-            train_loader,
-            epoch,
-            bert_optimizer=None,
-            num_epochs=1,
-            num_gpus=0,
-            lr=2e-5,
-            warmup_proportion=None,
-            fp16_allreduce=False,
-            num_train_optimization_steps=10,
+        self,
+        train_loader,
+        epoch,
+        bert_optimizer=None,
+        num_epochs=1,
+        num_gpus=0,
+        lr=2e-5,
+        warmup_proportion=None,
+        fp16_allreduce=False,
+        num_train_optimization_steps=10,
     ):
         """
         Method to fine-tune the bert classifier using the given training data
 
         Args:
+            train_loader(torch.DataLoader): Torch Dataloader created from Torch Dataset
             epoch(int): Current epoch number of training.
+            bert_optimizer(optimizer): optimizer can be BERTAdam for local and Dsitributed if Horovod
+            num_epochs(int): the number of epochs to run
+            num_gpus(int): the number of gpus
             lr (float): learning rate of the adam optimizer. defaults to 2e-5.
             warmup_proportion (float, optional): proportion of training to
                 perform linear learning rate warmup for. e.g., 0.1 = 10% of
                 training. defaults to none.
             fp16_allreduce(bool): if true, use fp16 compression during allreduce
-            num_train_optimization_steps:
-            train_loader(torch.DataLoader): Torch Dataloader created from Torch Dataset
-            bert_optimizer(optimizer): optimizer can be BERTAdam for local and Dsitributed if Horovod
-            num_epochs(int): the number of epochs to run
-            num_gpus(int): the number of gpus
-
+            num_train_optimization_steps: number of steps the optimizer should take.
         """
+
+        device = get_device("cpu" if num_gpus == 0 else "gpu")
+
+        if device:
+            self.model.cuda()
 
         if bert_optimizer is None:
             bert_optimizer = self.create_optimizer(
@@ -224,12 +206,6 @@ class BERTSequenceClassifier:
                 warmup_proportion=warmup_proportion,
                 fp16_allreduce=fp16_allreduce,
             )
-
-        # define loss function
-        device = get_device("cpu" if num_gpus == 0 else "gpu")
-
-        if device:
-            self.model.cuda()
 
         if self.use_distributed:
             hvd.broadcast_parameters(self.model.state_dict(), root_rank=0)
@@ -266,7 +242,6 @@ class BERTSequenceClassifier:
                 labels=None,
             )
 
-            # not sure of this part
             loss = loss_func(y_h, y_batch).mean()
             loss.backward()
 
@@ -324,10 +299,7 @@ class BERTSequenceClassifier:
             y_batch = data["labels"]
 
             token_type_ids_batch = None
-            if (
-                    "token_type_ids" in data
-                    and data["token_type_ids"] is not None
-            ):
+            if "token_type_ids" in data and data["token_type_ids"] is not None:
                 token_type_ids_batch = data["token_type_ids"]
                 token_type_ids_batch = token_type_ids_batch.cuda()
 
@@ -348,9 +320,7 @@ class BERTSequenceClassifier:
             return {
                 "Predictions": preds.argmax(axis=1),
                 "Target": test_labels,
-                "classes probabilities": nn.Softmax(dim=1)(
-                    torch.Tensor(preds)
-                ).numpy(),
+                "classes probabilities": nn.Softmax(dim=1)(torch.Tensor(preds)).numpy(),
             }
         else:
             return preds.argmax(axis=1), test_labels
