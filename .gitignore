@@ -125,10 +125,17 @@ tools/repo_metrics/config.py
 *.pkl
 nlp_*.yaml
 nohup.out
+temp/
+tmp/
 
 # Data
 data/
-sentence-similarity/data/
+*/question_answering/bidaf.tar.gz
+*/question_answering/bidafenv.yml
+*/question_answering/config.json
+*/question_answering/score.py
+*/question_answering/vocabulary/
+*/question_answering/weights.th
 
 # AML Config
 aml_config/
