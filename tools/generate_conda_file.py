@@ -82,6 +82,7 @@ PIP_BASE = {
     "nltk": "nltk>=3.4",
     "pytorch-pretrained-bert": "pytorch-pretrained-bert>=0.6",
     "seqeval": "seqeval>=0.0.12",
+    "allennlp": "allennlp>=0.8.4",
 }
 
 PIP_GPU = {}
