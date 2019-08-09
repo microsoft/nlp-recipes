@@ -1,28 +1,32 @@
-<!--
-Copyright (c) Microsoft Corporation. All rights reserved.
-Licensed under the MIT License.
--->
-
 # Doccano: Text Annotation Tool
 
 ## What is Doccano?
 
-[Doccano](https://github.com/chakki-works/doccano) is one of the best open source tools that provides text annotation features. Unlike other open source tools like [Brat](https://brat.nlplab.org/) and [Anafora](https://github.com/weitechen/anafora) that do not abide by modern UX principles, Doccano is a free alternative to [Prodigy](https://prodi.gy/) or [LightTag](https://www.lighttag.io/) with a modern UX experience. The latest version supports annotation features for text classification, sequence labeling (NER) and sequence to sequence (machine translation, text summarization).
+[Doccano](https://github.com/chakki-works/doccano) is one of the best open source tools that provides text annotation features. The latest version supports annotation features for text classification, sequence labeling (NER) and sequence to sequence (machine translation, text summarization). There are many other open source and commercial annotation tools available. Hereafter is an list of those tools:
 
-Doccano needs to be hosted somewhere such that we can collaborate it. Currently, it can be deployed to Azure, Heroku, and AWS with one click. In this short tutorial we will show you how to deploy it to Azure and how to collaborate it.
+- [Brat](https://brat.nlplab.org/) (open source)
+- [Anafora](https://github.com/weitechen/anafora) (open source)
+- [Prodigy](https://prodi.gy/) (commercial)
+- [LightTag](https://www.lighttag.io/) (commercial)
+
+Doccano needs to be hosted somewhere such that we can collaborate it. This tutorial walks through how to deploy Doccano on Azure and collaboratively annotate text data for natural language processing tasks.
 
 ## Deploy to Azure
 
 Doccano can be deployed to Azure ([Web App for Containers](https://azure.microsoft.com/en-us/services/app-service/containers/) +
 [PostgreSQL database](https://azure.microsoft.com/en-us/services/postgresql/)) by clicking on the button below:
 
-[![Deploy to Azure](https://azuredeploy.net/deploybutton.svg)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fchakki-works%2Fdoccano%2Fmaster%2Fazuredeploy.json)
+<p align="center">
+  <a href="https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fchakki-works%2Fdoccano%2Fmaster%2Fazuredeploy.json"><img width=180 src="https://nlpbp.blob.core.windows.net/images/deploybutton.jpg" /></a>
+</p>
 
 You will need to have an existing Azure subscription such that you can create all Azure resources need to deploy Doccano. Otherwise you can get a [free Azure account](https://azure.microsoft.com/en-us/offers/ms-azr-0044p/?WT.mc_id=medium-blog-abornst) and then click the deploy button above.
 
 You will need to specify your subscription and resource group, and fill in the setting details (App Name, Secret Key, and etc.) and then deploy. It takes a few minutes to create all needed Azure resources. Hereafter is a screen snippet of the deployment. 
 
-![Deploy to Azure](./media/deploy_to_azure.jpg)
+<p align="center">
+  <img src="https://nlpbp.blob.core.windows.net/images/deploy_to_azure.jpg" />
+</p>
 
 ## Tutorial
 
@@ -54,25 +58,32 @@ By default, only the Admin user is created for you after the deployment. You can
 
 _**https://doccano.azurewebsites.net/admin**_
 
-![Admin page](./media/admin_page.jpg)
+<p align="center">
+  <img src="https://nlpbp.blob.core.windows.net/images/admin_page.JPG" />
+</p>
 
 ### Create Project
 
-The first step we need to do is to create a new project for annotation. And here we will use the NER annotation task for science fictions to give you a brief tutorial on doccano. 
+The first step we need to do is to create a new project for annotation. And here we will use the NER annotation task for science fictions to give you a brief tutorial on Doccano. 
 
-After login with Admin user name and Admin password, you will be navigated to the main project list page of doccano and there is no project. 
+After login with Admin user name and Admin password, you will be navigated to the main project list page of Doccano and there is no project. 
 
-![Create project](./media/project_list.jpg)
+<p align="center">
+  <img src="https://nlpbp.blob.core.windows.net/images/project_list.jpg" />
+</p>
 
 To create your project, make sure you’re in the project list page and click `Create Project` button. As for this tutorial, we name the project as `sequence labeling for books`, write some description, then choose the sequence labeling task type.
 
-![Create project](./media/create_project.jpg)
+<p align="center">
+  <img src="https://nlpbp.blob.core.windows.net/images/create_project.jpg" />
+</p>
 
 ### Import Data
 
 After creating a project, we will see the "`Import Data`" page, or click `Import Data` button in the navigation bar. We should see the following screen:
-
-![Import data](./media/import_data.jpg)
+<p align="center">
+  <img src="https://nlpbp.blob.core.windows.net/images/import_data.jpg" />
+</p>
 
 We choose JSONL and click `Select a file` button. Select `books.json` and it would be loaded automatically. Below is the `books.json` file containing lots of science fictions description with different languages. We need to annotate some entities like people name, book title, date and so on. 
 
@@ -88,19 +99,25 @@ After importing the dataset, you should be able to see the dataset immediately.
 
 Click `Labels` button in left bar to define our own labels. We should see the label editor page. In label editor page, you can create labels by specifying label text, shortcut key, background color and text color.
 
-![Define labels](./media/define_labels.jpg)
+<p align="center">
+  <img src="https://nlpbp.blob.core.windows.net/images/define_labels.jpg" />
+</p>
 
 ### Annotation
 
 Next, we are ready to annotate the texts. Just click the `Annotate Data` button in the navigation bar, we can start to annotate the documents. You can just select the text and then use the shortcut key that you have defined to label the entities. 
 
-![Annotate](./media/annotate.jpg)
+<p align="center">
+  <img src="https://nlpbp.blob.core.windows.net/images/annotate.jpg" />
+</p>
 
 ### Export Data
 
 After the annotation step, we can download the annotated data. Click the `Edit data` button in the navigation bar, and then click `Export Data`. You should see below screen:
 
-![Export data](./media/export_data.jpg)
+<p align="center">
+  <img src="https://nlpbp.blob.core.windows.net/images/export_data.jpg" />
+</p>
 
 Here we choose JSONL file to download the data by clicking the button. Below is the annotated result for our tutorial project.
 
@@ -114,8 +131,10 @@ Please note that in the exported JSON file, the label for each entity is an enti
 
 ### View Statistics
 
-One good thing of doccano is that it also has dashboard to display annotation progress and label distributions. Click the `Edit data` button in the navigation bar, and then click `Statistics` on the left side of the menu.
+One good thing of Doccano is that it also has dashboard to display annotation progress and label distributions. Click the `Edit data` button in the navigation bar, and then click `Statistics` on the left side of the menu.
 
-![Statistics](./media/statistic.jpg)
+<p align="center">
+  <img src="https://nlpbp.blob.core.windows.net/images/statistic.jpg" />
+</p>
 
-Congratulation! You just mastered how to use doccano for a sequence labeling project.
+Congratulation! You just mastered how to use Doccano for a sequence labeling project.
