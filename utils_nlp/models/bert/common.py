@@ -5,6 +5,7 @@
 # This script reuses some code from
 # https://github.com/huggingface/pytorch-transformers/blob/master/examples
 # /run_glue.py
+# https://github.com/huggingface/pytorch-transformers/blob/master/examples/utils_squad.py
 
 import os
 import csv
@@ -385,6 +386,39 @@ class Tokenizer:
         is_impossible=None,
         cache_results=False,
     ):
+        """
+        Tokenize and preprocess Question Answering data, involving the
+        following steps:
+            0. WordPiece tokenization.
+            1. Convert character-based answer span indices to token-based
+                indices.
+            2. Truncate the question token list if it's longer than
+                `max_query_length`.
+            3. Split the paragraph into multiple segments if it's longer than
+                `MAX_SEQ_LENGTH` - `max_query_length` - 3.
+                (The "-3" is for the special [CLS] token and two [SEP] tokens.)
+            4. Add the special tokens [CLS] and [SEP].
+            5. Pad the concatenated token sequence to `max_len` if it's
+                shorter.
+            6. Convert the tokens into token indices corresponding to the
+                BERT tokenizer's vocabulary.
+        Args:
+            doc_text (list):
+            question_text (list):
+            qa_id (list):
+            is_training (bool):
+            is_impossible (list, optional):
+            answer_start (list, optional):
+            answer_text (list, optional):
+            max_query_length (int, optional):
+            max_len (int, optional):
+            doc_stride (int, optional):
+            cache_results (bool, optional):
+
+        Returns
+            tuple: (list of QAFeatures, list of QAExample)
+        """
+
         def _is_whitespace(c):
             if c == " " or c == "\t" or c == "\r" or c == "\n" or ord(c) == 0x202F:
                 return True
