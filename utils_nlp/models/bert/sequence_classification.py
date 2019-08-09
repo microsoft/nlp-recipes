@@ -198,18 +198,17 @@ class BERTSequenceClassifier:
         del [x_batch, y_batch, mask_batch, token_type_ids_batch]
         torch.cuda.empty_cache()
 
-    def move_model(self, num_gpus=None):
+    def move_model(self, device, num_gpus=None):
         """Moves the model to proper devices
 
         Args:
              num_gpus (int, optional): The number of gpus to use.
                                       If None is specified, all available GPUs
                                       will be used. Defaults to None.
+             device (string): device name, either "cpu" or gpu
+
         """
 
-        device = get_device(
-            "cpu" if num_gpus == 0 or not torch.cuda.is_available() else "gpu"
-        )
         self.model = move_to_device(self.model, device, num_gpus)
 
     def predict(
@@ -245,8 +244,13 @@ class BERTSequenceClassifier:
             1darray, namedtuple(1darray, ndarray): Predicted classes or
                 (classes, probabilities) if probabilities is True.
         """
+        device = get_device(
+            "cpu" if num_gpus == 0 or not torch.cuda.is_available() else "gpu"
+        )
+
         if move:
-            self.move(num_gpus)
+            self.move_model(device, num_gpus)
+
         # score
         self.model.eval()
 
