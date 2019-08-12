@@ -18,7 +18,19 @@ import random
 class XLNetSequenceClassifier:
     """XLNet-based sequence classifier"""
     
-    def __init__(self, language=Language.ENGLISHCASED, num_labels=5, cache_dir='.'):
+    def __init__(self,
+                 language=Language.ENGLISHCASED,
+                 num_labels=5,
+                 cache_dir='.',
+                 num_gpus=None,
+                 num_epochs=1,
+                 batch_size=8,
+                 lr=5e-5,
+                 adam_eps=1e-8,
+                 warmup_steps=0,
+                 weight_decay=0.0,
+                 max_grad_norm=1.0
+                ):
         """Initializes the classifier and the underlying pretrained model.
         
         Args:
@@ -28,6 +40,16 @@ class XLNetSequenceClassifier:
                 training data. Defaults to 5.
             cache_dir (str, optional): Location of XLNet's cache directory.
                 Defaults to ".".
+            num_gpus (int, optional): The number of gpus to use.
+                                      If None is specified, all available GPUs
+                                      will be used. Defaults to None.
+            num_epochs (int, optional): Number of training epochs.
+                Defaults to 1.
+            batch_size (int, optional): Training batch size. Defaults to 8.
+            lr (float): Learning rate of the Adam optimizer. Defaults to 5e-5.
+            warmup_proportion (float, optional): Proportion of training to
+                perform linear learning rate warmup for. E.g., 0.1 = 10% of
+                training. Defaults to None.
         """
         
         if num_labels < 2:
@@ -36,6 +58,15 @@ class XLNetSequenceClassifier:
         self.language = language
         self.num_labels = num_labels
         self.cache_dir = cache_dir
+        
+        self.num_gpus = num_gpus
+        self.num_epochs = num_epochs
+        self.batch_size = batch_size
+        self.lr = lr
+        self.adam_eps = adam_eps
+        self.warmup_steps = warmup_steps
+        self.weight_decay = weight_decay
+        self.max_grad_norm = max_grad_norm
         
         #create classifier
         self.config = XLNetConfig.from_pretrained(self.language.value, num_labels=num_labels)
@@ -47,15 +78,7 @@ class XLNetSequenceClassifier:
         input_mask,
         labels,
         token_type_ids=None,
-        num_gpus=None,
-        num_epochs=1,
-        batch_size=8,
-        lr=5e-5,
-        adam_eps=1e-8,
-        warmup_steps=0,
-        weight_decay=0.0,
-        max_grad_norm=1.0,
-        verbose=True,
+        verbose=True
     ):
         """Fine-tunes the XLNet classifier using the given training data.
         
@@ -67,22 +90,12 @@ class XLNetSequenceClassifier:
                 contains segment ids indicating if the token belongs to
                 the first sentence(0) or second sentence(1). Only needed
                 for two-sentence tasks.
-            num_gpus (int, optional): The number of gpus to use.
-                                      If None is specified, all available GPUs
-                                      will be used. Defaults to None.
-            num_epochs (int, optional): Number of training epochs.
-                Defaults to 1.
-            batch_size (int, optional): Training batch size. Defaults to 8.
-            lr (float): Learning rate of the Adam optimizer. Defaults to 5e-5.
-            warmup_proportion (float, optional): Proportion of training to
-                perform linear learning rate warmup for. E.g., 0.1 = 10% of
-                training. Defaults to None.
             verbose (bool, optional): If True, shows the training progress and
                 loss values. Defaults to True.
         """
         
-        device = get_device("cpu" if num_gpus == 0 or not torch.cuda.is_available() else "gpu")
-        self.model = move_to_device(self.model, device, num_gpus)
+        device = get_device("cpu" if self.num_gpus == 0 or not torch.cuda.is_available() else "gpu")
+        self.model = move_to_device(self.model, device, self.num_gpus)
         
         # define optimizer and model parameters
         param_optimizer = list(self.model.named_parameters())
@@ -94,7 +107,7 @@ class XLNetSequenceClassifier:
                     for n, p in param_optimizer
                     if not any(nd in n for nd in no_decay)
                 ],
-                'weight_decay': weight_decay
+                'weight_decay': self.weight_decay
             },
             {
                 'params': [
@@ -106,22 +119,22 @@ class XLNetSequenceClassifier:
         ]
         
         num_examples = len(token_ids)
-        num_batches = int(num_examples/batch_size)
-        num_train_optimization_steps = num_batches * num_epochs
+        num_batches = int(num_examples/self.batch_size)
+        num_train_optimization_steps = num_batches * self.num_epochs
         
-        optimizer = AdamW(optimizer_grouped_parameters, lr=lr, eps=adam_eps)
-        scheduler = WarmupLinearSchedule(optimizer, warmup_steps=warmup_steps, t_total=num_train_optimization_steps)
+        optimizer = AdamW(optimizer_grouped_parameters, lr=self.lr, eps=self.adam_eps)
+        scheduler = WarmupLinearSchedule(optimizer, warmup_steps=self.warmup_steps, t_total=num_train_optimization_steps)
         
-        global_step = 0
+        global_step =0
         tr_loss, logging_loss = 0.0, 0.0
         self.model.train()
         optimizer.zero_grad()
-        for epoch in range(num_epochs):
+        for epoch in range(self.num_epochs):
             for step in range(num_batches):
               
                  # get random batch
                 start = int(random.random() * num_examples)
-                end = start + batch_size
+                end = start + self.batch_size
                 x_batch = torch.tensor(
                     token_ids[start:end], dtype=torch.long, device=device
                 )
@@ -148,7 +161,7 @@ class XLNetSequenceClassifier:
                 loss = outputs[0]  # model outputs are always tuple in pytorch-transformers
 
                 loss.backward()
-                torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_grad_norm)
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.max_grad_norm)
 
                 tr_loss += loss.item()
                 scheduler.step()  # Update learning rate schedule
@@ -163,7 +176,7 @@ class XLNetSequenceClassifier:
                         print(
                             "epoch:{}/{}; batch:{}->{}/{}; loss:{:.6f}".format(
                                 epoch + 1,
-                                num_epochs,
+                                self.num_epochs,
                                 step + 1,
                                 min(step + 1 + num_batches // 10, num_batches),
                                 num_batches,
