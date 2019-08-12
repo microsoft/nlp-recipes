@@ -8,10 +8,12 @@ from enum import Enum
 from pytorch_transformers import XLNetTokenizer
 
 class Language(Enum):
-    """An enumeration of the supported pretrained models and languages."""
+    """
+    An enumeration of the supported pretrained models and languages.
+    """
 
-    ENGLISHCASED = "xlnet-base-cased"
-    ENGLISHLARGECASED = "xlnet-large-cased"
+    ENGLISHCASED = "xlnet-base-cased" #: Base cased model for xlnet
+    ENGLISHLARGECASED = "xlnet-large-cased" #: Large cased model for xlnet
 
 class Tokenizer:
     def __init__(
@@ -27,6 +29,24 @@ class Tokenizer:
         self.language = language
 
     def preprocess_classification_tokens(self, examples, max_seq_length):
+        """Preprocessing of example input tokens:
+            - add XLNet sentence markers ([CLS] and [SEP])
+            - pad and truncate sequences
+            - create an input_mask
+            - create token type ids, aka. segment ids
+
+        Args:
+            examples (list): List of input strings to preprocess.
+            max_seq_length (int, optional): Maximum number of tokens
+                            (documents will be truncated or padded).
+                            Defaults to 512.
+        Returns:
+            (tuple): A tuple containing:
+                list of input ids
+                list of input mask
+                list of segment ids
+
+        """
         features = []
         cls_token = self.tokenizer.cls_token
         sep_token = self.tokenizer.sep_token
@@ -87,4 +107,4 @@ class Tokenizer:
             list_segment_ids.append(segment_ids)
 
 #             features.append({"input_ids":input_ids,"input_mask":input_mask,"segment_ids":segment_ids,"label_id":label_id})
-        return list_input_ids, list_input_mask, list_segment_ids
+        return (list_input_ids, list_input_mask, list_segment_ids)
