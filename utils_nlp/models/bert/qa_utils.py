@@ -148,9 +148,9 @@ class QAResult(QAResult_):
 
 
 def postprocess_answer(
-    all_results,
-    all_examples,
-    all_features,
+    results,
+    examples,
+    features,
     do_lower_case,
     n_best_size=20,
     max_answer_length=30,
@@ -171,13 +171,13 @@ def postprocess_answer(
     # Map unique features to the original doc-question-answer triplet
     # Each doc-question-answer triplet can have multiple features because the doc
     # could be split into multiple spans
-    for feature in all_features:
+    for f in features:
         # example_index_to_features[feature.example_index].append(feature)
-        qa_id_to_features[feature.qa_id].append(feature)
+        qa_id_to_features[f.qa_id].append(f)
 
     unique_id_to_result = {}
-    for result in all_results:
-        unique_id_to_result[result.unique_id] = result
+    for r in results:
+        unique_id_to_result[r.unique_id] = r
 
     _PrelimPrediction = collections.namedtuple(
         "PrelimPrediction",
@@ -189,10 +189,9 @@ def postprocess_answer(
     all_nbest_json = collections.OrderedDict()
     scores_diff_json = collections.OrderedDict()
 
-    for (example_index, example) in enumerate(all_examples):
+    for (example_index, example) in enumerate(examples):
         # get all the features belonging to the same example,
         # i.e. paragaraph/question pair.
-        # features = example_index_to_features[example_index]
         features = qa_id_to_features[example.qa_id]
 
         prelim_predictions = []
@@ -376,6 +375,7 @@ def postprocess_answer(
     if unanswerable_exists:
         if not output_null_log_odds_file:
             output_null_log_odds_file = "./null_odds.json"
+            print("Saving null odds to file ./null_odds.json")
         with open(output_null_log_odds_file, "w") as writer:
             writer.write(json.dumps(scores_diff_json, indent=4) + "\n")
 
