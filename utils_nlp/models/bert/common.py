@@ -782,7 +782,6 @@ class Tokenizer:
                 features.append(
                     QAFeatures(
                         unique_id=unique_id,
-                        # example_index=example_index,
                         qa_id=example.qa_id,
                         tokens=tokens,
                         token_to_orig_map=token_to_orig_map,

@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License.
+
 import pytest
 from utils_nlp.models.bert.question_answering import BERTQAExtractor
 
@@ -52,7 +55,7 @@ def test_BERTQAExtractor(qa_test_features_examples, tmp_path):
     qa_extractor.fit(
         features=qa_test_features_examples["features"],
         cache_model=True,
-        warmup_proportion=0.01,
+        warmup_proportion=0.1,
         batch_size=8,
     )
 
