@@ -15,7 +15,7 @@ class Language(Enum):
 
 class Tokenizer:
     def __init__(
-        self, language=Language.ENGLISHCASED
+        self, language=Language.ENGLISHCASED, cache_dir="."
     ):
         """Initializes the underlying pretrained XLNet tokenizer.
 
@@ -23,7 +23,7 @@ class Tokenizer:
             language (Language, optional): The pretrained model's language.
                                            Defaults to Language.ENGLISHCASED
         """
-        self.tokenizer = XLNetTokenizer.from_pretrained(language.value)
+        self.tokenizer = XLNetTokenizer.from_pretrained(language.value, cache_dir=cache_dir)
         self.language = language
 
     def preprocess_classification_tokens(self, examples, max_seq_length):
