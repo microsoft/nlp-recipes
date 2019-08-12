@@ -80,6 +80,7 @@ PIP_BASE = {
     "gensim": "gensim>=3.7.0",
     "nltk": "nltk>=3.4",
     "pytorch-pretrained-bert": "pytorch-pretrained-bert>=0.6",
+    "pytorch-transformers": "pytorch-transformers>=1.0.0",
     "seqeval": "seqeval>=0.0.12",
 }
 
@@ -108,9 +109,7 @@ if __name__ == "__main__":
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--name", help="specify name of conda environment")
-    parser.add_argument(
-        "--gpu", action="store_true", help="include packages for GPU support"
-    )
+    parser.add_argument("--gpu", action="store_true", help="include packages for GPU support")
     args = parser.parse_args()
 
     # set name for environment and output yaml file
@@ -138,9 +137,7 @@ if __name__ == "__main__":
         pip_packages.update(PIP_WIN32)
         PIP_GPU.update(PIP_WIN32_GPU)
     else:
-        raise Exception(
-            "Unsupported platform, must be Windows, Linux, or macOS"
-        )
+        raise Exception("Unsupported platform, must be Windows, Linux, or macOS")
 
     if args.gpu:
         conda_packages.update(CONDA_GPU)
