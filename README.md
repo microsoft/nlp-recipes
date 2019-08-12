@@ -27,6 +27,7 @@ The following is a summary of the scenarios covered in the repository. Each scen
 |[Question Answering](scenarios/question_answering) |SQuAD                                              | BiDAF|
 |[Sentence Similarity](scenarios/sentence_similarity)      |STS Benchmark                         |Representation: TF-IDF, Word Embeddings, Doc Embeddings<br>Metrics: Cosine Similarity, Word Mover's Distance|
 |[Embeddings](scenarios/embeddings)| Custom Embeddings Training|Word2Vec<br>fastText<br>GloVe|
+| [Annotation](scenarios/annotation) | Text annotation | Tutorial |
 
 
 
