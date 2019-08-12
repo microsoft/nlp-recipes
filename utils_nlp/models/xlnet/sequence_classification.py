@@ -97,6 +97,36 @@ class XLNetSequenceClassifier:
         device = get_device("cpu" if self.num_gpus == 0 or not torch.cuda.is_available() else "gpu")
         self.model = move_to_device(self.model, device, self.num_gpus)
         
+        token_ids_tensor = torch.tensor(token_ids, dtype=torch.long)
+        input_mask_tensor = torch.tensor(input_mask, dtype=torch.long)
+        labels_tensor = torch.tensor(labels, dtype=torch.long)
+        
+        if token_type_ids:
+            token_type_ids_tensor = torch.tensor(token_type_ids, dtype=torch.long)
+
+            train_dataset = TensorDataset(
+                token_ids_tensor,
+                input_mask_tensor,
+                token_type_ids_tensor,
+                labels_tensor
+            )
+
+        else:
+
+            train_dataset = TensorDataset(
+                token_ids_tensor,
+                input_mask_tensor,
+                labels_tensor
+            )
+        
+        train_sampler = RandomSampler(train_dataset)
+        
+        train_dataloader = DataLoader(
+            train_dataset,
+            sampler=train_sampler,
+            batch_size=self.batch_size
+        )
+        
         # define optimizer and model parameters
         param_optimizer = list(self.model.named_parameters())
         no_decay = ['bias', 'LayerNorm.weight']
@@ -119,38 +149,29 @@ class XLNetSequenceClassifier:
         ]
         
         num_examples = len(token_ids)
-        num_batches = int(num_examples/self.batch_size)
+        num_batches = len(train_dataloader)
         num_train_optimization_steps = num_batches * self.num_epochs
         
         optimizer = AdamW(optimizer_grouped_parameters, lr=self.lr, eps=self.adam_eps)
         scheduler = WarmupLinearSchedule(optimizer, warmup_steps=self.warmup_steps, t_total=num_train_optimization_steps)
         
         global_step =0
-        tr_loss, logging_loss = 0.0, 0.0
         self.model.train()
         optimizer.zero_grad()
         for epoch in range(self.num_epochs):
-            for step in range(num_batches):
-              
-                 # get random batch
-                start = int(random.random() * num_examples)
-                end = start + self.batch_size
-                x_batch = torch.tensor(
-                    token_ids[start:end], dtype=torch.long, device=device
-                )
-                y_batch = torch.tensor(
-                    labels[start:end], dtype=torch.long, device=device
-                )
-                mask_batch = torch.tensor(
-                    input_mask[start:end], dtype=torch.long, device=device
-                )
-
-                token_type_ids_batch = torch.tensor(
-                        token_type_ids[start:end],
-                        dtype=torch.long,
-                        device=device,
-                )
-                
+            tr_loss = 0.0
+            
+            for i, batch in enumerate(tqdm(train_dataloader, desc="Iteration")):
+                if token_type_ids:
+                    x_batch, mask_batch, token_type_ids_batch, y_batch = tuple(
+                        t.to(device) for t in batch
+                    )
+                else:
+                    token_type_ids_batch = None
+                    x_batch, mask_batch, y_batch = tuple(
+                        t.to(device) for t in batch
+                    )
+                    
                 outputs = self.model(
                     input_ids=x_batch,
                     token_type_ids=token_type_ids_batch,
@@ -158,7 +179,7 @@ class XLNetSequenceClassifier:
                     labels=y_batch,
                ) 
                 
-                loss = outputs[0]  # model outputs are always tuple in pytorch-transformers
+                loss = outputs[0] # model outputs are always tuple in pytorch-transformers
 
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.max_grad_norm)
@@ -172,15 +193,15 @@ class XLNetSequenceClassifier:
                 global_step += 1
                 
                 if verbose:
-                    if step % ((num_batches // 10) + 1) == 0:
+                    if i % ((num_batches // 10) + 1) == 0:
                         print(
-                            "epoch:{}/{}; batch:{}->{}/{}; loss:{:.6f}".format(
+                            "epoch:{}/{}; batch:{}->{}/{}; average training loss:{:.6f}".format(
                                 epoch + 1,
                                 self.num_epochs,
-                                step + 1,
-                                min(step + 1 + num_batches // 10, num_batches),
+                                i + 1,
+                                min(i + 1 + num_batches // 10, num_batches),
                                 num_batches,
-                                loss.data,
+                                tr_loss/(i+1),
                             )
                         )
 
