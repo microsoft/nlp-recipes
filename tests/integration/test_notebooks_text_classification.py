@@ -6,7 +6,6 @@ import json
 import shutil
 import pytest
 import papermill as pm
-import scrapbook as sb
 from tests.notebooks_common import OUTPUT_NOTEBOOK, KERNEL_NAME
 
 ABS_TOL = 0.1
@@ -48,3 +47,19 @@ def test_tc_bert_azureml(
 
     if os.path.exists("outputs"):
         shutil.rmtree("outputs")
+
+
+@pytest.mark.gpu
+@pytest.mark.integration
+def test_tc_mnli_bert(notebooks):
+    notebook_path = notebooks["tc_mnli_bert"]
+    pm.execute_notebook(
+        notebook_path,
+        OUTPUT_NOTEBOOK,
+        parameters={
+            "TRAIN_DATA_USED_PERCENT": 0.01,
+            "TEST_DATA_USED_PERCENT": 0.01,
+            "NUM_EPOCHS": 1,
+        },
+        kernel_name=KERNEL_NAME,
+    )
