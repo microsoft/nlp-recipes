@@ -147,7 +147,7 @@ class QAResult(QAResult_):
     pass
 
 
-def postprocess_answers(
+def postprocess_answer(
     all_results,
     all_examples,
     all_features,

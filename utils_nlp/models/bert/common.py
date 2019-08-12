@@ -123,6 +123,7 @@ class Tokenizer:
             max_len (int, optional): Maximum number of tokens
                             (documents will be truncated or padded).
                             Defaults to 512.
+
         Returns:
             tuple: A tuple containing the following three lists
                 list of preprocesssed token lists
@@ -179,6 +180,7 @@ class Tokenizer:
             max_len (int, optional): Maximum number of tokens
                             (documents will be truncated or padded).
                             Defaults to 512.
+
         Returns:
             tuple: A tuple containing the following four lists
                 list of preprocesssed token lists
@@ -380,7 +382,7 @@ class Tokenizer:
         qa_id,
         answer_start=None,
         answer_text=None,
-        max_query_length=64,
+        max_question_length=64,
         max_len=BERT_MAX_LEN,
         doc_stride=128,
         is_impossible=None,
@@ -393,9 +395,9 @@ class Tokenizer:
             1. Convert character-based answer span indices to token-based
                 indices.
             2. Truncate the question token list if it's longer than
-                `max_query_length`.
+                `max_question_length`.
             3. Split the paragraph into multiple segments if it's longer than
-                `MAX_SEQ_LENGTH` - `max_query_length` - 3.
+                `MAX_SEQ_LENGTH` - `max_question_length` - 3.
                 (The "-3" is for the special [CLS] token and two [SEP] tokens.)
             4. Add the special tokens [CLS] and [SEP].
             5. Pad the concatenated token sequence to `max_len` if it's
@@ -403,20 +405,56 @@ class Tokenizer:
             6. Convert the tokens into token indices corresponding to the
                 BERT tokenizer's vocabulary.
         Args:
-            doc_text (list):
-            question_text (list):
-            qa_id (list):
-            is_training (bool):
-            is_impossible (list, optional):
-            answer_start (list, optional):
-            answer_text (list, optional):
-            max_query_length (int, optional):
-            max_len (int, optional):
-            doc_stride (int, optional):
-            cache_results (bool, optional):
+            doc_text (list): List of strings of document text.
+            question_text (list): List of strings of question text.
+            qa_id (list): List of unique ids identifying unique
+                document-question pairs. This is required so that the model
+                performance can be evaluated by matching qa_ids between
+                ground-truth and predicted answers.
+            is_training (bool): Whether the input data is training data.
+                This is required because ground-truth answer is not required
+                for testing data.
+            is_impossible (list, optional): List of booleans indicating if
+                each question is impossible to answer. Optional, defaults to
+                None. If None, all questions are considered possible to answer.
+            answer_start (list, optional): List of integers of answer start
+                indices. Note that the indices should be based on character,
+                NOT word, because different tokenization methods can produce
+                different sentence segmentation results, making word-based
+                indexing hard to persist across different pre-processing
+                methods. Optional, defaults to None, but required if
+                is_training is True.
+            answer_text (list, optional): List of strings of ground-truth
+                answer text. Optional, defaults to None, but required if
+                is_training is True.
+            max_question_length (int, optional): Maximum question length
+                allowed AFTER tokenization. Defaults to 64.
+            max_len (int, optional): Maximum total sequence length allowed,
+                including question tokens, text tokens, 1 [CLS] token and 2
+                [SEP] tokens. Defaults to BERT_MAX_LEN, i.e. 512.
+            doc_stride (int, optional): When splitting up a long document into
+                chunks, how much stride to take between chunks. Defaults to
+                128.
+            cache_results (bool, optional): Whether to save the tokenization
+                results to files. If True, results are saved to
+                'cached_features' and 'cached_examples' or
+                'cached_features_train' and 'cached_examples_train' (if
+                is_training is True) under the `cache_dir` of the tokenizer.
+                The cached features and examples can be loaded using
+                torch.load.
+                Defaults to False.
 
         Returns
             tuple: (list of QAFeatures, list of QAExample)
+                QAFeatures contains features required for model training,
+                predicting, and result postprocessing. See :class:
+                `~utils_nlp.models.bert.qa_utils.QAFeatures` for more details.
+                QAExample contains original document tokens required for
+                generating the final answers from predicted start and end
+                answer positions. See
+                :class:`~utils_nlp.models.bert.qa_utils.QAExample` for more
+                details.
+
         """
 
         def _is_whitespace(c):
@@ -584,8 +622,8 @@ class Tokenizer:
         for (example_index, example) in enumerate(qa_examples):
             query_tokens = self.tokenizer.tokenize(example.question_text)
 
-            if len(query_tokens) > max_query_length:
-                query_tokens = query_tokens[0:max_query_length]
+            if len(query_tokens) > max_question_length:
+                query_tokens = query_tokens[0:max_question_length]
             # map word-piece tokens to original tokens
             tok_to_orig_index = []
             # map original tokens to corresponding word-piece tokens
@@ -773,6 +811,7 @@ class Tokenizer:
 
 
 def _is_iterable_but_not_string(obj):
+    """Check whether obj is a non-string Iterable."""
     return isinstance(obj, Iterable) and not isinstance(obj, str)
 
 

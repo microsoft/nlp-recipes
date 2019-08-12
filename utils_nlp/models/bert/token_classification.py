@@ -30,14 +30,8 @@ class BERTTokenClassifier:
         Args:
             language (Language, optional): The pre-trained model's language.
                 The value of this argument determines which BERT model is
-                used:
-                    Language.ENGLISH: "bert-base-uncased"
-                    Language.ENGLISHCASED: "bert-base-cased"
-                    Language.ENGLISHLARGE: "bert-large-uncased"
-                    Language.ENGLISHLARGECASED: "bert-large-cased"
-                    Language.CHINESE: "bert-base-chinese"
-                    Language.MULTILINGUAL: "bert-base-multilingual-cased"
-                Defaults to Language.ENGLISH.
+                used. See :class:`~utils_nlp.models.bert.common.Language`
+                for details. Defaults to Language.ENGLISH.
             num_labels (int, optional): The number of unique labels in the
                 data. Defaults to 2.
             cache_dir (str, optional): Location of BERT's cache directory.
@@ -55,9 +49,7 @@ class BERTTokenClassifier:
             language, cache_dir=cache_dir, num_labels=num_labels
         )
 
-    def _get_optimizer(
-        self, learning_rate, num_train_optimization_steps, warmup_proportion
-    ):
+    def _get_optimizer(self, learning_rate, num_train_optimization_steps, warmup_proportion):
         """
         Initializes the optimizer and configure parameters to apply weight
         decay on.
@@ -68,26 +60,18 @@ class BERTTokenClassifier:
         optimizer_grouped_parameters = [
             {
                 "params": [
-                    p
-                    for n, p in param_optimizer
-                    if not any(nd in n for nd in no_decay_params)
+                    p for n, p in param_optimizer if not any(nd in n for nd in no_decay_params)
                 ],
                 "weight_decay": params_weight_decay,
             },
             {
-                "params": [
-                    p
-                    for n, p in param_optimizer
-                    if any(nd in n for nd in no_decay_params)
-                ],
+                "params": [p for n, p in param_optimizer if any(nd in n for nd in no_decay_params)],
                 "weight_decay": 0.0,
             },
         ]
 
         if warmup_proportion is None:
-            optimizer = BertAdam(
-                optimizer_grouped_parameters, lr=learning_rate
-            )
+            optimizer = BertAdam(optimizer_grouped_parameters, lr=learning_rate)
         else:
             optimizer = BertAdam(
                 optimizer_grouped_parameters,
@@ -142,9 +126,7 @@ class BERTTokenClassifier:
             batch_size=batch_size,
         )
 
-        device = get_device(
-            "cpu" if num_gpus == 0 or not torch.cuda.is_available() else "gpu"
-        )
+        device = get_device("cpu" if num_gpus == 0 or not torch.cuda.is_available() else "gpu")
         self.model = move_to_device(self.model, device, num_gpus)
 
         if num_gpus is None:
@@ -152,9 +134,7 @@ class BERTTokenClassifier:
         else:
             num_gpus_used = min(num_gpus, torch.cuda.device_count())
 
-        num_train_optimization_steps = max(
-            (int(len(token_ids) / batch_size) * num_epochs), 1
-        )
+        num_train_optimization_steps = max((int(len(token_ids) / batch_size) * num_epochs), 1)
         optimizer = self._get_optimizer(
             learning_rate=learning_rate,
             num_train_optimization_steps=num_train_optimization_steps,
@@ -165,16 +145,12 @@ class BERTTokenClassifier:
         for _ in trange(int(num_epochs), desc="Epoch"):
             tr_loss = 0
             nb_tr_steps = 0
-            for step, batch in enumerate(
-                tqdm(train_dataloader, desc="Iteration", mininterval=30)
-            ):
+            for step, batch in enumerate(tqdm(train_dataloader, desc="Iteration", mininterval=30)):
                 batch = tuple(t.to(device) for t in batch)
                 b_token_ids, b_input_mask, b_label_ids = batch
 
                 loss = self.model(
-                    input_ids=b_token_ids,
-                    attention_mask=b_input_mask,
-                    labels=b_label_ids,
+                    input_ids=b_token_ids, attention_mask=b_input_mask, labels=b_label_ids
                 )
 
                 if num_gpus_used > 1:
@@ -197,13 +173,7 @@ class BERTTokenClassifier:
             torch.cuda.empty_cache()
 
     def predict(
-        self,
-        token_ids,
-        input_mask,
-        labels=None,
-        batch_size=32,
-        num_gpus=None,
-        probabilities=False,
+        self, token_ids, input_mask, labels=None, batch_size=32, num_gpus=None, probabilities=False
     ):
         """
         Predict token labels on the testing data.
@@ -239,17 +209,13 @@ class BERTTokenClassifier:
             batch_size=batch_size,
             sample_method="sequential",
         )
-        device = get_device(
-            "cpu" if num_gpus == 0 or not torch.cuda.is_available() else "gpu"
-        )
+        device = get_device("cpu" if num_gpus == 0 or not torch.cuda.is_available() else "gpu")
         self.model = move_to_device(self.model, device, num_gpus)
 
         self.model.eval()
         eval_loss = 0
         nb_eval_steps = 0
-        for step, batch in enumerate(
-            tqdm(test_dataloader, desc="Iteration", mininterval=10)
-        ):
+        for step, batch in enumerate(tqdm(test_dataloader, desc="Iteration", mininterval=10)):
             batch = tuple(t.to(device) for t in batch)
             true_label_available = False
             if labels:
@@ -262,9 +228,7 @@ class BERTTokenClassifier:
                 logits = self.model(b_input_ids, attention_mask=b_input_mask)
                 if true_label_available:
                     active_loss = b_input_mask.view(-1) == 1
-                    active_logits = logits.view(-1, self.num_labels)[
-                        active_loss
-                    ]
+                    active_logits = logits.view(-1, self.num_labels)[active_loss]
                     active_labels = b_labels.view(-1)[active_loss]
                     loss_fct = nn.CrossEntropyLoss()
                     tmp_eval_loss = loss_fct(active_logits, active_labels)
@@ -288,8 +252,7 @@ class BERTTokenClassifier:
 
         if probabilities:
             return namedtuple("Predictions", "classes probabilities")(
-                predictions,
-                np.max(nn.Softmax(dim=2)(torch.Tensor(logits_all)).numpy(), 2),
+                predictions, np.max(nn.Softmax(dim=2)(torch.Tensor(logits_all)).numpy(), 2)
             )
         else:
             return predictions
@@ -305,11 +268,7 @@ def create_label_map(label_list, trailing_piece_tag="X"):
 
 
 def postprocess_token_labels(
-    labels,
-    input_mask,
-    label_map=None,
-    remove_trailing_word_pieces=False,
-    trailing_token_mask=None,
+    labels, input_mask, label_map=None, remove_trailing_word_pieces=False, trailing_token_mask=None
 ):
     """
     Postprocesses token classification output:
@@ -362,9 +321,7 @@ def postprocess_token_labels(
 
         labels_no_trailing_pieces = [
             [label for label, mask in zip(label_list, mask_list) if mask]
-            for label_list, mask_list in zip(
-                labels_org_no_padding, token_mask_no_padding
-            )
+            for label_list, mask_list in zip(labels_org_no_padding, token_mask_no_padding)
         ]
         return labels_no_trailing_pieces
     else:

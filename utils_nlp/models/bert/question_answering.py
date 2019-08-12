@@ -27,6 +27,26 @@ logger = logging.getLogger(__name__)
 
 
 class BERTQAExtractor:
+    """
+    Question answer extractor based on
+    :class:`pytorch_transformers.modeling_bert.BertForQuestionAnswering`
+
+    Args:
+        language (Language, optional): The pre-trained model's language.
+            The value of this argument determines which BERT model is
+            used. See :class:`~utils_nlp.models.bert.common.Language`
+            for details. Defaults to Language.ENGLISH.
+        cache_dir (str, optional):  Location of BERT's cache directory. If
+            `load_from_cache` is True, the model config and model is
+            loaded from this directory. When calling the `fit`
+            method, if cache_model is True, the fine-tuned model is
+            saved to this directory. Defaults to ".".
+        load_from_cache (bool, optional): Whether to load a fine-tuned model
+            `cache_dir`. If True, both the fine-tuned model file and model
+            config file should be located under `cache_dir`. Defaults to False.
+
+    """
+
     def __init__(self, language=Language.ENGLISH, cache_dir=".", load_from_cache=False):
 
         self.language = language
@@ -45,11 +65,38 @@ class BERTQAExtractor:
         num_gpus=None,
         num_epochs=1,
         batch_size=32,
-        lr=2e-5,
+        learning_rate=2e-5,
         warmup_proportion=None,
         max_grad_norm=1.0,
         cache_model=False,
     ):
+        """
+        Fine-tune pre-trained BertForQuestionAnswering model.
+
+        Args:
+            features (list): List of QAFeatures containing features of
+                training data. Use
+                :meth:`utils_nlp.models.bert.common.Tokenizer.tokenize_qa`
+                to generate training features. See
+                :class:`~utils_nlp.models.bert.qa_utils.QAFeatures` for
+                details of QAFeatures.
+            num_gpus (int, optional): The number of GPUs to use.
+                If None, all available GPUs will be used. Defaults to None.
+            num_epochs (int, optional): Number of training epochs. Defaults
+                to 1.
+            batch_size (int, optional): Training batch size. Defaults to 32.
+            learning_rate (float, optional):  Learning rate of the AdamW
+                optimizer. Defaults to 2e-5.
+            warmup_proportion (float, optional): Proportion of training to
+                perform linear learning rate warmup for. E.g., 0.1 = 10% of
+                training. Defaults to None.
+            max_grad_norm (float, optional): Maximum gradient norm for gradient
+                clipping. Defaults to 1.0.
+            cache_model (bool, optional): Whether to save the fine-tuned
+                model to the `cache_dir` of the answer extractor. Defaults
+                to False.
+
+        """
         # tb_writer = SummaryWriter()
         device = get_device("cpu" if num_gpus == 0 or not torch.cuda.is_available() else "gpu")
         self.model = move_to_device(self.model, device, num_gpus)
@@ -87,7 +134,7 @@ class BERTQAExtractor:
                 "weight_decay": 0.0,
             },
         ]
-        optimizer = AdamW(optimizer_grouped_parameters, lr=lr, eps=1e-8)
+        optimizer = AdamW(optimizer_grouped_parameters, lr=learning_rate, eps=1e-8)
 
         if warmup_proportion:
             warmup_steps = t_total * warmup_proportion
@@ -145,6 +192,29 @@ class BERTQAExtractor:
         torch.cuda.empty_cache()
 
     def predict(self, features, num_gpus=None, batch_size=32):
+
+        """
+        Predicts answer start and end logits using fine-tuned
+        BertForQuestionAnswering model.
+
+        Args:
+            features (list): List of QAFeatures containing features of
+                testing data. Use
+                :meth:`utils_nlp.models.bert.common.Tokenizer.tokenize_qa`
+                to generate training features. See
+                :class:`~utils_nlp.models.bert.qa_utils.QAFeatures` for
+                details of QAFeatures.
+            num_gpus (int, optional): The number of GPUs to use.
+                If None, all available GPUs will be used. Defaults to None.
+            batch_size (int, optional): Training batch size. Defaults to 32.
+
+        Returns:
+            list: List of QAResults. Each QAResult contains the unique id,
+                answer start logits, and answer end logits of the tokens in
+                QAFeatures.tokens of the input features. Use
+                :func:`utils_nlp.models.bert.qa_utils.postprocess_answer` to
+                generate the final predicted answers.
+        """
 
         device = get_device("cpu" if num_gpus == 0 or not torch.cuda.is_available() else "gpu")
         self.model = move_to_device(self.model, device, num_gpus)
