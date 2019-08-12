@@ -72,7 +72,7 @@ After login with Admin user name and Admin password, you will be navigated to th
   <img src="https://nlpbp.blob.core.windows.net/images/project_list.jpg" />
 </p>
 
-To create your project, make sure you’re in the project list page and click `Create Project` button. As for this tutorial, we name the project as `sequence labeling for books`, write some description, then choose the sequence labeling task type.
+To create your project, make sure you’re in the project list page and click `Create Project` button. As for this tutorial, we name the project as `sequence labeling for books`, write some description, then choose the sequence labeling task type. Please note that project type "sequence labeling" can be used for many NLP tasks that related to labeling each token, such as NER and POS tagging, this tutorial is showing a NER example.
 
 <p align="center">
   <img width=400 src="https://nlpbp.blob.core.windows.net/images/create_project.jpg" />
@@ -137,4 +137,4 @@ One good thing of Doccano is that it also has dashboard to display annotation pr
   <img src="https://nlpbp.blob.core.windows.net/images/statistic.jpg" />
 </p>
 
-Congratulation! You just mastered how to use Doccano for a sequence labeling project.
+Congratulation! You just mastered how to use Doccano for labeling NER as a sequence labeling project.
