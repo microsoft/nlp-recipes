@@ -47,9 +47,12 @@ class XLNetSequenceClassifier:
                 Defaults to 1.
             batch_size (int, optional): Training batch size. Defaults to 8.
             lr (float): Learning rate of the Adam optimizer. Defaults to 5e-5.
-            warmup_proportion (float, optional): Proportion of training to
-                perform linear learning rate warmup for. E.g., 0.1 = 10% of
-                training. Defaults to None.
+            adam_eps (float, optional): term added to the denominator to improve
+                                        numerical stability. Defaults to 1e-8.
+            warmup_steps (int, optional): Number of steps in which to increase 
+                                        learning rate linearly from 0 to 1. Defaults to 0.
+            weight_decay (float, optional): Weight decay. Defaults to 0.
+            max_grad_norm (float, optional): Maximum norm for the gradients. Defaults to 1.0
         """
         
         if num_labels < 2:
