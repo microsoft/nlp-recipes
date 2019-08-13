@@ -229,9 +229,9 @@ class BERTSequenceClassifier:
         """
 
         device_target = "cpu" if num_gpus == 0 or not torch.cuda.is_available() else "gpu"
+        device = get_device(device_target)
 
         if device_target == "cpu" and next(self.model.parameters()).is_cuda:
-            device = get_device(device_target)
             self.model = move_to_device(self.model, device, num_gpus)
 
         # score
