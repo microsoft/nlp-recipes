@@ -6,6 +6,7 @@ import json
 import shutil
 import pytest
 import papermill as pm
+import scrapbook as sb
 from tests.notebooks_common import OUTPUT_NOTEBOOK, KERNEL_NAME
 
 
