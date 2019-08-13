@@ -1,8 +1,24 @@
-# Datasets
+# Datasets    
 
 MICROSOFT PROVIDES THE DATASETS ON AN "AS IS" BASIS. MICROSOFT MAKES NO WARRANTIES, EXPRESS OR IMPLIED, GUARANTEES OR CONDITIONS WITH RESPECT TO YOUR USE OF THE DATASETS. TO THE EXTENT PERMITTED UNDER YOUR LOCAL LAW, MICROSOFT DISCLAIMS ALL LIABILITY FOR ANY DAMAGES OR LOSSES, INLCUDING DIRECT, CONSEQUENTIAL, SPECIAL, INDIRECT, INCIDENTAL OR PUNITIVE, RESULTING FROM YOUR USE OF THE DATASETS.
 
 The datasets are provided under the original terms that Microsoft received such datasets. See below for more information about each dataset.
+
+#### Description 
+This submodule includes helper functions for interacting with different datasets and formatting them appropriately as well as utilities for splitting data for training / testing.
+
+#### Data Loading
+There are dataloaders for several datasets. For example, the snli module will allow you to load a dataframe in pandas from the SNLI dataset, with the option to set the number of rows to load in order to test algorithms and evaluate performance benchmarks. Information on the datasets used in the repo can be found [here](https://github.com/microsoft/nlp/tree/staging/utils_nlp/dataset#datasets).
+
+Most datasets may be split into `train`, `dev`, and `test`.
+
+```python
+from utils_nlp.dataset.snli import load_pandas_df
+
+df = load_pandas_df(DATA_FOLDER, file_split ="train", nrows = 1000)
+```
+
+
 
 ### Microsoft Research Paraphrase Corpus
 >Original source: https://www.microsoft.com/en-us/download/details.aspx?id=52398
