@@ -62,9 +62,14 @@ def test_classifier_gpu_train_cpu_predict(bert_english_tokenizer, data):
     )
 
     assert next(classifier.model.parameters()).is_cuda is True 
+    # gpu prediction, no model move
+    preds = classifier.predict(
+        token_ids=tokens, input_mask=mask, num_gpus=1, batch_size=2
+    )
+    assert len(preds) == len(data[1])
+    # cpu prediction, need model move
+    assert next(classifier.model.parameters()).is_cuda is True
     preds = classifier.predict(
         token_ids=tokens, input_mask=mask, num_gpus=0, batch_size=2
     )
-    assert len(preds) == len(data[1])
-    
     assert next(classifier.model.parameters()).is_cuda is False
