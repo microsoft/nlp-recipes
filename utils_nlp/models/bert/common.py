@@ -418,7 +418,8 @@ def create_data_loader(
 class TextDataset(Dataset):
     """
     Characterizes a dataset for PyTorch which can be used to load a file containing multiple rows
-    where each row is a training example.
+    where each row is a training example. The format of each line in the file is assumed to be
+    tokens, mask and label.
     """
 
     def __init__(self, filename):
