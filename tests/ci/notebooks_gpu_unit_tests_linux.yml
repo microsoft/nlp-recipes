@@ -32,7 +32,7 @@ jobs:
 
   - bash: |
       source activate nlp_gpu
-      pytest --durations=0 tests/unit -m "notebooks and gpu" --junitxml=junit/test-unitttest.xml
+      pytest --durations=0 tests/unit -m "notebooks and gpu and not azureml" --junitxml=junit/test-unitttest.xml
     displayName: 'Run Unit tests'
 
 # Uncomment if needed

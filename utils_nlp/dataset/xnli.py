@@ -1,12 +1,8 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
-"""XNLI dataset utils
-https://www.nyu.edu/projects/bowman/xnli/
-"""
 
 import os
-
 import pandas as pd
 
 from utils_nlp.dataset.url_utils import extract_zip, maybe_download
@@ -16,8 +12,10 @@ URL_XNLI = "https://www.nyu.edu/projects/bowman/xnli/XNLI-1.0.zip"
 URL_XNLI_MT = "https://www.nyu.edu/projects/bowman/xnli/XNLI-MT-1.0.zip"
 
 
-def load_pandas_df(local_cache_path="./", file_split="dev", language="zh"):
+def load_pandas_df(local_cache_path=".", file_split="dev", language="zh"):
     """Downloads and extracts the dataset files.
+
+    Utilities information can be found `on this link <https://www.nyu.edu/projects/bowman/xnli/>`_.
 
     Args:
         local_cache_path (str, optional): Path to store the data.

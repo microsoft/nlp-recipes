@@ -11,14 +11,11 @@ import pickle
 
 import numpy as np
 import torch
-from azureml.core.run import Run
 from sklearn.utils import shuffle
 from torch.autograd import Variable
 
 # Change to python3+.
 # from itertools import zip
-# get the Azure ML run object
-run = Run.get_context()
 
 
 class DataIterator(object):
@@ -393,7 +390,7 @@ class NLIIterator(DataIterator):
             test(torch.Tensor): Testing dataset.
             vocab_size(int): The size of the vocabulary.
             lowercase(bool): If lowercase the dataset.
-            vocab(list): The list of the vocabulary.
+            vocab(Union[bytes,str): The list of the vocabulary.
         """
         self.seed = seed
         self.train = train

@@ -1,12 +1,18 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License.
+
 # More info on scheduling: https://docs.microsoft.com/en-us/azure/devops/pipelines/build/triggers?view=azure-devops&tabs=yaml#scheduled-triggers
-schedules:
-- cron: "56 22 * * *"
-  displayName: Daily track of metrics
-  branches:
-    include:
-    - master
-  always: true
-  
+# Implementing the scheduler from the dashboard
+# Uncomment in case it wants to be done from using the yml
+# schedules:
+# - cron: "56 22 * * *"
+#  displayName: Daily track of metrics
+#  branches:
+#    include:
+#    - master
+#  always: true
+
+
 # no PR builds
 pr: none
 

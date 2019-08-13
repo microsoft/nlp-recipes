@@ -36,6 +36,12 @@ Alexis Conneau, Guillaume Lample, Ruty Rinott, Holger Schwenk, Ves Stoyanov. 201
 Original source: https://www.nyu.edu/projects/bowman/xnli/  
 The dataset is preprocessed to remove unused columns.
 
+### The SQuAD dataset
+>This dataset is provided under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/legalcode).
+Redistributing the datasets "train-v1.1.json" and "dev-v1.1.json" with attribution:  
+Pranav Rajpurkar, Jian Zhang, Konstantin Lopyrev, and Percy Liang. 2016. SQuAD: 100,000+ Questions for Machine Comprehension of Text. Proceedings of the 2016 Conference on Empirical Methods in Natural Language Processing (EMNLP).  
+Original source: https://github.com/rajpurkar/SQuAD-explorer
+
 
 ### The STSbenchmark dataset
 >Redistributing the dataset "Stsbenchmark.tar.gz" with attribution:   
