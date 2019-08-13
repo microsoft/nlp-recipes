@@ -10,7 +10,6 @@ from copy import deepcopy
 
 
 class SentEvalConfig:
-
     """Object to store static properties of senteval experiments
     
     Attributes:
