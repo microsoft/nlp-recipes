@@ -4,45 +4,159 @@
 import pytest
 import os
 
-from utils_nlp.models.bert.qa_utils import QAFeatures, QAExample, QAResult, postprocess_answer
+from utils_nlp.models.bert.qa_utils import (
+    QAFeatures,
+    QAExample,
+    QAResult,
+    postprocess_answer,
+    evaluate_qa,
+)
+from collections import OrderedDict
 
 
-def test_postprocess_answer_no_unaswerable(qa_utils_test_data, tmp_path):
+def test_postprocess_answer_no_unaswerable(qa_postprocess_test_data, tmp):
+    prediction_file = os.path.join(tmp, "qa_predictions.json")
+    nbest_file = os.path.join(tmp, "nbest_predictions.json")
+
     final_answers, final_probs, _ = postprocess_answer(
-        results=qa_utils_test_data["test_results"],
-        examples=qa_utils_test_data["test_examples"],
-        features=qa_utils_test_data["test_features"],
+        results=qa_postprocess_test_data["test_results"],
+        examples=qa_postprocess_test_data["test_examples"],
+        features=qa_postprocess_test_data["test_features"],
         do_lower_case=True,
-        output_prediction_file=os.path.join(tmp_path, "qa_predictions.json"),
-        output_nbest_file=os.path.join(tmp_path, "nbest_predictions.json"),
+        output_prediction_file=prediction_file,
+        output_nbest_file=nbest_file,
     )
 
-    qa_id = qa_utils_test_data["test_examples"][0].qa_id
+    qa_id = qa_postprocess_test_data["test_examples"][0].qa_id
 
-    assert final_answers[qa_id] == qa_utils_test_data["expected_answers"][qa_id]
-    assert final_probs[qa_id] > qa_utils_test_data["expected_prob_thresh"][qa_id]
+    assert final_answers[qa_id] == qa_postprocess_test_data["expected_answers"][qa_id]
+    assert final_probs[qa_id] > qa_postprocess_test_data["expected_prob_thresh"][qa_id]
+
+    assert os.path.exists(prediction_file)
+    assert os.path.exists(nbest_file)
 
 
-def test_postprocess_answer_unaswerable_exists(qa_utils_test_data, tmp_path):
+def test_postprocess_answer_unaswerable_exists(qa_postprocess_test_data, tmp):
+    prediction_file = os.path.join(tmp, "qa_predictions.json")
+    nbest_file = os.path.join(tmp, "nbest_predictions.json")
+    null_odds_file = os.path.join(tmp, "null_odds.json")
+
     final_answers, final_probs, _ = postprocess_answer(
-        results=qa_utils_test_data["test_results"],
-        examples=qa_utils_test_data["test_examples"],
-        features=qa_utils_test_data["test_features"],
+        results=qa_postprocess_test_data["test_results"],
+        examples=qa_postprocess_test_data["test_examples"],
+        features=qa_postprocess_test_data["test_features"],
         do_lower_case=True,
-        output_prediction_file=os.path.join(tmp_path, "qa_predictions.json"),
-        output_nbest_file=os.path.join(tmp_path, "nbest_predictions.json"),
+        output_prediction_file=prediction_file,
+        output_nbest_file=nbest_file,
         unanswerable_exists=True,
-        output_null_log_odds_file=os.path.join(tmp_path, "null_odds.json"),
+        output_null_log_odds_file=null_odds_file,
     )
 
-    qa_id = qa_utils_test_data["test_examples"][0].qa_id
+    qa_id = qa_postprocess_test_data["test_examples"][0].qa_id
 
-    assert final_answers[qa_id] == qa_utils_test_data["expected_answers"][qa_id]
-    assert final_probs[qa_id] > qa_utils_test_data["expected_prob_thresh"][qa_id]
+    assert final_answers[qa_id] == qa_postprocess_test_data["expected_answers"][qa_id]
+    assert final_probs[qa_id] > qa_postprocess_test_data["expected_prob_thresh"][qa_id]
+
+    assert os.path.exists(prediction_file)
+    assert os.path.exists(nbest_file)
+    assert os.path.exists(null_odds_file)
+
+
+def test_evaluate_qa(qa_evaluation_test_data):
+    result = evaluate_qa(
+        qa_ids=qa_evaluation_test_data["qa_ids"],
+        actuals=qa_evaluation_test_data["gold_answers"],
+        preds=qa_evaluation_test_data["predicted_answers"],
+    )
+
+    assert result["exact"] == 100
+    assert result["f1"] == 100
+    assert result["total"] == 10
+
+    assert result["HasAns_exact"] == 100
+    assert result["HasAns_f1"] == 100
+    assert result["HasAns_total"] == 10
+
+
+def test_evaluate_qa_output_result(qa_evaluation_test_data, tmp):
+
+    output_file = os.path.join(tmp, "qa_evaluation_result.json")
+    result = evaluate_qa(
+        qa_ids=qa_evaluation_test_data["qa_ids"],
+        actuals=qa_evaluation_test_data["gold_answers"],
+        preds=qa_evaluation_test_data["predicted_answers"],
+        out_file=output_file,
+    )
+
+    assert result["exact"] == 100
+    assert result["f1"] == 100
+    assert result["total"] == 10
+
+    assert result["HasAns_exact"] == 100
+    assert result["HasAns_f1"] == 100
+    assert result["HasAns_total"] == 10
+
+    assert os.path.exists(output_file)
 
 
 @pytest.fixture()
-def qa_utils_test_data():
+def qa_evaluation_test_data():
+    return {
+        "qa_ids": [
+            "56be4db0acb8001400a502ec",
+            "56be4db0acb8001400a502ed",
+            "56be4db0acb8001400a502ee",
+            "56be4db0acb8001400a502ef",
+            "56be4db0acb8001400a502f0",
+            "56be8e613aeaaa14008c90d1",
+            "56be8e613aeaaa14008c90d2",
+            "56be8e613aeaaa14008c90d3",
+            "56bea9923aeaaa14008c91b9",
+            "56bea9923aeaaa14008c91ba",
+        ],
+        "gold_answers": [
+            ["Denver Broncos", "Denver Broncos", "Denver Broncos"],
+            ["Carolina Panthers", "Carolina Panthers", "Carolina Panthers"],
+            [
+                "Santa Clara, California",
+                "Levi's Stadium",
+                "Levi's Stadium in the San Francisco Bay Area at Santa Clara, California.",
+            ],
+            ["Denver Broncos", "Denver Broncos", "Denver Broncos"],
+            ["gold", "gold", "gold"],
+            ['"golden anniversary"', "gold-themed", '"golden anniversary'],
+            ["February 7, 2016", "February 7", "February 7, 2016"],
+            [
+                "American Football Conference",
+                "American Football Conference",
+                "American Football Conference",
+            ],
+            ['"golden anniversary"', "gold-themed", "gold"],
+            [
+                "American Football Conference",
+                "American Football Conference",
+                "American Football Conference",
+            ],
+        ],
+        "predicted_answers": OrderedDict(
+            [
+                ("56be4db0acb8001400a502ec", "Denver Broncos"),
+                ("56be4db0acb8001400a502ed", "Carolina Panthers"),
+                ("56be4db0acb8001400a502ee", "Santa Clara, California"),
+                ("56be4db0acb8001400a502ef", "Denver Broncos"),
+                ("56be4db0acb8001400a502f0", "gold"),
+                ("56be8e613aeaaa14008c90d1", "golden anniversary"),
+                ("56be8e613aeaaa14008c90d2", "February 7, 2016"),
+                ("56be8e613aeaaa14008c90d3", "American Football Conference"),
+                ("56bea9923aeaaa14008c91b9", "golden anniversary"),
+                ("56bea9923aeaaa14008c91ba", "American Football Conference"),
+            ]
+        ),
+    }
+
+
+@pytest.fixture()
+def qa_postprocess_test_data():
     return {
         "expected_answers": {"56beb4e43aeaaa14008c9265": "Gary Kubiak"},
         "expected_prob_thresh": {"56beb4e43aeaaa14008c9265": 0.99},
