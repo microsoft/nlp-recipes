@@ -14,5 +14,5 @@ def test_embedding_trainer_runs(notebooks):
         notebook_path,
         OUTPUT_NOTEBOOK,
         kernel_name=KERNEL_NAME,
+        parameters=dict(NLP_REPO_PATH=".")
     )
-
