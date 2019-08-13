@@ -9,6 +9,7 @@ This folder contains examples and best practices, written in Jupyter notebooks, 
 - [Question Answering](question_answering)
 - [Sentence Similarity](sentence_similarity)
 - [Embeddings](embeddings)
+- [Annotation](annotation)
 
 ## Azure-enhanced notebooks
 

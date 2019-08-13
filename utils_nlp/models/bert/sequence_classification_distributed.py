@@ -1,44 +1,41 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
-import logging
 
-import horovod.torch as hvd
+# This script reuses some code from
+# https://github.com/huggingface/pytorch-pretrained-BERT/blob/master/examples/run_classifier.py
+
+import os
+import warnings
+
 import numpy as np
 import torch.nn as nn
-from torch.utils.data import TensorDataset
-import torch.utils.data.distributed
+import torch.utils.data
 from pytorch_pretrained_bert.modeling import BertForSequenceClassification
 from pytorch_pretrained_bert.optimization import BertAdam
 from tqdm import tqdm
 
+from utils_nlp.common.pytorch_utils import get_device, move_to_device
 from utils_nlp.models.bert.common import Language
 
-from utils_nlp.models.bert.common import get_dataset_multiple_files
-from utils_nlp.common.pytorch_utils import get_device, move_to_device
-
-logger = logging.getLogger(__name__)
-hvd.init()
-torch.manual_seed(42)
-
-if torch.cuda.is_available():
-    # Horovod: pin GPU to local rank.
-    torch.cuda.set_device(hvd.local_rank())
-    torch.cuda.manual_seed(42)
+try:
+    import horovod.torch as hvd
+except ImportError:
+    raise warnings.warn("No Horovod found! Can't do distributed training..")
 
 
-class BERTSequenceDistClassifier:
-    """Distributed BERT-based sequence classifier"""
+class BERTSequenceClassifier:
+    """BERT-based sequence classifier"""
 
-    def __init__(self, language=Language.ENGLISH, num_labels=2, cache_dir="."):
-        """Initializes the classifier and the underlying pretrained model.
+    def __init__(
+        self, language=Language.ENGLISH, num_labels=2, cache_dir=".", use_distributed=False
+    ):
+
+        """
 
         Args:
-            language (Language, optional): The pretrained model's language.
-                                           Defaults to Language.ENGLISH.
-            num_labels (int, optional): The number of unique labels in the
-                training data. Defaults to 2.
-            cache_dir (str, optional): Location of BERT's cache directory.
-                Defaults to ".".
+            language: Language passed to pre-trained BERT model to pick the appropriate model
+            num_labels: number of unique labels in train dataset
+            cache_dir: cache_dir to load pre-trained BERT model. Defaults to "."
         """
         if num_labels < 2:
             raise ValueError("Number of labels should be at least 2.")
@@ -46,280 +43,280 @@ class BERTSequenceDistClassifier:
         self.language = language
         self.num_labels = num_labels
         self.cache_dir = cache_dir
-        self.kwargs = (
-            {"num_workers": 1, "pin_memory": True}
-            if torch.cuda.is_available()
-            else {}
-        )
+        self.use_distributed = use_distributed
 
         # create classifier
         self.model = BertForSequenceClassification.from_pretrained(
-            language.value, num_labels=num_labels
+            language.value, cache_dir=cache_dir, num_labels=num_labels
         )
-
-    def fit(
-        self,
-        token_ids,
-        input_mask,
-        labels,
-        token_type_ids=None,
-        input_files,
-        num_gpus=1,
-        num_epochs=1,
-        batch_size=32,
-        lr=2e-5,
-        warmup_proportion=None,
-        verbose=True,
-        fp16_allreduce=False,
-    ):
-        """fine-tunes the bert classifier using the given training data.
-
-        args:
-            input_files(list, required): list of paths to the training data files.
-            token_ids (list): List of training token id lists.
-            input_mask (list): List of input mask lists.
-            labels (list): List of training labels.
-            token_type_ids (list, optional): List of lists. Each sublist
-                contains segment ids indicating if the token belongs to
-                the first sentence(0) or second sentence(1). Only needed
-                for two-sentence tasks.
-            num_gpus (int, optional): the number of gpus to use.
-                                      if none is specified, all available gpus
-                                      will be used. defaults to none.
-            num_epochs (int, optional): number of training epochs.
-                defaults to 1.
-            batch_size (int, optional): training batch size. defaults to 32.
-            lr (float): learning rate of the adam optimizer. defaults to 2e-5.
-            warmup_proportion (float, optional): proportion of training to
-                perform linear learning rate warmup for. e.g., 0.1 = 10% of
-                training. defaults to none.
-            verbose (bool, optional): if true, shows the training progress and
-                loss values. defaults to true.
-            fp16_allreduce(bool, optional)L if true, use fp16 compression during allreduce
-        """
-
-        if input_files is not None:
-            train_dataset = get_dataset_multiple_files(input_files)
-        else:
-            token_ids_tensor = torch.tensor(token_ids, dtype=torch.long)
-            input_mask_tensor = torch.tensor(input_mask, dtype=torch.long)
-            labels_tensor = torch.tensor(labels, dtype=torch.long)
-
-            if token_type_ids:
-                token_type_ids_tensor = torch.tensor(
-                    token_type_ids, dtype=torch.long
-                )
-                train_dataset = TensorDataset(
-                    token_ids_tensor,
-                    input_mask_tensor,
-                    token_type_ids_tensor,
-                    labels_tensor,
-                )
-            else:
-                train_dataset = TensorDataset(
-                    token_ids_tensor, input_mask_tensor, labels_tensor
-                )
-
-        train_sampler = torch.utils.data.distributed.DistributedSampler(
-            train_dataset, num_replicas=hvd.size(), rank=hvd.rank()
-        )
-        train_loader = torch.utils.data.DataLoader(
-            train_dataset,
-            batch_size=batch_size,
-            sampler=train_sampler,
-            **self.kwargs
-        )
-
-        device = get_device()
-        self.model.cuda()
-
-        hvd.broadcast_parameters(self.model.state_dict(), root_rank=0)
-        # hvd.broadcast_optimizer_state(optimizer, root_rank=0)
-
-        # define loss function
-        loss_func = nn.CrossEntropyLoss().to(device)
 
         # define optimizer and model parameters
         param_optimizer = list(self.model.named_parameters())
         no_decay = ["bias", "LayerNorm.bias", "LayerNorm.weight"]
         optimizer_grouped_parameters = [
             {
-                "params": [
-                    p
-                    for n, p in param_optimizer
-                    if not any(nd in n for nd in no_decay)
-                ],
+                "params": [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)],
                 "weight_decay": 0.01,
             },
-            {
-                "params": [
-                    p
-                    for n, p in param_optimizer
-                    if any(nd in n for nd in no_decay)
-                ]
-            },
+            {"params": [p for n, p in param_optimizer if any(nd in n for nd in no_decay)]},
         ]
+        self.optimizer_params = optimizer_grouped_parameters
+        self.name_parameters = self.model.named_parameters()
+        self.state_dict = self.model.state_dict()
 
-        num_examples = len(train_dataset)
-        num_batches = int(num_examples / batch_size)
-        num_train_optimization_steps = num_batches * num_epochs
+        if use_distributed:
+            hvd.init()
+            if torch.cuda.is_available():
+                torch.cuda.set_device(hvd.local_rank())
+            else:
+                warnings.warn("No GPU available! Using CPU.")
+
+    def create_optimizer(
+        self, num_train_optimization_steps, lr=2e-5, fp16_allreduce=False, warmup_proportion=None
+    ):
+
+        """
+        Method to create an BERT Optimizer based on the inputs from the user.
+
+        Args:
+            num_train_optimization_steps(int): Number of optimization steps.
+            lr (float): learning rate of the adam optimizer. defaults to 2e-5.
+            warmup_proportion (float, optional): proportion of training to
+                perform linear learning rate warmup for. e.g., 0.1 = 10% of
+                training. defaults to none.
+            fp16_allreduce(bool, optional)L if true, use fp16 compression during allreduce
+
+        Returns:
+            pytorch_pretrained_bert.optimization.BertAdam  : A BertAdam optimizer with user
+            specified config.
+
+        """
+        if self.use_distributed:
+            lr = lr * hvd.size()
 
         if warmup_proportion is None:
-            optimizer = BertAdam(
-                optimizer_grouped_parameters, lr=lr * hvd.size()
-            )
+            optimizer = BertAdam(self.optimizer_params, lr=lr)
         else:
             optimizer = BertAdam(
-                optimizer_grouped_parameters,
-                lr=lr * hvd.size(),
+                self.optimizer_params,
+                lr=lr,
                 t_total=num_train_optimization_steps,
                 warmup=warmup_proportion,
             )
 
-        # Horovod: (optional) compression algorithm.
-        compression = (
-            hvd.Compression.fp16 if fp16_allreduce else hvd.Compression.none
-        )
+        if self.use_distributed:
+            compression = hvd.Compression.fp16 if fp16_allreduce else hvd.Compression.none
+            optimizer = hvd.DistributedOptimizer(
+                optimizer, named_parameters=self.model.named_parameters(), compression=compression
+            )
 
-        # Horovod: wrap optimizer with DistributedOptimizer.
-        optimizer = hvd.DistributedOptimizer(
-            optimizer,
-            named_parameters=self.model.named_parameters(),
-            compression=compression,
-        )
+        return optimizer
 
-        # Horovod: set epoch to sampler for shuffling.
-        for epoch in range(num_epochs):
-            self.model.train()
-            train_sampler.set_epoch(epoch)
-            for batch_idx, batch in enumerate(train_loader):
-
-                if token_type_ids:
-                    x_batch, mask_batch, token_type_ids_batch, y_batch = tuple(
-                        t.to(device) for t in batch
-                    )
-                else:
-                    token_type_ids_batch = None
-                    x_batch, mask_batch, y_batch = tuple(
-                        t.to(device) for t in batch
-                    )
-
-                optimizer.zero_grad()
-
-                output = self.model(
-                    input_ids=x_batch, attention_mask=mask_batch, labels=None
-                )
-
-                loss = loss_func(output, y_batch).mean()
-                loss.backward()
-                optimizer.step()
-                if verbose and (batch_idx % ((num_batches // 10) + 1)) == 0:
-                    # Horovod: use train_sampler to determine the number of examples in
-                    # this worker's partition.
-                    print(
-                        "Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}".format(
-                            epoch,
-                            batch_idx * len(x_batch),
-                            len(train_sampler),
-                            100.0 * batch_idx / len(train_loader),
-                            loss.item(),
-                        )
-                    )
-
-        # empty cache
-        torch.cuda.empty_cache()
-
-    def predict(
-        self,
-        input_files = None,
-        token_ids,
-        input_mask,
-        token_type_ids=None,
-        input_files, num_gpus=1, batch_size=32, probabilities=False
-    ):
-        """Scores the given set of train files and returns the predicted classes.
+    def create_data_loader(self, dataset, batch_size=32, mode="train", **kwargs):
+        """
+        Method to create a data loader for a given Tensor dataset.
 
         Args:
-            input_files(list, required): list of paths to the test data files.
-            token_ids (list): List of training token lists.
-            input_mask (list): List of input mask lists.
-            token_type_ids (list, optional): List of lists. Each sublist
-                contains segment ids indicating if the token belongs to
-                the first sentence(0) or second sentence(1). Only needed
-                for two-sentence tasks.
+            mode(str): Mode for creating data loader. Could be train or test.
+            dataset(torch.utils.data.Dataset): A Tensor dataset.
+            batch_size(int): Batch size.
+
+        Returns:
+            torch.utils.data.DataLoader: A torch data loader to the given dataset.
+
+        """
+
+        if mode == "test":
+            sampler = torch.utils.data.sampler.SequentialSampler(dataset)
+        elif self.use_distributed:
+            sampler = torch.utils.data.distributed.DistributedSampler(
+                dataset, num_replicas=hvd.size(), rank=hvd.rank()
+            )
+        else:
+            sampler = torch.utils.data.RandomSampler(dataset)
+
+        data_loader = torch.utils.data.DataLoader(
+            dataset, batch_size=batch_size, sampler=sampler, **kwargs
+        )
+
+        return data_loader
+
+    def save_model(self):
+        """
+        Method to save the trained model.
+        #ToDo: Works for English Language now. Multiple language support needs to be added.
+
+        """
+        # Save the model to the outputs directory for capture
+        output_dir = "outputs"
+        os.makedirs(output_dir, exist_ok=True)
+
+        # Save a trained model, configuration and tokenizer
+        model_to_save = self.model.module if hasattr(self.model, "module") else self.model
+
+        # If we save using the predefined names, we can load using `from_pretrained`
+        output_model_file = "outputs/bert-large-uncased"
+        output_config_file = "outputs/bert_config.json"
+
+        torch.save(model_to_save.state_dict(), output_model_file)
+        model_to_save.config.to_json_file(output_config_file)
+
+    def fit(
+        self,
+        train_loader,
+        epoch,
+        bert_optimizer=None,
+        num_epochs=1,
+        num_gpus=0,
+        lr=2e-5,
+        warmup_proportion=None,
+        fp16_allreduce=False,
+        num_train_optimization_steps=10,
+    ):
+        """
+        Method to fine-tune the bert classifier using the given training data
+
+        Args:
+            train_loader(torch.DataLoader): Torch Dataloader created from Torch Dataset
+            epoch(int): Current epoch number of training.
+            bert_optimizer(optimizer): optimizer can be BERTAdam for local and Dsitributed if Horovod
+            num_epochs(int): the number of epochs to run
+            num_gpus(int): the number of gpus
+            lr (float): learning rate of the adam optimizer. defaults to 2e-5.
+            warmup_proportion (float, optional): proportion of training to
+                perform linear learning rate warmup for. e.g., 0.1 = 10% of
+                training. defaults to none.
+            fp16_allreduce(bool): if true, use fp16 compression during allreduce
+            num_train_optimization_steps: number of steps the optimizer should take.
+        """
+
+        device = get_device("cpu" if num_gpus == 0 else "gpu")
+
+        if device:
+            self.model.cuda()
+
+        if bert_optimizer is None:
+            bert_optimizer = self.create_optimizer(
+                num_train_optimization_steps=num_train_optimization_steps,
+                lr=lr,
+                warmup_proportion=warmup_proportion,
+                fp16_allreduce=fp16_allreduce,
+            )
+
+        if self.use_distributed:
+            hvd.broadcast_parameters(self.model.state_dict(), root_rank=0)
+
+        loss_func = nn.CrossEntropyLoss().to(device)
+
+        # train
+        self.model.train()  # training mode
+
+        token_type_ids_batch = None
+
+        num_print = 1000
+        for batch_idx, data in enumerate(train_loader):
+
+            x_batch = data["token_ids"]
+            x_batch = x_batch.cuda()
+
+            y_batch = data["labels"]
+            y_batch = y_batch.cuda()
+
+            mask_batch = data["input_mask"]
+            mask_batch = mask_batch.cuda()
+
+            if "token_type_ids" in data and data["token_type_ids"] is not None:
+                token_type_ids_batch = data["token_type_ids"]
+                token_type_ids_batch = token_type_ids_batch.cuda()
+
+            bert_optimizer.zero_grad()
+
+            y_h = self.model(
+                input_ids=x_batch,
+                token_type_ids=token_type_ids_batch,
+                attention_mask=mask_batch,
+                labels=None,
+            )
+
+            loss = loss_func(y_h, y_batch).mean()
+            loss.backward()
+
+            bert_optimizer.synchronize()
+            bert_optimizer.step()
+
+            if batch_idx % num_print == 0:
+                print(
+                    "Train Epoch: {}/{} ({:.0f}%) \t Batch:{} \tLoss: {:.6f}".format(
+                        epoch,
+                        num_epochs,
+                        100.0 * batch_idx / len(train_loader),
+                        batch_idx + 1,
+                        loss.item(),
+                    )
+                )
+
+        del [x_batch, y_batch, mask_batch, token_type_ids_batch]
+        torch.cuda.empty_cache()
+
+    def predict(self, test_loader, num_gpus=None, probabilities=False):
+        """
+
+        Method to predict the results on the test loader. Only evaluates for non distributed
+        workload on the head node in a distributed setup.
+
+        Args:
+            test_loader(torch Dataloader): Torch Dataloader created from Torch Dataset
             num_gpus (int, optional): The number of gpus to use.
                                       If None is specified, all available GPUs
                                       will be used. Defaults to None.
-            batch_size (int, optional): Scoring batch size. Defaults to 32.
             probabilities (bool, optional):
                 If True, the predicted probability distribution
                 is also returned. Defaults to False.
+
         Returns:
             1darray, dict(1darray, 1darray, ndarray): Predicted classes and target labels or
                 a dictionary with classes, target labels, probabilities) if probabilities is True.
         """
-
-        if input_files is not None:
-            test_dataset = get_dataset_multiple_files(input_files)
-
-        else:
-            token_ids_tensor = torch.tensor(token_ids, dtype=torch.long)
-            input_mask_tensor = torch.tensor(input_mask, dtype=torch.long)
-
-            if token_type_ids:
-                token_type_ids_tensor = torch.tensor(
-                    token_type_ids, dtype=torch.long
-                )
-                test_dataset = TensorDataset(
-                    token_ids_tensor, input_mask_tensor, token_type_ids_tensor
-                )
-            else:
-                test_dataset = TensorDataset(token_ids_tensor, input_mask_tensor)
-
-        # Horovod: use DistributedSampler to partition the test data.
-        test_sampler = torch.utils.data.sampler.SequentialSampler(test_dataset)
-
-        test_loader = torch.utils.data.DataLoader(
-            test_dataset,
-            batch_size=batch_size,
-            sampler=test_sampler,
-            **self.kwargs
-        )
-
-        device = get_device()
+        device = get_device("cpu" if num_gpus == 0 else "gpu")
         self.model = move_to_device(self.model, device, num_gpus)
+
+        # score
         self.model.eval()
+
         preds = []
-        labels_test = []
+        test_labels = []
+        for i, data in enumerate(tqdm(test_loader, desc="Iteration")):
+            x_batch = data["token_ids"]
+            x_batch = x_batch.cuda()
 
-        with tqdm(total=len(test_loader)) as pbar:
-            for i, (tokens, mask, target) in enumerate(test_loader):
-                if torch.cuda.is_available():
-                    tokens, mask, target = (
-                        tokens.cuda(),
-                        mask.cuda(),
-                        target.cuda(),
-                    )
+            mask_batch = data["input_mask"]
+            mask_batch = mask_batch.cuda()
 
-                with torch.no_grad():
-                    p_batch = self.model(
-                        input_ids=tokens, attention_mask=mask, labels=None
-                    )
-                preds.append(p_batch.cpu())
-                labels_test.append(target.cpu())
-                if i % batch_size == 0:
-                    pbar.update(batch_size)
+            y_batch = data["labels"]
+
+            token_type_ids_batch = None
+            if "token_type_ids" in data and data["token_type_ids"] is not None:
+                token_type_ids_batch = data["token_type_ids"]
+                token_type_ids_batch = token_type_ids_batch.cuda()
+
+            with torch.no_grad():
+                p_batch = self.model(
+                    input_ids=x_batch,
+                    token_type_ids=token_type_ids_batch,
+                    attention_mask=mask_batch,
+                    labels=None,
+                )
+            preds.append(p_batch.cpu())
+            test_labels.append(y_batch)
 
         preds = np.concatenate(preds)
-        labels_test = np.concatenate(labels_test)
+        test_labels = np.concatenate(test_labels)
 
         if probabilities:
             return {
                 "Predictions": preds.argmax(axis=1),
-                "Target": labels_test,
-                "classes probabilities": nn.Softmax(dim=1)(
-                    torch.Tensor(preds)
-                ).numpy(),
+                "Target": test_labels,
+                "classes probabilities": nn.Softmax(dim=1)(torch.Tensor(preds)).numpy(),
             }
         else:
-            return preds.argmax(axis=1), labels_test
+            return preds.argmax(axis=1), test_labels
