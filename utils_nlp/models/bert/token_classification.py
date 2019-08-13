@@ -196,19 +196,6 @@ class BERTTokenClassifier:
 
             torch.cuda.empty_cache()
 
-    def move_model(self, device, num_gpus=None):
-        """Moves the model to proper devices
-
-        Args:
-             num_gpus (int, optional): The number of gpus to use.
-                                      If None is specified, all available GPUs
-                                      will be used. Defaults to None.
-             device (string): device name, either "cpu" or gpu
-
-        """
-
-        self.model = move_to_device(self.model, device, num_gpus)
-
 
     def predict(
         self,
@@ -218,7 +205,6 @@ class BERTTokenClassifier:
         batch_size=32,
         num_gpus=None,
         probabilities=False,
-        move=False,
     ):
         """
         Predict token labels on the testing data.
@@ -238,9 +224,6 @@ class BERTTokenClassifier:
             batch_size (int, optional): Testing batch size. Defaults to 32.
             num_gpus (int, optional): The number of GPUs to use.
                 If None, all available GPUs will be used. Defaults to None.
-            move (bool, optional):
-                if True, move the model to proper device, i.e. cpu or gpu.
-                Defaults to False.
 
         Returns:
             list or namedtuple(list, ndarray): List of lists of predicted
@@ -257,11 +240,12 @@ class BERTTokenClassifier:
             batch_size=batch_size,
             sample_method="sequential",
         )
-        device = get_device(
-            "cpu" if num_gpus == 0 or not torch.cuda.is_available() else "gpu"
-        )
-        if move:
-            self.move_model(device, num_gpus)
+
+        device_target = "cpu" if num_gpus == 0 or not torch.cuda.is_available() else "gpu"
+        device = get_device(device_target)
+
+        if device_target == "cpu" and next(self.model.parameters()).is_cuda:
+            self.model = move_to_device(self.model, device, num_gpus)
 
         self.model.eval()
         eval_loss = 0

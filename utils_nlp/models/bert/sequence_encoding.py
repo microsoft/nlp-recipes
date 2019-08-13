@@ -87,8 +87,13 @@ class BERTSentenceEncoder:
         Returns:
             pd.DataFrame with columns text_index (int), token (str), layer_index (int), values (list[float]). 
         """
-        device = get_device("cpu" if self.num_gpus == 0 else "gpu")
-        self.model = move_to_device(self.model, device, self.num_gpus)
+        
+        device_target = "cpu" if self.num_gpus == 0 or not torch.cuda.is_available() else "gpu"
+        device = get_device(device_target)
+
+        if device_target == "cpu" and next(self.model.parameters()).is_cuda:
+            self.model = move_to_device(self.model, device, self.num_gpus)
+
         self.model.eval()
 
         tokens = self.tokenizer.tokenize(text)
