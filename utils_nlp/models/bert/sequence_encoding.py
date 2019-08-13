@@ -71,11 +71,27 @@ class BERTSentenceEncoder:
         )
         self.num_gpus = num_gpus
         self.max_len = max_len
-        if isinstance(layer_index, int):
-            self.layer_index = [layer_index]
-        else:
-            self.layer_index = layer_index
+        self.layer_index = layer_index
         self.pooling_strategy = pooling_strategy
+
+    @property
+    def layer_index(self):
+        return self._layer_index
+
+    @layer_index.setter
+    def layer_index(self, layer_index):
+        if isinstance(layer_index, int):
+            self._layer_index = [layer_index]
+        else:
+            self._layer_index = layer_index
+    
+    @property
+    def pooling_strategy(self):
+        return self._pooling_strategy
+
+    @pooling_strategy.setter
+    def pooling_strategy(self, pooling_strategy):
+        self._pooling_strategy = pooling_strategy
 
     def get_hidden_states(self, text, batch_size=32):
         """Extract the hidden states from the pretrained model

@@ -56,6 +56,22 @@ def test_gensen_local(notebooks):
             assert results[key][k] == pytest.approx(v, abs=ABS_TOL_PEARSONS)
             
 
+@pytest.mark.gpu
+@pytest.mark.integration
+def test_bert_encoder(notebooks, tmp):
+    notebook_path = notebooks["bert_encoder"]
+    pm.execute_notebook(
+        notebook_path,
+        OUTPUT_NOTEBOOK,
+        kernel_name=KERNEL_NAME,
+        parameters=dict(NUM_GPUS=1,
+                        MAX_SEQ_LENGTH=128,
+                        CACHE_DIR=tmp),
+    )
+    size_emb = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict["size_emb"]
+    assert size_emb == 768
+    
+            
 @pytest.mark.integration
 @pytest.mark.azureml
 def test_similarity_embeddings_baseline_runs(notebooks, baseline_results):

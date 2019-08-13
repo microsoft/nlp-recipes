@@ -65,6 +65,9 @@ def notebooks():
         "ner_wikigold_bert": os.path.join(
             folder_notebooks, "named_entity_recognition", "ner_wikigold_bert.ipynb"
         ),
+        "deep_and_unified_understanding": os.path.join(
+            folder_notebooks, "interpret_NLP_models", "understand_models.ipynb"
+        ),
     }
     return paths
 

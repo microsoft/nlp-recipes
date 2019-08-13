@@ -1,0 +1,15 @@
+# SentEval data and .pyc files
+
+
+
+# python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# log files
+*.log
+*.txt
+
+# data files
+data/senteval_data*
