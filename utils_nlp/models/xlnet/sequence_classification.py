@@ -184,10 +184,10 @@ class XLNetSequenceClassifier:
                 
                 loss = outputs[0] # model outputs are always tuple in pytorch-transformers
 
-                loss.backward()
+                loss.sum().backward()
                 torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.max_grad_norm)
 
-                tr_loss += loss.item()
+                tr_loss += loss.sum().item()
                 scheduler.step()  # Update learning rate schedule
                 optimizer.step()
                 
