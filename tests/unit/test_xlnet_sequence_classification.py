@@ -29,19 +29,12 @@ def test_classifier(xlnet_english_tokenizer, data):
         token_ids=token_ids,
         input_mask=input_mask,
         token_type_ids=segment_ids,
-        labels=data[1],    
-        num_gpus=0,        
-        num_epochs=1,
-        batch_size=2,    
-        verbose=True,
+        labels=data[1] 
     )
 
     preds = classifier.predict(
         token_ids=token_ids,
         input_mask=input_mask,
-        token_type_ids=segment_ids,
-        num_gpus=0,
-        batch_size=2,
-        probabilities=False
+        token_type_ids=segment_ids
     )
     assert len(preds) == len(data[1])
