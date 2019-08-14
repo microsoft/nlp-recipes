@@ -418,7 +418,8 @@ def create_data_loader(
 class TextDataset(Dataset):
     """
     Characterizes a dataset for PyTorch which can be used to load a file containing multiple rows
-    where each row is a training example.
+    where each row is a training example. The format of each line in the file is assumed to be
+    tokens, mask and label.
     """
 
     def __init__(self, filename):
@@ -457,11 +458,13 @@ class TextDataset(Dataset):
         tokens = self._cast(row[0][1:-1].split(","))
         mask = self._cast(row[1][1:-1].split(","))
 
-        return (
-            torch.tensor(tokens, dtype=torch.long),
-            torch.tensor(mask, dtype=torch.long),
-            torch.tensor(int(row[2]), dtype=torch.long),
-        )
+        data = {
+            "token_ids": torch.tensor(tokens, dtype=torch.long),
+            "input_mask": torch.tensor(mask, dtype=torch.long),
+            "labels": torch.tensor(int(row[2]), dtype=torch.long),
+        }
+
+        return data
 
 
 def get_dataset_multiple_files(files):
