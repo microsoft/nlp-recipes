@@ -4,6 +4,8 @@ This folder provides end-to-end examples of building Natural Language Inference 
 demonstrate the typical workflow of data preprocessing and model building for NLI task and use the
 utility functions in the *utils_nlp* folder to speed up these processes.
 
+## Natural Language Inference
+
 Natural Language Inference or Recognizing Textual Entailment (RTE) is the task of classifying
 a pair of premise and hypothesis sentences into three classes: contradiction, neutral, and
 entailment. For example,  
@@ -21,9 +23,10 @@ Currently, we focus on fine-tuning pre-trained BERT models for NLI and use the u
 functions under [utils_nlp/models/bert](../../utils_nlp/models/bert/). We plan to continue adding
 new state-of-the-art models.
 
+## Folder Content
 The following notebooks are included in this folder
 
-|Notebook|Description|Dataset|
-|--------|-----------|-------|
-|entailment_multinli_bert.ipynb|Fine-tuning of pre-trained BERT model for NLI|[MultiNLI](https://www.nyu.edu/projects/bowman/multinli/)|
-|entailment_xnli_bert_azureml.ipynb|**Distributed** fine-tuning of pre-trained BERT model for NLI|[XNLI](https://www.nyu.edu/projects/bowman/xnli/)
+|Notebook|Description|Dataset|Runs Local|
+|--------|-----------|-------|----------|
+|entailment_multinli_bert.ipynb|Fine-tuning of pre-trained BERT model for NLI|[MultiNLI](https://www.nyu.edu/projects/bowman/multinli/)|Yes|
+|entailment_xnli_bert_azureml.ipynb|**Distributed** fine-tuning of pre-trained BERT model for NLI|[XNLI](https://www.nyu.edu/projects/bowman/xnli/)|Yes
