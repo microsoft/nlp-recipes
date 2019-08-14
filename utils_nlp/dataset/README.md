@@ -24,20 +24,20 @@ df = load_pandas_df(DATA_FOLDER, file_split ="train", nrows = 1000)
 >Original source: https://www.microsoft.com/en-us/download/details.aspx?id=52398
 
 
-### The Multi-Genre NLI Corpus (MultiNLI)
+### [The Multi-Genre NLI Corpus (MultiNLI)](./multinli.py)
 >The majority of the corpus is released under the [OANC](https://www.anc.org/OANC/license.txt)’s license, The data in the FICTION section falls under several permissive licenses. See the [data description paper](https://www.nyu.edu/projects/bowman/multinli/paper.pdf) for details.  
 Redistributing the datasets "MultiNLI 1.0.zip", "MultiNLI Matched.zip", and "MultiNLI Mismatched.zip" with attribution:  
 Adina Williams, Nikita Nangia, Samuel R. Bowman. 2018. A Broad-Coverage Challenge Corpus for Sentence Understanding through Inference. Proceedings of the 2018 Conference of the North American Chapter of the Association for Computational Linguistics: Human Language Technologies, Volume 1 (Long Papers).  
 Original source: https://www.nyu.edu/projects/bowman/multinli/
 
-### The Stanford Natural Language Inference (SNLI) Corpus
+### [The Stanford Natural Language Inference (SNLI) Corpus](./snli.py)
 >This dataset is provided under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
 Redistributing the dataset "snli_1.0.zip" with attribution:  
 Samuel R. Bowman, Gabor Angeli, Christopher Potts, and Christopher D. Manning. 2015. A large annotated corpus for learning natural language inference. In Proceedings of the 2015 Conference on Empirical Methods in Natural Language Processing (EMNLP).  
 Original source: https://nlp.stanford.edu/projects/snli/  
 The dataset is preprocessed to remove unused columns and badly formatted rows.
 
-### Wikigold dataset
+### [Wikigold dataset](./wikigold.py)
 >This dataset is provided under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.ast).
 Redistributing the dataset "wikigold.conll.txt" with attribution:  
 Balasuriya, Dominic, et al. "Named entity recognition in wikipedia."
@@ -45,7 +45,7 @@ Proceedings of the 2009 Workshop on The People's Web Meets NLP: Collaboratively 
 Original source: https://github.com/juand-r/entity-recognition-datasets/tree/master/data/wikigold/CONLL-format/data  
 The dataset is preprocessed to fit data format requirement of BERT.
 
-### The Cross-Lingual NLI Corpus (XNLI)
+### [The Cross-Lingual NLI Corpus (XNLI)](./xnli.py)
 >The majority of the corpus sentences are released under the [OANC](https://www.anc.org/OANC/license.txt)’s license. The data in the Fiction genre from Captain Blood are under [The_Project_Gutenberg_License](http://www.gutenberg.org/wiki/Gutenberg:The_Project_Gutenberg_License). See details in the [XNLI paper](https://arxiv.org/pdf/1809.05053.pdf).
 Redistributing the datasets "XNLI 1.0.zip" and "XNLI-MT 1.0.zip" with attribution:   
 Alexis Conneau, Guillaume Lample, Ruty Rinott, Holger Schwenk, Ves Stoyanov. 2018. XNLI: Evaluating Cross-lingual Sentence Representations. Proceedings of the 2018 Conference on Empirical Methods in Natural Language Processing.  
@@ -59,7 +59,7 @@ Pranav Rajpurkar, Jian Zhang, Konstantin Lopyrev, and Percy Liang. 2016. SQuAD: 
 Original source: https://github.com/rajpurkar/SQuAD-explorer
 
 
-### The STSbenchmark dataset
+### [The STSbenchmark dataset](./stsbenchmark.py)
 >Redistributing the dataset "Stsbenchmark.tar.gz" with attribution:   
 Eneko Agirre, Daniel Cer, Mona Diab, Iñigo Lopez-Gazpio, Lucia
  Specia. Semeval-2017 Task 1: Semantic Textual Similarity
