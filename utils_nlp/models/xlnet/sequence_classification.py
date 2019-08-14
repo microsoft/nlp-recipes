@@ -14,6 +14,7 @@ from pytorch_transformers import AdamW, WarmupLinearSchedule
 from utils_nlp.common.pytorch_utils import get_device, move_to_device
 from utils_nlp.models.xlnet.common import Language
 import random
+import mlflow
 
 class XLNetSequenceClassifier:
     """XLNet-based sequence classifier"""
@@ -81,7 +82,10 @@ class XLNetSequenceClassifier:
         input_mask,
         labels,
         token_type_ids=None,
-        verbose=True
+        verbose=True,
+        logging_steps = 0,
+        save_steps = 0,
+        output_dir = "./checkpoints"
     ):
         """Fine-tunes the XLNet classifier using the given training data.
         
@@ -157,56 +161,64 @@ class XLNetSequenceClassifier:
         
         optimizer = AdamW(optimizer_grouped_parameters, lr=self.lr, eps=self.adam_eps)
         scheduler = WarmupLinearSchedule(optimizer, warmup_steps=self.warmup_steps, t_total=num_train_optimization_steps)
-        
-        global_step =0
-        self.model.train()
-        optimizer.zero_grad()
-        for epoch in range(self.num_epochs):
-            tr_loss = 0.0
-            
-            for i, batch in enumerate(tqdm(train_dataloader, desc="Iteration")):
-                if token_type_ids:
-                    x_batch, mask_batch, token_type_ids_batch, y_batch = tuple(
-                        t.to(device) for t in batch
-                    )
-                else:
-                    token_type_ids_batch = None
-                    x_batch, mask_batch, y_batch = tuple(
-                        t.to(device) for t in batch
-                    )
-                    
-                outputs = self.model(
-                    input_ids=x_batch,
-                    token_type_ids=token_type_ids_batch,
-                    attention_mask=mask_batch,
-                    labels=y_batch,
-               ) 
-                
-                loss = outputs[0] # model outputs are always tuple in pytorch-transformers
+        with mlflow.start_run():
+            global_step =0
+            self.model.train()
+            optimizer.zero_grad()
+            for epoch in range(self.num_epochs):
+                tr_loss = 0.0
 
-                loss.sum().backward()
-                torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.max_grad_norm)
-
-                tr_loss += loss.sum().item()
-                scheduler.step()  # Update learning rate schedule
-                optimizer.step()
-                
-                optimizer.zero_grad()
-
-                global_step += 1
-                
-                if verbose:
-                    if i % ((num_batches // 10) + 1) == 0:
-                        print(
-                            "epoch:{}/{}; batch:{}->{}/{}; average training loss:{:.6f}".format(
-                                epoch + 1,
-                                self.num_epochs,
-                                i + 1,
-                                min(i + 1 + num_batches // 10, num_batches),
-                                num_batches,
-                                tr_loss/(i+1),
-                            )
+                for i, batch in enumerate(tqdm(train_dataloader, desc="Iteration")):
+                    if token_type_ids:
+                        x_batch, mask_batch, token_type_ids_batch, y_batch = tuple(
+                            t.to(device) for t in batch
                         )
+                    else:
+                        token_type_ids_batch = None
+                        x_batch, mask_batch, y_batch = tuple(
+                            t.to(device) for t in batch
+                        )
+
+                    outputs = self.model(
+                        input_ids=x_batch,
+                        token_type_ids=token_type_ids_batch,
+                        attention_mask=mask_batch,
+                        labels=y_batch,
+                   ) 
+
+                    loss = outputs[0] # model outputs are always tuple in pytorch-transformers
+
+                    loss.sum().backward()
+                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.max_grad_norm)
+
+                    tr_loss += loss.sum().item()
+                    scheduler.step()  # Update learning rate schedule
+                    optimizer.step()
+
+                    optimizer.zero_grad()
+
+                    global_step += 1
+                    # logging of learning rate and loss
+                    if logging_steps > 0 and global_step % logging_steps == 0:
+                        mlflow.log_metric("learning rate per iter",scheduler.get_lr()[0])
+                        mlflow.log_metric("loss per iter",(tr_loss - logging_loss)/logging_steps)
+                        logging_loss = tr_loss  
+                    # model checkpointing    
+                    if save_steps > 0 and global_step % save_steps == 0:
+                        mlflow.pytorch.save_model(self.model,output_dir)
+
+                    if verbose:
+                        if i % ((num_batches // 10) + 1) == 0:
+                            print(
+                                "epoch:{}/{}; batch:{}->{}/{}; average training loss:{:.6f}".format(
+                                    epoch + 1,
+                                    self.num_epochs,
+                                    i + 1,
+                                    min(i + 1 + num_batches // 10, num_batches),
+                                    num_batches,
+                                    tr_loss/(i+1),
+                                )
+                            )
 
         # empty cache
         del [x_batch, y_batch, mask_batch, token_type_ids_batch]
