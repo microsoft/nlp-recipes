@@ -7,8 +7,10 @@ The utilities package is made up of several high-level submodules for common uti
 
 For more information about the individual submodules, find links below:  
 
-- [AzureML](./azureml/README.md) - Contains AzureML specific utilities  
-- [Common](./common/README.md) - Contains common helper utilities  
+- [Azure Machine Learning](./azureml/README.md) - Contains Azure Machine Learning specific utilities  
+- [Common](./common/README.md) - Contains common helper utilities such as  
+        - `Timer`: A timer object that helps with timing execution runs.  
+        - `get_device` and `move_to_device`: Pytorch specific utilities that help determine the compute device and handle moving of models across various types of compute respectively. 
 - [Dataset](./dataset/README.md) - Contains dataset definition and sources  
 - [Evaluation (Eval)](./eval/README.md) - Contains metric and accuracy evaluation utilities     
 - [Models](./models/README.md) - Contains implementation of algorithms used     
@@ -18,8 +20,7 @@ For more information about the individual submodules, find links below:
 ## Semantic Versioning
 
 This library is configured to use
-[setuptools_scm](https://github.com/pypa/setuptools_scm/), following the
-instructions there, to automatically get package version from git commit histories.
+[setuptools_scm](https://github.com/pypa/setuptools_scm/) to automatically get package version from git commit histories.
 
 > NOTE: **There shouldn't be any references to manually coded versions**.
 
