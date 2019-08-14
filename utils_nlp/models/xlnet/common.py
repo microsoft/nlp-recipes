@@ -6,6 +6,8 @@
 # https://github.com/huggingface/pytorch-transformers/blob/master/examples/utils_glue.py
 from enum import Enum
 from pytorch_transformers import XLNetTokenizer
+from mlflow import log_metric, log_param, log_artifact
+
 
 class Language(Enum):
     """
@@ -108,3 +110,15 @@ class Tokenizer:
 
 #             features.append({"input_ids":input_ids,"input_mask":input_mask,"segment_ids":segment_ids,"label_id":label_id})
         return (list_input_ids, list_input_mask, list_segment_ids)
+
+def log_xlnet_params(local_dict):
+    """wrapper that abstracts away logging of ipython notebook local training parameters described at definition
+    Args:
+        local_dict(dict): dict containing all local varaibles from notebook 
+    """
+    params = ["DATA_FOLDER","XLNET_CACHE_DIR","LANGUAGE","MAX_SEQ_LENGTH","BATCH_SIZE","NUM_GPUS",
+              "NUM_EPOCHS","TRAIN_SIZE","LABEL_COL","TEXT_COL","LEARNING_RATE","WEIGHT_DECAY",
+              "ADAM_EPSILON","WARMUP_STEPS","DEBUG"]
+    for i in params:
+         log_param(i,local_dict[i])
+    return
