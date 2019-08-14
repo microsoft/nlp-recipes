@@ -4,31 +4,33 @@
 import pytest
 import papermill as pm
 import scrapbook as sb
-from tests.notebooks_common import OUTPUT_NOTEBOOK
+from tests.notebooks_common import OUTPUT_NOTEBOOK, KERNEL_NAME
 
 ABS_TOL = 0.2
 
 
 @pytest.mark.integration
 @pytest.mark.azureml
-def test_bidaf_deep_dive(notebooks,
-                         subscription_id,
-                         resource_group,
-                         workspace_name,
-                         workspace_region):
+def test_bidaf_deep_dive(
+    notebooks, subscription_id, resource_group, workspace_name, workspace_region
+):
     notebook_path = notebooks["bidaf_deep_dive"]
-    pm.execute_notebook(notebook_path,
-                        OUTPUT_NOTEBOOK,
-                        parameters = {'NUM_EPOCHS':2,
-                                      'config_path': "tests/ci",
-                                      'PROJECT_FOLDER': "scenarios/question_answering/bidaf-question-answering",
-                                      'SQUAD_FOLDER': "scenarios/question_answering/squad",
-                                      'LOGS_FOLDER': "scenarios/question_answering/",
-                                      'BIDAF_CONFIG_PATH': "scenarios/question_answering/",
-                                      'subscription_id': subscription_id,
-                                      'resource_group': resource_group,
-                                      'workspace_name': workspace_name,
-                                      'workspace_region': workspace_region})
+    pm.execute_notebook(
+        notebook_path,
+        OUTPUT_NOTEBOOK,
+        parameters={
+            "NUM_EPOCHS": 2,
+            "config_path": "tests/ci",
+            "PROJECT_FOLDER": "scenarios/question_answering/bidaf-question-answering",
+            "SQUAD_FOLDER": "scenarios/question_answering/squad",
+            "LOGS_FOLDER": "scenarios/question_answering/",
+            "BIDAF_CONFIG_PATH": "scenarios/question_answering/",
+            "subscription_id": subscription_id,
+            "resource_group": resource_group,
+            "workspace_name": workspace_name,
+            "workspace_region": workspace_region,
+        },
+    )
     result = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict["validation_EM"]
     assert result == pytest.approx(0.5, abs=ABS_TOL)
 
@@ -36,20 +38,22 @@ def test_bidaf_deep_dive(notebooks,
 @pytest.mark.usefixtures("teardown_service")
 @pytest.mark.integration
 @pytest.mark.azureml
-def test_bidaf_quickstart(notebooks,
-                          subscription_id,
-                           resource_group,
-                           workspace_name,
-                           workspace_region):
+def test_bidaf_quickstart(
+    notebooks, subscription_id, resource_group, workspace_name, workspace_region
+):
     notebook_path = notebooks["bidaf_quickstart"]
-    pm.execute_notebook(notebook_path,
-                        OUTPUT_NOTEBOOK,
-                        parameters = {'config_path': "tests/ci",
-                                      'subscription_id': subscription_id,
-                                      'resource_group': resource_group,
-                                      'workspace_name': workspace_name,
-                                      'workspace_region': workspace_region,
-                                      'webservice_name': "aci-test-service"})
+    pm.execute_notebook(
+        notebook_path,
+        OUTPUT_NOTEBOOK,
+        parameters={
+            "config_path": "tests/ci",
+            "subscription_id": subscription_id,
+            "resource_group": resource_group,
+            "workspace_name": workspace_name,
+            "workspace_region": workspace_region,
+            "webservice_name": "aci-test-service",
+        },
+    )
     result = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict["answer"]
     assert result == "Bi-Directional Attention Flow"
 
@@ -64,11 +68,11 @@ def test_bert_qa_runs(notebooks):
         OUTPUT_NOTEBOOK,
         parameters=dict(
             AZUREML_CONFIG_PATH="./tests/integration/.azureml",
-            DATA_FOLDER='./tests/integration/squad',
-            PROJECT_FOLDER='./tests/integration/pytorch-transformers',
-            EXPERIMENT_NAME='NLP-QA-BERT-deepdive',
-            BERT_UTIL_PATH='./utils_nlp/azureml/azureml_bert_util.py',
-            EVALUATE_SQAD_PATH = './utils_nlp/eval/evaluate_squad.py',
+            DATA_FOLDER="./tests/integration/squad",
+            PROJECT_FOLDER="./tests/integration/pytorch-transformers",
+            EXPERIMENT_NAME="NLP-QA-BERT-deepdive",
+            BERT_UTIL_PATH="./utils_nlp/azureml/azureml_bert_util.py",
+            EVALUATE_SQAD_PATH="./utils_nlp/eval/evaluate_squad.py",
             TRAIN_SCRIPT_PATH="./scenarios/question_answering/bert_run_squad_azureml.py",
             BERT_MODEL="bert-base-uncased",
             NUM_TRAIN_EPOCHS=1.0,
@@ -84,3 +88,19 @@ def test_bert_qa_runs(notebooks):
     assert result["learning_rate"] >= 5e-5
     assert result["learning_rate"] <= 9e-5
 
+
+@pytest.mark.gpu
+@pytest.mark.integration
+def test_question_answering_squad_bert(notebooks, tmp):
+    notebook_path = notebooks["question_answering_squad_bert"]
+    pm.execute_notebook(
+        notebook_path,
+        OUTPUT_NOTEBOOK,
+        parameters={
+            "TRAIN_DATA_USED_PERCENT": 0.001,
+            "DEV_DATA_USED_PERCENT": 0.01,
+            "NUM_EPOCHS": 1,
+            "CACHE_DIR": tmp,
+        },
+        kernel_name=KERNEL_NAME,
+    )
