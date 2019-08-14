@@ -47,6 +47,9 @@ def notebooks():
         "bert_qa_trainer": os.path.join(
             folder_notebooks, "question_answering", "pretrained-BERT-SQuAD-deep-dive-aml.ipynb"
         ),
+        "question_answering_squad_bert": os.path.join(
+            folder_notebooks, "question_answering", "question_answering_squad_bert.ipynb"
+        ),
         "bidaf_deep_dive": os.path.join(
             folder_notebooks, "question_answering", "bidaf_aml_deep_dive.ipynb"
         ),
