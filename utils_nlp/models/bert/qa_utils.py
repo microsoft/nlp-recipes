@@ -181,8 +181,12 @@ def postprocess_answer(
             data preprocessing. This is required during answer finalization
             by comparing the predicted answer text and the original text
             span in :func:`_get_final_text`.
-        ##TODO:
-        n_best_size (int, optional):
+        n_best_size (int, optional): The number of candidates to choose from
+            each QAResult to generate the final prediction. It's also the
+            maximum number of n-best answers to output for each question.
+            Note that the number of n-best answers can be smaller than
+            `n_best_size` because some unqualified answers, e.g. answer that
+            are too long, are removed.
         max_answer_length (int, optional): Maximum length of the answer.
             Defaults to 30.
         output_prediction_file (str, optional): Path of the file to save the
@@ -214,9 +218,10 @@ def postprocess_answer(
             texts in string type.
             The values of the second dictionary  are the softmax
             probabilities of the predicted answers.
-            ##TODO:
-            The values of the third dictionary are the nbest answers for
-            each qa_id.
+            The values of the third dictionary are the n-best answers for
+            each qa_id. Note that the number of n-best answers can be smaller
+            than `n_best_size` because some unqualified answers,
+            e.g. answers that are too long, are removed.
 
     """
     # Helper functions
@@ -620,15 +625,19 @@ def evaluate_qa(qa_ids, actuals, preds, na_probs=None, na_prob_thresh=0, out_fil
         return _normalize_answer(s).split()
 
     def _compute_exact(a_gold, a_pred):
-        """Compute the exact match between two strings after normalization.
+        """Compute the exact match between two sentences after normalization.
 
         Returns:
-            int: 1 if the two strings match exactly after normalization,
+            int: 1 if two sentences match exactly after normalization,
                 0 otherwise.
         """
         return int(_normalize_answer(a_gold) == _normalize_answer(a_pred))
 
     def _compute_f1(a_gold, a_pred):
+        """
+            Compute F1 score based on token overlapping between two
+            sentences.
+        """
         gold_toks = _get_tokens(a_gold)
         pred_toks = _get_tokens(a_pred)
         common = collections.Counter(gold_toks) & collections.Counter(pred_toks)
@@ -644,6 +653,10 @@ def evaluate_qa(qa_ids, actuals, preds, na_probs=None, na_prob_thresh=0, out_fil
         return f1
 
     def _get_raw_scores(qa_ids, actuals, preds):
+        """
+            Compute exact match and F1 scores without applying any
+            unanswerable probability threshold.
+        """
         exact_scores = {}
         f1_scores = {}
 
@@ -661,6 +674,8 @@ def evaluate_qa(qa_ids, actuals, preds, na_probs=None, na_prob_thresh=0, out_fil
         return exact_scores, f1_scores
 
     def _apply_no_ans_threshold(scores, na_probs, qid_to_has_ans, na_prob_thresh):
+        """Update the input scores by applying unanswerable probability threshold."""
+
         new_scores = {}
         for qid, s in scores.items():
             pred_na = na_probs[qid] > na_prob_thresh
@@ -671,6 +686,7 @@ def evaluate_qa(qa_ids, actuals, preds, na_probs=None, na_prob_thresh=0, out_fil
         return new_scores
 
     def _make_eval_dict(exact_scores, f1_scores, qid_list=None):
+        """Create a dictionary of evaluation results."""
         if not qid_list:
             total = len(exact_scores)
             return collections.OrderedDict(
@@ -691,6 +707,7 @@ def evaluate_qa(qa_ids, actuals, preds, na_probs=None, na_prob_thresh=0, out_fil
             )
 
     def _merge_eval(main_eval, new_eval, prefix):
+        """Merge multiple evaluation result dictionaries."""
         for k in new_eval:
             main_eval["%s_%s" % (prefix, k)] = new_eval[k]
 
