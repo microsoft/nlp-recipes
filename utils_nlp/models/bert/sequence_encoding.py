@@ -97,6 +97,7 @@ class BERTSentenceEncoder:
         """
         device = get_device("cpu" if self.num_gpus == 0 or self.cuda else "gpu")
         self.model = move_to_device(self.model, device, self.num_gpus)
+
         self.model.eval()
 
         tokens = self.tokenizer.tokenize(text)

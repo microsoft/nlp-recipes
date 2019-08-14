@@ -207,7 +207,6 @@ class BERTSequenceClassifier:
         del [x_batch, y_batch, mask_batch, token_type_ids_batch]
         torch.cuda.empty_cache()
 
-    
     def predict(
         self,
         token_ids,
@@ -233,9 +232,6 @@ class BERTSequenceClassifier:
             probabilities (bool, optional):
                 If True, the predicted probability distribution
                 is also returned. Defaults to False.
-            move (bool, optional):
-                if True, move the model to proper device, i.e. cpu or gpu. 
-                Defaults to False.
         Returns:
             1darray, namedtuple(1darray, ndarray): Predicted classes or
                 (classes, probabilities) if probabilities is True.
@@ -244,6 +240,7 @@ class BERTSequenceClassifier:
             "cpu" if num_gpus == 0 or not self.cuda else "gpu"
         )
         self.model = move_to_device(self.model, device, num_gpus)
+
         # score
         self.model.eval()
 

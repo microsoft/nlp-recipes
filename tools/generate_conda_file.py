@@ -73,6 +73,7 @@ PIP_BASE = {
     "ipywebrtc": "ipywebrtc==0.4.3",
     "pre-commit": "pre-commit>=1.14.4",
     "scikit-learn": "scikit-learn>=0.19.0,<=0.20.3",
+    "sklearn-crfsuite": "sklearn-crfsuite>=0.3.6",
     "spacy": "spacy>=2.1.4",
     "spacy-models": (
         "https://github.com/explosion/spacy-models/releases/download/"

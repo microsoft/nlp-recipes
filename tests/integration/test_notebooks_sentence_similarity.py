@@ -33,6 +33,45 @@ def baseline_results():
     }
 
 
+@pytest.mark.gpu
+@pytest.mark.integration
+def test_gensen_local(notebooks):
+    notebook_path = notebooks["gensen_local"]
+    pm.execute_notebook(
+        notebook_path,
+        OUTPUT_NOTEBOOK,
+        kernel_name=KERNEL_NAME,
+        parameters=dict(
+            max_epoch=1,
+            config_filepath="scenarios/sentence_similarity/gensen_config.json",
+            base_data_path="data",
+        ),
+    )
+
+    results = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict["results"]
+    expected = {"0": {"0": 1, "1": 0.95}, "1": {"0": 0.95, "1": 1}}
+
+    for key, value in expected.items():
+        for k, v in value.items():
+            assert results[key][k] == pytest.approx(v, abs=ABS_TOL_PEARSONS)
+            
+
+@pytest.mark.gpu
+@pytest.mark.integration
+def test_bert_encoder(notebooks, tmp):
+    notebook_path = notebooks["bert_encoder"]
+    pm.execute_notebook(
+        notebook_path,
+        OUTPUT_NOTEBOOK,
+        kernel_name=KERNEL_NAME,
+        parameters=dict(NUM_GPUS=1,
+                        MAX_SEQ_LENGTH=128,
+                        CACHE_DIR=tmp),
+    )
+    size_emb = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict["size_emb"]
+    assert size_emb == 768
+    
+            
 @pytest.mark.integration
 @pytest.mark.azureml
 def test_similarity_embeddings_baseline_runs(notebooks, baseline_results):
@@ -67,30 +106,7 @@ def test_automl_local_runs(notebooks,
     assert result == pytest.approx(0.5, abs=ABS_TOL)
 
 
-@pytest.mark.gpu
 @pytest.mark.integration
-def test_gensen_local(notebooks):
-    notebook_path = notebooks["gensen_local"]
-    pm.execute_notebook(
-        notebook_path,
-        OUTPUT_NOTEBOOK,
-        kernel_name=KERNEL_NAME,
-        parameters=dict(
-            max_epoch=1,
-            config_filepath="scenarios/sentence_similarity/gensen_config.json",
-            base_data_path="data",
-        ),
-    )
-
-    results = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict["results"]
-    expected = {"0": {"0": 1, "1": 0.95}, "1": {"0": 0.95, "1": 1}}
-
-    for key, value in expected.items():
-        for k, v in value.items():
-            assert results[key][k] == pytest.approx(v, abs=ABS_TOL_PEARSONS)
-
-
-@pytest.mark.notebooks
 @pytest.mark.azureml
 def test_similarity_gensen_azureml_runs(notebooks):
     notebook_path = notebooks["gensen_azureml"]
@@ -113,3 +129,13 @@ def test_similarity_gensen_azureml_runs(notebooks):
     assert result["learning_rate"] >= 0.0001
     assert result["learning_rate"] <= 0.001
 
+
+@pytest.mark.integration
+@pytest.mark.azureml
+@pytest.mark.skip(reason="can't run programmatically, AKS cluster takes ~20 minutes to create and there is no blocking call in the notebook to tell that the cluster creation is in progress")
+def test_automl_with_pipelines_deployment_aks(notebooks):
+    notebook_path = notebooks["automl_with_pipelines_deployment_aks"]
+    pm.execute_notebook(
+        notebook_path,
+        OUTPUT_NOTEBOOK)
+    
