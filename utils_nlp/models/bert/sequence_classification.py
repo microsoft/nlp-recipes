@@ -20,6 +20,7 @@ from tqdm import tqdm
 from utils_nlp.models.bert.common import Language
 from utils_nlp.common.pytorch_utils import get_device, move_to_device
 
+from cached_property import cached_property
 
 class BERTSequenceClassifier:
     """BERT-based sequence classifier"""
@@ -46,7 +47,15 @@ class BERTSequenceClassifier:
         self.model = BertForSequenceClassification.from_pretrained(
             language, cache_dir=cache_dir, num_labels=num_labels
         )
+        self.has_cuda = self.cuda
 
+    @cached_property
+    def cuda(self):
+        """ cache the output of torch.cuda.is_available() """
+
+        self.has_cuda = torch.cuda.is_available()
+        return self.has_cuda
+        
     def fit(
         self,
         token_ids,
@@ -85,7 +94,7 @@ class BERTSequenceClassifier:
         """
 
         device = get_device(
-            "cpu" if num_gpus == 0 or not torch.cuda.is_available() else "gpu"
+            "cpu" if num_gpus == 0 or not self.cuda else "gpu"
         )
         self.model = move_to_device(self.model, device, num_gpus)
 
@@ -198,19 +207,7 @@ class BERTSequenceClassifier:
         del [x_batch, y_batch, mask_batch, token_type_ids_batch]
         torch.cuda.empty_cache()
 
-    def move_model(self, device, num_gpus=None):
-        """Moves the model to proper devices
-
-        Args:
-             num_gpus (int, optional): The number of gpus to use.
-                                      If None is specified, all available GPUs
-                                      will be used. Defaults to None.
-             device (string): device name, either "cpu" or gpu
-
-        """
-
-        self.model = move_to_device(self.model, device, num_gpus)
-
+    
     def predict(
         self,
         token_ids,
@@ -219,7 +216,6 @@ class BERTSequenceClassifier:
         num_gpus=None,
         batch_size=32,
         probabilities=False,
-        move=False,
     ):
         """Scores the given dataset and returns the predicted classes.
 
@@ -245,11 +241,9 @@ class BERTSequenceClassifier:
                 (classes, probabilities) if probabilities is True.
         """
         device = get_device(
-            "cpu" if num_gpus == 0 or not torch.cuda.is_available() else "gpu"
+            "cpu" if num_gpus == 0 or not self.cuda else "gpu"
         )
-
-        if move:
-            self.move_model(device, num_gpus)
+        self.model = move_to_device(self.model, device, num_gpus)
         # score
         self.model.eval()
 
