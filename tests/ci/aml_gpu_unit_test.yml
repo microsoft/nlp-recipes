@@ -2,7 +2,7 @@
 # Licensed under the MIT License.
 #
 variables:
-- group: AML-config
+- group: AMLMLConfig
 - name  : 'test'
   value : 'tests/ci/run_pytest.py'
 - name  : 'testfolder'
