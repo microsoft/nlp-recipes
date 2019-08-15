@@ -161,7 +161,7 @@ def test_tokenize_qa_is_training(qa_test_data, bert_english_tokenizer):
         answer_text=qa_test_data["answer_text"],
         max_len=qa_test_data["max_seq_len"],
         doc_stride=qa_test_data["doc_stride"],
-        max_query_length=qa_test_data["max_query_len"],
+        max_question_length=qa_test_data["max_query_len"],
     )
 
     features = qa_tokenization_result[0]
@@ -289,7 +289,7 @@ def test_tokenize_qa_cache_result(qa_test_data, bert_english_tokenizer):
         answer_text=qa_test_data["answer_text"],
         max_len=qa_test_data["max_seq_len"],
         doc_stride=qa_test_data["doc_stride"],
-        max_query_length=qa_test_data["max_query_len"],
+        max_question_length=qa_test_data["max_query_len"],
         cache_results=True,
     )
 
