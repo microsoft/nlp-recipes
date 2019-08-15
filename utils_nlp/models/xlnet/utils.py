@@ -15,7 +15,7 @@ def generate_confusion_matrix(y_true, y_pred,labels):
 
     """
     conf_matrix=np.array(confusion_matrix(y_true, y_pred))
-    conf_matrix=np.divide(conf_matrix.astype('float'), conf_matrix.sum(axis=1)[:,np.newaxis])
+    conf_matrix=np.divide(conf_matrix.astype('float'), conf_matrix.sum())
     conf_dataframe = pd.DataFrame(conf_matrix,labels,labels)
     dimensions_plot = (8, 5)
     fig, ax = pyplot.subplots(figsize=dimensions_plot)
