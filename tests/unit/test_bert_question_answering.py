@@ -42,7 +42,7 @@ def qa_test_features_examples(bert_english_tokenizer):
         answer_text=raw_data["answer_text"],
         max_len=raw_data["max_seq_len"],
         doc_stride=raw_data["doc_stride"],
-        max_query_length=raw_data["max_query_len"],
+        max_question_length=raw_data["max_query_len"],
     )
 
     return {"features": features, "examples": examples}
