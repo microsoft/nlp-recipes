@@ -83,7 +83,11 @@ class XLNetSequenceClassifier:
         token_ids,
         input_mask,
         labels,
+        val_token_ids,
+        val_input_mask,
+        val_labels,
         token_type_ids=None,
+        val_token_type_ids=None,
         verbose=True,
         logging_steps = 0,
         save_steps = 0,
@@ -108,15 +112,29 @@ class XLNetSequenceClassifier:
         token_ids_tensor = torch.tensor(token_ids, dtype=torch.long)
         input_mask_tensor = torch.tensor(input_mask, dtype=torch.long)
         labels_tensor = torch.tensor(labels, dtype=torch.long)
+
+        val_token_ids_tensor = torch.tensor(val_token_ids, dtype=torch.long)
+        val_input_mask_tensor = torch.tensor(val_input_mask, dtype=torch.long)
+        val_labels_tensor = torch.tensor(val_labels, dtype=torch.long)
+        
+        val_size = len(val_token_ids)
         
         if token_type_ids:
             token_type_ids_tensor = torch.tensor(token_type_ids, dtype=torch.long)
+            val_token_type_ids_tensor = torch.tensor(val_token_type_ids, dtype=torch.long)
 
             train_dataset = TensorDataset(
                 token_ids_tensor,
                 input_mask_tensor,
                 token_type_ids_tensor,
                 labels_tensor
+            )
+            
+            val_dataset = TensorDataset(
+                val_token_ids_tensor,
+                val_input_mask_tensor,
+                val_token_type_ids_tensor,
+                val_labels_tensor
             )
 
         else:
@@ -127,13 +145,11 @@ class XLNetSequenceClassifier:
                 labels_tensor
             )
         
-        train_sampler = RandomSampler(train_dataset)
-        
-        train_dataloader = DataLoader(
-            train_dataset,
-            sampler=train_sampler,
-            batch_size=self.batch_size
-        )
+            val_dataset = TensorDataset(
+                val_token_ids_tensor,
+                val_input_mask_tensor,
+                val_labels_tensor
+            )
         
         # define optimizer and model parameters
         param_optimizer = list(self.model.named_parameters())
@@ -156,6 +172,21 @@ class XLNetSequenceClassifier:
             }
         ]
         
+        train_sampler = RandomSampler(train_dataset)
+        val_sampler = RandomSampler(val_dataset)
+        
+        train_dataloader = DataLoader(
+            train_dataset,
+            sampler=train_sampler,
+            batch_size=self.batch_size
+        )
+        
+        val_dataloader = DataLoader(
+            val_dataset,
+            sampler=val_sampler,
+            batch_size=self.batch_size
+        )
+        
         num_examples = len(token_ids)
         num_batches = len(train_dataloader)
         num_train_optimization_steps = num_batches * self.num_epochs
@@ -167,6 +198,15 @@ class XLNetSequenceClassifier:
         self.model.train()
         optimizer.zero_grad()
         for epoch in range(self.num_epochs):
+            
+            train_sampler = RandomSampler(train_dataset)
+        
+            train_dataloader = DataLoader(
+                train_dataset,
+                sampler=train_sampler,
+                batch_size=self.batch_size
+            )
+            
             tr_loss = 0.0
             logging_loss = 0.0
 
@@ -194,8 +234,8 @@ class XLNetSequenceClassifier:
                 torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.max_grad_norm)
 
                 tr_loss += loss.sum().item()
-                scheduler.step()  # Update learning rate schedule
                 optimizer.step()
+                scheduler.step()  # Update learning rate schedule
 
                 optimizer.zero_grad()
 
@@ -216,20 +256,54 @@ class XLNetSequenceClassifier:
 
                 if verbose:
                     if i % ((num_batches // 10) + 1) == 0:
+                        
+                        # run model on validation set                        
+                        
+                        self.model.eval()
+                        
+                        val_loss = 0.0
+                        
+                        for j, val_batch in enumerate(val_dataloader):
+
+                            if token_type_ids:
+                                val_x_batch, val_mask_batch, val_token_type_ids_batch, val_y_batch = tuple(
+                                    t.to(device) for t in val_batch
+                                )
+                            else:
+                                token_type_ids_batch = None
+                                val_x_batch, val_mask_batch, val_y_batch = tuple(
+                                    t.to(device) for t in val_batch
+                                )
+
+                            val_outputs = self.model(
+                                input_ids=val_x_batch,
+                                token_type_ids=val_token_type_ids_batch,
+                                attention_mask=val_mask_batch,
+                                labels=val_y_batch,
+                            )
+
+                            vloss = val_outputs[0]
+                            
+                            val_loss += vloss.sum().item()
+                            
                         print(
-                            "epoch:{}/{}; batch:{}->{}/{}; average training loss:{:.6f}".format(
+                            "epoch:{}/{}; batch:{}->{}/{}; average training loss:{:.6f}; average val loss:{:.6f}".format(
                                 epoch + 1,
                                 self.num_epochs,
                                 i + 1,
                                 min(i + 1 + num_batches // 10, num_batches),
                                 num_batches,
                                 tr_loss/(i+1),
+                                val_loss/(j+1)
                             )
                         )
+                        
+                        self.model.train()
 
         
         # empty cache
         del [x_batch, y_batch, mask_batch, token_type_ids_batch]
+        del [val_x_batch, val_y_batch, val_mask_batch, val_token_type_ids_batch]
         torch.cuda.empty_cache()
         
     def predict(
