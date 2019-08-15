@@ -83,7 +83,7 @@ def notebooks():
     return paths
 
 
-@pytest.fixture()
+@pytest.fixture
 def tmp(tmp_path_factory):
     td = TemporaryDirectory(dir=tmp_path_factory.getbasetemp())
     try:
@@ -194,8 +194,8 @@ def cluster_name(request):
 
 
 @pytest.fixture()
-def bert_english_tokenizer(tmp_path):
-    return BERTTokenizer(language=Language.ENGLISHCASED, to_lower=False, cache_dir=tmp_path)
+def bert_english_tokenizer(tmp):
+    return BERTTokenizer(language=Language.ENGLISHCASED, to_lower=False, cache_dir=tmp)
 
 
 @pytest.fixture(scope="module")
