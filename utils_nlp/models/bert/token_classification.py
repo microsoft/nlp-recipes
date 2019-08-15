@@ -18,6 +18,7 @@ from tqdm import tqdm, trange
 from utils_nlp.models.bert.common import Language, create_data_loader
 from utils_nlp.common.pytorch_utils import get_device, move_to_device
 
+from cached_property import cached_property
 
 class BERTTokenClassifier:
     """BERT-based token classifier."""
@@ -48,6 +49,14 @@ class BERTTokenClassifier:
         self.model = BertForTokenClassification.from_pretrained(
             language, cache_dir=cache_dir, num_labels=num_labels
         )
+        self.has_cuda = self.cuda
+
+    @cached_property
+    def cuda(self):
+        """ Caches the output of torch.cuda.is_available() """
+
+        self.has_cuda = torch.cuda.is_available()
+        return self.has_cuda
 
     def _get_optimizer(self, learning_rate, num_train_optimization_steps, warmup_proportion):
         """
@@ -126,7 +135,9 @@ class BERTTokenClassifier:
             batch_size=batch_size,
         )
 
-        device = get_device("cpu" if num_gpus == 0 or not torch.cuda.is_available() else "gpu")
+        device = get_device(
+            "cpu" if num_gpus == 0 or not self.cuda else "gpu"
+        )
         self.model = move_to_device(self.model, device, num_gpus)
 
         if num_gpus is None:
@@ -209,7 +220,10 @@ class BERTTokenClassifier:
             batch_size=batch_size,
             sample_method="sequential",
         )
-        device = get_device("cpu" if num_gpus == 0 or not torch.cuda.is_available() else "gpu")
+
+        device = get_device(
+            "cpu" if num_gpus == 0 or not self.cuda else "gpu"
+        )
         self.model = move_to_device(self.model, device, num_gpus)
 
         self.model.eval()
