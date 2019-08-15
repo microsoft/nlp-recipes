@@ -70,9 +70,7 @@ def notebooks():
         "bert_senteval": os.path.join(
             folder_notebooks, "sentence_similarity", "bert_senteval.ipynb"
         ),
-        "tc_mnli_bert": os.path.join(
-            folder_notebooks, "text_classification", "tc_mnli_bert.ipynb"
-        ),
+        "tc_mnli_bert": os.path.join(folder_notebooks, "text_classification", "tc_mnli_bert.ipynb"),
         "ner_wikigold_bert": os.path.join(
             folder_notebooks, "named_entity_recognition", "ner_wikigold_bert.ipynb"
         ),
@@ -194,8 +192,8 @@ def cluster_name(request):
 
 
 @pytest.fixture()
-def bert_english_tokenizer(tmp):
-    return BERTTokenizer(language=Language.ENGLISHCASED, to_lower=False, cache_dir=tmp)
+def bert_english_tokenizer(tmp_path):
+    return BERTTokenizer(language=Language.ENGLISHCASED, to_lower=False, cache_dir=tmp_path)
 
 
 @pytest.fixture(scope="module")
