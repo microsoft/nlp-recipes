@@ -91,7 +91,6 @@ class XLNetSequenceClassifier:
         verbose=True,
         logging_steps = 0,
         save_steps = 0,
-        output_dir = "./checkpoints"
     ):
         """Fine-tunes the XLNet classifier using the given training data.
         
@@ -243,13 +242,17 @@ class XLNetSequenceClassifier:
                 global_step += 1
                 # logging of learning rate and loss
                 if logging_steps > 0 and global_step % logging_steps == 0:
-                    mlflow.log_metric("learning rate per iter",scheduler.get_lr()[0])
-                    mlflow.log_metric("loss per iter",(tr_loss - logging_loss)/logging_steps)
+                    mlflow.log_metric("learning rate",scheduler.get_lr()[0],step=global_step)
+                    mlflow.log_metric("training loss",(tr_loss - logging_loss)/logging_steps,step=global_step)
                     logging_loss = tr_loss  
                 # model checkpointing    
                 if save_steps > 0 and global_step % save_steps == 0:
-                    checkpoint_dir = os.path.join(output_dir, str(global_step), )
-                    mlflow.pytorch.log_model(self.model, "models")
+                    checkpoint_dir = os.path.join(os.getcwd(),"checkpoints")
+                    if not os.path.isdir(checkpoint_dir):
+                        os.makedirs(checkpoint_dir)
+                    checkpoint_path = checkpoint_dir + "/" + str(global_step) + ".pth"
+                    torch.save(self.model.state_dict(), checkpoint_path)
+                    mlflow.log_artifact(checkpoint_path)
 
                 if verbose:
                     if i % ((num_batches // 10) + 1) == 0:
@@ -297,6 +300,7 @@ class XLNetSequenceClassifier:
                         
                         self.model.train()
 
+        
         # empty cache
         del [x_batch, y_batch, mask_batch, token_type_ids_batch]
         del [val_x_batch, val_y_batch, val_mask_batch, val_token_type_ids_batch]
