@@ -392,8 +392,7 @@ class Tokenizer:
         Tokenize and preprocess Question Answering data, involving the
         following steps:
             0. WordPiece tokenization.
-            1. Convert character-based answer span indices to token-based
-                indices.
+            1. Convert character-based answer span indices to token-based indices.
             2. Truncate the question token list if it's longer than
                 `max_question_length`.
             3. Split the paragraph into multiple segments if it's longer than
