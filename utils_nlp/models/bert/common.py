@@ -400,8 +400,7 @@ class Tokenizer:
                 `MAX_SEQ_LENGTH` - `max_question_length` - 3.
                 (The "-3" is for the special [CLS] token and two [SEP] tokens.)
             4. Add the special tokens [CLS] and [SEP].
-            5. Pad the concatenated token sequence to `max_len` if it's
-                shorter.
+            5. Pad the concatenated token sequence to `max_len` if it's shorter.
             6. Convert the tokens into token indices corresponding to the
                 BERT tokenizer's vocabulary.
 
