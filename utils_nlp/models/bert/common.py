@@ -404,6 +404,7 @@ class Tokenizer:
                 shorter.
             6. Convert the tokens into token indices corresponding to the
                 BERT tokenizer's vocabulary.
+
         Args:
             doc_text (list): List of strings of document text.
             question_text (list): List of strings of question text.
