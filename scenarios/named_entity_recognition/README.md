@@ -1,14 +1,17 @@
 # Named Entity Recognition (NER)
 
-This folder contains examples and best practices, written in Jupyter notebooks, for building Named Entity Recognition models. The models can be used in a wide variety of applications, such as information extraction and filtering. It also plays an important role in other
-NLP tasks like question answering and text summarization.
+This folder contains examples and best practices, written in Jupyter notebooks, for building Named
+Entity Recognition models. The models can be used in a wide variety of applications, such as
+information extraction and filtering. It also plays an important role in other NLP tasks like
+question answering and text summarization.
 
 ## What is Named Entity Recognition (NER)
 
-Named Entity Recognition (NER) is the task of detecting and classifying
-real-world objects mentioned in text. Common named entities include person
-names, locations, organizations, etc. The [state-of-the art](https://paperswithcode.com/task/named-entity-recognition-ner) NER methods include combining Long Short-Term Memory neural network with Conditional Random Field
-(LSTM-CRF) and pretrained language models like BERT.
+Named Entity Recognition (NER) is the task of detecting and classifying real-world objects mentioned
+in text. Common named entities include person names, locations, organizations, etc. The
+[state-of-the art](https://paperswithcode.com/task/named-entity-recognition-ner) NER methods include
+combining Long Short-Term Memory neural network with Conditional Random Field (LSTM-CRF) and
+pretrained language models like BERT.
 
 NER usually involves assigning an entity label to each word in a sentence as shown in the figure below.   
 <p align="center">
@@ -31,6 +34,6 @@ principles on building state of the art models. Currently, we focus on fine-tuni
 model. We plan to continue adding state-of-the-art models as they come up and welcome community
 contributions.
 
-|Notebook|Runs Local|Description|
-|---|---|---|
-|[BERT](ner_wikigold_bert.ipynb)| Yes| Fine-tune a [pretrained BERT model](https://github.com/huggingface/pytorch-pretrained-BERT) using the [wikigold dataset](https://www.aclweb.org/anthology/W09-3302)  for token classification.|
+|Notebook|Runs Local|Description|Dataset|
+|---|:---:|---|---|
+|[BERT](ner_wikigold_bert.ipynb)| Yes| Fine-tune a pretrained BERT model for token classification.|[wikigold](https://www.aclweb.org/anthology/W09-3302)|
