@@ -1,6 +1,6 @@
 # Sentence Similarity
 
-This folder contains examples and best practices, written in Jupyter notebooks, for building sentence similarity models. The scores can be used in a wide variety of applications, such as search/retrieval, nearest-neighbor or kernel-based classification methods, recommendations, and ranking tasks.
+This folder contains examples and best practices, written in Jupyter notebooks, for building sentence similarity models. The sentence similarity scores can be used in a wide variety of applications, such as search/retrieval, nearest-neighbor or kernel-based classification methods, recommendations, and ranking tasks.
 
 ## What is sentence similarity
 
@@ -32,10 +32,12 @@ We did a comparative study to make it easier for you to choose between a GPU ena
 and Azure ML compute. The table below provides the cost vs performance trade-off for
 each of the choices.
 
+* The "Azure VM" column refers to the running time of the [gensen local](gensen_local.ipynb) notebook. All the other columns refer to the [gensen AzureML](gensen_aml_deep_dive.ipynb) notebook.
+* Both the Azure VM and each Azure ML Compute node are Standard_NC6 with 1 NVIDIA Tesla K80 GPU with 12 GB GPU memory.
 * The total time in the table stands for the training time + setup time.
 * Cost is the estimated cost of running the Azure ML Compute Job or the VM up-time.
 
-**Please note:** These were the estimated cost for running these notebooks as of July 1. Please
+**Please note:** These were the estimated cost for running these notebooks as of July 1st, 2019. Please
 look at the [Azure Pricing Calculator](https://azure.microsoft.com/en-us/pricing/calculator/) to see the most up to date pricing information.
 
 |---|Azure VM| AML 1 Node| AML 2 Nodes | AML 4 Nodes | AML 8 Nodes|
