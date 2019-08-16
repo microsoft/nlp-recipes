@@ -5,7 +5,7 @@ This repository contains examples and best practices for building natural langua
 ![](https://nlpbp.blob.core.windows.net/images/cognitive_services.PNG)
 ## Overview
 
-The goal of this repository is to build a comprehensive set of tools and examples that leverage recent advances in NLP algorithms, neural architectures, and distributed machine learning systems. 
+The goal of this repository is to build a comprehensive set of tools and examples that leverage recent advances in NLP algorithms, neural architectures, and distributed machine learning systems.
 The content is based on our past and potential future engagements with customers as well as collaboration with partners, researchers, and the open source community.
 
 We’re hoping that the tools would significantly reduce the time from a business problem, or a research idea, to full implementation of a system. In addition, the example notebooks would serve as guidelines and showcase best practices and usage of the tools.
@@ -23,10 +23,11 @@ The following is a summary of the scenarios covered in the repository. Each scen
 |---| ------------------------ | ------------------- |
 |[Text Classification](scenarios/text_classification)      |Topic Classification|BERT|
 |[Named Entity Recognition](scenarios/named_entity_recognition) |Wikipedia NER                                              |BERT|
-|[Entailment](scenarios/entailment)|XNLI Natural Language Inference|BERT|
-|[Question Answering](scenarios/question_answering) |SQuAD                                              | BiDAF|
+|[Entailment](scenarios/entailment)|MultiNLI Natural Language Inference|BERT|
+|[Question Answering](scenarios/question_answering) |SQuAD                                              | BiDAF, BERT|
 |[Sentence Similarity](scenarios/sentence_similarity)      |STS Benchmark                         |Representation: TF-IDF, Word Embeddings, Doc Embeddings<br>Metrics: Cosine Similarity, Word Mover's Distance|
 |[Embeddings](scenarios/embeddings)| Custom Embeddings Training|Word2Vec<br>fastText<br>GloVe|
+| [Annotation](scenarios/annotation) | Text annotation | Tutorial |
 
 
 
@@ -38,8 +39,7 @@ This project welcomes contributions and suggestions. Before contributing, please
 
 
 ## Build Status
-
-| Build Type | Branch | Status |   
-| --- | --- | --- | 
-| **Linux CPU** | master | [![Build Status](https://dev.azure.com/best-practices/nlp/_apis/build/status/cpu_integration_tests_linux?branchName=master)](https://dev.azure.com/best-practices/nlp/_build/latest?definitionId=50&branchName=master) |
-| **Linux GPU** | master | [![Build Status](https://dev.azure.com/best-practices/nlp/_apis/build/status/gpu_integration_tests_linux?branchName=master)](https://dev.azure.com/best-practices/nlp/_build/latest?definitionId=51&branchName=master) |
+| Build Type | Branch | Status |  | Branch | Status | 
+| --- | --- | --- | --- | --- | --- | 
+| **Linux CPU** | master | [![Build Status](https://dev.azure.com/best-practices/nlp/_apis/build/status/cpu_integration_tests_linux?branchName=master)](https://dev.azure.com/best-practices/nlp/_build/latest?definitionId=50&branchName=master) | | staging | [![Build Status](https://dev.azure.com/best-practices/nlp/_apis/build/status/cpu_integration_tests_linux?branchName=master)](https://dev.azure.com/best-practices/nlp/_build/latest?definitionId=50&branchName=staging) |
+| **Linux GPU** | master | [![Build Status](https://dev.azure.com/best-practices/nlp/_apis/build/status/gpu_integration_tests_linux?branchName=master)](https://dev.azure.com/best-practices/nlp/_build/latest?definitionId=51&branchName=master) | | staging | [![Build Status](https://dev.azure.com/best-practices/nlp/_apis/build/status/gpu_integration_tests_linux?branchName=master)](https://dev.azure.com/best-practices/nlp/_build/latest?definitionId=51&branchName=master) |

@@ -8,12 +8,12 @@ class DaskCSVLoader:
     at a time), before sampling batches from the partitions."""
 
     def __init__(
-        self,
-        file_path,
-        sep=",",
-        header="infer",
-        block_size=10e6,
-        random_seed=None,
+            self,
+            file_path,
+            sep=",",
+            header="infer",
+            block_size=10e6,
+            random_seed=None,
     ):
         """Initializes the loader.
 
@@ -69,7 +69,7 @@ class DaskCSVLoader:
         for i in range(self.df.npartitions):
             part = self.df.partitions[i].compute()
             for j in range(0, part.shape[0], batch_size):
-                yield part.iloc[j : j + batch_size, :]
+                yield part.iloc[j: j + batch_size, :]
 
 
 class DaskJSONLoader:
@@ -78,7 +78,7 @@ class DaskJSONLoader:
     batches from the partitions."""
 
     def __init__(
-        self, file_path, block_size=10e6, random_seed=None, lines=True
+            self, file_path, block_size=10e6, random_seed=None, lines=True
     ):
         """Initializes the loader.
 
@@ -118,15 +118,19 @@ class DaskJSONLoader:
             else:
                 yield sample_part
 
-    def get_sequential_batches(self, batch_size):
+    def get_sequential_batches(self, batch_size, num_batches=None):
         """Creates a sequential generator.
             Batches returned are pandas dataframes of length=batch_size.
             Note: Final batch might be of smaller size.
 
         Args:
+            num_batches: Number of batches to generate.
             batch_size (int): Batch size.
         """
-        for i in range(self.df.npartitions):
+
+        if num_batches is None:
+            num_batches = self.df.npartitions
+        for i in range(num_batches):
             part = self.df.partitions[i].compute()
             for j in range(0, part.shape[0], batch_size):
-                yield part.iloc[j : j + batch_size, :]
+                yield part.iloc[j: j + batch_size, :]

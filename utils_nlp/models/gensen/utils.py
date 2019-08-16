@@ -11,14 +11,11 @@ import pickle
 
 import numpy as np
 import torch
-from azureml.core.run import Run
 from sklearn.utils import shuffle
 from torch.autograd import Variable
 
 # Change to python3+.
 # from itertools import zip
-# get the Azure ML run object
-run = Run.get_context()
 
 
 class DataIterator(object):

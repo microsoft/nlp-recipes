@@ -1,6 +1,6 @@
 # Towards a Deep and Unified Understanding of Deep Neural Models in NLP
 
-Code implementation of paper [*Towards a Deep and Unified Understanding of Deep Neural Models in NLP*](http://proceedings.mlr.press/v97/guan19a/guan19a.pdf)
+This submodule contains implementations to explain hidden states of models. It is a code implementation of paper [*Towards a Deep and Unified Understanding of Deep Neural Models in NLP*](http://proceedings.mlr.press/v97/guan19a/guan19a.pdf)
 
 ## Environment
 
@@ -17,7 +17,7 @@ tqdm
 
 ## How to use
 
-We provide a notebook tutorial [here](../../scenarios/interpret_NLP_models/explain_simple_model.ipynb) to help you start quickly. The important class we need to utilize is the `Interpreter` in [Interpreter.py](Interpreter.py). Given any input word embeddings and a forward function $\Phi$ that transforms the word embeddings $\bf x$ to a hidden state $\bf s$, Interpreter helps understand how much each input word contributes to the hidden state. Suppose the $\Phi$, the input $\bf x$ and the input words are defined as:
+We provide a notebook tutorial [here](../../scenarios/interpret_NLP_models/understand_models.ipynb) to help you start quickly. The important class we need to utilize is the `Interpreter` in [Interpreter.py](Interpreter.py). Given any input word embeddings and a forward function $\Phi$ that transforms the word embeddings $\bf x$ to a hidden state $\bf s$, Interpreter helps understand how much each input word contributes to the hidden state. Suppose the $\Phi$, the input $\bf x$ and the input words are defined as:
 ```
 import torch
 
