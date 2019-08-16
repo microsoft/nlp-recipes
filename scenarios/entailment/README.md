@@ -27,6 +27,6 @@ new state-of-the-art models.
 The following notebooks are included in this folder
 
 |Notebook|Description|Dataset|Runs Local|
-|--------|-----------|-------|----------|
+|--------|-----------|-------|:----------:|
 |entailment_multinli_bert.ipynb|Fine-tuning of pre-trained BERT model for NLI|[MultiNLI](https://www.nyu.edu/projects/bowman/multinli/)|Yes|
 |entailment_xnli_bert_azureml.ipynb|**Distributed** fine-tuning of pre-trained BERT model for NLI|[XNLI](https://www.nyu.edu/projects/bowman/xnli/)|Yes
