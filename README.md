@@ -29,11 +29,9 @@ The following is a summary of the commonly used NLP scenarios covered in the rep
 |Sentence Similarity                     |Representation: TF-IDF, Word Embeddings, Doc Embeddings<br>Metrics: Cosine Similarity, Word Mover's Distance| Sentence similarity is the process of computing a similarity score given a pair of text documents. |
 |Embeddings| Word2Vec<br>fastText<br>GloVe| An embedding is a low dimensionality representation of the text that will be analyzed.
 
-## Target Audience
-While solving a NLP problem its always good to start with the [Language-based Cognitive Services](https://azure.microsoft.com/en-us/services/cognitive-services/directory/lang/). If the needs are beyond the bounds of Cognitive Services, you can try custom Machine Learning and this is where the repository can be very useful. Our target audience includes data scientists and machine learning engineers with varying levels of NLP knowledge as our content is source-only    and intended to be solution accelerators for real-world problems.   
 
 ## Getting Started
-To get started, navigate to the [Setup Guide](SETUP.md), where you'll find instructions on how to setup your environment and dependencies.
+While solving NLP problems, its always good to start with [Language-based Cognitive Services](https://azure.microsoft.com/en-us/services/cognitive-services/directory/lang/). When the needs are beyond the bounds of Cognitive Services, you can try custom Machine Learning and this is where the repository can be very useful. To get started, navigate to the [Setup Guide](SETUP.md), where you'll find instructions on how to setup your environment and dependencies.
 
 ## Contributing
 We hope that the open source community would contribute to the content and bring in the latest SOTA algorithm. This project welcomes contributions and suggestions. Before contributing, please see our [contribution guidelines](CONTRIBUTING.md).
