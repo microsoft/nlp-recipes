@@ -1,6 +1,6 @@
 # Sentence Similarity
 
-This folder contains examples and best practices, written in Jupyter notebooks, for building sentence similarity models. The scores can be used in a wide variety of applications, such as search/retrieval, nearest-neighbor or kernel-based classification methods, recommendations, and ranking tasks.
+This folder contains examples and best practices, written in Jupyter notebooks, for building sentence similarity models. The sentence similarity scores can be used in a wide variety of applications, such as search/retrieval, nearest-neighbor or kernel-based classification methods, recommendations, and ranking tasks.
 
 ## What is sentence similarity
 
