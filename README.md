@@ -1,40 +1,42 @@
 # NLP Best Practices
 
+In recent years, Natural Language Processing has seen quick growth in quality and usability, and this has helped to drive business adoption of Artificial Intelligence solutions. In the last few years, researchers have been applying newer deep learning methods to natural language processing. Data Scientists started moving from traditional methods to state-of-the-art DNN algorithms which allow them to use language models pretrained on large corpus of data.
+
 This repository contains examples and best practices for building natural language processing (NLP) systems, provided as [Jupyter notebooks](scenarios) and [utility functions](utils_nlp). The focus of the repository is on state-of-the-art methods and common scenarios that are popular among researchers and practitioners working on problems involving text and language.
 
-![](https://nlpbp.blob.core.windows.net/images/cognitive_services.PNG)
 ## Overview
 
 The goal of this repository is to build a comprehensive set of tools and examples that leverage recent advances in NLP algorithms, neural architectures, and distributed machine learning systems. 
 The content is based on our past and potential future engagements with customers as well as collaboration with partners, researchers, and the open source community.
 
-We’re hoping that the tools would significantly reduce the time from a business problem, or a research idea, to full implementation of a system. In addition, the example notebooks would serve as guidelines and showcase best practices and usage of the tools.
+We’re hoping that the tools would significantly reduce the “time to market” by simplifying the experience from defining the business problem to development of solution by orders of magnitude. In addition, the example notebooks would serve as guidelines and showcase best practices and usage of the tools in a wide variety of languages.
 
-In an era of transfer learning, transformers, and deep architectures, we believe that pretrained models provide a unified solution to many real-world problems and allow handling different tasks and languages easily. We will, therefore, prioritize such models, as they achieve state-of-the-art results on several NLP benchmarks and can be used in a number of applications ranging from simple text classification to sophisticated intelligent chat bots.
+In an era of transfer learning, transformers, and deep architectures, we believe that pretrained models provide a unified solution to many real-world problems and allow handling different tasks and languages easily. We will, therefore, prioritize such models, as they achieve state-of-the-art results on several NLP benchmarks like [*GLUE*](https://gluebenchmark.com/leaderboard) and [*SQuAD*](https://rajpurkar.github.io/SQuAD-explorer/) leaderboard. They can be used in a number of applications ranging from simple text classification to sophisticated intelligent chat bots.
 
-> [*GLUE Leaderboard*](https://gluebenchmark.com/leaderboard)  
-> [*SQuAD Leaderbord*](https://rajpurkar.github.io/SQuAD-explorer/)
+>   
+> 
 
 ## Content
 
-The following is a summary of the scenarios covered in the repository. Each scenario is demonstrated in one or more Jupyter notebook examples that make use of the core code base of models and utilities.
+The following is a summary of the commonly used NLP scenarios covered in the repository. Each scenario is demonstrated in one or more [Jupyter notebook examples](examples) that make use of the core code base of models and repository utilities.
 
-| Scenario                 | Applications                                 |  Models |
-|---| ------------------------ | ------------------- |
-|[Text Classification](scenarios/text_classification)      |Topic Classification|BERT|
-|[Named Entity Recognition](scenarios/named_entity_recognition) |Wikipedia NER                                              |BERT|
-|[Entailment](scenarios/entailment)|XNLI Natural Language Inference|BERT|
-|[Question Answering](scenarios/question_answering) |SQuAD                                              | BiDAF|
-|[Sentence Similarity](scenarios/sentence_similarity)      |STS Benchmark                         |Representation: TF-IDF, Word Embeddings, Doc Embeddings<br>Metrics: Cosine Similarity, Word Mover's Distance|
-|[Embeddings](scenarios/embeddings)| Custom Embeddings Training|Word2Vec<br>fastText<br>GloVe|
+| Scenario                              |  Models | Description|
+|-------------------------|  ------------------- |-------|
+|Text Classification                     |BERT| Text classification is a supervised learning method of learning and predicting the category or the class of a document given its text content. | 
+|Named Entity Recognition                |BERT| Named Entity Recognition (NER) is the task of classifying words or key phrases of a text into predefined entities of interest. |
+|Entailment                              |BERT| Textual entailment is a binary relation between two natural-language texts (called ‘text’ and ‘hypothesis’), where readers of the ‘text’ would agree the ‘hypothesis’ is most likely true. |
+|Question Answering                      |BiDAF| Question Answering (QA) is the task of retrieving or generating a valid answer for a given natural language query. |
+|Sentence Similarity                     |Representation: TF-IDF, Word Embeddings, Doc Embeddings<br>Metrics: Cosine Similarity, Word Mover's Distance| Sentence similarity is the process of computing a similarity score given a pair of text documents. |
+|Embeddings| Word2Vec<br>fastText<br>GloVe| An embedding is a low dimensionality representation of the text that will be analyzed.
 
-
+## Target Audience
+While solving a NLP problem its always good to start with the [Language-based Cognitive Services](https://azure.microsoft.com/en-us/services/cognitive-services/directory/lang/). If the needs are beyond the bounds of Cognitive Services, you can try custom Machine Learning and this is where the repository can be very useful. Our target audience includes data scientists and machine learning engineers with varying levels of NLP knowledge as our content is source-only    and intended to be solution accelerators for real-world problems.   
 
 ## Getting Started
 To get started, navigate to the [Setup Guide](SETUP.md), where you'll find instructions on how to setup your environment and dependencies.
 
 ## Contributing
-This project welcomes contributions and suggestions. Before contributing, please see our [contribution guidelines](CONTRIBUTING.md).
+We hope that the open source community would contribute to the content and bring in the latest SOTA algorithm. This project welcomes contributions and suggestions. Before contributing, please see our [contribution guidelines](CONTRIBUTING.md).
 
 
 ## Build Status
