@@ -75,5 +75,5 @@ which means that the second and forth words are most important to $\Phi$, which 
 
 ## Explain a certain layer in any saved pytorch model
 
-We provide an example on how to use our method to explain a saved pytorch model (*pre-trained BERT model in our case*) [here](../../scenarios/interpret_NLP_models/explain_BERT_model.ipynb). 
+We provide an example on how to use our method to explain a saved pytorch model (*pre-trained BERT model in our case*) [here](../../scenarios/interpret_NLP_models/understand_models.ipynb). 
 > NOTE: This result may not be consistent with the result in the paper because  we use the pre-trained BERT model directly for simplicity, while the BERT model we use in paper is fine-tuned on specific dataset like SST-2.
