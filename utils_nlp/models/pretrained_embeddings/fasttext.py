@@ -1,6 +1,8 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
+"""Functions to help user load and extract fastText pretrained embeddings."""
+
 import os
 import zipfile
 
