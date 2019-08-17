@@ -1,23 +1,11 @@
 # Towards a Deep and Unified Understanding of Deep Neural Models in NLP
 
-This submodule contains implementations to explain hidden states of models. It is a code implementation of paper [*Towards a Deep and Unified Understanding of Deep Neural Models in NLP*](http://proceedings.mlr.press/v97/guan19a/guan19a.pdf)
+This submodule contains a tool for explaining hidden states of models. It is an implementation of the paper [*Towards a Deep and Unified Understanding of Deep Neural Models in NLP*](http://proceedings.mlr.press/v97/guan19a/guan19a.pdf)
 
-## Environment
-
-In order to use our code, you need to install following softwares/packages:
-
-```
-python>=3.5
-pytorch-pretrained-bert==0.2.0
-torch==0.4.1
-matplotlib
-numpy
-tqdm
-```
 
 ## How to use
 
-We provide a notebook tutorial [here](../../scenarios/interpret_NLP_models/understand_models.ipynb) to help you start quickly. The important class we need to utilize is the `Interpreter` in [Interpreter.py](Interpreter.py). Given any input word embeddings and a forward function $\Phi$ that transforms the word embeddings $\bf x$ to a hidden state $\bf s$, Interpreter helps understand how much each input word contributes to the hidden state. Suppose the $\Phi$, the input $\bf x$ and the input words are defined as:
+We provide a notebook tutorial [here](../../scenarios/interpret_NLP_models/understand_models.ipynb) to help you get started quickly. The main class needed is the `Interpreter` in [Interpreter.py](Interpreter.py). Given any input word embeddings and a forward function $\Phi$ that transforms the word embeddings $\bf x$ to a hidden state $\bf s$, the Interpreter helps understand how much each input word contributes to the hidden state. Suppose the $\Phi$, the input $\bf x$ and the input words are defined as:
 ```
 import torch
 
@@ -32,7 +20,7 @@ def Phi(x):
     return W @ x
 ```
 
-To explain a certain hidden state, we also need to get the variance of it for regularization. We provide a simple tool in `Interpreter.py` for calculating regularization. You just need to provide your sampled x as a list and your Phi. Like below:
+To explain a certain hidden state, we also need to get its variance for regularization. We provide a simple tool in `Interpreter.py` for calculating regularization. You just need to provide your sampled x as a list and your Phi. as shown below:
 
 ```
 from Interpreter import calculate_regularization
@@ -75,5 +63,5 @@ which means that the second and forth words are most important to $\Phi$, which 
 
 ## Explain a certain layer in any saved pytorch model
 
-We provide an example on how to use our method to explain a saved pytorch model (*pre-trained BERT model in our case*) [here](../../scenarios/interpret_NLP_models/explain_BERT_model.ipynb). 
-> NOTE: This result may not be consistent with the result in the paper because  we use the pre-trained BERT model directly for simplicity, while the BERT model we use in paper is fine-tuned on specific dataset like SST-2.
+We provide an example on how to use our method to explain a saved pytorch model (*pre-trained BERT model in our case*) [here](../../scenarios/interpret_NLP_models/understand_models.ipynb). 
+> NOTE: This result may not be consistent with the result in the paper because we use the pre-trained BERT model directly for simplicity, while the BERT model we use in paper is fine-tuned on a specific dataset like SST-2.
