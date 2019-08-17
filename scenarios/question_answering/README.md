@@ -16,9 +16,6 @@ of Bidirectional Recurrent Neural Networks (BRNN).
 
 ## Summary
 
-The following summarizes each notebook for Question Answering. Each notebook provides more details
-and guiding in principles on building state of the art models.
-
 |Notebook|Environment|Description|Dataset
 |---|---|---|---|
 |[Deployed QA System in Under 20 minutes](question_answering_system_bidaf_quickstart.ipynb)|Azure Container Instances| Learn how to deploy a QA system in under 20 minutes using Azure Container Instances (ACI) and a popular AllenNLP pre-trained model called BiDAF.|[SQuAD](https://rajpurkar.github.io/SQuAD-explorer/)|

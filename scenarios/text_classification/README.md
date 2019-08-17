@@ -2,7 +2,7 @@
 This folder contains examples and best practices, written in Jupyter notebooks, for building text classification models. We use the
 utility scripts in the [utils_nlp](../../utils_nlp) folder to speed up data preprocessing and model building for text classification.  
 The models can be used in a wide variety of applications, such as
-sentiment analysis, document indexing in digital libraries, hate speech detection, and general-purpose categorization in medical, academic, legal, and many other domains..  
+sentiment analysis, document indexing in digital libraries, hate speech detection, and general-purpose categorization in medical, academic, legal, and many other domains. 
 Currently, we focus on fine-tuning pre-trained BERT
 model. We plan to continue adding state-of-the-art models as they come up and welcome community
 contributions.
@@ -10,7 +10,7 @@ contributions.
 ## What is Text Classification?
 Text classification is a supervised learning method of learning and predicting the category or the
 class of a document given its text content. The state-of-the-art methods are based on neural
-networks of different architectures as well as pretrained language models or word embeddings. 
+networks of different architectures as well as pretrained language models or word embeddings.
 
 
 ## Summary
