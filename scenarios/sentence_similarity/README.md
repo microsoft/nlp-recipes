@@ -26,16 +26,13 @@ Sentence similarity is normally calculated by the following two steps:
 
 ## Summary
 
-The following summarizes each notebook for Sentence Similarity. Each notebook provides more details
-and guiding in principles on building state of the art models.
-
 |Notebook|Environment|Description|Dataset|
 |---|---|---|---|
 |[Creating a Baseline model](baseline_deep_dive.ipynb)| Local| A baseline model is a basic solution that serves as a point of reference for comparing other models to. The baseline model's performance gives us an indication of how much better our models can perform relative to a naive approach.|[STS Benchmark](http://ixa2.si.ehu.es/stswiki/index.php/STSbenchmark#STS_benchmark_dataset_and_companion_dataset)|
 |[BERT Sentence Encoder](bert_encoder.ipynb)|Local|In this notebook, we show how to extract features from pretrained BERT as sentence embeddings.|Handcrafted sample data|
 |[BERT with SentEval](bert_senteval.ipynb)|AzureML|In this notebook, we show how to use SentEval to compare the performance of BERT sequence encodings with various pooling strategies on a sentence similarity task. We leverage AzureML  resources such as Datastore and AmlCompute to autoscale our compute cluster and run the experiments in parallel.|[STS Benchmark](http://ixa2.si.ehu.es/stswiki/index.php/STSbenchmark#STS_benchmark_dataset_and_companion_dataset)|
 |Gensen | [Local](gensen_local.ipynb), [AzureML](gensen_aml_deep_dive.ipynb)|This notebook serves as an introduction to an end-to-end NLP solution for sentence similarity building one of the State of the Art models, GenSen. We provide two notebooks. One, which runs on the AzureML platform.  We show the advantages of AzureML when training large NLP models with GPU in this notebook. The other example walks through using a GPU enabled VM to train and score Gensen.|[SNLI](https://nlp.stanford.edu/projects/snli/)|
-|[Automated Machine Learning(AutoML) with Deployment on Azure Container Instance](automl_local_deployment_aci.ipynb)|Local|This notebook shows users how to use AutoML on local machine and deploy the model as a webservice to Azure Container Instance(ACI) to get a sentence similarity score.|[STS Benchmark](http://ixa2.si.ehu.es/stswiki/index.php/STSbenchmark#STS_benchmark_dataset_and_companion_dataset)|
+|[Automated Machine Learning(AutoML) with Deployment on Azure Container Instance](automl_local_deployment_aci.ipynb)|Azure Container Instances|This notebook shows users how to use AutoML on local machine and deploy the model as a webservice to Azure Container Instances (ACI) to get a sentence similarity score.|[STS Benchmark](http://ixa2.si.ehu.es/stswiki/index.php/STSbenchmark#STS_benchmark_dataset_and_companion_dataset)|
 |[Google Universal Sentence Encoder with Azure Machine Learning Pipeline, AutoML with Deployment on Azure Kubernetes Service](automl_with_pipelines_deployment_aks.ipynb)|AzureML| This notebook shows a user how to use AzureML pipelines and deploy the pipeline output model as a webservice to Azure Kubernetes Service which can be used as an end point to get sentence similarity scores.|[STS Benchmark](http://ixa2.si.ehu.es/stswiki/index.php/STSbenchmark#STS_benchmark_dataset_and_companion_dataset)|
 
 ## Using GPU vs Azure ML Compute

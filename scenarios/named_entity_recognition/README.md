@@ -1,9 +1,14 @@
 # Named Entity Recognition (NER)
 
 This folder contains examples and best practices, written in Jupyter notebooks, for building Named
-Entity Recognition models. The models can be used in a wide variety of applications, such as
+Entity Recognition models. We use the
+utility scripts in the [utils_nlp](../../utils_nlp) folder to speed up data preprocessing and model building for NER.  
+The models can be used in a wide variety of applications, such as
 information extraction and filtering. It also plays an important role in other NLP tasks like
-question answering and text summarization.
+question answering and text summarization.  
+Currently, we focus on fine-tuning pre-trained BERT
+model. We plan to continue adding state-of-the-art models as they come up and welcome community
+contributions.
 
 ## What is Named Entity Recognition (NER)
 
@@ -29,11 +34,6 @@ can also be labeled with custom entities as required by the use case.
 
 ## Summary
 
-The following summarizes each notebook for NER. Each notebook provides more details and guiding in
-principles on building state of the art models. Currently, we focus on fine-tuning pre-trained BERT
-model. We plan to continue adding state-of-the-art models as they come up and welcome community
-contributions.
-
-|Notebook|Runs Local|Description|Dataset|
+|Notebook|Environment|Description|Dataset|
 |---|:---:|---|---|
-|[BERT](ner_wikigold_bert.ipynb)| Yes| Fine-tune a pretrained BERT model for token classification.|[wikigold](https://www.aclweb.org/anthology/W09-3302)|
+|[BERT](ner_wikigold_bert.ipynb)|Local| Fine-tune a pretrained BERT model for token classification.|[wikigold](https://www.aclweb.org/anthology/W09-3302)|
