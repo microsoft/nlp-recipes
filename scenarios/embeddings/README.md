@@ -2,7 +2,7 @@
 
 This folder contains examples and best practices, written in Jupyter notebooks, for training word embedding on custom data from scratch.   
 There are
-three typical ways for word embedding:
+three typical ways for training word embedding:
 [Word2Vec](https://papers.nips.cc/paper/5021-distributed-representations-of-words-and-phrases-and-their-compositionality.pdf),
 [GloVe](https://nlp.stanford.edu/pubs/glove.pdf), and [fastText](https://arxiv.org/abs/1607.01759).
 All of the three methods provide pretrained models ([pretrained model with
