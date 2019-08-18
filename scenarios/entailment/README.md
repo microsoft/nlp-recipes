@@ -23,5 +23,5 @@ entailment. For example,
 
 |Notebook|Environment|Description|Dataset|
 |--------|:-----------:|-------|----------|
-|entailment_multinli_bert.ipynb|Local|Fine-tuning of pre-trained BERT model for NLI|[MultiNLI](https://www.nyu.edu/projects/bowman/multinli/)|
-|entailment_xnli_bert_azureml.ipynb|AzureML|**Distributed** fine-tuning of pre-trained BERT model for NLI|[XNLI](https://www.nyu.edu/projects/bowman/xnli/)|Yes
+|[entailment_multinli_bert.ipynb](entailment_multinli_bert.ipynb)|Local|Fine-tuning of pre-trained BERT model for NLI|[MultiNLI](https://www.nyu.edu/projects/bowman/multinli/)|
+|[entailment_xnli_bert_azureml.ipynb](entailment_xnli_bert_azureml.ipynb)|AzureML|**Distributed** fine-tuning of pre-trained BERT model for NLI|[XNLI](https://www.nyu.edu/projects/bowman/xnli/)|Yes
