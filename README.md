@@ -25,7 +25,7 @@ The following is a summary of the commonly used NLP scenarios covered in the rep
 |Named Entity Recognition                |BERT| Named Entity Recognition (NER) is the task of classifying words or key phrases of a text into predefined entities of interest. |
 |Entailment                              |BERT| Textual entailment is a binary relation between two natural-language texts (called ‘text’ and ‘hypothesis’), where readers of the ‘text’ would agree the ‘hypothesis’ is most likely true. |
 |Question Answering                      |BiDAF <br> BERT| Question Answering (QA) is the task of retrieving or generating a valid answer for a given natural language query. |
-|Sentence Similarity                     |Representation: TF-IDF, Word Embeddings, Doc Embeddings<br>Metrics: Cosine Similarity, Word Mover's Distance<br>BERT<br> GenSen| Sentence similarity is the process of computing a similarity score given a pair of text documents. |
+|Sentence Similarity                     |Representation: TF-IDF, Word Embeddings, Doc Embeddings<br>Metrics: Cosine Similarity, Word Mover's Distance<br>Models: BERT, GenSen| Sentence similarity is the process of computing a similarity score given a pair of text documents. |
 |Embeddings| Word2Vec<br>fastText<br>GloVe| An embedding is a low dimensionality representation of the text that will be analyzed.
 
 
