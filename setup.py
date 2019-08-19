@@ -10,6 +10,11 @@ from glob import glob
 from os.path import basename, dirname, join, splitext
 
 from setuptools import find_packages, setup
+from setuptools_scm import get_version
+
+# Determine semantic versioning automatically
+# from git commits
+__version__ = get_version()
 
 def read(*names, **kwargs):
     with io.open(
@@ -21,6 +26,7 @@ def read(*names, **kwargs):
 
 setup(
     name="utils_nlp",
+    version = __version__,
     license="MIT License",
     description="NLP Utility functions that are used for best practices in building state-of-the-art NLP methods and scenarios. Developed by Microsoft AI CAT",
     long_description="%s\n%s"
@@ -72,6 +78,6 @@ setup(
     install_requires=['setuptools_scm>=3.2.0',],
     dependency_links=[],
     extras_require={},
-    use_scm_version=True,
+    use_scm_version = {"root": ".", "relative_to": __file__},
     setup_requires=['setuptools_scm'],
 )
