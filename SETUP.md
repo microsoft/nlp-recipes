@@ -86,6 +86,9 @@ We can register our created conda environment to appear as a kernel in the Jupyt
 If you are using the DSVM, you can [connect to JupyterHub](https://docs.microsoft.com/en-us/azure/machine-learning/data-science-virtual-machine/dsvm-ubuntu-intro#jupyterhub-and-jupyterlab) by browsing to `https://your-vm-ip:8000`.  If you are prompted to enter user name and password, enter the user name and password that you use to log in to your virtual machine. 
 
 ## Install this repository via PIP
+
+<details><summary>The utils_nlp module of this repositiory can be installed as a python package. **Click to see the details ** </summary> 
+<p>
 A [setup.py](setup.py) file is provied in order to simplify the installation of this utilities in this repo from the main directory.
 
     pip install -e .
@@ -95,3 +98,8 @@ It is also possible to install directly from Github.
     pip install -e  git+git@github.com:microsoft/nlp.git@master#egg=utils_nlp
 
 **NOTE** - The pip installation does not install any of the necessary package dependencies, it is expected that conda will be used as shown above to setup the environment for the utilities being used.
+</p>
+</details>
+## Versioning of utils_nlp in this repository
+The details of the versioning info can be found at [VERSIONING.md](VERSIONING.md)
+
