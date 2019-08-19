@@ -1,7 +1,11 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
-"""A Gated Recurrent Unit (GRU) cell with peepholes."""
+"""A Gated Recurrent Unit (GRU) cell with peepholes.
+An implemention of Gated Recurrent Unit (GRU) with peepholes, 
+which was proposed in [Learning Precise Timing with LSTM Recurrent Networks](http://www.jmlr.org/papers/volume3/gers02a/gers02a.pdf) 
+by Gers, F. A., Schraudolph, N. N., and Schmidhuber, J."""
+
 import math
 import torch
 import torch.nn as nn

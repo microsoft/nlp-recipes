@@ -6,6 +6,15 @@
 # https://github.com/huggingface/pytorch-transformers/blob/master/examples
 # /run_glue.py
 
+"""
+
+This script defines a token classifer,  
+a wrapper for BertForSequenceClassification, for finetuning BERT.
+It has much simplied interfaces for training and prediction. 
+It is commonly used for name entity recognition.
+
+"""
+
 from collections import namedtuple
 
 import numpy as np

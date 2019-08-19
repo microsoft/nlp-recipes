@@ -1,6 +1,14 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
+"""
+
+This script defines a sequence classifer, 
+a wrapper for BertForSequenceClassification, for finetuning BERT.
+It has much simplied interfaces for training and prediction. 
+It is commonly used for text classification.
+
+"""
 
 from collections import namedtuple
 

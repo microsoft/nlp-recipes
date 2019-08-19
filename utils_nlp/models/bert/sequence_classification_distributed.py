@@ -4,6 +4,15 @@
 # This script reuses some code from
 # https://github.com/huggingface/pytorch-pretrained-BERT/blob/master/examples/run_classifier.py
 
+"""
+
+This script defines a sequence classifer with distributed trainining, 
+a wrapper for BertForSequenceClassification, for finetuning BERT.
+[Horovod](https://github.com/horovod/horovod) is the underlying distributed training framework.
+It has much simplied interfaces for training and prediction. 
+It is commonly used for text classification.
+
+"""
 import os
 import warnings
 

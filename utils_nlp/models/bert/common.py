@@ -6,6 +6,16 @@
 # https://github.com/huggingface/pytorch-transformers/blob/master/examples
 # /run_glue.py
 
+
+"""
+
+This script includes commonly used functionality used by the classes defined in the subfolder.  
+1. Language class which defines the languages supported by this package/git repository through BERT.
+2. tokenization class which does tokenization for text classification, name entity recognition, and encoding
+3. utilities to load data,  etc.
+
+"""
+
 import csv
 import linecache
 import subprocess

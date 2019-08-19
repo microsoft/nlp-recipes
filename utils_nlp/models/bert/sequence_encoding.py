@@ -4,6 +4,17 @@
 # This script reuses code from https://github.com/huggingface/pytorch-pretrained-BERT/blob/master/examples
 # /extract_features.py, with necessary modifications.
 
+"""
+
+This script defines a sequence encoding class  with simplied interface for encoding. 
+An implementation of sequence encoding based on BERT. 
+Both pretrained and fine-tuned BERT models can be used. 
+The hidden states from the loaded BERT model for the input sequence are used in
+ the computation of the encoding. It provides mean, max and class pooling stragegies. 
+It is commonly used in upstream tasks for sentence similarity.
+
+"""
+
 from pytorch_pretrained_bert.modeling import BertModel
 
 from utils_nlp.common.pytorch_utils import get_device, move_to_device
