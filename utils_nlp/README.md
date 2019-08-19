@@ -26,7 +26,7 @@ ws = get_or_create_workspace(
 This submodule contains high-level utilities that are commonly used in multiple algorithms as well as helper functions for managing frameworks like pytorch.
 
 ### [Dataset](dataset)
-Dataset includes helper functions for interacting with well-known datasets,  utility functions to process datasets for different NLP tasks, as well as utilities for splitting data for training/testing. For example, the [snli module](snli.py) will allow you to load a dataframe in pandas from the  Stanford Natural Language Inference (SNLI) Corpus dataset, with the option to set the number of rows to load in order to test algorithms and evaluate performance benchmarks. Information on the datasets used in the repo can be found [here](https://github.com/microsoft/nlp/tree/staging/utils_nlp/dataset#datasets).
+This submodule includes helper functions for interacting with well-known datasets,  utility functions to process datasets for different NLP tasks, as well as utilities for splitting data for training/testing. For example, the [snli module](snli.py) will allow you to load a dataframe in pandas from the  Stanford Natural Language Inference (SNLI) Corpus dataset, with the option to set the number of rows to load in order to test algorithms and evaluate performance benchmarks. Information on the datasets used in the repo can be found [here](https://github.com/microsoft/nlp/tree/staging/utils_nlp/dataset#datasets).
 
 Most datasets may be split into `train`, `dev`, and `test`.
 
@@ -36,8 +36,8 @@ from utils_nlp.dataset.snli import load_pandas_df
 df = load_pandas_df(DATA_FOLDER, file_split ="train", nrows = 1000)
 ```
 
-### [Evaluation (Eval)](eval)
-The evaluation (eval) submodule includes functionalities for computing common classification evaluation metrics like accuracy, precision, recall, and f1 scores for classification scenarios. It also includes metric utitlities for normalizing and finding f1_scores for  dataset  [The Stanford Question Answering Dataset (SQuAD)](https://rajpurkar.github.io/SQuAD-explorer/) , and utilities to  log the means and other coefficients in evaluating the quality of sentence embedding.
+### [Evaluation](eval)
+The *eval* submodule includes functionalities for computing common classification evaluation metrics like accuracy, precision, recall, and f1 scores for classification scenarios. It also includes metric utitlities for normalizing and finding f1_scores for [The Stanford Question Answering Dataset (SQuAD)](https://rajpurkar.github.io/SQuAD-explorer/), and utilities to log the means and other coefficients in evaluating the quality of sentence embedding.
 
 ### [Models](models)
 The models submodule contains implementations of various algorithms that can be used in addition to external packages to evaluate and develop new natural language processing systems. A description of which algorithms are used in each scenario can be found on [this table](../README.md#content).
@@ -47,6 +47,5 @@ A few highlights are
 * GenSen
 
 
-### [Model Explainability](interpreter)
-The model_explainability submodule contains implementations to explain a model through its hidden states of models. It is a code implementation of the paper [Towards a Deep and Unified Understanding of Deep Neural Models in NLP](http://proceedings.mlr.press/v97/guan19a/guan19a.pdf). 
-
+### [Model Explainability](model_explainability)
+The model_explainability submodule contains utils that help explain or diagnose models, such as interpreting layers of a neural network.
