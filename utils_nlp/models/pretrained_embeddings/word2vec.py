@@ -1,7 +1,7 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
-"""Functions to help user load and extract Word2Vec pretrained embeddings."""
+"""Functions to help users load and extract Word2Vec pretrained embeddings."""
 
 import gzip
 import os
