@@ -13,26 +13,22 @@ import pandas as pd
 import os
 import torch
 
-from torch.utils.data import (
-    DataLoader,
-    RandomSampler,
-    SequentialSampler,
-    TensorDataset,
-)
+from torch.utils.data import DataLoader, RandomSampler, SequentialSampler, TensorDataset
 
 from utils_nlp.models.bert.common import Language, Tokenizer
-
+from cached_property import cached_property
 
 class PoolingStrategy(str, Enum):
-    """Enumerate pooling strategies"""   
-    MAX : str = "max"
-    MEAN : str = "mean"
-    CLS : str = "cls"
+    """Enumerate pooling strategies"""
+
+    MAX: str = "max"
+    MEAN: str = "mean"
+    CLS: str = "cls"
 
 
 class BERTSentenceEncoder:
     """BERT-based sentence encoder"""
-    
+
     def __init__(
         self,
         bert_model=None,
@@ -65,17 +61,40 @@ class BERTSentenceEncoder:
             else BertModel.from_pretrained(language, cache_dir=cache_dir)
         )
         self.tokenizer = (
-            tokenizer
-            if tokenizer
-            else Tokenizer(language, to_lower=to_lower, cache_dir=cache_dir)
+            tokenizer if tokenizer else Tokenizer(language, to_lower=to_lower, cache_dir=cache_dir)
         )
         self.num_gpus = num_gpus
         self.max_len = max_len
+        self.layer_index = layer_index
+        self.pooling_strategy = pooling_strategy
+        self.has_cuda = self.cuda
+
+    @property
+    def layer_index(self):
+        return self._layer_index
+
+    @layer_index.setter
+    def layer_index(self, layer_index):
         if isinstance(layer_index, int):
-            self.layer_index = [layer_index]
+            self._layer_index = [layer_index]
         else:
             self.layer_index = layer_index
-        self.pooling_strategy = pooling_strategy
+        
+
+    @cached_property
+    def cuda(self):
+        """ cache the output of torch.cuda.is_available() """
+        
+        self.has_cuda = torch.cuda.is_available()
+        return self.has_cuda
+
+    @property
+    def pooling_strategy(self):
+        return self._pooling_strategy
+
+    @pooling_strategy.setter
+    def pooling_strategy(self, pooling_strategy):
+        self._pooling_strategy = pooling_strategy
 
     def get_hidden_states(self, text, batch_size=32):
         """Extract the hidden states from the pretrained model
@@ -87,8 +106,9 @@ class BERTSentenceEncoder:
         Returns:
             pd.DataFrame with columns text_index (int), token (str), layer_index (int), values (list[float]). 
         """
-        device = get_device("cpu" if self.num_gpus == 0 else "gpu")
+        device = get_device("cpu" if self.num_gpus == 0 or self.cuda else "gpu")
         self.model = move_to_device(self.model, device, self.num_gpus)
+
         self.model.eval()
 
         tokens = self.tokenizer.tokenize(text)
@@ -99,55 +119,33 @@ class BERTSentenceEncoder:
 
         input_ids = torch.tensor(input_ids, dtype=torch.long, device=device)
         input_mask = torch.tensor(input_mask, dtype=torch.long, device=device)
-        input_type_ids = torch.arange(
-            input_ids.size(0), dtype=torch.long, device=device
-        )
+        input_type_ids = torch.arange(input_ids.size(0), dtype=torch.long, device=device)
 
         eval_data = TensorDataset(input_ids, input_mask, input_type_ids)
         eval_dataloader = DataLoader(
-            eval_data,
-            sampler=SequentialSampler(eval_data),
-            batch_size=batch_size,
+            eval_data, sampler=SequentialSampler(eval_data), batch_size=batch_size
         )
 
-        hidden_states = {
-            "text_index": [],
-            "token": [],
-            "layer_index": [],
-            "values": [],
-        }
-        for (
-            input_ids_tensor,
-            input_mask_tensor,
-            example_indices_tensor,
-        ) in eval_dataloader:
-            with torch.no_grad(): 
+        hidden_states = {"text_index": [], "token": [], "layer_index": [], "values": []}
+        for (input_ids_tensor, input_mask_tensor, example_indices_tensor) in eval_dataloader:
+            with torch.no_grad():
                 all_encoder_layers, _ = self.model(
-                    input_ids_tensor,
-                    token_type_ids=None,
-                    attention_mask=input_mask_tensor,
+                    input_ids_tensor, token_type_ids=None, attention_mask=input_mask_tensor
                 )
                 self.embedding_dim = all_encoder_layers[0].size()[-1]
 
             for b, example_index in enumerate(example_indices_tensor):
                 for (i, token) in enumerate(tokens[example_index.item()]):
                     for (j, layer_index) in enumerate(self.layer_index):
-                        layer_output = (
-                            all_encoder_layers[int(layer_index)]
-                            .detach()
-                            .cpu()
-                            .numpy()
-                        )
+                        layer_output = all_encoder_layers[int(layer_index)].detach().cpu().numpy()
                         layer_output = layer_output[b]
-                        hidden_states["text_index"].append(
-                            example_index.item()
-                        )
+                        hidden_states["text_index"].append(example_index.item())
                         hidden_states["token"].append(token)
                         hidden_states["layer_index"].append(layer_index)
                         hidden_states["values"].append(
                             [round(x.item(), 6) for x in layer_output[i]]
                         )
-            
+
             # empty cache
             del [input_ids_tensor, input_mask_tensor, example_indices_tensor]
             torch.cuda.empty_cache()
@@ -168,6 +166,7 @@ class BERTSentenceEncoder:
         Returns:
             pd.DataFrame grouped by text index and layer index
         """
+
         def max_pool(x):
             values = np.array(
                 [
@@ -185,9 +184,7 @@ class BERTSentenceEncoder:
                     for i in range(x.values.shape[0])
                 ]
             )
-            return torch.mean(
-                torch.tensor(values, dtype=torch.float), 0
-            ).numpy()
+            return torch.mean(torch.tensor(values, dtype=torch.float), 0).numpy()
 
         def cls_pool(x):
             values = np.array(
@@ -197,7 +194,7 @@ class BERTSentenceEncoder:
                 ]
             )
             return values[0]
-        
+
         try:
             if self.pooling_strategy == "max":
                 pool_func = max_pool
@@ -209,15 +206,14 @@ class BERTSentenceEncoder:
                 raise ValueError("Please enter valid pooling strategy")
         except ValueError as ve:
             print(ve)
-        
-        return df.groupby(["text_index", "layer_index"])["values"].apply(lambda x: pool_func(x)).reset_index()
 
-    def encode(
-        self,
-        text,
-        batch_size=32,
-        as_numpy=False
-    ):
+        return (
+            df.groupby(["text_index", "layer_index"])["values"]
+            .apply(lambda x: pool_func(x))
+            .reset_index()
+        )
+
+    def encode(self, text, batch_size=32, as_numpy=False):
         """Computes sentence encodings 
         
         Args:
@@ -226,10 +222,8 @@ class BERTSentenceEncoder:
         """
         df = self.get_hidden_states(text, batch_size)
         pooled = self.pool(df)
-        
+
         if as_numpy:
             return np.array(pooled["values"].tolist())
         else:
             return pooled
-
-

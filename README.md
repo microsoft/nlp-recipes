@@ -6,7 +6,7 @@ This repository contains examples and best practices for building natural langua
 
 ## Overview
 
-The goal of this repository is to build a comprehensive set of tools and examples that leverage recent advances in NLP algorithms, neural architectures, and distributed machine learning systems. 
+The goal of this repository is to build a comprehensive set of tools and examples that leverage recent advances in NLP algorithms, neural architectures, and distributed machine learning systems.
 The content is based on our past and potential future engagements with customers as well as collaboration with partners, researchers, and the open source community.
 
 We’re hoping that the tools would significantly reduce the “time to market” by simplifying the experience from defining the business problem to development of solution by orders of magnitude. In addition, the example notebooks would serve as guidelines and showcase best practices and usage of the tools in a wide variety of languages.
@@ -17,7 +17,6 @@ In an era of transfer learning, transformers, and deep architectures, we believe
 > 
 
 ## Content
-
 The following is a summary of the commonly used NLP scenarios covered in the repository. Each scenario is demonstrated in one or more [Jupyter notebook examples](examples) that make use of the core code base of models and repository utilities.
 
 | Scenario                              |  Models | Description|
@@ -38,8 +37,7 @@ We hope that the open source community would contribute to the content and bring
 
 
 ## Build Status
-
-| Build Type | Branch | Status |   
-| --- | --- | --- | 
-| **Linux CPU** | master | [![Build Status](https://dev.azure.com/best-practices/nlp/_apis/build/status/cpu_integration_tests_linux?branchName=master)](https://dev.azure.com/best-practices/nlp/_build/latest?definitionId=50&branchName=master) |
-| **Linux GPU** | master | [![Build Status](https://dev.azure.com/best-practices/nlp/_apis/build/status/gpu_integration_tests_linux?branchName=master)](https://dev.azure.com/best-practices/nlp/_build/latest?definitionId=51&branchName=master) |
+| Build Type | Branch | Status |  | Branch | Status | 
+| --- | --- | --- | --- | --- | --- | 
+| **Linux CPU** | master | [![Build Status](https://dev.azure.com/best-practices/nlp/_apis/build/status/cpu_integration_tests_linux?branchName=master)](https://dev.azure.com/best-practices/nlp/_build/latest?definitionId=50&branchName=master) | | staging | [![Build Status](https://dev.azure.com/best-practices/nlp/_apis/build/status/cpu_integration_tests_linux?branchName=master)](https://dev.azure.com/best-practices/nlp/_build/latest?definitionId=50&branchName=staging) |
+| **Linux GPU** | master | [![Build Status](https://dev.azure.com/best-practices/nlp/_apis/build/status/gpu_integration_tests_linux?branchName=master)](https://dev.azure.com/best-practices/nlp/_build/latest?definitionId=51&branchName=master) | | staging | [![Build Status](https://dev.azure.com/best-practices/nlp/_apis/build/status/gpu_integration_tests_linux?branchName=master)](https://dev.azure.com/best-practices/nlp/_build/latest?definitionId=51&branchName=master) |

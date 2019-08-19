@@ -33,40 +33,6 @@ def baseline_results():
     }
 
 
-@pytest.mark.integration
-@pytest.mark.azureml
-def test_similarity_embeddings_baseline_runs(notebooks, baseline_results):
-    notebook_path = notebooks["similarity_embeddings_baseline"]
-    pm.execute_notebook(notebook_path, OUTPUT_NOTEBOOK, kernel_name=KERNEL_NAME)
-    results = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict["results"]
-    for key, value in baseline_results.items():
-        assert results[key] == pytest.approx(value, abs=ABS_TOL)
-
-
-@pytest.mark.usefixtures("teardown_service")
-@pytest.mark.integration
-@pytest.mark.azureml
-def test_automl_local_runs(notebooks,
-                           subscription_id,
-                           resource_group,
-                           workspace_name,
-                           workspace_region):
-    notebook_path = notebooks["similarity_automl_local"]
-
-    pm.execute_notebook(notebook_path,
-                        OUTPUT_NOTEBOOK,
-                        parameters = {'automl_iterations': 2,
-                                      'automl_iteration_timeout':7,
-                                      'config_path': "tests/ci",
-                                      'webservice_name': "aci-test-service",
-                                      'subscription_id': subscription_id,
-                                      'resource_group': resource_group,
-                                      'workspace_name': workspace_name,
-                                      'workspace_region': workspace_region})
-    result = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict["pearson_correlation"]
-    assert result == pytest.approx(0.5, abs=ABS_TOL)
-
-
 @pytest.mark.gpu
 @pytest.mark.integration
 def test_gensen_local(notebooks):
@@ -90,7 +56,82 @@ def test_gensen_local(notebooks):
             assert results[key][k] == pytest.approx(v, abs=ABS_TOL_PEARSONS)
 
 
-@pytest.mark.notebooks
+@pytest.mark.gpu
+@pytest.mark.integration
+def test_bert_encoder(notebooks, tmp):
+    notebook_path = notebooks["bert_encoder"]
+    pm.execute_notebook(
+        notebook_path,
+        OUTPUT_NOTEBOOK,
+        kernel_name=KERNEL_NAME,
+        parameters=dict(NUM_GPUS=1, MAX_SEQ_LENGTH=128, CACHE_DIR=tmp),
+    )
+    size_emb = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict["size_emb"]
+    assert size_emb == 768
+
+
+@pytest.mark.integration
+@pytest.mark.azureml
+def test_bert_senteval(
+    notebooks, subscription_id, resource_group, workspace_name, workspace_region, tmp
+):
+    notebook_path = notebooks["bert_senteval"]
+    pm.execute_notebook(
+        notebook_path,
+        OUTPUT_NOTEBOOK,
+        kernel_name=KERNEL_NAME,
+        parameters=dict(
+            subscription_id=subscription_id,
+            resource_group=resource_group,
+            workspace_name=workspace_name,
+            workspace_region=workspace_region,
+            CACHE_DIR=tmp,
+            LOCAL_UTILS="utils_nlp",
+            LOCAL_SENTEVAL="utils_nlp/eval/SentEval",
+            EXPERIMENT_NAME="test-nlp-ss-bert",
+            CLUSTER_NAME="eval-gpu",
+            MAX_NODES=1,
+        ),
+    )
+
+
+@pytest.mark.integration
+@pytest.mark.azureml
+def test_similarity_embeddings_baseline_runs(notebooks, baseline_results):
+    notebook_path = notebooks["similarity_embeddings_baseline"]
+    pm.execute_notebook(notebook_path, OUTPUT_NOTEBOOK, kernel_name=KERNEL_NAME)
+    results = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict["results"]
+    for key, value in baseline_results.items():
+        assert results[key] == pytest.approx(value, abs=ABS_TOL)
+
+
+@pytest.mark.usefixtures("teardown_service")
+@pytest.mark.integration
+@pytest.mark.azureml
+def test_automl_local_runs(
+    notebooks, subscription_id, resource_group, workspace_name, workspace_region
+):
+    notebook_path = notebooks["similarity_automl_local"]
+
+    pm.execute_notebook(
+        notebook_path,
+        OUTPUT_NOTEBOOK,
+        parameters={
+            "automl_iterations": 2,
+            "automl_iteration_timeout": 7,
+            "config_path": "tests/ci",
+            "webservice_name": "aci-test-service",
+            "subscription_id": subscription_id,
+            "resource_group": resource_group,
+            "workspace_name": workspace_name,
+            "workspace_region": workspace_region,
+        },
+    )
+    result = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict["pearson_correlation"]
+    assert result == pytest.approx(0.5, abs=ABS_TOL)
+
+
+@pytest.mark.integration
 @pytest.mark.azureml
 def test_similarity_gensen_azureml_runs(notebooks):
     notebook_path = notebooks["gensen_azureml"]
@@ -113,3 +154,12 @@ def test_similarity_gensen_azureml_runs(notebooks):
     assert result["learning_rate"] >= 0.0001
     assert result["learning_rate"] <= 0.001
 
+
+@pytest.mark.integration
+@pytest.mark.azureml
+@pytest.mark.skip(
+    reason="can't run programmatically, AKS cluster takes ~20 minutes to create and there is no blocking call in the notebook to tell that the cluster creation is in progress"
+)
+def test_automl_with_pipelines_deployment_aks(notebooks):
+    notebook_path = notebooks["automl_with_pipelines_deployment_aks"]
+    pm.execute_notebook(notebook_path, OUTPUT_NOTEBOOK)
