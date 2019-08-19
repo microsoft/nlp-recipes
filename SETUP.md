@@ -100,6 +100,7 @@ It is also possible to install directly from Github.
 **NOTE** - The pip installation does not install any of the necessary package dependencies, it is expected that conda will be used as shown above to setup the environment for the utilities being used.
 </p>
 </details>
+
 ## Versioning of utils_nlp in this repository
 
 The details of the versioning info can be found at [VERSIONING.md](VERSIONING.md)
