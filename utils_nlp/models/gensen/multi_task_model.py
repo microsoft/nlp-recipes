@@ -134,7 +134,7 @@ class MultitaskModel(nn.Module):
     def forward(
         self, minibatch, task_idx, return_hidden=False, paired_trg=None
     ):
-        """Propogate input through the network.
+        """Propagate input through the network.
 
         Seq2Seq:
         inputs: minibatch['input_src'], minibatch['input_trg']
