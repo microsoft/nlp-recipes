@@ -1,5 +1,5 @@
 # Models
-The models submodule contains implementations of various algorithms that can be used in addition to external packages to evaluate and develop new natural language processing systems. A description of which algorithms are used in each scenario can be found on [this table](../../README.md#content)
+The [models](models) submodule contains implementations of several algorithms like BERT that can achieve close to state of art performance for command NLP tasks.  The provided implementations have handled the complexity that would have to be dealt with by the users of this git repository and therefore are much simpler to use than the original implementations like PyTransformer.  A description of which algorithms are used in each scenario can be found on [this table](../../README.md#content)
 
 ## Summary
 
