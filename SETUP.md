@@ -87,8 +87,10 @@ If you are using the DSVM, you can [connect to JupyterHub](https://docs.microsof
 
 ## Install this repository via PIP
 
-<details><summary>The utils_nlp module of this repositiory can be installed as a python package. **Click to see the details ** </summary> 
-<p>
+<details>
+    <summary>The utils_nlp module of this repositiory can be installed as a python package. <strong><em>Click here to expand and see the details</em></strong> 
+    </summary> 
+    <p>
 A [setup.py](setup.py) file is provied in order to simplify the installation of this utilities in this repo from the main directory.
 
     pip install -e .
@@ -98,7 +100,7 @@ It is also possible to install directly from Github.
     pip install -e  git+git@github.com:microsoft/nlp.git@master#egg=utils_nlp
 
 **NOTE** - The pip installation does not install any of the necessary package dependencies, it is expected that conda will be used as shown above to setup the environment for the utilities being used.
-</p>
+    </p>
 </details>
 
 ## Versioning of utils_nlp in this repository
