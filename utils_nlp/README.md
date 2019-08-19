@@ -1,66 +1,52 @@
 # NLP Utilities
 
-This module (**utils_nlp**) contains functions to simplify common tasks used when developing and evaluating NLP systems. For more details about what functions are available and how to use them, please review the doc-strings provided with the code.
+Modern NLP research and development can involve tedious tasks ranging from data loading, model development, model evaluation to productionize a trained NLP model. Recognizing the need of simplying these tedious tasks, we developed this module (**utils_nlp**) to provide a wide spectrum of classes, functions and utilities. Adoption of this module can greately speed up the development work and examples in [Senarios](scenarios) folder can demonstrate this.  The following provides a short description of the sub-modules.  For more details about what functions/classes/utitilies are available and how to use them, please review the doc-strings provided with the code.
 
 ## Submodules
-The utilities package is made up of several high-level submodules for common utilies, datasets, evaluation and model interpretability. It also includes code that make it easy to interact with various platforms and frameworks.  
 
-For more information about the individual submodules, find links below:  
+### [AzureML](azureml)
 
-- [Azure Machine Learning](./azureml/README.md) - Contains Azure Machine Learning specific utilities  
-- [Common](./common/README.md) - Contains common helper utilities such as  
-        - `Timer`: A timer object that helps with timing execution runs.  
-        - `get_device` and `move_to_device`: Pytorch specific utilities that help determine the compute device and handle moving of models across various types of compute respectively. 
-- [Dataset](./dataset/README.md) - Contains dataset definition and sources  
-- [Evaluation (Eval)](./eval/README.md) - Contains metric and accuracy evaluation utilities     
-- [Models](./models/README.md) - Contains implementation of algorithms used     
-- [Interpreter](./interpreter/README.md) - Contains utilities to explain hidden states of models i.e. **model interpretability**. 
+The AzureML submodule contains utilities to connect to an Azure Machine Learning workspace, train, tune and operationalize NLP systems at scale using AzureML.
 
+```python
+from utils_nlp.azureml.azureml_utils import get_or_create_workspace
 
-## Semantic Versioning
-
-This library is configured to use
-[setuptools_scm](https://github.com/pypa/setuptools_scm/) to automatically get package version from git commit histories.
-
-> NOTE: **There shouldn't be any references to manually coded versions**.
-
-Verify what git tag to use by running:
-
-```bash
-python setup.py --version
+###Note: you do not need to fill in these values if you have a config.json in the same folder as this notebook
+ws = get_or_create_workspace(
+    config_path=config_path,
+    subscription_id=subscription_id,
+    resource_group=resource_group,
+    workspace_name=workspace_name,
+    workspace_region=workspace_region,
+)
 ```
-It should look something like `0.1.0.dev4+gdfedba7.d20190209`
 
-Using the information above the master branch, after a merge commit, can be _**Tagged**_ with the above semantic version `0.1.0` (ignoring the `dev4+gdfedba7.d20190209`)  
+### [Common](common)
 
-For example: 
+This submodule contains high-level utilities for defining constants used in most algorithms as well as helper functions for managing aspects of different frameworks like pytorch.
 
-    git tag v0.1.0  
+### [Dataset](dataset)
+Dataset includes helper functions for interacting with well-known datasets,  utility functions to process datasets for different NLP tasks, as well as utilities for splitting data for training/testing. For example, the [snli module](snli.py) will allow you to load a dataframe in pandas from the  Stanford Natural Language Inference (SNLI) Corpus dataset, with the option to set the number of rows to load in order to test algorithms and evaluate performance benchmarks. Information on the datasets used in the repo can be found [here](https://github.com/microsoft/nlp/tree/staging/utils_nlp/dataset#datasets).
 
-Now verify the semantic version for the package:
+Most datasets may be split into `train`, `dev`, and `test`.
 
-    python setup.py --version
+```python
+from utils_nlp.dataset.snli import load_pandas_df
 
+df = load_pandas_df(DATA_FOLDER, file_split ="train", nrows = 1000)
+```
 
-All new merged commit on master must have a
-   [Semantic Versioning](https://semver.org/) release version with an
-   accompanying tag.  TL;DR:
-   * `major.minor.patch`
-   * Patch is for bugfix
-   * Minor is for new features
-   * Major is for backwards-incompatible changes
-   * tags should be of the form `v0.1.2`  
+### [Evaluation (Eval)](eval)
+The evaluation (eval) submodule includes functionalities for computing common classification evaluation metrics like accuracy, precision, recall, and f1 scores for classification scenarios. It also includes metric utitlities for normalizing and finding f1_scores for  dataset  [The Stanford Question Answering Dataset (SQuAD)](https://rajpurkar.github.io/SQuAD-explorer/) , and utilities to  log the means and other coefficients in evaluating the quality of sentence embedding.
 
-Installing this library into another clean git repository with a tag version, you should get a nice version like `0.2.1`.  
+### [Models](models)
+The models submodule contains implementations of various algorithms that can be used in addition to external packages to evaluate and develop new natural language processing systems. A description of which algorithms are used in each scenario can be found on [this table](../README.md#content).
 
-However, if you inspect the `__version__` in this repo,
-you'll get a nice **'dirty'** version number like `'0.2.1.dev0+g850a76d.d20180908'`.  
-
-This is useful for debugging, building sphinx docs in dev and so on.   
-
-You should never have to specify a version manually except just tagging your commit from the tag calculation generated by running  
-
-    python setup.py --version 
+A few highlights are
+* BERT
+* GenSen
 
 
-   
+### [Model Explainability](interpreter)
+The model_explainability submodule contains implementations to explain a model through its hidden states of models. It is a code implementation of the paper [Towards a Deep and Unified Understanding of Deep Neural Models in NLP](http://proceedings.mlr.press/v97/guan19a/guan19a.pdf). 
+
