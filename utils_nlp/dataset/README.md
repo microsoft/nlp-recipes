@@ -1,4 +1,4 @@
-## [Dataset](dataset)
+## [Dataset](.)
 This submodule includes helper functions for downloading datasets and formatting them appropriately as well as utilities for splitting data for training / testing.
 
 ## Data Loading
