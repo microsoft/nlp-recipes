@@ -1,12 +1,12 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
-from sklearn.metrics import (
-    accuracy_score,
-    precision_score,
-    recall_score,
-    f1_score,
-)
+"""
+This script contains utilities functions for computing general model
+evaluation metrics.
+"""
+
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
 from numpy import corrcoef
 import pandas as pd
@@ -23,17 +23,9 @@ def eval_classification(actual, predicted, round_decimals=4):
     """
     return {
         "accuracy": accuracy_score(actual, predicted).round(round_decimals),
-        "precision": list(
-            precision_score(actual, predicted, average=None).round(
-                round_decimals
-            )
-        ),
-        "recall": list(
-            recall_score(actual, predicted, average=None).round(round_decimals)
-        ),
-        "f1": list(
-            f1_score(actual, predicted, average=None).round(round_decimals)
-        ),
+        "precision": list(precision_score(actual, predicted, average=None).round(round_decimals)),
+        "recall": list(recall_score(actual, predicted, average=None).round(round_decimals)),
+        "f1": list(f1_score(actual, predicted, average=None).round(round_decimals)),
     }
 
 

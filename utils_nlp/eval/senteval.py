@@ -1,30 +1,23 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
-import os
-import sys
-import itertools
-import pandas as pd
-from collections import OrderedDict
-from copy import deepcopy
+"""
+This script contains utilities for evaluating sentence embeddings.
+"""
 
 
 class SentEvalConfig:
     """Object to store static properties of senteval experiments
-    
+
     Attributes:
         model_params (dict): model parameters that stay consistent across all runs
         senteval_params (dict): senteval parameters that stay consistent across all runs
-    
+
     """
-    
-    def __init__(
-        self,
-        model_params,
-        senteval_params,
-    ):
+
+    def __init__(self, model_params, senteval_params):
         """Summary
-        
+
         Args:
             model_params (dict): model parameters that stay consistent across all runs
             senteval_params (dict): senteval parameters that stay consistent across all runs
@@ -61,25 +54,16 @@ class SentEvalConfig:
             try:
                 a = "classifier" in self.senteval_params
                 if not a:
-                    raise ValueError(
-                        "Include param['classifier'] to run task {}".format(t)
-                    )
+                    raise ValueError("Include param['classifier'] to run task {}".format(t))
                 else:
                     b = (
-                        set(
-                            "nhid",
-                            "optim",
-                            "batch_size",
-                            "tenacity",
-                            "epoch_size",
-                        )
+                        set("nhid", "optim", "batch_size", "tenacity", "epoch_size")
                         in self.senteval_params["classifier"].keys()
                     )
                     if not b:
                         raise ValueError(
-                            "Include nhid, optim, batch_size, tenacity, and epoch_size params to run task {}".format(
-                                t
-                            )
+                            "Include nhid, optim, batch_size, tenacity, and epoch_size params to "
+                            "run task {}".format(t)
                         )
             except ValueError as ve:
                 print(ve)

@@ -1,4 +1,4 @@
-### [AzureML](azureml)
+## [AzureML](azureml)
 
 The AzureML submodule contains utilities to connect to a
 [workspace](https://docs.microsoft.com/en-us/azure/machine-learning/service/how-to-manage-workspace),
