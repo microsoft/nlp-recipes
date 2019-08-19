@@ -6,34 +6,29 @@ from __future__ import print_function
 import io
 
 import re
-from glob import glob
-from os.path import basename, dirname, join, splitext
+from os.path import dirname, join
 
-from setuptools import find_packages, setup
+from setuptools import setup
 from setuptools_scm import get_version
 
 # Determine semantic versioning automatically
 # from git commits
 __version__ = get_version()
 
+
 def read(*names, **kwargs):
-    with io.open(
-        join(dirname(__file__), *names),
-        encoding=kwargs.get("encoding", "utf8"),
-    ) as fh:
+    with io.open(join(dirname(__file__), *names), encoding=kwargs.get("encoding", "utf8")) as fh:
         return fh.read()
 
 
 setup(
     name="utils_nlp",
-    version = __version__,
+    version=__version__,
     license="MIT License",
     description="NLP Utility functions that are used for best practices in building state-of-the-art NLP methods and scenarios. Developed by Microsoft AI CAT",
     long_description="%s\n%s"
     % (
-        re.compile("^.. start-badges.*^.. end-badges", re.M | re.S).sub(
-            "", read("README.md")
-        ),
+        re.compile("^.. start-badges.*^.. end-badges", re.M | re.S).sub("", read("README.md")),
         re.sub(":[a-z]+:`~?(.*?)`", r"``\1``", read("CONTRIBUTING.md")),
     ),
     author="AI CAT",
@@ -68,16 +63,11 @@ setup(
         "Documentation": "https://github.com/microsoft/nlp/",
         "Issue Tracker": "https://github.com/microsoft/nlp/issues",
     },
-    keywords=[
-        "Microsoft NLP",
-        "Natural Language Processing",
-        "Text Processing",
-        "Word Embedding",
-    ],
+    keywords=["Microsoft NLP", "Natural Language Processing", "Text Processing", "Word Embedding"],
     python_requires=">=3.6",
-    install_requires=['setuptools_scm>=3.2.0',],
+    install_requires=["setuptools_scm>=3.2.0"],
     dependency_links=[],
     extras_require={},
-    use_scm_version = {"root": ".", "relative_to": __file__},
-    setup_requires=['setuptools_scm'],
+    use_scm_version={"root": ".", "relative_to": __file__},
+    setup_requires=["setuptools_scm"],
 )

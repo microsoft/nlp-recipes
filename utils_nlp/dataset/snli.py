@@ -20,17 +20,15 @@ S2_COL = "sentence2"
 LABEL_COL = "score"
 
 
-def load_pandas_df(
-    local_cache_path=None, file_split=Split.TRAIN, file_type="txt", nrows=None
-):
+def load_pandas_df(local_cache_path=None, file_split=Split.TRAIN, file_type="txt", nrows=None):
     """
     Loads the SNLI dataset as pd.DataFrame
     Download the dataset from "https://nlp.stanford.edu/projects/snli/snli_1.0.zip", unzip, and load
 
     Args:
         local_cache_path (str): Path (directory or a zip file) to cache the downloaded zip file.
-                               If None, all the intermediate files will be stored in a temporary directory and removed
-                               after use.
+            If None, all the intermediate files will be stored in a temporary directory and removed
+            after use.
         file_split (str): File split to load, defaults to "train"
         file_type (str): File type to load, defaults to "txt"
         nrows (int): Number of rows to load, defaults to None (in which all rows will be returned)
@@ -78,12 +76,8 @@ def _maybe_download_and_extract(zip_path, file_split, file_type):
     extract_path = os.path.join(dir_path, file_name)
 
     if not os.path.exists(extract_path):
-        dpath = download_snli(zip_path)
-        extract_snli(
-            zip_path,
-            source_path=SNLI_DIRNAME + "/" + file_name,
-            dest_path=extract_path,
-        )
+        _ = download_snli(zip_path)
+        extract_snli(zip_path, source_path=SNLI_DIRNAME + "/" + file_name, dest_path=extract_path)
 
     return extract_path
 
@@ -143,11 +137,7 @@ def clean_cols(df):
     )
 
     snli_df = snli_df.rename(
-        columns={
-            "sentence1": S1_COL,
-            "sentence2": S2_COL,
-            "gold_label": LABEL_COL,
-        }
+        columns={"sentence1": S1_COL, "sentence2": S2_COL, "gold_label": LABEL_COL}
     )
 
     return snli_df
@@ -155,12 +145,12 @@ def clean_cols(df):
 
 def clean_rows(df, label_col=LABEL_COL):
     """Drop badly formatted rows from the input dataframe
-    
+
     Args:
         df (pd.DataFrame): Input dataframe
         label_col (str): Name of label column. 
-                         Defaults to the standardized column name that is set after running the clean_col method.  
-    
+            Defaults to the standardized column name that is set after running the clean_col method.
+
     Returns:
         pd.DataFrame
     """
@@ -169,23 +159,23 @@ def clean_rows(df, label_col=LABEL_COL):
 
     return snli_df
 
+
 def clean_df(df, label_col=LABEL_COL):
     df = clean_cols(df)
     df = clean_rows(df, label_col)
 
     return df
 
-def load_azureml_df(
-    local_cache_path=None, file_split=Split.TRAIN, file_type="txt"
-):
+
+def load_azureml_df(local_cache_path=None, file_split=Split.TRAIN, file_type="txt"):
     """
     Loads the SNLI dataset as AzureML dataflow object
     Download the dataset from "https://nlp.stanford.edu/projects/snli/snli_1.0.zip", unzip, and load.
 
     Args:
         local_cache_path (str): Path (directory or a zip file) to cache the downloaded zip file.
-                               If None, all the intermediate files will be stored in a temporary directory and removed
-                               after use.
+            If None, all the intermediate files will be stored in a temporary directory and removed
+            after use.
         file_split (str): File split to load. One of (dev, test, train)
         file_type (str): File type to load. One of (txt, jsonl)
 
