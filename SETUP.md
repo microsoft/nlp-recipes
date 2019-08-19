@@ -101,5 +101,6 @@ It is also possible to install directly from Github.
 </p>
 </details>
 ## Versioning of utils_nlp in this repository
+
 The details of the versioning info can be found at [VERSIONING.md](VERSIONING.md)
 
