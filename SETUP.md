@@ -85,7 +85,7 @@ We can register our created conda environment to appear as a kernel in the Jupyt
 
 If you are using the DSVM, you can [connect to JupyterHub](https://docs.microsoft.com/en-us/azure/machine-learning/data-science-virtual-machine/dsvm-ubuntu-intro#jupyterhub-and-jupyterlab) by browsing to `https://your-vm-ip:8000`.  If you are prompted to enter user name and password, enter the user name and password that you use to log in to your virtual machine. 
 
-## Install this repository via PIP
+## Install Utils via PIP
 
 <details>
     <summary>The utils_nlp module of this repositiory can be installed as a python package. <strong><em>Click here to expand and see the details</em></strong> 
