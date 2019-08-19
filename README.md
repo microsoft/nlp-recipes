@@ -1,6 +1,6 @@
 # NLP Best Practices
 
-In recent years, Natural Language Processing has seen quick growth in quality and usability, and this has helped to drive business adoption of Artificial Intelligence solutions. In the last few years, researchers have been applying newer deep learning methods to natural language processing. Data Scientists started moving from traditional methods to state-of-the-art DNN algorithms which allow them to use language models pretrained on large corpus of data.
+In recent years, Natural Language Processing has seen quick growth in quality and usability, and this has helped to drive business adoption of Artificial Intelligence solutions. In the last few years, researchers have been applying newer deep learning methods to natural language processing. Data Scientists started moving from traditional methods to state-of-the-art DNN algorithms which allow them to use language models pretrained on large text corpora.
 
 This repository contains examples and best practices for building natural language processing (NLP) systems, provided as [Jupyter notebooks](scenarios) and [utility functions](utils_nlp). The focus of the repository is on state-of-the-art methods and common scenarios that are popular among researchers and practitioners working on problems involving text and language.
 
@@ -11,7 +11,7 @@ The content is based on our past and potential future engagements with customers
 
 We’re hoping that the tools would significantly reduce the “time to market” by simplifying the experience from defining the business problem to development of solution by orders of magnitude. In addition, the example notebooks would serve as guidelines and showcase best practices and usage of the tools in a wide variety of languages.
 
-In an era of transfer learning, transformers, and deep architectures, we believe that pretrained models provide a unified solution to many real-world problems and allow handling different tasks and languages easily. We will, therefore, prioritize such models, as they achieve state-of-the-art results on several NLP benchmarks like [*GLUE*](https://gluebenchmark.com/leaderboard) and [*SQuAD*](https://rajpurkar.github.io/SQuAD-explorer/) leaderboard. They can be used in a number of applications ranging from simple text classification to sophisticated intelligent chat bots.
+In an era of transfer learning, transformers, and deep architectures, we believe that pretrained models provide a unified solution to many real-world problems and allow handling different tasks and languages easily. We will, therefore, prioritize such models, as they achieve state-of-the-art results on several NLP benchmarks like [*GLUE*](https://gluebenchmark.com/leaderboard) and [*SQuAD*](https://rajpurkar.github.io/SQuAD-explorer/) leaderboard. The models can be used in a number of applications ranging from simple text classification to sophisticated intelligent chat bots.
 
 >   
 > 
