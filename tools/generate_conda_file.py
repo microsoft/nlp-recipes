@@ -87,10 +87,10 @@ PIP_BASE = {
 PIP_GPU = {}
 
 PIP_DARWIN = {}
-PIP_DARWIN_GPU = {"horovod": "horovod>=0.16.1"}
+PIP_DARWIN_GPU = {}
 
 PIP_LINUX = {}
-PIP_LINUX_GPU = {"horovod": "horovod>=0.16.1"}
+PIP_LINUX_GPU = {}
 
 PIP_WIN32 = {}
 PIP_WIN32_GPU = {}
