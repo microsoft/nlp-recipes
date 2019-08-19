@@ -1,3 +1,12 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License.
+
+"""
+This script contains common helper functions for preprocessing Named Entity
+Recognition (NER) datasets.
+"""
+
+
 def preprocess_conll(text, data_type=""):
     """
     Helper function converting data in conll format to word lists
@@ -37,9 +46,5 @@ def preprocess_conll(text, data_type=""):
 
         if len(s_split_split) > max_seq_len:
             max_seq_len = len(s_split_split)
-    print(
-        "Maximum sequence length in the {0} data is: {1}".format(
-            data_type, max_seq_len
-        )
-    )
+    print("Maximum sequence length in the {0} data is: {1}".format(data_type, max_seq_len))
     return sentence_list, labels_list

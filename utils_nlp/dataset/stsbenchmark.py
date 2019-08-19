@@ -1,6 +1,13 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
+"""
+This script contains utility functions for downloading, extracting,
+and reading the STSbenchmark dataset.
+http://ixa2.si.ehu.es/stswiki/index.php/STSbenchmark
+"""
+
+
 import os
 import tarfile
 import pandas as pd
@@ -48,9 +55,7 @@ def _download_sts(dirpath):
         str: Path to extracted STS Benchmark data.
     """
     filepath = maybe_download(STS_URL, work_directory=dirpath)
-    extracted_path = _extract_sts(
-        filepath, target_dirpath=dirpath, tmode="r:gz"
-    )
+    extracted_path = _extract_sts(filepath, target_dirpath=dirpath, tmode="r:gz")
     print("Data downloaded to {}".format(extracted_path))
     return extracted_path
 
@@ -120,15 +125,8 @@ def clean_sts(df):
     Args:
         df (pandas.Dataframe): drop columns from train/test/dev files.
     """
-    clean_df = df.drop(
-        ["column_0", "column_1", "column_2", "column_3"], axis=1
-    )
+    clean_df = df.drop(["column_0", "column_1", "column_2", "column_3"], axis=1)
     clean_df = clean_df.rename(
-        index=str,
-        columns={
-            "column_4": "score",
-            "column_5": "sentence1",
-            "column_6": "sentence2",
-        },
+        index=str, columns={"column_4": "score", "column_5": "sentence1", "column_6": "sentence2"}
     )
     return clean_df

@@ -1,3 +1,11 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License.
+
+"""
+This script contains data loaders for sampling and reading large files that
+can not fit into the memory.
+"""
+
 import random
 import dask.dataframe as dd
 
@@ -7,14 +15,7 @@ class DaskCSVLoader:
     files. The loader uses dask to read smaller partitions of a file into memory (one partition
     at a time), before sampling batches from the partitions."""
 
-    def __init__(
-            self,
-            file_path,
-            sep=",",
-            header="infer",
-            block_size=10e6,
-            random_seed=None,
-    ):
+    def __init__(self, file_path, sep=",", header="infer", block_size=10e6, random_seed=None):
         """Initializes the loader.
 
         Args:
@@ -30,9 +31,7 @@ class DaskCSVLoader:
                 Defaults to None.
         """
 
-        self.df = dd.read_csv(
-            file_path, sep=sep, header=header, blocksize=block_size
-        )
+        self.df = dd.read_csv(file_path, sep=sep, header=header, blocksize=block_size)
 
         self.random_seed = random_seed
         random.seed(random_seed)
@@ -52,9 +51,7 @@ class DaskCSVLoader:
             rnd_part_idx = random.randint(0, self.df.npartitions - 1)
             sample_part = self.df.partitions[rnd_part_idx].compute()
             if sample_part.shape[0] > batch_size:
-                yield sample_part.sample(
-                    batch_size, random_state=self.random_seed
-                )
+                yield sample_part.sample(batch_size, random_state=self.random_seed)
             else:
                 yield sample_part
 
@@ -69,7 +66,7 @@ class DaskCSVLoader:
         for i in range(self.df.npartitions):
             part = self.df.partitions[i].compute()
             for j in range(0, part.shape[0], batch_size):
-                yield part.iloc[j: j + batch_size, :]
+                yield part.iloc[j : j + batch_size, :]
 
 
 class DaskJSONLoader:
@@ -77,9 +74,7 @@ class DaskJSONLoader:
     read smaller partitions of a file into memory (one partition at a time), before sampling
     batches from the partitions."""
 
-    def __init__(
-            self, file_path, block_size=10e6, random_seed=None, lines=True
-    ):
+    def __init__(self, file_path, block_size=10e6, random_seed=None, lines=True):
         """Initializes the loader.
 
         Args:
@@ -112,9 +107,7 @@ class DaskJSONLoader:
             rnd_part_idx = random.randint(0, self.df.npartitions - 1)
             sample_part = self.df.partitions[rnd_part_idx].compute()
             if sample_part.shape[0] > batch_size:
-                yield sample_part.sample(
-                    batch_size, random_state=self.random_seed
-                )
+                yield sample_part.sample(batch_size, random_state=self.random_seed)
             else:
                 yield sample_part
 
@@ -133,4 +126,4 @@ class DaskJSONLoader:
         for i in range(num_batches):
             part = self.df.partitions[i].compute()
             for j in range(0, part.shape[0], batch_size):
-                yield part.iloc[j: j + batch_size, :]
+                yield part.iloc[j : j + batch_size, :]

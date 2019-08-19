@@ -1,6 +1,12 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
+"""
+This script contains utility functions for downloading, extracting,
+and reading the Cross-Lingual NLI Corpus (XNLI).
+https://www.nyu.edu/projects/bowman/xnli/
+"""
+
 
 import os
 import pandas as pd
@@ -49,22 +55,14 @@ def load_pandas_df(local_cache_path=".", file_split="dev", language="zh"):
 
         zip_file_name = url.split("/")[-1]
         folder_name = ".".join(zip_file_name.split(".")[:-1])
-        file_name = (
-            folder_name
-            + "/multinli/"
-            + ".".join(["multinli", file_split, language, "tsv"])
-        )
+        file_name = folder_name + "/multinli/" + ".".join(["multinli", file_split, language, "tsv"])
 
     maybe_download(url, zip_file_name, local_cache_path)
 
     if not os.path.exists(os.path.join(local_cache_path, folder_name)):
-        extract_zip(
-            os.path.join(local_cache_path, zip_file_name), local_cache_path
-        )
+        extract_zip(os.path.join(local_cache_path, zip_file_name), local_cache_path)
 
-    with open(
-        os.path.join(local_cache_path, file_name), "r", encoding="utf-8"
-    ) as f:
+    with open(os.path.join(local_cache_path, file_name), "r", encoding="utf-8") as f:
         lines = f.read().splitlines()
 
     line_list = [line.split("\t") for line in lines]
@@ -75,32 +73,23 @@ def load_pandas_df(local_cache_path=".", file_split="dev", language="zh"):
         line_list = [line for line in line_list if line[0] == language]
 
     valid_lines = [
-        True if line[sentence_1_index] and line[sentence_2_index] else False
-        for line in line_list
+        True if line[sentence_1_index] and line[sentence_2_index] else False for line in line_list
     ]
     total_line_count = len(line_list)
     line_list = [line for line, valid in zip(line_list, valid_lines) if valid]
     valid_line_count = len(line_list)
 
     if valid_line_count != total_line_count:
-        print(
-            "{} invalid lines removed.".format(
-                total_line_count - valid_line_count
-            )
-        )
+        print("{} invalid lines removed.".format(total_line_count - valid_line_count))
 
     label_list = [convert_to_unicode(line[label_index]) for line in line_list]
     old_contradict_label = convert_to_unicode("contradictory")
     new_contradict_label = convert_to_unicode("contradiction")
     label_list = [
-        new_contradict_label if label == old_contradict_label else label
-        for label in label_list
+        new_contradict_label if label == old_contradict_label else label for label in label_list
     ]
     text_list = [
-        (
-            convert_to_unicode(line[sentence_1_index]),
-            convert_to_unicode(line[sentence_2_index]),
-        )
+        (convert_to_unicode(line[sentence_1_index]), convert_to_unicode(line[sentence_2_index]))
         for line in line_list
     ]
 

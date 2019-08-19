@@ -1,3 +1,11 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License.
+
+"""
+This script contains utility functions for loading the Cross-Lingual NLI
+Corpus (XNLI) as a PyTorch Dataset.
+"""
+
 import numpy as np
 import torch
 from utils_nlp.models.bert.common import Language, Tokenizer
@@ -66,9 +74,10 @@ class XnliDataset(data.Dataset):
                                       Defaults to "./".
             language(str):Language required to load which xnli file (eg - "en", "zh")
             to_lowercase(bool):flag to convert samples in dataset to lowercase
-            tok_language(Language, optional): language (Language, optional): The pretrained model's language.
-                                              Defaults to Language.ENGLISH.
-            data_percent_used(float, optional): Data used to create Torch Dataset.Defaults to "1.0" which is 100% data
+            tok_language(Language, optional): language (Language, optional),
+                The pretrained model's language. Defaults to Language.ENGLISH.
+            data_percent_used(float, optional): Data used to create Torch Dataset.Defaults to "1.0"
+                which is 100% data
         """
         if file_split not in VALID_FILE_SPLIT:
             raise ValueError("The file split is not part of ", VALID_FILE_SPLIT)
