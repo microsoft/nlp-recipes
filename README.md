@@ -2,7 +2,7 @@
 
 In recent years, Natural Language Processing has seen quick growth in quality and usability, and this has helped to drive business adoption of Artificial Intelligence solutions. In the last few years, researchers have been applying newer deep learning methods to natural language processing. Data Scientists started moving from traditional methods to state-of-the-art DNN algorithms which allow them to use language models pretrained on large text corpora.
 
-This repository contains examples and best practices for building natural language processing (NLP) systems, provided as [Jupyter notebooks](scenarios) and [utility functions](utils_nlp). The focus of the repository is on state-of-the-art methods and common scenarios that are popular among researchers and practitioners working on problems involving text and language.
+This repository contains examples and best practices for building natural language processing (NLP) systems, provided as [Jupyter notebooks](examples) and [utility functions](utils_nlp). The focus of the repository is on state-of-the-art methods and common scenarios that are popular among researchers and practitioners working on problems involving text and language.
 
 ## Overview
 
