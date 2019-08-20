@@ -141,7 +141,7 @@ if __name__ == "__main__":
         pip_packages.update(PIP_WIN32)
         PIP_GPU.update(PIP_WIN32_GPU)
     else:
-        raise Exception("Unsupported platform, must be Windows, Linux, or macOS")
+        raise Exception("Unsupported platform. Must be Windows, Linux, or macOS")
 
     if args.gpu:
         conda_packages.update(CONDA_GPU)
