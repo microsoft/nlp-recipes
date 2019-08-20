@@ -63,6 +63,7 @@ PIP_BASE = {
     "azureml-mlflow": "azureml-mlflow>=1.0.43.1",
     "black": "black>=18.6b4",
     "cached-property": "cached-property==1.5.1",
+    "cudatoolkit": "cudatoolkit==9.2",
     "dask": "dask[dataframe]==1.2.2",
     "papermill": "papermill>=1.0.1",
     "nteract-scrapbook": "nteract-scrapbook>=0.2.1",
