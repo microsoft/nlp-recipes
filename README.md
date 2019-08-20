@@ -14,14 +14,14 @@ We’re hoping that the tools would significantly reduce the “time to market�
 In an era of transfer learning, transformers, and deep architectures, we believe that pretrained models provide a unified solution to many real-world problems and allow handling different tasks and languages easily. We will, therefore, prioritize such models, as they achieve state-of-the-art results on several NLP benchmarks like [*GLUE*](https://gluebenchmark.com/leaderboard) and [*SQuAD*](https://rajpurkar.github.io/SQuAD-explorer/) leaderboard. The models can be used in a number of applications ranging from simple text classification to sophisticated intelligent chat bots.
 
 >   
-> 
+>
 
 ## Content
 The following is a summary of the commonly used NLP scenarios covered in the repository. Each scenario is demonstrated in one or more [Jupyter notebook examples](examples) that make use of the core code base of models and repository utilities.
 
 | Scenario                              |  Models | Description|
 |-------------------------|  ------------------- |-------|
-|Text Classification                     |BERT| Text classification is a supervised learning method of learning and predicting the category or the class of a document given its text content. | 
+|Text Classification                     |BERT| Text classification is a supervised learning method of learning and predicting the category or the class of a document given its text content. |
 |Named Entity Recognition                |BERT| Named Entity Recognition (NER) is the task of classifying words or key phrases of a text into predefined entities of interest. |
 |Entailment                              |BERT| Textual entailment is a binary relation between two natural-language texts (called ‘text’ and ‘hypothesis’), where readers of the ‘text’ would agree the ‘hypothesis’ is most likely true. |
 |Question Answering                      |BiDAF <br> BERT| Question Answering (QA) is the task of retrieving or generating a valid answer for a given natural language query. |
@@ -37,7 +37,7 @@ We hope that the open source community would contribute to the content and bring
 
 
 ## Build Status
-| Build Type | Branch | Status |  | Branch | Status | 
-| --- | --- | --- | --- | --- | --- | 
-| **Linux CPU** | master | [![Build Status](https://dev.azure.com/best-practices/nlp/_apis/build/status/cpu_integration_tests_linux?branchName=master)](https://dev.azure.com/best-practices/nlp/_build/latest?definitionId=50&branchName=master) | | staging | [![Build Status](https://dev.azure.com/best-practices/nlp/_apis/build/status/cpu_integration_tests_linux?branchName=master)](https://dev.azure.com/best-practices/nlp/_build/latest?definitionId=50&branchName=staging) |
-| **Linux GPU** | master | [![Build Status](https://dev.azure.com/best-practices/nlp/_apis/build/status/gpu_integration_tests_linux?branchName=master)](https://dev.azure.com/best-practices/nlp/_build/latest?definitionId=51&branchName=master) | | staging | [![Build Status](https://dev.azure.com/best-practices/nlp/_apis/build/status/gpu_integration_tests_linux?branchName=master)](https://dev.azure.com/best-practices/nlp/_build/latest?definitionId=51&branchName=master) |
+| Build Type | Branch | Status |  | Branch | Status |
+| --- | --- | --- | --- | --- | --- |
+| **Linux CPU** | master | [![Build Status](https://dev.azure.com/best-practices/nlp/_apis/build/status/cpu_integration_tests_linux?branchName=master)](https://dev.azure.com/best-practices/nlp/_build/latest?definitionId=50&branchName=master) | | staging | [![Build Status](https://dev.azure.com/best-practices/nlp/_apis/build/status/cpu_integration_tests_linux?branchName=staging)](https://dev.azure.com/best-practices/nlp/_build/latest?definitionId=50&branchName=staging) |
+| **Linux GPU** | master | [![Build Status](https://dev.azure.com/best-practices/nlp/_apis/build/status/gpu_integration_tests_linux?branchName=master)](https://dev.azure.com/best-practices/nlp/_build/latest?definitionId=51&branchName=master) | | staging | [![Build Status](https://dev.azure.com/best-practices/nlp/_apis/build/status/gpu_integration_tests_linux?branchName=staging)](https://dev.azure.com/best-practices/nlp/_build/latest?definitionId=51&branchName=staging) |
