@@ -3,7 +3,8 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
-"""Minibatching utilities."""
+"""Data iterators and utilities for mini-batches"""
+
 import itertools
 import operator
 import os

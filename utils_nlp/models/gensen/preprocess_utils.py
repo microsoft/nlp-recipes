@@ -1,6 +1,12 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
+"""
+utilities to preprocess SNLI 1.0 (https://nlp.stanford.edu/projects/snli/)
+dataset for  Gensen model training
+
+"""
+
 import os
 import shutil
 from utils_nlp.models.gensen import SNLI_CLEAN_PATH

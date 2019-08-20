@@ -1,6 +1,8 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
+"""GenSen Encoder"""
+
 import h5py
 from sklearn.linear_model import LinearRegression
 import nltk
