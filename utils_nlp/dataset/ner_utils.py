@@ -1,7 +1,7 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
-"""Common helper functions for preprocessing Named EntityRecognition (NER) datasets."""
+"""Common helper functions for preprocessing Named Entity Recognition (NER) datasets."""
 
 
 def preprocess_conll(text, data_type=""):

@@ -40,7 +40,7 @@ def get_or_create_workspace(
 
     Args:
         config_path: optional directory to look for / store config.json file (defaults to current
-        directory)
+            directory)
         subscription_id: Azure subscription id
         resource_group: Azure resource group to create workspace and related resources
         workspace_name: name of azure ml workspace
