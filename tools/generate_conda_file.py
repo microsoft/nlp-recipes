@@ -52,7 +52,6 @@ CONDA_GPU = {
     "numba": "numba>=0.38.1",
     "pytorch": "pytorch>=1.0.0",
     "tensorflow": "tensorflow-gpu==1.12.0",
-    "cudatoolkit": "cudatoolkit==9.2",
 }
 
 PIP_BASE = {
@@ -93,10 +92,10 @@ PIP_DARWIN_GPU = {"horovod": "horovod>=0.16.1"}
 
 PIP_LINUX = {}
 PIP_LINUX_GPU = {"horovod": "horovod>=0.16.1"}
+CONDA_LINUX = {"cudatoolkit": "cudatoolkit>=9.2"}
 
 PIP_WIN32 = {}
 PIP_WIN32_GPU = {}
-
 CONDA_WIN32 = {"pytorch": "pytorch==1.0.0", "cudatoolkit": "cuda90"}
 
 if __name__ == "__main__":
@@ -134,6 +133,7 @@ if __name__ == "__main__":
         pip_packages.update(PIP_DARWIN)
         PIP_GPU.update(PIP_DARWIN_GPU)
     elif platform.startswith("linux"):
+        conda_packages.update(CONDA_LINUX)
         pip_packages.update(PIP_LINUX)
         PIP_GPU.update(PIP_LINUX_GPU)
     elif platform == "win32":
@@ -141,9 +141,7 @@ if __name__ == "__main__":
         pip_packages.update(PIP_WIN32)
         PIP_GPU.update(PIP_WIN32_GPU)
     else:
-        raise Exception(
-            "Unsupported platform, must be Windows, Linux, or macOS"
-        )
+        raise Exception("Unsupported platform, must be Windows, Linux, or macOS")
 
     if args.gpu:
         conda_packages.update(CONDA_GPU)
