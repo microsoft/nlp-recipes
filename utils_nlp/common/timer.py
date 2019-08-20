@@ -1,10 +1,7 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
-"""
-This script contains timer utilities for benchmarking running times of
-executions.
-"""
+"""Timer utilities for benchmarking running times of executions."""
 
 from timeit import default_timer
 

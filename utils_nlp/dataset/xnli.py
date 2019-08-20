@@ -2,9 +2,9 @@
 # Licensed under the MIT License.
 
 """
-This script contains utility functions for downloading, extracting,
-and reading the Cross-Lingual NLI Corpus (XNLI).
-https://www.nyu.edu/projects/bowman/xnli/
+    Utility functions for downloading, extracting, and reading the
+    Cross-Lingual NLI Corpus (XNLI).
+    https://www.nyu.edu/projects/bowman/xnli/
 """
 
 

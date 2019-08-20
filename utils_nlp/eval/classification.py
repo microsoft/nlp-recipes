@@ -1,10 +1,7 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
-"""
-This script contains utilities functions for computing general model
-evaluation metrics.
-"""
+"""Utilities functions for computing general model evaluation metrics."""
 
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 

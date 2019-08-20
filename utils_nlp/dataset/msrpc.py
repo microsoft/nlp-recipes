@@ -2,9 +2,9 @@
 # Licensed under the MIT License.
 
 """
-This script contains utility functions for downloading, extracting,
-and reading the Microsoft Research Paraphrase Corpus (MSRPC) dataset.
-https://www.microsoft.com/en-us/download/details.aspx?id=52398
+    Utility functions for downloading, extracting, and reading the Microsoft
+    Research Paraphrase Corpus (MSRPC) dataset.
+    https://www.microsoft.com/en-us/download/details.aspx?id=52398
 """
 
 import os

@@ -2,8 +2,8 @@
 # Licensed under the MIT License.
 
 """
-This script contains utility functions for common text preprocessing tasks
-like converting to lower case, removing stop words, convert to unicode, etc.
+    Utility functions for common text preprocessing tasks like converting to
+    lower case, removing stop words, convert to unicode, etc.
 """
 
 import pandas as pd

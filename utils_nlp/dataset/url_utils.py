@@ -1,9 +1,7 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
-"""
-This script contains common utilities for downloading and extracting datasets.
-"""
+"""Common utilities for downloading and extracting datasets."""
 
 import logging
 import math

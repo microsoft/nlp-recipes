@@ -1,10 +1,7 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
-"""
-This script contains common PyTorch utilities that facilitate building
-Pytorch models.
-"""
+"""Common PyTorch utilities that facilitate building Pytorch models."""
 
 import torch
 import torch.nn as nn

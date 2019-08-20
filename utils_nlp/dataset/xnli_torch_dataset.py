@@ -1,10 +1,7 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
-"""
-This script contains utility functions for loading the Cross-Lingual NLI
-Corpus (XNLI) as a PyTorch Dataset.
-"""
+"""Utility functions for loading the Cross-Lingual NLI Corpus (XNLI) as a PyTorch Dataset."""
 
 import numpy as np
 import torch

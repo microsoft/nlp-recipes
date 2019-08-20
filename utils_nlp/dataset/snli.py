@@ -2,9 +2,9 @@
 # Licensed under the MIT License.
 
 """
-This script contains utility functions for downloading, extracting,
-and reading the Stanford Natural Language Inference (SNLI) Corpus.
-https://nlp.stanford.edu/projects/snli/
+    Utility functions for downloading, extracting, and reading the Stanford
+    Natural Language Inference (SNLI) Corpus.
+    https://nlp.stanford.edu/projects/snli/
 """
 import os
 import shutil

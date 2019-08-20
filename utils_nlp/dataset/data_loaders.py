@@ -1,10 +1,7 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
-"""
-This script contains data loaders for sampling and reading large files that
-can not fit into the memory.
-"""
+"""Data loaders for sampling and reading large files that can not fit into the memory."""
 
 import random
 import dask.dataframe as dd

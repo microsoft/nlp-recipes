@@ -1,9 +1,7 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
-"""
-This script contains helper functions for interacting with AzureML Resources.
-"""
+"""Helper functions for interacting with AzureML Resources."""
 
 import os
 from azureml.core.authentication import AzureCliAuthentication

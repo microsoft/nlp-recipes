@@ -5,8 +5,8 @@
 # https://github.com/microsoft/AzureML-BERT/blob/dec79be13befdd51fa72c05419cf9288d32eb263/finetune/PyTorch/azureml_bert_util.py
 
 """
-This script contains classes and helper functions for fine-tuning BERT
-models at scale (e.g. distributed training) using AzureML.
+    Classes and helper functions for fine-tuning BERT models at scale (e.g.
+    distributed training) using AzureML.
 """
 
 

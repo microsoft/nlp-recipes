@@ -2,9 +2,9 @@
 # Licensed under the MIT License.
 
 """
-This script contains utility functions for downloading, extracting,
-and reading the STSbenchmark dataset.
-http://ixa2.si.ehu.es/stswiki/index.php/STSbenchmark
+    Utility functions for downloading, extracting, and reading the
+    STSbenchmark dataset.
+    http://ixa2.si.ehu.es/stswiki/index.php/STSbenchmark
 """
 
 

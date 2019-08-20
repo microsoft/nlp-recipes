@@ -1,9 +1,7 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
-"""
-This script contains utilities for evaluating sentence embeddings.
-"""
+"""Utilities for evaluating sentence embeddings."""
 
 
 class SentEvalConfig:

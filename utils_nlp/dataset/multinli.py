@@ -2,9 +2,9 @@
 # Licensed under the MIT License.
 
 """
-This script contains utility functions for downloading, extracting,
-and reading the Multi-Genre NLI (MultiNLI) Corpus.
-https://www.nyu.edu/projects/bowman/multinli/
+    Utility functions for downloading, extracting, and reading the
+    Multi-Genre NLI (MultiNLI) Corpus.
+    https://www.nyu.edu/projects/bowman/multinli/
 """
 
 import os
