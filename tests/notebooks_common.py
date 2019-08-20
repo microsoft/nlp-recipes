@@ -11,7 +11,4 @@ OUTPUT_NOTEBOOK = "output.ipynb"
 
 def path_notebooks():
     """Returns the path of the notebooks folder"""
-    return os.path.abspath(
-        os.path.join(os.path.dirname(__file__), os.path.pardir, "scenarios")
-    )
-
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.pardir, "examples"))

@@ -5,7 +5,7 @@ This submodule contains a tool for explaining hidden states of models. It is an 
 
 ## How to use
 
-We provide a notebook tutorial [here](../../scenarios/interpret_NLP_models/understand_models.ipynb) to help you get started quickly. The main class needed is the `Interpreter` in [Interpreter.py](Interpreter.py). Given any input word embeddings and a forward function $\Phi$ that transforms the word embeddings $\bf x$ to a hidden state $\bf s$, the Interpreter helps understand how much each input word contributes to the hidden state. Suppose the $\Phi$, the input $\bf x$ and the input words are defined as:
+We provide a notebook tutorial [here](../../examples/interpret_NLP_models/understand_models.ipynb) to help you get started quickly. The main class needed is the `Interpreter` in [Interpreter.py](Interpreter.py). Given any input word embeddings and a forward function $\Phi$ that transforms the word embeddings $\bf x$ to a hidden state $\bf s$, the Interpreter helps understand how much each input word contributes to the hidden state. Suppose the $\Phi$, the input $\bf x$ and the input words are defined as:
 ```
 import torch
 
@@ -63,5 +63,5 @@ which means that the second and forth words are most important to $\Phi$, which 
 
 ## Explain a certain layer in any saved pytorch model
 
-We provide an example on how to use our method to explain a saved pytorch model (*pre-trained BERT model in our case*) [here](../../scenarios/interpret_NLP_models/understand_models.ipynb). 
+We provide an example on how to use our method to explain a saved pytorch model (*pre-trained BERT model in our case*) [here](../../examples/interpret_NLP_models/understand_models.ipynb). 
 > NOTE: This result may not be consistent with the result in the paper because we use the pre-trained BERT model directly for simplicity, while the BERT model we use in paper is fine-tuned on a specific dataset like SST-2.

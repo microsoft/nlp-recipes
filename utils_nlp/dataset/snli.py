@@ -31,10 +31,9 @@ def load_pandas_df(local_cache_path=None, file_split=Split.TRAIN, file_type="txt
     Download the dataset from "https://nlp.stanford.edu/projects/snli/snli_1.0.zip", unzip, and load
 
     Args:
-        local_cache_path (str):
-            Path (directory or a zip file) to cache the downloaded zip file.
-            If None, all the intermediate files will be stored in a temporary
-            directory and removed after use.
+        local_cache_path (str): Path (directory or a zip file) to cache the downloaded zip file.
+            If None, all the intermediate files will be stored in a temporary directory and removed
+            after use.
         file_split (str): File split to load, defaults to "train"
         file_type (str): File type to load, defaults to "txt"
         nrows (int): Number of rows to load, defaults to None (in which all rows will be returned)
@@ -82,7 +81,7 @@ def _maybe_download_and_extract(zip_path, file_split, file_type):
     extract_path = os.path.join(dir_path, file_name)
 
     if not os.path.exists(extract_path):
-        download_snli(zip_path)
+        _ = download_snli(zip_path)
         extract_snli(zip_path, source_path=SNLI_DIRNAME + "/" + file_name, dest_path=extract_path)
 
     return extract_path

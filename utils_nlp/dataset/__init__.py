@@ -9,6 +9,6 @@ nltk.download("stopwords", quiet=True)
 
 
 class Split(str, Enum):
-    TRAIN : str = "train"
-    DEV : str = "dev"
-    TEST : str = "test"
+    TRAIN: str = "train"
+    DEV: str = "dev"
+    TEST: str = "test"

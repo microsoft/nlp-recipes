@@ -2,7 +2,7 @@
 
 In recent years, Natural Language Processing has seen quick growth in quality and usability, and this has helped to drive business adoption of Artificial Intelligence solutions. In the last few years, researchers have been applying newer deep learning methods to natural language processing. Data Scientists started moving from traditional methods to state-of-the-art DNN algorithms which allow them to use language models pretrained on large text corpora.
 
-This repository contains examples and best practices for building natural language processing (NLP) systems, provided as [Jupyter notebooks](scenarios) and [utility functions](utils_nlp). The focus of the repository is on state-of-the-art methods and common scenarios that are popular among researchers and practitioners working on problems involving text and language.
+This repository contains examples and best practices for building natural language processing (NLP) systems, provided as [Jupyter notebooks](examples) and [utility functions](utils_nlp). The focus of the repository is on state-of-the-art methods and common scenarios that are popular among researchers and practitioners working on problems involving text and language.
 
 ## Overview
 
@@ -24,8 +24,8 @@ The following is a summary of the commonly used NLP scenarios covered in the rep
 |Text Classification                     |BERT| Text classification is a supervised learning method of learning and predicting the category or the class of a document given its text content. | 
 |Named Entity Recognition                |BERT| Named Entity Recognition (NER) is the task of classifying words or key phrases of a text into predefined entities of interest. |
 |Entailment                              |BERT| Textual entailment is a binary relation between two natural-language texts (called ‘text’ and ‘hypothesis’), where readers of the ‘text’ would agree the ‘hypothesis’ is most likely true. |
-|Question Answering                      |BiDAF| Question Answering (QA) is the task of retrieving or generating a valid answer for a given natural language query. |
-|Sentence Similarity                     |Representation: TF-IDF, Word Embeddings, Doc Embeddings<br>Metrics: Cosine Similarity, Word Mover's Distance| Sentence similarity is the process of computing a similarity score given a pair of text documents. |
+|Question Answering                      |BiDAF <br> BERT| Question Answering (QA) is the task of retrieving or generating a valid answer for a given natural language query. |
+|Sentence Similarity                     |Representation: TF-IDF, Word Embeddings, Doc Embeddings<br>Metrics: Cosine Similarity, Word Mover's Distance<br>Models: BERT, GenSen| Sentence similarity is the process of computing a similarity score given a pair of text documents. |
 |Embeddings| Word2Vec<br>fastText<br>GloVe| An embedding is a low dimensionality representation of the text that will be analyzed.
 
 
