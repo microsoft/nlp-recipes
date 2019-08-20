@@ -14,9 +14,7 @@ URL = (
 )
 
 
-def load_train_test_dfs(
-    local_cache_path="./", test_percentage=0.5, random_seed=None
-):
+def load_train_test_dfs(local_cache_path="./", test_percentage=0.5, random_seed=None):
     """
     Get the training and testing data frames based on test_percentage.
 
@@ -58,13 +56,9 @@ def load_train_test_dfs(
     train_sentence_list = sentence_list[test_sentence_count:]
     train_labels_list = labels_list[test_sentence_count:]
 
-    train_df = pd.DataFrame(
-        {"sentence": train_sentence_list, "labels": train_labels_list}
-    )
+    train_df = pd.DataFrame({"sentence": train_sentence_list, "labels": train_labels_list})
 
-    test_df = pd.DataFrame(
-        {"sentence": test_sentence_list, "labels": test_labels_list}
-    )
+    test_df = pd.DataFrame({"sentence": test_sentence_list, "labels": test_labels_list})
 
     return (train_df, test_df)
 
