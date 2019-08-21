@@ -2,7 +2,7 @@
 # Licensed under the MIT License.
 
 """
-utilities to preprocess SNLI 1.0 (https://nlp.stanford.edu/projects/snli/)
+Utilities to preprocess SNLI 1.0 (https://nlp.stanford.edu/projects/snli/)
 dataset for  Gensen model training
 
 """
