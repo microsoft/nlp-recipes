@@ -45,14 +45,14 @@ CONDA_BASE = {
     "tensorflow": "tensorflow==1.12.0",
     "h5py": "h5py>=2.8.0",
     "tensorflow-hub": "tensorflow-hub==0.5.0",
-    "py-xgboost": "py-xgboost<=0.80",
-    "cudatoolkit": "cudatoolkit==9.2",
+    "py-xgboost": "py-xgboost<=0.80",    
 }
 
 CONDA_GPU = {
     "numba": "numba>=0.38.1",
     "pytorch": "pytorch>=1.0.0",
     "tensorflow": "tensorflow-gpu==1.12.0",
+    "cudatoolkit": "cudatoolkit==9.2"
 }
 
 PIP_BASE = {
