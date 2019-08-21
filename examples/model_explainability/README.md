@@ -1,8 +1,8 @@
 # Model Explainability
 
 This folder contains examples and best practices, written in Jupyter notebooks, for explaining and
-interpreting models. Being able to explain and understand machine learning models does not only help
-guiding further model improvements. More importantly, it's critical for gaining user's trust of the
+interpreting models. Being able to explain and understand machine learning models not only helps
+guiding further model improvements, but more importantly, it's critical for gaining users' trust in the
 models and detecting biases caused by the training data.
 
 ## Summary
