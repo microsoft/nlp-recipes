@@ -1,6 +1,6 @@
 # NLP Utilities
 
-Modern NLP research and development can involve tedious tasks ranging from data loading, dataset understanding,  model development, model evaluation to productionize a trained NLP model. Recognizing the need of simplying these tedious tasks, we developed this module (**utils_nlp**) to provide a wide spectrum of classes, functions and utilities. Adoption of this module can greately speed up the development work and examples in [Senarios](scenarios) folder can demonstrate this.  The following provides a short description of the sub-modules.  For more details about what functions/classes/utitilies are available and how to use them, please review the doc-strings provided with the code and see examples in [Senarios](scenarios).
+Modern NLP research and development can involve tedious tasks ranging from data loading, dataset understanding,  model development, model evaluation to productionize a trained NLP model. Recognizing the need of simplying these tedious tasks, we developed this module (**utils_nlp**) to provide a wide spectrum of classes, functions and utilities. Adoption of this module can greately speed up the development work and sample notebooks in [Examples](../examples) folder can demonstrate this.  The following provides a short description of the sub-modules. For more details about what functions/classes/utitilies are available and how to use them, please review the doc-strings provided with the code and see the sample notebooks in [Examples](../examples) folder.
 
 ## Submodules
 
