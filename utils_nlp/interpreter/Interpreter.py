@@ -1,7 +1,7 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
-# Toolkit that enables you to explain every hidden state in your model
+"""Utilities that enables you to explain every hidden state in your model"""
 
 import torch
 from torch import nn
@@ -65,9 +65,7 @@ class Interpreter(nn.Module):
 
     """
 
-    def __init__(
-        self, x, Phi, scale=0.5, rate=0.1, regularization=None, words=None
-    ):
+    def __init__(self, x, Phi, scale=0.5, rate=0.1, regularization=None, words=None):
         """ Initialize an interpreter class.
 
         Args:
@@ -109,9 +107,7 @@ class Interpreter(nn.Module):
 
         self.regular = regularization
         if self.regular is not None:
-            self.regular = nn.Parameter(
-                torch.tensor(self.regular).to(x), requires_grad=False
-            )
+            self.regular = nn.Parameter(torch.tensor(self.regular).to(x), requires_grad=False)
         self.words = words
         if self.words is not None:
             assert self.s == len(
@@ -130,9 +126,7 @@ class Interpreter(nn.Module):
         """
         ratios = torch.sigmoid(self.ratio)  # S * 1
         x = self.x + 0.0  # S * D
-        x_tilde = (
-            x + ratios * torch.randn(self.s, self.d).to(x.device) * self.scale
-        )  # S * D
+        x_tilde = x + ratios * torch.randn(self.s, self.d).to(x.device) * self.scale  # S * D
         s = self.Phi(x)  # D or S * D
         s_tilde = self.Phi(x_tilde)
         loss = (s_tilde - s) ** 2
@@ -163,10 +157,7 @@ class Interpreter(nn.Module):
             loss.backward()
             optimizer.step()
             if minLoss is None or minLoss > loss:
-                state_dict = {
-                    k: self.state_dict()[k] + 0.0
-                    for k in self.state_dict().keys()
-                }
+                state_dict = {k: self.state_dict()[k] + 0.0 for k in self.state_dict().keys()}
                 minLoss = loss
         self.eval()
         self.load_state_dict(state_dict)

@@ -1,6 +1,7 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
-"""PyTorch device utils."""
+
+"""Common PyTorch utilities that facilitate building Pytorch models."""
 
 import torch
 import torch.nn as nn
@@ -58,9 +59,7 @@ def move_to_device(model, device, num_gpus=None):
             if num_cuda_devices < 1:
                 raise Exception("CUDA devices are not available.")
             elif num_cuda_devices < 2:
-                print(
-                    "Warning: Only 1 CUDA device is available. Data parallelism is not possible."
-                )
+                print("Warning: Only 1 CUDA device is available. Data parallelism is not possible.")
                 return model
             else:
                 if num_gpus is None:
@@ -69,20 +68,18 @@ def move_to_device(model, device, num_gpus=None):
                 elif num_gpus > num_cuda_devices:
                     print(
                         "Warning: Only {0} devices are available. "
-                        "Setting the number of gpus to {0}".format(
-                            num_cuda_devices
-                        )
+                        "Setting the number of gpus to {0}".format(num_cuda_devices)
                     )
                     return nn.DataParallel(model, device_ids=None)
                 else:
-                    return nn.DataParallel(
-                        model, device_ids=list(range(num_gpus))
-                    )
+                    return nn.DataParallel(model, device_ids=list(range(num_gpus)))
     elif device.type == "cpu":
         if num_gpus != 0 and num_gpus is not None:
             warnings.warn("Device type is 'cpu'. num_gpus is ignored.")
         return model.to(device)
 
     else:
-        raise Exception("Device type '{}' not supported. Currently, only cpu "
-                        "and cuda devices are supported.".format(device.type))
+        raise Exception(
+            "Device type '{}' not supported. Currently, only cpu "
+            "and cuda devices are supported.".format(device.type)
+        )

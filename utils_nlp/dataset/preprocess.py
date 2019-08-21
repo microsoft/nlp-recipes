@@ -1,6 +1,11 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
+"""
+    Utility functions for common text preprocessing tasks like converting to
+    lower case, removing stop words, convert to unicode, etc.
+"""
+
 import pandas as pd
 import spacy
 import nltk
@@ -35,9 +40,7 @@ def to_lowercase(df, column_names=[]):
     if not column_names:
         return to_lowercase_all(df)
     else:
-        df[column_names] = df[column_names].applymap(
-            lambda s: s.lower() if type(s) == str else s
-        )
+        df[column_names] = df[column_names].applymap(lambda s: s.lower() if type(s) == str else s)
         return df
 
 
@@ -71,10 +74,7 @@ def to_spacy_tokens(
 def rm_spacy_stopwords(
     df,
     sentence_cols=["sentence1", "sentence2"],
-    stop_cols=[
-        "sentence1_tokens_rm_stopwords",
-        "sentence2_tokens_rm_stopwords",
-    ],
+    stop_cols=["sentence1_tokens_rm_stopwords", "sentence2_tokens_rm_stopwords"],
     custom_stopwords=[],
 ):
     """
@@ -100,9 +100,7 @@ def rm_spacy_stopwords(
             nlp.vocab[csw].is_stop = True
     text_df = df[sentence_cols]
     nlp_df = text_df.applymap(lambda x: nlp(x))
-    stop_df = nlp_df.applymap(
-        lambda doc: [token.text for token in doc if not token.is_stop]
-    )
+    stop_df = nlp_df.applymap(lambda doc: [token.text for token in doc if not token.is_stop])
     stop_df.columns = stop_cols
     return pd.concat([df, stop_df], axis=1)
 
@@ -134,10 +132,7 @@ def to_nltk_tokens(
 def rm_nltk_stopwords(
     df,
     sentence_cols=["sentence1", "sentence2"],
-    stop_cols=[
-        "sentence1_tokens_rm_stopwords",
-        "sentence2_tokens_rm_stopwords",
-    ],
+    stop_cols=["sentence1_tokens_rm_stopwords", "sentence2_tokens_rm_stopwords"],
 ):
     """
     This function removes stop words from a sentence using nltk.
@@ -156,9 +151,9 @@ def rm_nltk_stopwords(
     nltk.download("stopwords")
     stop_words = tuple(stopwords.words("english"))
     text_df = df[sentence_cols]
-    stop_df = text_df.applymap(
-        lambda sentence: nltk.word_tokenize(sentence)
-    ).applymap(lambda l: [word for word in l if word not in stop_words])
+    stop_df = text_df.applymap(lambda sentence: nltk.word_tokenize(sentence)).applymap(
+        lambda l: [word for word in l if word not in stop_words]
+    )
 
     stop_df.columns = stop_cols
     return pd.concat([df, stop_df], axis=1)

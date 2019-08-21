@@ -1,6 +1,11 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
+"""
+    Utility functions for downloading, extracting, and reading the Stanford
+    Natural Language Inference (SNLI) Corpus.
+    https://nlp.stanford.edu/projects/snli/
+"""
 import os
 import shutil
 import azureml.dataprep as dprep
@@ -148,7 +153,7 @@ def clean_rows(df, label_col=LABEL_COL):
 
     Args:
         df (pd.DataFrame): Input dataframe
-        label_col (str): Name of label column. 
+        label_col (str): Name of label column.
             Defaults to the standardized column name that is set after running the clean_col method.
 
     Returns:
@@ -170,7 +175,8 @@ def clean_df(df, label_col=LABEL_COL):
 def load_azureml_df(local_cache_path=None, file_split=Split.TRAIN, file_type="txt"):
     """
     Loads the SNLI dataset as AzureML dataflow object
-    Download the dataset from "https://nlp.stanford.edu/projects/snli/snli_1.0.zip", unzip, and load.
+    Download the dataset from "https://nlp.stanford.edu/projects/snli/snli_1.0.zip", unzip,
+    and load.
 
     Args:
         local_cache_path (str): Path (directory or a zip file) to cache the downloaded zip file.

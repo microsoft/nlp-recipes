@@ -1,6 +1,12 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
+"""
+    Utility functions for downloading and reading the wikigold dataset for
+    Named Entity Recognition (NER).
+    https://github.com/juand-r/entity-recognition-datasets/tree/master/data/wikigold/CONLL-format/data
+"""
+
 import random
 import os
 import pandas as pd
