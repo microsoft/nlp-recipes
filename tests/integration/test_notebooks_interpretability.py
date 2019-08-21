@@ -23,6 +23,6 @@ def test_deep_and_unified_understanding(notebooks):
        0.21249843, 0.18685372, 0.14112663, 0.25824168, 0.22399105,
        0.2393731 , 0.12868434, 0.27386534, 0.35876372]
     
-    np.testing.assert_array_almost_equal(result["sigma_numbers"], sigma_numbers, decimal=4) 
+    np.testing.assert_array_almost_equal(result["sigma_numbers"], sigma_numbers, decimal=3) 
     np.testing.assert_array_almost_equal(result["sigma_bert"], sigma_bert, decimal=1) 
     
