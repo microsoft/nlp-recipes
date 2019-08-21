@@ -48,4 +48,4 @@ A few highlights are
 
 
 ### [Model Explainability](model_explainability)
-The model_explainability submodule contains utils that help explain or diagnose models, such as interpreting layers of a neural network.
+The model_explainability submodule contains utils that help explain or diagnose models, such as interpreting the hidden state at a specific layer of a neural network.

@@ -14,15 +14,6 @@ This code is based on the github codebase from [Maluuba](https://github.com/Malu
 6. Add some code for training on AzureML platform
 7. Fix the bug on when setting the batch size to 1, the training raises an error
 
-### Requirements
-
-- Python 3+
-- PyTorch 1.0.1
-- nltk
-- h5py
-- numpy
-- scikit-learn
-
 ### Reference
 
 ```
