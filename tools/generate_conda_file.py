@@ -46,6 +46,7 @@ CONDA_BASE = {
     "h5py": "h5py>=2.8.0",
     "tensorflow-hub": "tensorflow-hub==0.5.0",
     "py-xgboost": "py-xgboost<=0.80",
+    "cudatoolkit": "cudatoolkit==9.2",
 }
 
 CONDA_GPU = {
@@ -62,8 +63,7 @@ PIP_BASE = {
     "azureml-widgets": "azureml-widgets==1.0.48",
     "azureml-mlflow": "azureml-mlflow>=1.0.43.1",
     "black": "black>=18.6b4",
-    "cached-property": "cached-property==1.5.1",
-    "cudatoolkit": "cudatoolkit==9.2",
+    "cached-property": "cached-property==1.5.1",    
     "dask": "dask[dataframe]==1.2.2",
     "papermill": "papermill>=1.0.1",
     "nteract-scrapbook": "nteract-scrapbook>=0.2.1",
