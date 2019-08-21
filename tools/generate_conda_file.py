@@ -45,14 +45,14 @@ CONDA_BASE = {
     "tensorflow": "tensorflow==1.12.0",
     "h5py": "h5py>=2.8.0",
     "tensorflow-hub": "tensorflow-hub==0.5.0",
-    "py-xgboost": "py-xgboost<=0.80",    
+    "py-xgboost": "py-xgboost<=0.80",
 }
 
 CONDA_GPU = {
     "numba": "numba>=0.38.1",
     "pytorch": "pytorch>=1.0.0",
     "tensorflow": "tensorflow-gpu==1.12.0",
-    "cudatoolkit": "cudatoolkit==9.2"
+    "cudatoolkit": "cudatoolkit==9.2",
 }
 
 PIP_BASE = {
@@ -63,7 +63,7 @@ PIP_BASE = {
     "azureml-widgets": "azureml-widgets==1.0.48",
     "azureml-mlflow": "azureml-mlflow>=1.0.43.1",
     "black": "black>=18.6b4",
-    "cached-property": "cached-property==1.5.1",    
+    "cached-property": "cached-property==1.5.1",
     "dask": "dask[dataframe]==1.2.2",
     "papermill": "papermill>=1.0.1",
     "nteract-scrapbook": "nteract-scrapbook>=0.2.1",
@@ -73,7 +73,7 @@ PIP_BASE = {
     "ipywebrtc": "ipywebrtc==0.4.3",
     "pre-commit": "pre-commit>=1.14.4",
     "scikit-learn": "scikit-learn>=0.19.0,<=0.20.3",
-    "setuptools_scm": "setuptools_scm==3.2.",
+    "setuptools_scm": "setuptools_scm==3.2.0",
     "sklearn-crfsuite": "sklearn-crfsuite>=0.3.6",
     "spacy": "spacy>=2.1.4",
     "spacy-models": (
@@ -111,9 +111,7 @@ if __name__ == "__main__":
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--name", help="specify name of conda environment")
-    parser.add_argument(
-        "--gpu", action="store_true", help="include packages for GPU support"
-    )
+    parser.add_argument("--gpu", action="store_true", help="include packages for GPU support")
     args = parser.parse_args()
 
     # set name for environment and output yaml file
