@@ -35,6 +35,7 @@ def baseline_results():
 
 @pytest.mark.gpu
 @pytest.mark.integration
+@pytest.mark.skip("push for release, no horovod installation automation or documentation yet")
 def test_gensen_local(notebooks):
     notebook_path = notebooks["gensen_local"]
     pm.execute_notebook(
