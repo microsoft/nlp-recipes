@@ -46,7 +46,7 @@ jobs:
 
   - bash: |
       source activate integration_gpu
-      pytest --durations=0 tests/integration -m "integration and gpu and not azureml" --junitxml=junit/test-integration-test.xml
+      pytest --durations=0 tests/integration/test_notebooks_sentence_similarity.py -m "integration and gpu and not azureml" --junitxml=junit/test-integration-test.xml
     displayName: 'Run integration tests'
 
   - bash: |
