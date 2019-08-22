@@ -14,7 +14,7 @@ For training at scale, operationalization or hyperparameter tuning, it is recomm
   * [Requirements](#requirements)
   * [Dependencies setup](#dependencies-setup)
   * [Register the conda environment in the DSVM JupyterHub](#register-conda-environment-in-dsvm-jupyterhub)
-  * [Installing the repo's utils via PIP](#installing-the-repo's-utils-via-pip)
+  * [Installing the Repo's Utils via PIP](#installing-the-repo's-utils-via-pip)
 
 
 ## Compute Environments
@@ -88,7 +88,7 @@ We can register our created conda environment to appear as a kernel in the Jupyt
 
 If you are using the DSVM, you can [connect to JupyterHub](https://docs.microsoft.com/en-us/azure/machine-learning/data-science-virtual-machine/dsvm-ubuntu-intro#jupyterhub-and-jupyterlab) by browsing to `https://your-vm-ip:8000`.  If you are prompted to enter user name and password, enter the user name and password that you use to log in to your virtual machine. 
 
-### Installing the repo's utils via PIP
+### Installing the Repo's Utils via PIP
 
 <details>
     <summary>The utils_nlp module of this repositiory needs to be installed as a python package in order to be used by the examples. <strong><em>Click to expand and see the details</em></strong> 
