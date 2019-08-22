@@ -51,13 +51,15 @@ def get_or_create_workspace(
     """
 
     config_dir, config_file_name = os.path.split(config_path)
+    config_file_path = None
+
     if config_file_name != 'config.json':
-        config_path = os.path.join(config_path, 'config.json')
+        config_file_path = os.path.join(config_path, 'config.json')
 
     try:
         # get existing azure ml workspace
-        if os.path.isfile(config_path):
-            ws = Workspace.from_config(config_path, auth=get_auth())
+        if os.path.isfile(config_file_path):
+            ws = Workspace.from_config(config_file_path, auth=get_auth())
         else:
             ws = Workspace.get(
                 name=workspace_name,
