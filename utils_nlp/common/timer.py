@@ -1,14 +1,15 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
+"""Timer utilities for benchmarking running times of executions."""
+
 from timeit import default_timer
-from datetime import timedelta
 
 
 class Timer(object):
     """Timer class.
     Original code: https://github.com/miguelgfierro/codebase
-    
+
     Examples:
         >>> import time
         >>> t = Timer()
@@ -53,7 +54,8 @@ class Timer(object):
             self.running = False
         except AttributeError:
             raise ValueError(
-                "Timer has not been initialized: use start() or the contextual form with Timer() as t:"
+                "Timer has not been initialized: use start() or the contextual form with Timer() "
+                "as t:"
             )
 
     @property
