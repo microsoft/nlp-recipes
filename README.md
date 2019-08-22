@@ -32,6 +32,19 @@ The following is a summary of the commonly used NLP scenarios covered in the rep
 ## Getting Started
 While solving NLP problems, its always good to start with [Language-based Cognitive Services](https://azure.microsoft.com/en-us/services/cognitive-services/directory/lang/). When the needs are beyond the bounds of Cognitive Services, you can try custom Machine Learning and this is where the repository can be very useful. To get started, navigate to the [Setup Guide](SETUP.md), where you'll find instructions on how to setup your environment and dependencies.
 
+## Azure Machine Learning service
+[Azure Machine Learning service](https://azure.microsoft.com/en-us/services/machine-learning-service/) is a cloud service used to train, deploy, automate, and manage machine learning models, all at the broad scale that the cloud provides. AzureML is presented in notebooks across different scenarios to enhance the efficiency of developing Natural Language systems at scale and for various AI model development related tasks like:
+  * [**Datastores**](https://docs.microsoft.com/en-us/azure/machine-learning/service/how-to-access-data) to easily access your data in Azure storage servicesblob storage or file share.
+  * Scaling up and out on [**Azure Machine Learning Compute**](https://docs.microsoft.com/en-us/azure/machine-learning/service/how-to-set-up-training-targets#amlcompute).
+  * [**Automated Machine Learning**](https://docs.microsoft.com/en-us/azure/machine-learning/service/how-to-configure-auto-train) whuch builds high quality machine learning models for you by automating model and hyperparameter selection.
+  * [**Track your experiments and monitor metrics**](https://docs.microsoft.com/en-us/azure/machine-learning/service/how-to-track-experiments) to enhance the model creation process.
+  * [**Distributed Training**](https://docs.microsoft.com/en-us/azure/machine-learning/service/how-to-train-ml-models#distributed-training-and-custom-docker-images)
+  * [**Hyperparameter tuning**](https://docs.microsoft.com/en-us/azure/machine-learning/service/how-to-tune-hyperparameters)
+  * Deploying a web service to [**Azure Container Instance**]() for DevTest or low scale, CPU-based workloads.
+  * Deploying a web service to [**Azure Kubernetes Service**]() for high-scale production deployments and provides autoscaling, and fast response times.
+
+To successfully run these notebooks, you will need an [**Azure subscription**](https://azure.microsoft.com/en-us/) or can [**try Azure for free**](https://azure.microsoft.com/en-us/free/). There may be other Azure services or products used in the notebooks. Introduction and/or reference of those will be provided in the notebooks themselves.
+
 ## Contributing
 We hope that the open source community would contribute to the content and bring in the latest SOTA algorithm. This project welcomes contributions and suggestions. Before contributing, please see our [contribution guidelines](CONTRIBUTING.md).
 
