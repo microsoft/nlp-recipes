@@ -59,6 +59,8 @@ def test_BERTQAExtractor(qa_test_features_examples, tmp_path):
         batch_size=8,
     )
 
-    qa_extractor_from_cache = BERTQAExtractor(cache_dir=tmp_path, load_from_cache=True)
+    qa_extractor_from_cache = BERTQAExtractor(cache_dir=tmp_path, load_model_from_dir=tmp_path)
 
     qa_extractor_from_cache.predict(qa_test_features_examples["features"])
+
+    # Test not overwritting existing model

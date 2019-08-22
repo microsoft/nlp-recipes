@@ -47,17 +47,21 @@ class BERTQAExtractor:
 
     """
 
-    def __init__(self, language=Language.ENGLISH, cache_dir=".", load_from_cache=False):
+    def __init__(self, language=Language.ENGLISH, cache_dir=".", load_model_from_dir=None):
 
         self.language = language
         self.cache_dir = cache_dir
+        self.load_model_from_dir = load_model_from_dir
 
-        if load_from_cache:
-            config = BertConfig.from_pretrained(cache_dir)
-            self.model = BertForQuestionAnswering.from_pretrained(cache_dir, config=config)
-        else:
+        if load_model_from_dir is None:
             config = BertConfig.from_pretrained(language.value)
             self.model = BertForQuestionAnswering.from_pretrained(language.value, config=config)
+        else:
+            logger.info("Loading cached model from {}".format())
+            config = BertConfig.from_pretrained(load_model_from_dir)
+            self.model = BertForQuestionAnswering.from_pretrained(
+                load_model_from_dir, config=config
+            )
 
     def fit(
         self,
@@ -69,6 +73,7 @@ class BERTQAExtractor:
         warmup_proportion=None,
         max_grad_norm=1.0,
         cache_model=False,
+        overwrite_model=False,
     ):
         """
         Fine-tune pre-trained BertForQuestionAnswering model.
@@ -179,16 +184,23 @@ class BERTQAExtractor:
         logger.info(" global_step = %s, average loss = %s", global_step, tr_loss / global_step)
 
         if cache_model:
+            if self.cache_dir == self.load_model_from_dir and not overwrite_model:
+                output_model_dir = os.path.join(self.cache_dir, "fine_tuned")
+            else:
+                output_model_dir = self.cache_dir
+
             if not os.path.exists(self.cache_dir):
                 os.makedirs(self.cache_dir)
+            if not os.path.exists(output_model_dir):
+                os.makedirs(output_model_dir)
 
-            logger.info("Saving model checkpoint to %s", self.cache_dir)
+            logger.info("Saving model checkpoint to %s", output_model_dir)
             # Save a trained model, configuration and tokenizer using `save_pretrained()`.
             # They can then be reloaded using `from_pretrained()`
             model_to_save = (
                 self.model.module if hasattr(self.model, "module") else self.model
             )  # Take care of distributed/parallel training
-            model_to_save.save_pretrained(self.cache_dir)
+            model_to_save.save_pretrained(output_model_dir)
         torch.cuda.empty_cache()
 
     def predict(self, features, num_gpus=None, batch_size=32):
