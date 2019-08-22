@@ -21,4 +21,4 @@ df = load_pandas_df(DATA_FOLDER, file_split ="train", nrows = 1000)
 |[The STSbenchmark dataset](http://ixa2.si.ehu.es/stswiki/index.php/STSbenchmark)|[stsbenchmark.py](./stsbenchmark.py)|
 
 ## Dataset References
-Please see [Dataset References](DatasetReferences.md) for attributions of datasets used.
+Please see [Dataset References](../../DatasetReferences.md) for notice and information regarding datasets used.
