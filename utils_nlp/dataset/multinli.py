@@ -1,8 +1,10 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
-"""MultiNLI dataset utils
-https://www.nyu.edu/projects/bowman/multinli/
+"""
+    Utility functions for downloading, extracting, and reading the
+    Multi-Genre NLI (MultiNLI) Corpus.
+    https://www.nyu.edu/projects/bowman/multinli/
 """
 
 import os
@@ -35,23 +37,13 @@ def load_pandas_df(local_cache_path=".", file_split="train"):
     file_name = URL.split("/")[-1]
     maybe_download(URL, file_name, local_cache_path)
 
-    if not os.path.exists(
-        os.path.join(local_cache_path, DATA_FILES[file_split])
-    ):
-        extract_zip(
-            os.path.join(local_cache_path, file_name), local_cache_path
-        )
-    return pd.read_json(
-        os.path.join(local_cache_path, DATA_FILES[file_split]), lines=True
-    )
+    if not os.path.exists(os.path.join(local_cache_path, DATA_FILES[file_split])):
+        extract_zip(os.path.join(local_cache_path, file_name), local_cache_path)
+    return pd.read_json(os.path.join(local_cache_path, DATA_FILES[file_split]), lines=True)
 
 
 def get_generator(
-    local_cache_path=".",
-    file_split="train",
-    block_size=10e6,
-    batch_size=10e6,
-    num_batches=None,
+    local_cache_path=".", file_split="train", block_size=10e6, batch_size=10e6, num_batches=None
 ):
     """ Downloads and extracts the dataset files and then returns a random batch generator that
     yields pandas dataframes.
@@ -71,17 +63,11 @@ def get_generator(
     file_name = URL.split("/")[-1]
     maybe_download(URL, file_name, local_cache_path)
 
-    if not os.path.exists(
-        os.path.join(local_cache_path, DATA_FILES[file_split])
-    ):
-        extract_zip(
-            os.path.join(local_cache_path, file_name), local_cache_path
-        )
+    if not os.path.exists(os.path.join(local_cache_path, DATA_FILES[file_split])):
+        extract_zip(os.path.join(local_cache_path, file_name), local_cache_path)
 
     loader = DaskJSONLoader(
-        os.path.join(local_cache_path, DATA_FILES[file_split]),
-        block_size=block_size,)
-
-    return loader.get_sequential_batches(
-        batch_size=int(batch_size), num_batches=num_batches
+        os.path.join(local_cache_path, DATA_FILES[file_split]), block_size=block_size
     )
+
+    return loader.get_sequential_batches(batch_size=int(batch_size), num_batches=num_batches)
