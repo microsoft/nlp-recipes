@@ -91,10 +91,10 @@ If you are using the DSVM, you can [connect to JupyterHub](https://docs.microsof
 ### Installing the Repo's Utils via PIP
 
 <details>
-    <summary>The utils_nlp module of this repositiory needs to be installed as a python package in order to be used by the examples. <strong><em>Click to expand and see the details</em></strong> 
+    <summary>The utils_nlp module of this repository needs to be installed as a python package in order to be used by the examples. <strong><em>Click to expand and see the details</em></strong> 
     </summary> 
     <p>  
-A setup.py file is provied in order to simplify the installation of this utilities in this repo from the main directory.  
+A setup.py file is provided in order to simplify the installation of this utilities in this repo from the main directory.  
     
 To install, please run the command below
 
