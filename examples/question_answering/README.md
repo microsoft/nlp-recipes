@@ -11,7 +11,7 @@ Question Answering is a classical NLP task which consists of determining the rel
 (snippet of text out of a provided passage) that answers a user's "question". This task is a subset
 of Machine Comprehension, or measuring how well a machine comprehends a passage of text. The
 Stanford Question Answering Dataset ([SQuAD](https://rajpurkar.github.io/SQuAD-explorer/))
-leaderboard displays the state-of-the-art models in this space. Traditional QA models are varients
+leader board displays the state-of-the-art models in this space. Traditional QA models are variants
 of Bidirectional Recurrent Neural Networks (BRNN).
 
 ## Summary
