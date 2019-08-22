@@ -34,7 +34,7 @@ While solving NLP problems, its always good to start with [Language-based Cognit
 
 ## Azure Machine Learning service
 [Azure Machine Learning service](https://azure.microsoft.com/en-us/services/machine-learning-service/) is a cloud service used to train, deploy, automate, and manage machine learning models, all at the broad scale that the cloud provides. AzureML is presented in notebooks across different scenarios to enhance the efficiency of developing Natural Language systems at scale and for various AI model development related tasks like:
-  * [**Datastores**](https://docs.microsoft.com/en-us/azure/machine-learning/service/how-to-access-data) to easily access your data in Azure storage servicesblob storage or file share.
+  * [**Datastores**](https://docs.microsoft.com/en-us/azure/machine-learning/service/how-to-access-data) to easily access your data in Azure storage services such as blob storage or file share.
   * Scaling up and out on [**Azure Machine Learning Compute**](https://docs.microsoft.com/en-us/azure/machine-learning/service/how-to-set-up-training-targets#amlcompute).
   * [**Automated Machine Learning**](https://docs.microsoft.com/en-us/azure/machine-learning/service/how-to-configure-auto-train) whuch builds high quality machine learning models for you by automating model and hyperparameter selection.
   * [**Track your experiments and monitor metrics**](https://docs.microsoft.com/en-us/azure/machine-learning/service/how-to-track-experiments) to enhance the model creation process.
