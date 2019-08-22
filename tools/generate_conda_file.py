@@ -73,6 +73,7 @@ PIP_BASE = {
     "ipywebrtc": "ipywebrtc==0.4.3",
     "pre-commit": "pre-commit>=1.14.4",
     "scikit-learn": "scikit-learn>=0.19.0,<=0.20.3",
+    "setuptools_scm": "setuptools_scm==3.2.0",
     "sklearn-crfsuite": "sklearn-crfsuite>=0.3.6",
     "spacy": "spacy>=2.1.4",
     "spacy-models": (
@@ -88,14 +89,14 @@ PIP_BASE = {
 PIP_GPU = {}
 
 PIP_DARWIN = {}
-PIP_DARWIN_GPU = {"horovod": "horovod>=0.16.1"}
+PIP_DARWIN_GPU = {}
 
 PIP_LINUX = {}
-PIP_LINUX_GPU = {"horovod": "horovod>=0.16.1"}
+PIP_LINUX_GPU = {}
+CONDA_LINUX = {"cudatoolkit": "cudatoolkit==9.2"}
 
 PIP_WIN32 = {}
 PIP_WIN32_GPU = {}
-
 CONDA_WIN32 = {"pytorch": "pytorch==1.0.0", "cudatoolkit": "cuda90"}
 
 if __name__ == "__main__":
@@ -110,9 +111,7 @@ if __name__ == "__main__":
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--name", help="specify name of conda environment")
-    parser.add_argument(
-        "--gpu", action="store_true", help="include packages for GPU support"
-    )
+    parser.add_argument("--gpu", action="store_true", help="include packages for GPU support")
     args = parser.parse_args()
 
     # set name for environment and output yaml file
@@ -133,6 +132,7 @@ if __name__ == "__main__":
         pip_packages.update(PIP_DARWIN)
         PIP_GPU.update(PIP_DARWIN_GPU)
     elif platform.startswith("linux"):
+        conda_packages.update(CONDA_LINUX)
         pip_packages.update(PIP_LINUX)
         PIP_GPU.update(PIP_LINUX_GPU)
     elif platform == "win32":
@@ -140,9 +140,7 @@ if __name__ == "__main__":
         pip_packages.update(PIP_WIN32)
         PIP_GPU.update(PIP_WIN32_GPU)
     else:
-        raise Exception(
-            "Unsupported platform, must be Windows, Linux, or macOS"
-        )
+        raise Exception("Unsupported platform. Must be Windows, Linux, or macOS")
 
     if args.gpu:
         conda_packages.update(CONDA_GPU)

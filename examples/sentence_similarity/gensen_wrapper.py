@@ -3,7 +3,7 @@
 import json
 import os
 
-from scenarios.sentence_similarity.gensen_train import train
+from examples.sentence_similarity.gensen_train import train
 from utils_nlp.eval.classification import compute_correlation_coefficients
 from utils_nlp.models.gensen.create_gensen_model import (
     create_multiseq2seq_model,
