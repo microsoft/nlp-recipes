@@ -35,7 +35,7 @@ def baseline_results():
 
 @pytest.mark.gpu
 @pytest.mark.integration
-@pytest.mark.skip("push for release, no horovod installation automation or documentation yet")
+@pytest.mark.skip(reason="push for release, no horovod installation automation or documentation yet")
 def test_gensen_local(notebooks):
     notebook_path = notebooks["gensen_local"]
     pm.execute_notebook(
@@ -134,7 +134,7 @@ def test_automl_local_runs(
 
 @pytest.mark.integration
 @pytest.mark.azureml
-@pytest.mark.skip("push for release, no horovod installation automation or documentation yet")
+@pytest.mark.skip(reason="push for release, no horovod installation automation or documentation yet")
 def test_similarity_gensen_azureml_runs(notebooks):
     notebook_path = notebooks["gensen_azureml"]
     pm.execute_notebook(
