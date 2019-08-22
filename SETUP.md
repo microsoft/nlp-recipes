@@ -13,8 +13,8 @@ For training at scale, operationalization or hyperparameter tuning, it is recomm
 * [Setup guide for Local or DSVM](#setup-guide-for-local-or-dsvm-machines)
   * [Requirements](#requirements)
   * [Dependencies setup](#dependencies-setup)
-  * [Register the conda environment in the DSVM JupyterHub](#register-the-conda-environment-in--the-dsvm-jupyterhub)
-  * [Installing the repo's utils via PIP](installing-utils_nlp-via-pip)
+  * [Register the conda environment in the DSVM JupyterHub](#register-conda-environment-in-dsvm-jupyterhub)
+  * [Installing the repo's utils via PIP](#installing-the-repo's-utils-via-pip)
 
 
 ## Compute Environments
