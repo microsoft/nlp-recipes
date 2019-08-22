@@ -29,11 +29,11 @@ def get_auth():
 
 
 def get_or_create_workspace(
-    config_path=None,
-    subscription_id=None,
-    resource_group=None,
-    workspace_name=None,
-    workspace_region=None,
+        config_path="./.azureml",
+        subscription_id=None,
+        resource_group=None,
+        workspace_name=None,
+        workspace_region=None,
 ):
     """
     Method to get or create workspace.
@@ -50,9 +50,13 @@ def get_or_create_workspace(
         obj: AzureML workspace if one exists already with the name otherwise creates a new one.
     """
 
+    config_dir, config_file_name = os.path.split(config_path)
+    if config_file_name != 'config.json':
+        config_path = os.path.join(config_path, 'config.json')
+
     try:
         # get existing azure ml workspace
-        if config_path is not None:
+        if os.path.isfile(config_path):
             ws = Workspace.from_config(config_path, auth=get_auth())
         else:
             ws = Workspace.get(
