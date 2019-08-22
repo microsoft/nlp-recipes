@@ -10,18 +10,19 @@ For training at scale, operationalization or hyperparameter tuning, it is recomm
 ## Table of Contents
 
 * [Compute environments](#compute-environments)
-* [Setup guide for Local or DSVM](#setup-guide-for-local-or-dsvm)
+* [Setup guide for Local or DSVM](#setup-guide-for-local-or-dsvm-machines)
   * [Requirements](#requirements)
   * [Dependencies setup](#dependencies-setup)
-  * [Register the conda environment in the DSVM JupyterHub](#register-the-conda-environment-in--the-dsvm-jupyterhub)
+  * [Register the conda environment in the DSVM JupyterHub](#register-conda-environment-in-dsvm-jupyterhub)
+  * [Installing the Repo's Utils via PIP](#installing-the-repo's-utils-via-pip)
 
 
 ## Compute Environments
 
-Depending on the type of NLP system and the notebook that needs to be run, there are different computational requirements. Currently, this repository supports **Python CPU** and **Python GPU**.
+Depending on the type of NLP system and the notebook that needs to be run, there are different computational requirements. Currently, this repository supports **Python CPU** and **Python GPU**. A conda environment YAML file can be generated for either CPU or GPU environments as shown below in the *Dependencies Setup* section.
 
 
-## Setup Guide for Local or DSVM
+## Setup Guide for Local or DSVM Machines
 
 ### Requirements
 
@@ -87,7 +88,7 @@ We can register our created conda environment to appear as a kernel in the Jupyt
 
 If you are using the DSVM, you can [connect to JupyterHub](https://docs.microsoft.com/en-us/azure/machine-learning/data-science-virtual-machine/dsvm-ubuntu-intro#jupyterhub-and-jupyterlab) by browsing to `https://your-vm-ip:8000`.  If you are prompted to enter user name and password, enter the user name and password that you use to log in to your virtual machine. 
 
-## Installing `utils_nlp` via PIP
+### Installing the Repo's Utils via PIP
 
 <details>
     <summary>The utils_nlp module of this repositiory needs to be installed as a python package in order to be used by the examples. <strong><em>Click to expand and see the details</em></strong> 
@@ -112,7 +113,5 @@ Either command, from above, makes `utils_nlp` available in your conda virtual en
     </p>
 </details>
 
-## Versioning of `utils_nlp` in this repository
-
-The details of the versioning info can be found at [VERSIONING.md](VERSIONING.md)
+The details of the versioning info can be found at [VERSIONING.md](VERSIONING.md).
 
