@@ -8,7 +8,7 @@ from azureml.core.authentication import AzureCliAuthentication
 from azureml.core.authentication import InteractiveLoginAuthentication
 from azureml.core.authentication import AuthenticationException
 from azureml.core import Workspace
-from azureml.exceptions import WorkspaceException
+from azureml.exceptions import ProjectSystemException
 from azureml.core.compute import ComputeTarget, AmlCompute
 from azureml.core.compute_target import ComputeTargetException
 
@@ -29,11 +29,11 @@ def get_auth():
 
 
 def get_or_create_workspace(
-        config_path="./.azureml",
-        subscription_id=None,
-        resource_group=None,
-        workspace_name=None,
-        workspace_region=None,
+    config_path="./.azureml",
+    subscription_id=None,
+    resource_group=None,
+    workspace_name=None,
+    workspace_region=None,
 ):
     """
     Method to get or create workspace.
@@ -53,8 +53,8 @@ def get_or_create_workspace(
     config_dir, config_file_name = os.path.split(config_path)
     config_file_path = None
 
-    if config_file_name != 'config.json':
-        config_file_path = os.path.join(config_path, 'config.json')
+    if config_file_name != "config.json":
+        config_file_path = os.path.join(config_path, "config.json")
 
     try:
         # get existing azure ml workspace
@@ -68,7 +68,7 @@ def get_or_create_workspace(
                 auth=get_auth(),
             )
 
-    except WorkspaceException:
+    except ProjectSystemException:
         # this call might take a minute or two.
         print("Creating new workspace")
         ws = Workspace.create(
