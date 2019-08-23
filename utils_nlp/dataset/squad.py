@@ -26,6 +26,16 @@ URL_DICT = {
 def load_pandas_df(
     local_cache_path=".", squad_version="v1.1", file_split="train"
 ):
+    """Loads the SQuAD dataset in pandas data frame.
+
+    Args:
+        local_cache_path (str, optional): Path to load the data from. If the file doesn't exist,
+            download it first. Defaults to the current directory.
+        squad_version (str, optional): Version of the SQuAD dataset, accepted values are: 
+            "v1.1" and "v2.0". Defaults to "v1.1".
+        file_split (str, optional): Dataset split to load, accepted values are: "train" and "dev".
+            Defaults to "train". 
+    """
     URL = URL_DICT[squad_version][file_split]
     file_name = URL.split("/")[-1]
     maybe_download(URL, file_name, local_cache_path)

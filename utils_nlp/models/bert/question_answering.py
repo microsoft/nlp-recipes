@@ -36,14 +36,15 @@ class BERTQAExtractor:
             The value of this argument determines which BERT model is
             used. See :class:`~utils_nlp.models.bert.common.Language`
             for details. Defaults to Language.ENGLISH.
-        cache_dir (str, optional):  Location of BERT's cache directory. If
-            `load_from_cache` is True, the model config and model is
-            loaded from this directory. When calling the `fit`
-            method, if cache_model is True, the fine-tuned model is
-            saved to this directory. Defaults to ".".
-        load_from_cache (bool, optional): Whether to load a fine-tuned model
-            `cache_dir`. If True, both the fine-tuned model file and model
-            config file should be located under `cache_dir`. Defaults to False.
+        cache_dir (str, optional):  Location of BERT's cache directory. 
+            When calling the `fit` method, if `cache_model` is `True`, 
+            the fine-tuned model is saved to this directory. If `cache_dir` 
+            and `load_model_from_dir` are the same and `overwrite_model` is 
+            `False`, the fitted model is saved to "cache_dir/fine_tuned".
+            Defaults to ".".
+        load_model_from_dir (str, optional): Directory to load the model from.
+            The directory must contain a model file "pytorch_model.bin" and a 
+            configuration file "config.json". Defaults to None.
 
     """
 
@@ -98,8 +99,14 @@ class BERTQAExtractor:
             max_grad_norm (float, optional): Maximum gradient norm for gradient
                 clipping. Defaults to 1.0.
             cache_model (bool, optional): Whether to save the fine-tuned
-                model to the `cache_dir` of the answer extractor. Defaults
-                to False.
+                model to the `cache_dir` of the answer extractor. 
+                If `cache_dir` and `load_model_from_dir` are the same and 
+                `overwrite_model` is `False`, the fitted model is saved 
+                to "cache_dir/fine_tuned". Defaults to False.
+            overwrite_model (bool, optional): Whether to overwrite an existing model.
+                If `cache_dir` and `load_model_from_dir` are the same and 
+                `overwrite_model` is `False`, the fitted model is saved to 
+                "cache_dir/fine_tuned". Defaults to False.
 
         """
         # tb_writer = SummaryWriter()
