@@ -10,27 +10,30 @@ For training at scale, operationalization or hyperparameter tuning, it is recomm
 ## Table of Contents
 
 * [Compute environments](#compute-environments)
-* [Setup guide for Local or DSVM](#setup-guide-for-local-or-dsvm)
+* [Setup guide for Local or DSVM](#setup-guide-for-local-or-dsvm-machines)
   * [Requirements](#requirements)
   * [Dependencies setup](#dependencies-setup)
-  * [Register the conda environment in the DSVM JupyterHub](#register-the-conda-environment-in--the-dsvm-jupyterhub)
+  * [Register the conda environment in the DSVM JupyterHub](#register-conda-environment-in-dsvm-jupyterhub)
+  * [Installing the Repo's Utils via PIP](#installing-the-repo's-utils-via-pip)
 
 
 ## Compute Environments
 
-Depending on the type of NLP system and the notebook that needs to be run, there are different computational requirements. Currently, this repository supports **Python CPU** and **Python GPU**.
+Depending on the type of NLP system and the notebook that needs to be run, there are different computational requirements. Currently, this repository supports **Python CPU** and **Python GPU**. A conda environment YAML file can be generated for either CPU or GPU environments as shown below in the *Dependencies Setup* section.
 
 
-## Setup Guide for Local or DSVM
+## Setup Guide for Local or DSVM Machines
 
 ### Requirements
 
-* A machine running Linux, MacOS or Windows.  
-    > NOTE: Windows machines are not **FULLY SUPPORTED**. Please use at your own risk.  
+* A machine running Linux, MacOS or Windows.
+* On Windows, Microsoft Visual C++ 14.0 is required for building certain packages. Download Microsoft Visual C++ Build Tools [here](https://visualstudio.microsoft.com/downloads/).
+
 * Miniconda or Anaconda with Python version >= 3.6.
     * This is pre-installed on Azure DSVM such that one can run the following steps directly. To setup on your local machine, [Miniconda](https://docs.conda.io/en/latest/miniconda.html) is a quick way to get started.
     * It is recommended to update conda to the latest version: `conda update -n base -c defaults conda`
 
+> NOTE: Windows machines are not **FULLY SUPPORTED**. Please use at your own risk.
 
 ### Dependencies Setup
 
@@ -85,13 +88,30 @@ We can register our created conda environment to appear as a kernel in the Jupyt
 
 If you are using the DSVM, you can [connect to JupyterHub](https://docs.microsoft.com/en-us/azure/machine-learning/data-science-virtual-machine/dsvm-ubuntu-intro#jupyterhub-and-jupyterlab) by browsing to `https://your-vm-ip:8000`.  If you are prompted to enter user name and password, enter the user name and password that you use to log in to your virtual machine. 
 
-## Install this repository via PIP
-A [setup.py](setup.py) file is provied in order to simplify the installation of this utilities in this repo from the main directory.
+### Installing the Repo's Utils via PIP
 
-    pip install -e .
+<details>
+    <summary>The utils_nlp module of this repository needs to be installed as a python package in order to be used by the examples. <strong><em>Click to expand and see the details</em></strong> 
+    </summary> 
+    <p>  
+A setup.py file is provided in order to simplify the installation of this utilities in this repo from the main directory.  
+    
+To install, please run the command below
 
-It is also possible to install directly from Github.
+    python setup.py install 
 
-    pip install -e  git+git@github.com:microsoft/nlp.git@master#egg=utils_nlp
+It is also possible to install directly from Github, which is the best way to utilize the `utils_nlp` package in external projects. 
+
+    pip install -e  git+git@github.com:microsoft/nlp.git@master#egg=utils_nlp  
+
+Either command, from above, makes `utils_nlp` available in your conda virtual environment. You can verify it was properly installed by running:  
+
+    pip list  
+    
 
 **NOTE** - The pip installation does not install any of the necessary package dependencies, it is expected that conda will be used as shown above to setup the environment for the utilities being used.
+    </p>
+</details>
+
+The details of the versioning info can be found at [VERSIONING.md](VERSIONING.md).
+

@@ -1,14 +1,17 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
+"""Helper functions for interacting with AzureML Resources."""
+
 import os
 from azureml.core.authentication import AzureCliAuthentication
 from azureml.core.authentication import InteractiveLoginAuthentication
 from azureml.core.authentication import AuthenticationException
 from azureml.core import Workspace
-from azureml.exceptions import WorkspaceException
+from azureml.exceptions import ProjectSystemException
 from azureml.core.compute import ComputeTarget, AmlCompute
 from azureml.core.compute_target import ComputeTargetException
+
 
 def get_auth():
     """
@@ -26,7 +29,7 @@ def get_auth():
 
 
 def get_or_create_workspace(
-    config_path=None,
+    config_path="./.azureml",
     subscription_id=None,
     resource_group=None,
     workspace_name=None,
@@ -36,7 +39,8 @@ def get_or_create_workspace(
     Method to get or create workspace.
 
     Args:
-        config_path: optional directory to look for / store config.json file (defaults to current directory)
+        config_path: optional directory to look for / store config.json file (defaults to current
+            directory)
         subscription_id: Azure subscription id
         resource_group: Azure resource group to create workspace and related resources
         workspace_name: name of azure ml workspace
@@ -46,10 +50,16 @@ def get_or_create_workspace(
         obj: AzureML workspace if one exists already with the name otherwise creates a new one.
     """
 
+    config_dir, config_file_name = os.path.split(config_path)
+    config_file_path = None
+
+    if config_file_name != "config.json":
+        config_file_path = os.path.join(config_path, "config.json")
+
     try:
         # get existing azure ml workspace
-        if config_path is not None:
-            ws = Workspace.from_config(config_path, auth=get_auth())
+        if os.path.isfile(config_file_path):
+            ws = Workspace.from_config(config_file_path, auth=get_auth())
         else:
             ws = Workspace.get(
                 name=workspace_name,
@@ -58,7 +68,7 @@ def get_or_create_workspace(
                 auth=get_auth(),
             )
 
-    except WorkspaceException:
+    except ProjectSystemException:
         # this call might take a minute or two.
         print("Creating new workspace")
         ws = Workspace.create(
@@ -73,6 +83,7 @@ def get_or_create_workspace(
         ws.write_config(path=config_path)
     return ws
 
+
 def get_or_create_amlcompute(
     workspace,
     compute_name,
@@ -82,16 +93,18 @@ def get_or_create_amlcompute(
     idle_seconds_before_scaledown=None,
     verbose=False,
 ):
-    """Get or create AmlCompute as the compute target. If a cluster of the same name is found, attach it and rescale
-       accordingly. Otherwise, create a new cluster.
-    
+    """
+        Get or create AmlCompute as the compute target. If a cluster of the same name is found,
+        attach it and rescale accordingly. Otherwise, create a new cluster.
+
     Args:
         workspace (Workspace): workspace
         compute_name (str): name
         vm_size (str, optional): vm size
         min_nodes (int, optional): minimum number of nodes in cluster
         max_nodes (None, optional): maximum number of nodes in cluster
-        idle_seconds_before_scaledown (None, optional): how long to wait before the cluster autoscales down
+        idle_seconds_before_scaledown (None, optional): how long to wait before the cluster
+            autoscales down
         verbose (bool, optional): if true, print logs
     Returns:
         Compute target
@@ -121,6 +134,7 @@ def get_or_create_amlcompute(
         compute_target.wait_for_completion(show_output=verbose)
 
     return compute_target
+
 
 def get_output_files(run, output_path, file_names=None):
     """
