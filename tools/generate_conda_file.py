@@ -48,11 +48,11 @@ CONDA_BASE = {
     "py-xgboost": "py-xgboost<=0.80",
     "dask": "dask[dataframe]==1.2.2",
 }
-
 CONDA_GPU = {
     "numba": "numba>=0.38.1",
     "pytorch": "pytorch>=1.0.0",
     "tensorflow": "tensorflow-gpu==1.12.0",
+    "cudatoolkit": "cudatoolkit==9.2"
 }
 
 PIP_BASE = {
@@ -84,21 +84,25 @@ PIP_BASE = {
     "nltk": "nltk>=3.4",
     "seqeval": "seqeval>=0.0.12",
 }
-
+PIP_GPU = {}
 
 PIP_DARWIN = {}
 PIP_DARWIN_GPU = {}
+
 PIP_LINUX = {}
 PIP_LINUX_GPU = {}
+
 PIP_WIN32 = {}
 PIP_WIN32_GPU = {}
 
 CONDA_DARWIN = {}
 CONDA_DARWIN_GPU = {}
+
 CONDA_LINUX = {}
-CONDA_LINUX_GPU = {"cudatoolkit": "cudatoolkit==9.2"}
-CONDA_WIN32 = {"pytorch": "pytorch==1.0.0"}
-CONDA_WIN32_GPU = {"cudatoolkit": "cuda90"}
+CONDA_LINUX_GPU = {}
+
+CONDA_WIN32 = {}
+CONDA_WIN32_GPU = {"pytorch": "pytorch==1.0.0", "cudatoolkit": "cuda90"}
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -124,11 +128,16 @@ if __name__ == "__main__":
     if args.name is not None:
         conda_env = args.name
 
-    # update conda and pip packages based on flags provided
+    # add conda and pip base packages 
     conda_packages = CONDA_BASE
     pip_packages = PIP_BASE
 
-    # check for os platform support
+    # update conda and pip packages based on flags provided
+    if args.gpu:
+        conda_packages.update(CONDA_GPU)
+        pip_packages.update(PIP_GPU)
+
+    # update conda and pip packages based on os platform support
     if platform == "darwin":
         conda_packages.update(CONDA_DARWIN)
         pip_packages.update(PIP_DARWIN)
