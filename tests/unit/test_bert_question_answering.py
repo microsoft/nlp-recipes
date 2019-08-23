@@ -2,6 +2,7 @@
 # Licensed under the MIT License.
 
 import pytest
+import os
 from utils_nlp.models.bert.question_answering import BERTQAExtractor
 
 
@@ -63,4 +64,17 @@ def test_BERTQAExtractor(qa_test_features_examples, tmp_path):
 
     qa_extractor_from_cache.predict(qa_test_features_examples["features"])
 
-    # Test not overwritting existing model
+    # Test not overwritting existing model, the model should be saved to tmp_path/fine_tuned
+    qa_extractor_from_cache.fit(
+        features=qa_test_features_examples["features"],
+        cache_model=True, 
+        batch_size=8)
+
+    model_output_dir = os.path.join(tmp_path, 'fine_tuned')
+    qa_extractor_from_cache_new = BERTQAExtractor(cache_dir=tmp_path, load_model_from_dir=model_output_dir)
+
+    assert os.path.exists(os.path.join(model_output_dir,  "pytorch_model.bin"))
+    assert os.path.exists(os.path.join(model_output_dir,  "config.json"))
+
+
+

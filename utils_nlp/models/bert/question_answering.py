@@ -57,7 +57,7 @@ class BERTQAExtractor:
             config = BertConfig.from_pretrained(language.value)
             self.model = BertForQuestionAnswering.from_pretrained(language.value, config=config)
         else:
-            logger.info("Loading cached model from {}".format())
+            logger.info("Loading cached model from {}".format(load_model_from_dir))
             config = BertConfig.from_pretrained(load_model_from_dir)
             self.model = BertForQuestionAnswering.from_pretrained(
                 load_model_from_dir, config=config
