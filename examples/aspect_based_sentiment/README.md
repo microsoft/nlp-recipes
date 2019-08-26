@@ -5,7 +5,7 @@ This folder contains examples and best practices, written in Jupyter notebooks, 
 
 # What is Aspect Based Sentiment Analysis?
 
-Aspect based sentiment analysis an advanced sentiment analysis technique that identifies and provides coresponding sentiment scores to the aspects of a given text. This is a powerful tool for getting actionable insight from your text data.
+Aspect based sentiment analysis (ABSA) is an advanced sentiment analysis technique that identifies and provides coresponding sentiment scores to the aspects of a given text. ABSA a powerful tool for getting actionable insight from your text data.
 
 For example consider the sentence following resturant review 
 
