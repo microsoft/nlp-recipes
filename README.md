@@ -27,6 +27,8 @@ The following is a summary of the commonly used NLP scenarios covered in the rep
 |Question Answering                      |BiDAF <br> BERT| Question answering (QA) is the task of retrieving or generating a valid answer for a given query in natural language, provided with a passage related to the query. |
 |Sentence Similarity                     |Representation: TF-IDF, Word Embeddings, Doc Embeddings<br>Metrics: Cosine Similarity, Word Mover's Distance<br>Models: BERT, GenSen| Sentence similarity is the process of computing a similarity score given a pair of text documents. |
 |Embeddings| Word2Vec<br>fastText<br>GloVe| Embedding is the process of converting a word or a piece of text to a continuous vector space of real number, usually, in low dimension.
+|Aspect Based Sentiment Analysis| BIST Dependency Parser| Aspect based sentiment analys is an advanced sentiment analysis technique that identifies and provides coresponding sentiment scores to the aspects of a given text. ABSA is a powerful tool for getting actionable insight from your text data.
+
 
 
 ## Getting Started
