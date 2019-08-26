@@ -130,7 +130,7 @@ def get_or_create_amlcompute(
             max_nodes=max_nodes,
             idle_seconds_before_scaledown=idle_seconds_before_scaledown,
         )
-        compute_target = ComputeTarget.create(ws, compute_name, compute_config)
+        compute_target = ComputeTarget.create(workspace, compute_name, compute_config)
         compute_target.wait_for_completion(show_output=verbose)
 
     return compute_target
