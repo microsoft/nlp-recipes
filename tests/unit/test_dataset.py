@@ -100,15 +100,15 @@ def test_msrpc():
 
 def test_wikigold(tmp_path):
     wg_sentence_count = 1841
-    wg_test_percentage = 0.5
-    wg_test_sentence_count = round(wg_sentence_count * wg_test_percentage)
+    wg_test_fraction = 0.5
+    wg_test_sentence_count = round(wg_sentence_count * wg_test_fraction)
     wg_train_sentence_count = wg_sentence_count - wg_test_sentence_count
 
     downloaded_file = os.path.join(tmp_path, "wikigold.conll.txt")
     assert not os.path.exists(downloaded_file)
 
     train_df, test_df = wikigold.load_train_test_dfs(
-        tmp_path, test_percentage=wg_test_percentage
+        tmp_path, test_fraction=wg_test_fraction
     )
 
     assert os.path.exists(downloaded_file)

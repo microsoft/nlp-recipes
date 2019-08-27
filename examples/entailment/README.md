@@ -5,7 +5,7 @@ demonstrate the best practices of data preprocessing and model building for NLI 
 utility scripts in the [utils_nlp](../../utils_nlp) folder to speed up these processes.  
 NLI is one of many NLP tasks that require robust compositional sentence understanding, but it's
 simpler compared to other tasks like question answering and machine translation.  
- Currently, we focus on fine-tuning pre-trained BERT model. We plan to continue adding state-of-the-art models as they come up and welcome community contributions.
+ Currently, we focus on fine-tuning pre-trained BERT model. If you are interested in pre-training your own BERT model, you can view the [AzureML-BERT repo](https://github.com/microsoft/AzureML-BERT), which walks through the process in depth.  We plan to continue adding state-of-the-art models as they come up and welcome community contributions.
 
 ## Natural Language Inference
 
