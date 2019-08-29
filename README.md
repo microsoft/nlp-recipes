@@ -21,7 +21,7 @@ The following is a summary of the commonly used NLP scenarios covered in the rep
 
 | Scenario                              |  Models | Description|
 |-------------------------|  ------------------- |-------|
-|Text Classification                     |BERT| Text classification is a supervised learning method of learning and predicting the category or the class of a document given its text content. |
+|Text Classification                     |BERT <br> XLNet| Text classification is a supervised learning method of learning and predicting the category or the class of a document given its text content. |
 |Named Entity Recognition                |BERT| Named entity recognition (NER) is the task of classifying words or key phrases of a text into predefined entities of interest. |
 |Entailment                              |BERT| Textual entailment is the task of classifying the binary relation between two natural-language texts,  ‘text’ and ‘hypothesis’,  to determine if the `text' agrees with the `hypothesis` or not. |
 |Question Answering                      |BiDAF <br> BERT| Question answering (QA) is the task of retrieving or generating a valid answer for a given query in natural language, provided with a passage related to the query. |
