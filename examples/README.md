@@ -5,7 +5,7 @@ This folder contains examples and best practices, written in Jupyter notebooks, 
 
 |Category|Applications|Methods|Languages|
 |---| ------------------------ | ------------------- |---|
-|[Text Classification](text_classification)|Topic Classification|BERT|en|
+|[Text Classification](text_classification)|Topic Classification|BERT, XLNet|en|
 |[Named Entity Recognition](named_entity_recognition) |Wikipedia NER|BERT|en|
 |[Entailment](entailment)|MultiNLI Natural Language Inference|BERT|en|
 |[Question Answering](question_answering) |SQuAD|BiDAF, BERT|en|
