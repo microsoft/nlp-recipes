@@ -48,6 +48,17 @@ To successfully run these notebooks, you will need an [**Azure subscription**](h
 ## Contributing
 We hope that the open source community would contribute to the content and bring in the latest SOTA algorithm. This project welcomes contributions and suggestions. Before contributing, please see our [contribution guidelines](CONTRIBUTING.md).
 
+## Links
+The following is a list of related repositories that we like and think are useful for NLP tasks.
+
+|||
+|---|---|
+|[pytorch-transformers](https://github.com/huggingface/pytorch-transformers)|A great PyTorch library from Hugging Face with implementations of popular transformer-based models. We've been using their package extensively in this repo and greatly appreciate their effort.|
+|[Azure Machine Learning Notebooks](https://github.com/Azure/MachineLearningNotebooks/)|ML and deep learning examples with Azure Machine Learning.|
+|[AzureML-BERT](https://github.com/Microsoft/AzureML-BERT)|End-to-end recipes for pre-training and fine-tuning BERT using Azure Machine Learning service.|
+|[MASS](https://github.com/microsoft/MASS)|MASS: Masked Sequence to Sequence Pre-training for Language Generation.|
+|[MT-DNN](https://github.com/namisan/mt-dnn)|Multi-Task Deep Neural Networks for Natural Language Understanding.|
+
 
 ## Build Status
 | Build Type | Branch | Status |  | Branch | Status |
