@@ -2,15 +2,15 @@
 # -*- encoding: utf-8 -*-
 from __future__ import absolute_import
 from __future__ import print_function
-
 import io
 import re
-from glob import glob
-from os.path import basename, dirname, join, splitext
-from setuptools import find_packages, setup
+from os.path import dirname, join
+from setuptools import setup
+from setuptools_scm import get_version
 
-from utils_nlp import VERSION, TITLE, AUTHOR, LICENSE
-
+# Determine semantic versioning automatically
+# from git commits
+__version__ = get_version()
 
 def read(*names, **kwargs):
     with io.open(join(dirname(__file__), *names), encoding=kwargs.get("encoding", "utf8")) as fh:
@@ -18,9 +18,9 @@ def read(*names, **kwargs):
 
 
 setup(
-    name=TITLE,
-    version=VERSION,
-    license=LICENSE,
+    name="utils_nlp",
+    version=__version__,
+    license="MIT License",
     description="NLP Utility functions that are used for best practices in building state-of-the-art NLP methods and scenarios. Developed by Microsoft AI CAT",
     long_description="%s\n%s"
     % (
@@ -61,8 +61,9 @@ setup(
     },
     keywords=["Microsoft NLP", "Natural Language Processing", "Text Processing", "Word Embedding"],
     python_requires=">=3.6",
-    install_requires=[],
+    install_requires=["setuptools_scm>=3.2.0"],
     dependency_links=[],
     extras_require={},
-    setup_requires=[],
+    use_scm_version={"root": ".", "relative_to": __file__},
+    setup_requires=["setuptools_scm"],
 )

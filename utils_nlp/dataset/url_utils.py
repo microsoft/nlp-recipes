@@ -1,6 +1,8 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
+"""Common utilities for downloading and extracting datasets."""
+
 import logging
 import math
 import os
@@ -15,9 +17,7 @@ from tqdm import tqdm
 log = logging.getLogger(__name__)
 
 
-def maybe_download(
-    url, filename=None, work_directory=".", expected_bytes=None
-):
+def maybe_download(url, filename=None, work_directory=".", expected_bytes=None):
     """Download a file if it is not already downloaded.
 
     Args:
@@ -32,7 +32,8 @@ def maybe_download(
         filename = url.split("/")[-1]
     filepath = os.path.join(work_directory, filename)
     if not os.path.exists(filepath):
-        if not os.path.isdir(work_directory): os.makedirs(work_directory)
+        if not os.path.isdir(work_directory):
+            os.makedirs(work_directory)
         r = requests.get(url, stream=True)
         total_size = int(r.headers.get("content-length", 0))
         block_size = 1024
@@ -40,10 +41,7 @@ def maybe_download(
 
         with open(filepath, "wb") as file:
             for data in tqdm(
-                r.iter_content(block_size),
-                total=num_iterables,
-                unit="KB",
-                unit_scale=True,
+                r.iter_content(block_size), total=num_iterables, unit="KB", unit_scale=True
             ):
                 file.write(data)
     else:
@@ -82,7 +80,7 @@ def extract_zip(file_path, dest_path="."):
     if not os.path.exists(dest_path):
         raise IOError("Destination directory doesn't exist")
     with zipfile.ZipFile(file_path) as z:
-        z.extractall(dest_path, filter(lambda f: not f.endswith('\r'), z.namelist()))
+        z.extractall(dest_path, filter(lambda f: not f.endswith("\r"), z.namelist()))
 
 
 @contextmanager

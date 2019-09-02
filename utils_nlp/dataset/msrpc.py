@@ -1,6 +1,11 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
+"""
+    Utility functions for downloading, extracting, and reading the Microsoft
+    Research Paraphrase Corpus (MSRPC) dataset.
+    https://www.microsoft.com/en-us/download/details.aspx?id=52398
+"""
 
 import os
 import pathlib
@@ -56,14 +61,11 @@ def load_pandas_df(local_cache_path=None, dataset_type="train"):
         installer_datapath = download_msrpc(path)
 
         print(
-            "The Windows Installer for Mircosoft Paraphrase Corpus has been "
-            "downloaded at ",
+            "The Windows Installer for Mircosoft Paraphrase Corpus has been " "downloaded at ",
             installer_datapath,
             "\n",
         )
-        data_directory = input(
-            "Please install and provide the installed directory. Thanks! \n"
-        )
+        data_directory = input("Please install and provide the installed directory. Thanks! \n")
 
         data_directory = pathlib.Path(data_directory)
         assert os.path.exists(data_directory)
@@ -71,20 +73,11 @@ def load_pandas_df(local_cache_path=None, dataset_type="train"):
         fields = ["Quality", "#1 String", "#2 String"]
         file_path = os.path.join(data_directory, DATASET_DICT[dataset_type])
         df = (
-            pd.read_csv(
-                file_path,
-                delimiter="\t",
-                error_bad_lines=False,
-                usecols=fields,
-            )
+            pd.read_csv(file_path, delimiter="\t", error_bad_lines=False, usecols=fields)
             .dropna()
             .rename(
                 index=str,
-                columns={
-                    "Quality": "score",
-                    "#1 String": "sentence1",
-                    "#2 String": "sentence2",
-                },
+                columns={"Quality": "score", "#1 String": "sentence1", "#2 String": "sentence2"},
             )
         )
         return df
