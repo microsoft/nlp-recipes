@@ -6,11 +6,8 @@ import io
 import re
 from os.path import dirname, join
 from setuptools import setup
-from setuptools_scm import get_version
+from utils_nlp import VERSION, AUTHOR, TITLE, LICENSE
 
-# Determine semantic versioning automatically
-# from git commits
-__version__ = get_version()
 
 def read(*names, **kwargs):
     with io.open(join(dirname(__file__), *names), encoding=kwargs.get("encoding", "utf8")) as fh:
@@ -19,8 +16,8 @@ def read(*names, **kwargs):
 
 setup(
     name="utils_nlp",
-    version=__version__,
-    license="MIT License",
+    version=VERSION,
+    license=LICENSE,
     description="NLP Utility functions that are used for best practices in building state-of-the-art NLP methods and scenarios. Developed by Microsoft AI CAT",
     long_description="%s\n%s"
     % (

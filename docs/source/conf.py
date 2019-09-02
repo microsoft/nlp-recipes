@@ -30,7 +30,7 @@ copyright = COPYRIGHT
 author = AUTHOR
 
 # The short X.Y version
-version = VERSION
+version = ".".join(VERSION.split(".")[:2])
 # The full version, including alpha/beta/rc tags
 release = VERSION
 
