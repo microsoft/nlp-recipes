@@ -65,3 +65,8 @@ The following is a list of related repositories that we like and think are usefu
 | --- | --- | --- | --- | --- | --- |
 | **Linux CPU** | master | [![Build Status](https://dev.azure.com/best-practices/nlp/_apis/build/status/cpu_integration_tests_linux?branchName=master)](https://dev.azure.com/best-practices/nlp/_build/latest?definitionId=50&branchName=master) | | staging | [![Build Status](https://dev.azure.com/best-practices/nlp/_apis/build/status/cpu_integration_tests_linux?branchName=staging)](https://dev.azure.com/best-practices/nlp/_build/latest?definitionId=50&branchName=staging) |
 | **Linux GPU** | master | [![Build Status](https://dev.azure.com/best-practices/nlp/_apis/build/status/gpu_integration_tests_linux?branchName=master)](https://dev.azure.com/best-practices/nlp/_build/latest?definitionId=51&branchName=master) | | staging | [![Build Status](https://dev.azure.com/best-practices/nlp/_apis/build/status/gpu_integration_tests_linux?branchName=staging)](https://dev.azure.com/best-practices/nlp/_build/latest?definitionId=51&branchName=staging) |
+
+## Build Status on AzureML
+| Build Type | Branch | Status |  | Branch | Status |
+| --- | --- | --- | --- | --- | --- |
+| **Linux CPU** | master | [![Build Status](https://dev.azure.com/best-practices/nlp/_apis/build/status/AzureML_nightly_cpu?branchName=master)](https://dev.azure.com/best-practices/nlp/_build/latest?definitionId=57&branchName=master)  | | staging | [![Build Status](https://dev.azure.com/best-practices/nlp/_apis/build/status/AzureML_nightly_cpu?branchName=staging)](https://dev.azure.com/best-practices/nlp/_build/latest?definitionId=57&branchName=staging) |

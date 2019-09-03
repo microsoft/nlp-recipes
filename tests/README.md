@@ -10,6 +10,8 @@ For more information, see a [quick introduction to unit, smoke and integration t
 
 Tests are automatically run as part of a DevOps pipeline. The pipelines are defined in the `.yml` files in [tests/ci](./ci) with filenames that align with pipeline names.
 
+Tests are also run on AzureML in order to leverage the ability to turn on/off the VM, scale up and more.  Test badges for AzureML are in the README.md in the root folder.
+
 ## Test execution
 
 **Click on the following menus** to see more details on how to execute the unit, smoke and integration tests:
