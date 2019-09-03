@@ -48,9 +48,7 @@ from azureml.core.compute_target import ComputeTargetException
 from azureml.core.workspace import WorkspaceException
 
 
-def setup_workspace(
-    workspace_name, subscription_id, resource_group, cli_auth, location
-):
+def setup_workspace(workspace_name, subscription_id, resource_group, cli_auth, location):
     """
     This sets up an Azure Workspace.
     An existing Azure Workspace is used or a new one is created if needed for
@@ -99,9 +97,7 @@ def setup_workspace(
     return ws
 
 
-def setup_persistent_compute_target(
-    workspace, cluster_name, vm_size, max_nodes
-):
+def setup_persistent_compute_target(workspace, cluster_name, vm_size, max_nodes):
     """
     Set up a persistent compute target on AzureML.
     A persistent compute target runs noticeably faster than a
@@ -132,12 +128,8 @@ def setup_persistent_compute_target(
         logger.debug("setup: Found existing cluster, use it.")
     except ComputeTargetException:
         logger.debug("setup: create cluster")
-        compute_config = AmlCompute.provisioning_configuration(
-            vm_size=vm_size, max_nodes=max_nodes
-        )
-        cpu_cluster = ComputeTarget.create(
-            workspace, cluster_name, compute_config
-        )
+        compute_config = AmlCompute.provisioning_configuration(vm_size=vm_size, max_nodes=max_nodes)
+        cpu_cluster = ComputeTarget.create(workspace, cluster_name, compute_config)
     cpu_cluster.wait_for_completion(show_output=True)
     return cpu_cluster
 
@@ -198,9 +190,7 @@ def create_experiment(workspace, experiment_name):
     return exp
 
 
-def submit_experiment_to_azureml(
-    test, test_folder, test_markers, junitxml, run_config, experiment
-):
+def submit_experiment_to_azureml(test, test_folder, test_markers, junitxml, run_config, experiment):
 
     """
     Submitting the experiment to AzureML actually runs the script.
@@ -268,10 +258,7 @@ def create_arg_parser():
     )
     # test folder
     parser.add_argument(
-        "--testfolder",
-        action="store",
-        default="./tests/unit",
-        help="folder where tests are stored",
+        "--testfolder", action="store", default="./tests/unit", help="folder where tests are stored"
     )
     # pytest test markers
     parser.add_argument(
@@ -296,24 +283,15 @@ def create_arg_parser():
     )
     # Azure resource group
     parser.add_argument(
-        "--rg",
-        action="store",
-        default="nlpbp_project_resources",
-        help="Azure Resource Group",
+        "--rg", action="store", default="nlpbp_project_resources", help="Azure Resource Group"
     )
     # AzureML workspace Name
     parser.add_argument(
-        "--wsname",
-        action="store",
-        default="nlpbp-test-ws",
-        help="AzureML workspace name",
+        "--wsname", action="store", default="nlpbp-test-ws", help="AzureML workspace name"
     )
     # AzureML clustername
     parser.add_argument(
-        "--clustername",
-        action="store",
-        default="amlcompute",
-        help="Set name of Azure cluster",
+        "--clustername", action="store", default="amlcompute", help="Set name of Azure cluster"
     )
     # Azure VM size
     parser.add_argument(
@@ -324,39 +302,22 @@ def create_arg_parser():
     )
     # cpu or gpu
     parser.add_argument(
-        "--dockerproc",
-        action="store",
-        default="cpu",
-        help="Base image used in docker container",
+        "--dockerproc", action="store", default="cpu", help="Base image used in docker container"
     )
     # Azure subscription id, when used in a pipeline, it is stored in keyvault
+    parser.add_argument("--subid", action="store", default="123456", help="Azure Subscription ID")
     parser.add_argument(
-        "--subid",
-        action="store",
-        default="123456",
-        help="Azure Subscription ID",
-    )
-    parser.add_argument(
-        "--condafile",
-        action="store",
-        default="./nlp.yaml",
-        help="file with environment variables",
+        "--condafile", action="store", default="./nlp.yaml", help="file with environment variables"
     )
     # AzureML experiment name
     parser.add_argument(
-        "--expname",
-        action="store",
-        default="persistentAML",
-        help="experiment name on Azure",
+        "--expname", action="store", default="persistentAML", help="experiment name on Azure"
     )
     # Azure datacenter location
     parser.add_argument("--location", default="EastUS", help="Azure location")
     # github repo, stored in AzureML experiment for info purposes
     parser.add_argument(
-        "--reponame",
-        action="store",
-        default="MyGithubRepo",
-        help="GitHub repo being tested",
+        "--reponame", action="store", default="MyGithubRepo", help="GitHub repo being tested"
     )
     # github branch, stored in AzureML experiment for info purposes
     parser.add_argument(
@@ -386,11 +347,15 @@ if __name__ == "__main__":
 
     if args.dockerproc == "cpu":
         from azureml.core.runconfig import DEFAULT_CPU_IMAGE
+
         docker_proc_type = DEFAULT_CPU_IMAGE
     elif args.dockerproc == "gpucuda9":
-        docker_proc_type = "mcr.microsoft.com/azureml/base-gpu:intelmpi2018.3-cuda9.0-cudnn7-ubuntu16.04"
+        docker_proc_type = (
+            "mcr.microsoft.com/azureml/base-gpu:intelmpi2018.3-cuda9.0-cudnn7-ubuntu16.04"
+        )
     else:
         from azureml.core.runconfig import DEFAULT_GPU_IMAGE
+
         docker_proc_type = DEFAULT_GPU_IMAGE
 
     cli_auth = AzureCliAuthentication()
@@ -411,14 +376,10 @@ if __name__ == "__main__":
     )
 
     run_config = create_run_config(
-        cpu_cluster=cpu_cluster,
-        docker_proc_type=docker_proc_type,
-        conda_env_file=args.condafile,
+        cpu_cluster=cpu_cluster, docker_proc_type=docker_proc_type, conda_env_file=args.condafile
     )
 
-    logger.info(
-        "exp: In Azure, look for experiment named {}".format(args.expname)
-    )
+    logger.info("exp: In Azure, look for experiment named {}".format(args.expname))
 
     # create new or use existing experiment
     experiment = Experiment(workspace=workspace, name=args.expname)

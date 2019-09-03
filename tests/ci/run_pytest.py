@@ -36,11 +36,7 @@ def create_arg_parser():
     )
     # test results file
     parser.add_argument(
-        "--xmlname",
-        "-j",
-        action="store",
-        default="reports/test-unit.xml",
-        help="Test results",
+        "--xmlname", "-j", action="store", default="reports/test-unit.xml", help="Test results"
     )
     args = parser.parse_args()
 
