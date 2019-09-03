@@ -59,9 +59,4 @@ jobs:
       testResultsFiles: '**/test-unitttest.xml'
       testRunTitle: 'Test results for PyTest'
 
-# Executed only once in notebook_cpu_unit_tests_linux
-#  - task: ComponentGovernanceComponentDetection@0
-#    inputs:
-#      scanType: 'Register'
-#      verbosity: 'Verbose'
-#      alertWarningLevel: 'High'
+
