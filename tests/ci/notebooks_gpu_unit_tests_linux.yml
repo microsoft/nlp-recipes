@@ -7,9 +7,7 @@ pr:
 - staging
 
 #Any commit to this branch will trigger the build.
-trigger:
-- staging
-- master
+trigger: none
 
 jobs:
 - job: notebooks_gpu_unit_tests_linux

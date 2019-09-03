@@ -3,53 +3,51 @@
 
 # Pull request against these branches will trigger this build
 pr:
-- master
-- staging
+  - master
+  - staging
 
 #Any commit to this branch will trigger the build.
-trigger:
-- staging
-- master
+trigger: none
 
 jobs:
-- job: notebooks_cpu_unit_tests_linux
-  timeoutInMinutes: 10 # how long to run the job before automatically cancelling
-  pool:
-    name: nlpagentpool
+  - job: notebooks_cpu_unit_tests_linux
+    timeoutInMinutes: 10 # how long to run the job before automatically cancelling
+    pool:
+      name: nlpagentpool
 
-  steps:
-  - bash: |
-      echo "##vso[task.prependpath]/data/anaconda/bin"
-      conda env list
-    displayName: Add Conda to PATH
+    steps:
+      - bash: |
+          echo "##vso[task.prependpath]/data/anaconda/bin"
+          conda env list
+        displayName: Add Conda to PATH
 
-# Uncomment if needed
-# Conda creation can take around 10min
-#  - bash: |
-#      python tools/generate_conda_file.py
-#      conda env create -n nlp_cpu -f nlp_cpu.yaml
-#    displayName: 'Creating Conda Environment with dependencies'
+      # Uncomment if needed
+      # Conda creation can take around 10min
+      #  - bash: |
+      #      python tools/generate_conda_file.py
+      #      conda env create -n nlp_cpu -f nlp_cpu.yaml
+      #    displayName: 'Creating Conda Environment with dependencies'
 
-  - bash: |
-      source activate nlp_cpu
-      pytest --durations=0 tests/unit -m "notebooks and not gpu and not azureml" --junitxml=junit/test-unitttest.xml
-    displayName: 'Run Unit tests'
+      - bash: |
+          source activate nlp_cpu
+          pytest --durations=0 tests/unit -m "notebooks and not gpu and not azureml" --junitxml=junit/test-unitttest.xml
+        displayName: "Run Unit tests"
 
-# Uncomment if needed
-#  - bash: |
-#      echo Remove Conda Environment
-#      conda remove -n nlp_cpu --all -q --force -y
-#      echo Done Cleanup
-#    displayName: 'Cleanup Task'
-#    condition: always()
+      # Uncomment if needed
+      #  - bash: |
+      #      echo Remove Conda Environment
+      #      conda remove -n nlp_cpu --all -q --force -y
+      #      echo Done Cleanup
+      #    displayName: 'Cleanup Task'
+      #    condition: always()
 
-  - task: PublishTestResults@2
-    inputs:
-      testResultsFiles: '**/test-unitttest.xml'
-      testRunTitle: 'Test results for PyTest'
+      - task: PublishTestResults@2
+        inputs:
+          testResultsFiles: "**/test-unitttest.xml"
+          testRunTitle: "Test results for PyTest"
 
-  - task: ComponentGovernanceComponentDetection@0
-    inputs:
-      scanType: 'Register'
-      verbosity: 'Verbose'
-      alertWarningLevel: 'High'
+      - task: ComponentGovernanceComponentDetection@0
+        inputs:
+          scanType: "Register"
+          verbosity: "Verbose"
+          alertWarningLevel: "High"
