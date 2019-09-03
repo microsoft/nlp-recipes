@@ -47,5 +47,5 @@ A few highlights are
 * GenSen
 
 
-### [Model Explainability](model_explainability)
-The model_explainability submodule contains utils that help explain or diagnose models, such as interpreting layers of a neural network.
+### [Model Explainability](interpreter)
+The interpreter submodule contains utils that help explain or diagnose models, such as interpreting layers of a neural network.
