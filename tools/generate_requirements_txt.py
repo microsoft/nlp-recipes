@@ -15,7 +15,7 @@ from generate_conda_file import (
     CONDA_WIN32,
     PIP_DARWIN_GPU,
     PIP_LINUX_GPU,
-    PIP_WIN32_GPU
+    PIP_WIN32_GPU,
     CONDA_DARWIN_GPU,
     CONDA_LINUX_GPU,
     CONDA_WIN32_GPU,
