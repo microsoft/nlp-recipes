@@ -31,7 +31,7 @@ We strongly subscribe to the multi-language principles laid down by ["Emily Bend
 * "English isn't generic for language, despite what NLP papers might lead you to believe" 
 * "Always name the language you are working on" ([Bender rule](https://www.aclweb.org/anthology/Q18-1041/))
 
-The repository aims to support non-English languages  across all the scenarios. Pre-trianed models used in the repository such as BERT, FastText support 100+ languages out of the box. Our goal is to provide end-to-end examples in as many languages as possible. We encourage community contributions in this area
+The repository aims to support non-English languages  across all the scenarios. Pre-trianed models used in the repository such as BERT, FastText support 100+ languages out of the box. Our goal is to provide end-to-end examples in as many languages as possible. We encourage community contributions in this area.
 
 
 
