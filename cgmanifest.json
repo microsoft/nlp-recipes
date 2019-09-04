@@ -1,0 +1,34 @@
+{"Registrations":[ 
+    {
+      "component": { 
+       "type": "git", 
+       "git": { 
+         "repositoryUrl": "https://github.com/huggingface/pytorch-transformers", 
+         "commitHash": "b33a385091de604afb566155ec03329b84c96926" 
+         }
+       },
+       "license": "Apache-2.0"
+    },
+    {
+      "component": { 
+       "type": "git", 
+       "git": { 
+         "repositoryUrl": "https://github.com/allenai/bi-att-flow", 
+         "commitHash": "e444acf13892cf62189b9eac3c7654bd83baf848" 
+         }
+       },
+       "license": "Apache-2.0"
+    },
+    {
+      "component": { 
+      "type": "git", 
+      "git": { 
+        "repositoryUrl": "https://github.com/stanfordnlp/glove", 
+        "commitHash": "26f6e18eb117ca7b080d01acb453fd1c9742418d" 
+        }
+      },
+      "license": "Apache-2.0"
+   }
+ ],
+ "Version": 1
+}

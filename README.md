@@ -16,6 +16,25 @@ In an era of transfer learning, transformers, and deep architectures, we believe
 >   
 >
 
+## Focus areas
+The repository aims to expand NLP capabilities along three separate dimensions
+
+### Scenarios
+We aim to have end-to-end examples of common tasks and scenarios such as text classification, named entity recognition etc.
+
+### Algorithms
+We aim to support multiple models for each of the supported scenarios. Currently, BERT-based models are supported across most scenarios. We are working to integrate [pytorch-transformers](https://github.com/huggingface/pytorch-transformers) to allow use of many more models.
+
+### Languages 
+We strongly subscribe to the multi-language principles laid down by ["Emily Bender"](http://faculty.washington.edu/ebender/papers/Bender-SDSS-2019.pdf)
+* "Natural language is not a synonym for English"
+* "English isn't generic for language, despite what NLP papers might lead you to believe" 
+* "Always name the language you are working on" ([Bender rule](https://www.aclweb.org/anthology/Q18-1041/))
+
+The repository aims to support non-English languages  across all the scenarios. Pre-trianed models used in the repository such as BERT, FastText support 100+ languages out of the box. Our goal is to provide end-to-end examples in as many languages as possible. We encourage community contributions in this area.
+
+
+
 ## Content
 The following is a summary of the commonly used NLP scenarios covered in the repository. Each scenario is demonstrated in one or more [Jupyter notebook examples](examples) that make use of the core code base of models and repository utilities.
 
@@ -27,7 +46,6 @@ The following is a summary of the commonly used NLP scenarios covered in the rep
 |Question Answering                      |BiDAF <br> BERT| Question answering (QA) is the task of retrieving or generating a valid answer for a given query in natural language, provided with a passage related to the query. |
 |Sentence Similarity                     |Representation: TF-IDF, Word Embeddings, Doc Embeddings<br>Metrics: Cosine Similarity, Word Mover's Distance<br>Models: BERT, GenSen| Sentence similarity is the process of computing a similarity score given a pair of text documents. |
 |Embeddings| Word2Vec<br>fastText<br>GloVe| Embedding is the process of converting a word or a piece of text to a continuous vector space of real number, usually, in low dimension.
-
 
 ## Getting Started
 While solving NLP problems, it is always good to start with the prebuilt [Cognitive Services](https://azure.microsoft.com/en-us/services/cognitive-services/directory/lang/). When the needs are beyond the bounds of the prebuilt cognitive service and when you want to search for custom machine learning methods,  you will find this repository  very useful. To get started, navigate to the [Setup Guide](SETUP.md), which lists instructions on how to setup your environment and dependencies.
@@ -47,6 +65,17 @@ To successfully run these notebooks, you will need an [**Azure subscription**](h
 
 ## Contributing
 We hope that the open source community would contribute to the content and bring in the latest SOTA algorithm. This project welcomes contributions and suggestions. Before contributing, please see our [contribution guidelines](CONTRIBUTING.md).
+
+## Links
+The following is a list of related repositories that we like and think are useful for NLP tasks.
+
+|||
+|---|---|
+|[pytorch-transformers](https://github.com/huggingface/pytorch-transformers)|A great PyTorch library from Hugging Face with implementations of popular transformer-based models. We've been using their package extensively in this repo and greatly appreciate their effort.|
+|[Azure Machine Learning Notebooks](https://github.com/Azure/MachineLearningNotebooks/)|ML and deep learning examples with Azure Machine Learning.|
+|[AzureML-BERT](https://github.com/Microsoft/AzureML-BERT)|End-to-end recipes for pre-training and fine-tuning BERT using Azure Machine Learning service.|
+|[MASS](https://github.com/microsoft/MASS)|MASS: Masked Sequence to Sequence Pre-training for Language Generation.|
+|[MT-DNN](https://github.com/namisan/mt-dnn)|Multi-Task Deep Neural Networks for Natural Language Understanding.|
 
 
 ## Build Status
