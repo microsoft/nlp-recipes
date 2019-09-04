@@ -52,15 +52,15 @@ CONDA_GPU = {
     "numba": "numba>=0.38.1",
     "pytorch": "pytorch>=1.0.0",
     "tensorflow": "tensorflow-gpu==1.12.0",
-    "cudatoolkit": "cudatoolkit==9.2"
+    "cudatoolkit": "cudatoolkit==9.2",
 }
 
 PIP_BASE = {
     "allennlp": "allennlp==0.8.4",
-    "azureml-sdk[automl,notebooks,contrib]": "azureml-sdk[automl,notebooks,contribs]==1.0.48",
-    "azureml-train-automl": "azureml-train-automl==1.0.48",
+    "azureml-sdk": "azureml-sdk[automl,notebooks,contrib]==1.0.57",
+    "azureml-train-automl": "azureml-train-automl==1.0.57",
     "azureml-dataprep": "azureml-dataprep==1.1.8",
-    "azureml-widgets": "azureml-widgets==1.0.48",
+    "azureml-widgets": "azureml-widgets==1.0.57",
     "azureml-mlflow": "azureml-mlflow>=1.0.43.1",
     "black": "black>=18.6b4",
     "cached-property": "cached-property==1.5.1",
@@ -128,7 +128,7 @@ if __name__ == "__main__":
     if args.name is not None:
         conda_env = args.name
 
-    # add conda and pip base packages 
+    # add conda and pip base packages
     conda_packages = CONDA_BASE
     pip_packages = PIP_BASE
 
