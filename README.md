@@ -26,7 +26,11 @@ We aim to have end-to-end examples of common tasks and scenarios such as text cl
 We aim to support multiple models for each of the supported scenarios. Currently, BERT-based models are supported across most scenarios. We are working to integrate [pytorch-transformers](https://github.com/huggingface/pytorch-transformers) to allow use of many more models.
 
 ### Languages 
-"English isn't generic for language, despite what NLP papers might lead you to believe" - ["Bender Rule"](http://faculty.washington.edu/ebender/papers/Bender-SDSS-2019.pdf). 
+We strongly subscribe to the multi-language principles laid down by ["Emily Bender"](http://faculty.washington.edu/ebender/papers/Bender-SDSS-2019.pdf)
+* "Natural language is not a synonym for English"
+* "English isn't generic for language, despite what NLP papers might lead you to believe" 
+* "Always name the language you are working on" ([Bender rule](https://www.aclweb.org/anthology/Q18-1041/))
+
 The repository aims to support non-English languages  across all the scenarios. Pre-trianed models used in the repository such as BERT, FastText support 100+ languages out of the box. Our goal is to provide end-to-end examples in as many languages as possible. We encourage community contributions in this area
 
 
