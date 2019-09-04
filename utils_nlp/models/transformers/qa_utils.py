@@ -1,0 +1,762 @@
+# coding=utf-8
+# Copyright 2018 The Google AI Language Team Authors and The HuggingFace Inc. team.
+# Copyright (c) 2018, NVIDIA CORPORATION.  All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Modifications copyright © Microsoft Corporation
+
+import collections
+import json
+import math
+import logging
+import re
+import string
+
+logger = logging.getLogger(__name__)
+
+from pytorch_transformers.tokenization_bert import BasicTokenizer
+
+QAExample_ = collections.namedtuple(
+    "QAExample",
+    [
+        "qa_id",
+        "doc_tokens",
+        "question_text",
+        "orig_answer_text",
+        "start_position",
+        "end_position",
+        "is_impossible",
+    ],
+)
+
+
+# create a wrapper class so that we can add docstrings
+class QAExample(QAExample_):
+    """
+    A data structure representing an unique document-question-answer triplet.
+
+    Args:
+        qa_id (int): An unique id identifying the document-question pair.
+            This is used to map prediction results to ground truth answers
+            during evaluation, because the data order is not preserved
+            during pre-processing and post-processing.
+        doc_tokens (list): White-space tokenized tokens of the document
+            text. This is used to generate the final answer based on
+            predicted start and end token indices during post-processing.
+        question_text (str): Text of the question.
+        orig_answer_text (str): Text of the ground truth answer if available.
+        start_position (int): Index of the starting token of the answer
+            span, if available.
+        end_position (int): Index of the ending token of the answer span,
+            if available.
+        is_impossible (bool): If the question is impossible to answer based
+            on the given document.
+    """
+
+    pass
+
+
+QAFeatures_ = collections.namedtuple(
+    "QAFeatures",
+    [
+        "unique_id",
+        "qa_id",
+        "tokens",
+        "token_to_orig_map",
+        "token_is_max_context",
+        "input_ids",
+        "input_mask",
+        "segment_ids",
+        "start_position",
+        "end_position",
+        "cls_index",
+        "p_mask",
+    ],
+)
+
+
+# create a wrapper class so that we can add docstrings
+class QAFeatures(QAFeatures_):
+    """
+    BERT-format features of an unique document span-question-answer triplet.
+
+    Args:
+        unique_id (int): An unique id identifying the
+            document-question-answer triplet.
+        example_index (int): Index of the unique QAExample from which this
+            feature instance is derived from. A single QAExample can derive
+            multiple QAFeatures if the document is too long and gets split
+            into multiple document spans. This index is used to group
+            QAResults belonging to the same document-question pair and
+            generate the final answer.
+        tokens (list): Concatenated question tokens and paragraph tokens.
+        token_to_orig_map (dict): A dictionary mapping token indices in the
+            document span back to the token indices in the original document
+            before document splitting.
+            This is needed during post-processing to generate the final
+            predicted answer.
+        token_is_max_context (list): List of booleans indicating whether a
+            token has the maximum context in teh current document span if it
+            appears in multiple document spans and gets multiple predicted
+            scores. We only want to consider the score with "maximum context".
+            "Maximum context" is defined as the *minimum* of its left and
+            right context.
+            For example:
+                Doc: the man went to the store and bought a gallon of milk
+                Span A: the man went to the
+                Span B: to the store and bought
+                Span C: and bought a gallon of
+
+            In the example the maximum context for 'bought' would be span C
+            since it has 1 left context and 3 right context, while span B
+            has 4 left context and 0 right context.
+            This is needed during post-processing to generate the final
+            predicted answer.
+        input_ids (list): List of numerical token indices corresponding to
+            the tokens.
+        input_mask (list): List of 1s and 0s indicating if a token is from
+            the input data or padded to conform to the maximum sequence
+            length. 1 for actual token and 0 for padded token.
+        segment_ids (list): List of 0s and 1s indicating if a token is from
+            the question text (0) or paragraph text (1).
+        start_position (int): Index of the starting token of the answer span.
+        end_position (int): Index of the ending token of the answer span.
+
+    """
+
+    pass
+
+
+QAResult_ = collections.namedtuple("QAResult", ["unique_id", "start_logits", "end_logits"])
+QAResultExtended = collections.namedtuple(
+    "QAResultExtended",
+    [
+        "unique_id",
+        "start_top_log_probs",
+        "start_top_index",
+        "end_top_log_probs",
+        "end_top_index",
+        "cls_logits",
+    ],
+)
+
+
+# create a wrapper class so that we can add docstrings
+class QAResult(QAResult_):
+    """
+    Question answering prediction result returned by BERTQAExtractor.predict.
+
+    Args:
+        unique_id: Unique id identifying the training/testing sample. It's
+            used to map the prediction result back to the QAFeatures
+            during postprocessing.
+        start_logits (list): List of logits for predicting each token being
+            the start of the answer span.
+        end__logits (list): List of logits for predicting each token being
+            the end of the answer span.
+
+    """
+
+    pass
+
+
+def postprocess_answer(
+    results,
+    examples,
+    features,
+    do_lower_case,
+    n_best_size=20,
+    max_answer_length=30,
+    output_prediction_file="./qa_predictions.json",
+    output_nbest_file="./nbest_predictions.json",
+    unanswerable_exists=False,
+    output_null_log_odds_file="./null_odds.json",
+    null_score_diff_threshold=0.0,
+    verbose_logging=False,
+):
+    """
+    Postprocesses start and end logits generated by
+    :meth:`utils_nlp.models.bert.BERTQAExtractor.fit`.
+
+    Args:
+        results (list): List of QAResults, each QAResult contains an
+            unique id, answer start logits, and answer end logits. See
+            :class:`.QAResult` for more details.
+        examples (list): List of QAExamples. QAExample contains the original
+            document tokens that are used to generate the final predicted
+            answer from the predicted the start and end positions. See
+            :class:`.QAExample` for more details.
+        features (list): List of QAFeatures. QAFeatures contains the mapping
+            from indices in the processed token list to the original
+            document tokens that are used to generate the final predicted
+            answers. See :class:`.QAFeatures` for more details.
+        do_lower_case (bool): Whether an uncased tokenizer was used during
+            data preprocessing. This is required during answer finalization
+            by comparing the predicted answer text and the original text
+            span in :func:`_get_final_text`.
+        n_best_size (int, optional): The number of candidates to choose from
+            each QAResult to generate the final prediction. It's also the
+            maximum number of n-best answers to output for each question.
+            Note that the number of n-best answers can be smaller than
+            `n_best_size` because some unqualified answers, e.g. answer that
+            are too long, are removed.
+        max_answer_length (int, optional): Maximum length of the answer.
+            Defaults to 30.
+        output_prediction_file (str, optional): Path of the file to save the
+            predicted answers. Defaults to "./qa_predictions.json".
+        output_nbest_file (str, optional): Path of the file to save the
+            n-best answers. Defaults to "./nbest_predictions.json".
+        unanswerable_exists (bool, optional): Whether there are unanswerable
+            questions in the data. If True, the start and end logits of the
+            [CLS] token, which indicate the probability of the answer being
+            empty, are included in the candidate answer list.  Defaults to
+            False.
+        output_null_log_odds_file (str, optional): If unanswerable_exists is
+            True, the score difference between empty prediction and best
+            non-empty prediction are saved to this file. These scores can be
+            used to find the best threshold for predicting an empty answer.
+            Defaults to "./null_odds.json".
+        null_score_diff_threshold (float, optional): If the score
+            difference between empty prediction and best non-empty
+            prediction is higher than this threshold, the final predicted
+            answer is empty. Defaults to 0.0.
+        verbose_logging (bool, optional): Whether to log details of answer
+            postprocessing. Defaults to False.
+
+    Returns:
+        tuple: (OrderedDict, OrderedDict, OrderedDict)
+            The keys of the dictionaries are the `qa_id` of the original
+            :class:`.QAExample` the answers correspond to.
+            The values of the first dictionary are the predicted answer
+            texts in string type.
+            The values of the second dictionary  are the softmax
+            probabilities of the predicted answers.
+            The values of the third dictionary are the n-best answers for
+            each qa_id. Note that the number of n-best answers can be smaller
+            than `n_best_size` because some unqualified answers,
+            e.g. answers that are too long, are removed.
+
+    """
+    # Helper functions
+    def _get_final_text(pred_text, orig_text, do_lower_case, verbose_logging=False):
+        """Project the tokenized prediction back to the original text."""
+
+        # When we created the data, we kept track of the alignment between original
+        # (whitespace tokenized) tokens and our WordPiece tokenized tokens. So
+        # now `orig_text` contains the span of our original text corresponding to the
+        # span that we predicted.
+        #
+        # However, `orig_text` may contain extra characters that we don't want in
+        # our prediction.
+        #
+        # For example, let's say:
+        #   pred_text = steve smith
+        #   orig_text = Steve Smith's
+        #
+        # We don't want to return `orig_text` because it contains the extra "'s".
+        #
+        # We don't want to return `pred_text` because it's already been normalized
+        # (the SQuAD eval script also does punctuation stripping/lower casing but
+        # our tokenizer does additional normalization like stripping accent
+        # characters).
+        #
+        # What we really want to return is "Steve Smith".
+        #
+        # Therefore, we have to apply a semi-complicated alignment heuristic between
+        # `pred_text` and `orig_text` to get a character-to-character alignment. This
+        # can fail in certain cases in which case we just return `orig_text`.
+
+        def _strip_spaces(text):
+            ns_chars = []
+            ns_to_s_map = collections.OrderedDict()
+            for (i, c) in enumerate(text):
+                if c == " ":
+                    continue
+                ns_to_s_map[len(ns_chars)] = i
+                ns_chars.append(c)
+            ns_text = "".join(ns_chars)
+            return (ns_text, ns_to_s_map)
+
+        # We first tokenize `orig_text`, strip whitespace from the result
+        # and `pred_text`, and check if they are the same length. If they are
+        # NOT the same length, the heuristic has failed. If they are the same
+        # length, we assume the characters are one-to-one aligned.
+        tokenizer = BasicTokenizer(do_lower_case=do_lower_case)
+
+        tok_text = " ".join(tokenizer.tokenize(orig_text))
+
+        start_position = tok_text.find(pred_text)
+        if start_position == -1:
+            if verbose_logging:
+                logger.info("Unable to find text: '%s' in '%s'" % (pred_text, orig_text))
+            return orig_text
+        end_position = start_position + len(pred_text) - 1
+
+        (orig_ns_text, orig_ns_to_s_map) = _strip_spaces(orig_text)
+        (tok_ns_text, tok_ns_to_s_map) = _strip_spaces(tok_text)
+
+        if len(orig_ns_text) != len(tok_ns_text):
+            if verbose_logging:
+                logger.info(
+                    "Length not equal after stripping spaces: '%s' vs '%s'",
+                    orig_ns_text,
+                    tok_ns_text,
+                )
+            return orig_text
+
+        # We then project the characters in `pred_text` back to `orig_text` using
+        # the character-to-character alignment.
+        tok_s_to_ns_map = {}
+        for (i, tok_index) in tok_ns_to_s_map.items():
+            tok_s_to_ns_map[tok_index] = i
+
+        orig_start_position = None
+        if start_position in tok_s_to_ns_map:
+            ns_start_position = tok_s_to_ns_map[start_position]
+            if ns_start_position in orig_ns_to_s_map:
+                orig_start_position = orig_ns_to_s_map[ns_start_position]
+
+        if orig_start_position is None:
+            if verbose_logging:
+                logger.info("Couldn't map start position")
+            return orig_text
+
+        orig_end_position = None
+        if end_position in tok_s_to_ns_map:
+            ns_end_position = tok_s_to_ns_map[end_position]
+            if ns_end_position in orig_ns_to_s_map:
+                orig_end_position = orig_ns_to_s_map[ns_end_position]
+
+        if orig_end_position is None:
+            if verbose_logging:
+                logger.info("Couldn't map end position")
+            return orig_text
+
+        output_text = orig_text[orig_start_position : (orig_end_position + 1)]
+        return output_text
+
+    def _get_best_indexes(logits, n_best_size):
+        """Get the n-best logits from a list."""
+        index_and_score = sorted(enumerate(logits), key=lambda x: x[1], reverse=True)
+
+        best_indexes = []
+        for i in range(len(index_and_score)):
+            if i >= n_best_size:
+                break
+            best_indexes.append(index_and_score[i][0])
+        return best_indexes
+
+    def _compute_softmax(scores):
+        """Compute softmax probability over raw logits."""
+        if not scores:
+            return []
+
+        max_score = None
+        for score in scores:
+            if max_score is None or score > max_score:
+                max_score = score
+
+        exp_scores = []
+        total_sum = 0.0
+        for score in scores:
+            x = math.exp(score - max_score)
+            exp_scores.append(x)
+            total_sum += x
+
+        probs = []
+        for score in exp_scores:
+            probs.append(score / total_sum)
+        return probs
+
+    # Helper functions end
+
+    """Write final predictions to the json file and log-odds of null if needed."""
+    logger.info("Writing predictions to: %s" % (output_prediction_file))
+    logger.info("Writing nbest to: %s" % (output_nbest_file))
+
+    # example_index_to_features = collections.defaultdict(list)
+    qa_id_to_features = collections.defaultdict(list)
+    # Map unique features to the original doc-question-answer triplet
+    # Each doc-question-answer triplet can have multiple features because the doc
+    # could be split into multiple spans
+    for f in features:
+        # example_index_to_features[feature.example_index].append(feature)
+        qa_id_to_features[f.qa_id].append(f)
+
+    unique_id_to_result = {}
+    for r in results:
+        unique_id_to_result[r.unique_id] = r
+
+    _PrelimPrediction = collections.namedtuple(
+        "PrelimPrediction",
+        ["feature_index", "start_index", "end_index", "start_logit", "end_logit"],
+    )
+
+    all_predictions = collections.OrderedDict()
+    all_probs = collections.OrderedDict()
+    all_nbest_json = collections.OrderedDict()
+    scores_diff_json = collections.OrderedDict()
+
+    for (example_index, example) in enumerate(examples):
+        # get all the features belonging to the same example,
+        # i.e. paragaraph/question pair.
+        features = qa_id_to_features[example.qa_id]
+
+        prelim_predictions = []
+        # keep track of the minimum score of null start+end of position 0
+        score_null = 1000000  # large and positive
+        min_null_feature_index = 0  # the paragraph slice with min null score
+        null_start_logit = 0  # the start logit at the slice with min null score
+        null_end_logit = 0  # the end logit at the slice with min null score
+        for (feature_index, feature) in enumerate(features):
+            result = unique_id_to_result[feature.unique_id]
+            start_indexes = _get_best_indexes(result.start_logits, n_best_size)
+            end_indexes = _get_best_indexes(result.end_logits, n_best_size)
+            # if we could have irrelevant answers, get the min score of irrelevant
+            if unanswerable_exists:
+                # The first element of the start end end logits is the
+                # probability of predicting the [CLS] token as the start and
+                # end positions of the answer, which means the answer is
+                # empty.
+                feature_null_score = result.start_logits[0] + result.end_logits[0]
+                if feature_null_score < score_null:
+                    score_null = feature_null_score
+                    min_null_feature_index = feature_index
+                    null_start_logit = result.start_logits[0]
+                    null_end_logit = result.end_logits[0]
+            for start_index in start_indexes:
+                for end_index in end_indexes:
+                    # We could hypothetically create invalid predictions, e.g., predict
+                    # that the start of the span is in the question. We throw out all
+                    # invalid predictions.
+                    if start_index >= len(feature.tokens):
+                        continue
+                    if end_index >= len(feature.tokens):
+                        continue
+                    if start_index not in feature.token_to_orig_map:
+                        continue
+                    if end_index not in feature.token_to_orig_map:
+                        continue
+                    if not feature.token_is_max_context.get(start_index, False):
+                        continue
+                    if end_index < start_index:
+                        continue
+                    length = end_index - start_index + 1
+                    if length > max_answer_length:
+                        continue
+                    prelim_predictions.append(
+                        _PrelimPrediction(
+                            feature_index=feature_index,
+                            start_index=start_index,
+                            end_index=end_index,
+                            start_logit=result.start_logits[start_index],
+                            end_logit=result.end_logits[end_index],
+                        )
+                    )
+        if unanswerable_exists:
+            prelim_predictions.append(
+                _PrelimPrediction(
+                    feature_index=min_null_feature_index,
+                    start_index=0,
+                    end_index=0,
+                    start_logit=null_start_logit,
+                    end_logit=null_end_logit,
+                )
+            )
+
+        # Sort by the sum of the start and end logits in ascending order,
+        # so that the first element is the most probable answer
+        prelim_predictions = sorted(
+            prelim_predictions, key=lambda x: (x.start_logit + x.end_logit), reverse=True
+        )
+
+        _NbestPrediction = collections.namedtuple(
+            "NbestPrediction", ["text", "start_logit", "end_logit"]
+        )
+
+        seen_predictions = {}
+        nbest = []
+        for pred in prelim_predictions:
+            if len(nbest) >= n_best_size:
+                break
+            feature = features[pred.feature_index]
+            if pred.start_index > 0:  # this is a non-null prediction
+                tok_tokens = feature.tokens[pred.start_index : (pred.end_index + 1)]
+                orig_doc_start = feature.token_to_orig_map[pred.start_index]
+                orig_doc_end = feature.token_to_orig_map[pred.end_index]
+                orig_tokens = example.doc_tokens[orig_doc_start : (orig_doc_end + 1)]
+                tok_text = " ".join(tok_tokens)
+
+                # De-tokenize WordPieces that have been split off.
+                tok_text = tok_text.replace(" ##", "")
+                tok_text = tok_text.replace("##", "")
+
+                # Clean whitespace
+                tok_text = tok_text.strip()
+                tok_text = " ".join(tok_text.split())
+                orig_text = " ".join(orig_tokens)
+
+                final_text = _get_final_text(tok_text, orig_text, do_lower_case, verbose_logging)
+                if final_text in seen_predictions:
+                    continue
+
+                seen_predictions[final_text] = True
+            else:
+                final_text = ""
+                seen_predictions[final_text] = True
+
+            nbest.append(
+                _NbestPrediction(
+                    text=final_text, start_logit=pred.start_logit, end_logit=pred.end_logit
+                )
+            )
+        # if we didn't include the empty option in the n-best, include it
+        if unanswerable_exists:
+            if "" not in seen_predictions:
+                nbest.append(
+                    _NbestPrediction(
+                        text="", start_logit=null_start_logit, end_logit=null_end_logit
+                    )
+                )
+
+            # In very rare edge cases we could only have single null prediction.
+            # So we just create a nonce prediction in this case to avoid failure.
+            if len(nbest) == 1:
+                nbest.insert(0, _NbestPrediction(text="empty", start_logit=0.0, end_logit=0.0))
+
+        # In very rare edge cases we could have no valid predictions. So we
+        # just create a nonce prediction in this case to avoid failure.
+        if not nbest:
+            nbest.append(_NbestPrediction(text="empty", start_logit=0.0, end_logit=0.0))
+
+        assert len(nbest) >= 1
+
+        total_scores = []
+        best_non_null_entry = None
+        for ie, entry in enumerate(nbest):
+            total_scores.append(entry.start_logit + entry.end_logit)
+            if not best_non_null_entry:
+                if entry.text:
+                    best_non_null_entry = entry
+                    best_non_null_entry_index = ie
+
+        probs = _compute_softmax(total_scores)
+
+        nbest_json = []
+        for (i, entry) in enumerate(nbest):
+            output = collections.OrderedDict()
+            output["text"] = entry.text
+            output["probability"] = probs[i]
+            output["start_logit"] = entry.start_logit
+            output["end_logit"] = entry.end_logit
+            nbest_json.append(output)
+
+            if entry.text == "":
+                null_prediction_index = i
+
+        assert len(nbest_json) >= 1
+
+        if not unanswerable_exists:
+            all_predictions[example.qa_id] = nbest_json[0]["text"]
+            all_probs[example.qa_id] = nbest_json[0]["probability"]
+        else:
+            # predict "" iff the null score - the score of best non-null > threshold
+            score_diff = (
+                score_null - best_non_null_entry.start_logit - (best_non_null_entry.end_logit)
+            )
+            scores_diff_json[example.qa_id] = score_diff
+            if score_diff > null_score_diff_threshold:
+                all_predictions[example.qa_id] = ""
+                ## TODO: double check this
+                all_probs[example.qa_id] = probs[null_prediction_index]
+            else:
+                all_predictions[example.qa_id] = best_non_null_entry.text
+                all_probs[example.qa_id] = probs[best_non_null_entry_index]
+        all_nbest_json[example.qa_id] = nbest_json
+
+    with open(output_prediction_file, "w") as writer:
+        writer.write(json.dumps(all_predictions, indent=4) + "\n")
+
+    with open(output_nbest_file, "w") as writer:
+        writer.write(json.dumps(all_nbest_json, indent=4) + "\n")
+
+    if unanswerable_exists:
+        logger.info("Writing null odds to: %s" % (output_null_log_odds_file))
+        with open(output_null_log_odds_file, "w") as writer:
+            writer.write(json.dumps(scores_diff_json, indent=4) + "\n")
+
+    return all_predictions, all_probs, all_nbest_json
+
+
+def evaluate_qa(qa_ids, actuals, preds, na_probs=None, na_prob_thresh=0, out_file=None):
+    """
+    Evaluate question answering prediction results against ground truth answers.
+
+    Args:
+        qa_ids (list): List of ids identifying unique document-question pairs.
+        actuals (list): List of ground truth answer texts corresponding the
+            qa_ids.
+        preds (dict): Dictionary of qa_id and predicted answer pairs. This
+            is a dictionary because the data order is not preserved during
+            pre- and post-processing.
+        na_probs (dict, optional): Dictionary of qa_id and unanswerable
+            probability pairs. If None, unanswerable probabilities are all
+            set to zero. Defaults to None.
+        na_prob_thresh (float, optional): Probability threshold to predict a
+            question to be unanswerable. If `na_probs` > `na_prob_thresh`,
+            the prediction is considered as correct if the question
+            is unanswerable. Otherwise, the prediction is considered as
+            incorrect. Defaults to 0.
+        out_file (str, optional): Path of the file to save the evaluation
+            results to. Defaults to None.
+    """
+
+    # Helper functions
+    def _normalize_answer(s):
+        """Lower text and remove punctuation, articles and extra whitespace."""
+
+        def remove_articles(text):
+            regex = re.compile(r"\b(a|an|the)\b", re.UNICODE)
+            return re.sub(regex, " ", text)
+
+        def white_space_fix(text):
+            return " ".join(text.split())
+
+        def remove_punc(text):
+            exclude = set(string.punctuation)
+            return "".join(ch for ch in text if ch not in exclude)
+
+        def lower(text):
+            return text.lower()
+
+        return white_space_fix(remove_articles(remove_punc(lower(s))))
+
+    def _get_tokens(s):
+        """Normalizes text and returns white-space tokenized tokens. """
+        if not s:
+            return []
+        return _normalize_answer(s).split()
+
+    def _compute_exact(a_gold, a_pred):
+        """Compute the exact match between two sentences after normalization.
+
+        Returns:
+            int: 1 if two sentences match exactly after normalization,
+                0 otherwise.
+        """
+        return int(_normalize_answer(a_gold) == _normalize_answer(a_pred))
+
+    def _compute_f1(a_gold, a_pred):
+        """
+            Compute F1 score based on token overlapping between two
+            sentences.
+        """
+        gold_toks = _get_tokens(a_gold)
+        pred_toks = _get_tokens(a_pred)
+        common = collections.Counter(gold_toks) & collections.Counter(pred_toks)
+        num_same = sum(common.values())
+        if len(gold_toks) == 0 or len(pred_toks) == 0:
+            # If either is no-answer, then F1 is 1 if they agree, 0 otherwise
+            return int(gold_toks == pred_toks)
+        if num_same == 0:
+            return 0
+        precision = 1.0 * num_same / len(pred_toks)
+        recall = 1.0 * num_same / len(gold_toks)
+        f1 = (2 * precision * recall) / (precision + recall)
+        return f1
+
+    def _get_raw_scores(qa_ids, actuals, preds):
+        """
+            Compute exact match and F1 scores without applying any
+            unanswerable probability threshold.
+        """
+        exact_scores = {}
+        f1_scores = {}
+
+        for qid, gold_answers in zip(qa_ids, actuals):
+            if not gold_answers:
+                # For unanswerable questions, only correct answer is empty string
+                gold_answers = [""]
+            if qid not in preds:
+                print("Missing prediction for %s" % qid)
+                continue
+            a_pred = preds[qid]
+            # Take max over all gold answers
+            exact_scores[qid] = max(_compute_exact(a, a_pred) for a in gold_answers)
+            f1_scores[qid] = max(_compute_f1(a, a_pred) for a in gold_answers)
+        return exact_scores, f1_scores
+
+    def _apply_no_ans_threshold(scores, na_probs, qid_to_has_ans, na_prob_thresh):
+        """Update the input scores by applying unanswerable probability threshold."""
+
+        new_scores = {}
+        for qid, s in scores.items():
+            pred_na = na_probs[qid] > na_prob_thresh
+            if pred_na:
+                new_scores[qid] = float(not qid_to_has_ans[qid])
+            else:
+                new_scores[qid] = s
+        return new_scores
+
+    def _make_eval_dict(exact_scores, f1_scores, qid_list=None):
+        """Create a dictionary of evaluation results."""
+        if not qid_list:
+            total = len(exact_scores)
+            return collections.OrderedDict(
+                [
+                    ("exact", 100.0 * sum(exact_scores.values()) / total),
+                    ("f1", 100.0 * sum(f1_scores.values()) / total),
+                    ("total", total),
+                ]
+            )
+        else:
+            total = len(qid_list)
+            return collections.OrderedDict(
+                [
+                    ("exact", 100.0 * sum(exact_scores[k] for k in qid_list) / total),
+                    ("f1", 100.0 * sum(f1_scores[k] for k in qid_list) / total),
+                    ("total", total),
+                ]
+            )
+
+    def _merge_eval(main_eval, new_eval, prefix):
+        """Merge multiple evaluation result dictionaries."""
+        for k in new_eval:
+            main_eval["%s_%s" % (prefix, k)] = new_eval[k]
+
+    # Helper functions end
+
+    if na_probs is None:
+        na_probs = {k: 0.0 for k in preds}
+
+    qid_to_has_ans = {qa_id: bool(ans) for (qa_id, ans) in zip(qa_ids, actuals)}
+    has_ans_qids = [k for k, v in qid_to_has_ans.items() if v]
+    no_ans_qids = [k for k, v in qid_to_has_ans.items() if not v]
+    exact_raw, f1_raw = _get_raw_scores(qa_ids, actuals, preds)
+    exact_thresh = _apply_no_ans_threshold(exact_raw, na_probs, qid_to_has_ans, na_prob_thresh)
+    f1_thresh = _apply_no_ans_threshold(f1_raw, na_probs, qid_to_has_ans, na_prob_thresh)
+    out_eval = _make_eval_dict(exact_thresh, f1_thresh)
+    if has_ans_qids:
+        has_ans_eval = _make_eval_dict(exact_thresh, f1_thresh, qid_list=has_ans_qids)
+        _merge_eval(out_eval, has_ans_eval, "HasAns")
+    if no_ans_qids:
+        no_ans_eval = _make_eval_dict(exact_thresh, f1_thresh, qid_list=no_ans_qids)
+        _merge_eval(out_eval, no_ans_eval, "NoAns")
+
+    if out_file:
+        with open(out_file, "w") as f:
+            json.dump(out_eval, f)
+    else:
+        print(json.dumps(out_eval, indent=2))
+    return out_eval
