@@ -31,7 +31,7 @@ from torch.utils.data import (
     ConcatDataset,
 )
 
-from utils_nlp.models.bert.qa_utils import QAFeatures, QAExample
+from utils_nlp.models.transformers.qa_utils import QAFeatures, QAExample
 
 # Max supported sequence length
 BERT_MAX_LEN = 512
@@ -71,6 +71,10 @@ class BERTSubModelType(str, Enum):
     ENGLISHLARGECASEDWWM: str = "bert-large-cased-whole-word-masking"
     CHINESE: str = "bert-base-chinese"
     MULTILINGUAL: str = "bert-base-multilingual-cased"
+
+class XLNetSubModelType(str, Enum):
+    ENGLISHCASED: str = "xlnet-base-cased"
+    ENGLISHLARGECASED: str = "xlnet-large-cased"
 
 
 TOKENIZER_CLASSES = {"bert": BertTokenizer, "xlnet": XLNetTokenizer}

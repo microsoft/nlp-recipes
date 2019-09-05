@@ -127,11 +127,13 @@ class TransformerAnswerExtractor:
         all_input_ids = torch.tensor([f.input_ids for f in features], dtype=torch.long)
         all_input_mask = torch.tensor([f.input_mask for f in features], dtype=torch.long)
         all_segment_ids = torch.tensor([f.segment_ids for f in features], dtype=torch.long)
+        all_cls_index = torch.tensor([f.cls_index for f in features], dtype=torch.long)
+        all_p_mask = torch.tensor([f.p_mask for f in features], dtype=torch.float)
 
         all_start_positions = torch.tensor([f.start_position for f in features], dtype=torch.long)
         all_end_positions = torch.tensor([f.end_position for f in features], dtype=torch.long)
         train_dataset = TensorDataset(
-            all_input_ids, all_input_mask, all_segment_ids, all_start_positions, all_end_positions
+            all_input_ids, all_input_mask, all_segment_ids, all_start_positions, all_end_positions, all_cls_index, all_p_mask
         )
 
         train_sampler = RandomSampler(train_dataset)
@@ -196,9 +198,9 @@ class TransformerAnswerExtractor:
                 torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_grad_norm)
 
                 tr_loss += loss.item()
-
-                scheduler.step()  # Update learning rate schedule
+                
                 optimizer.step()
+                scheduler.step()  # Update learning rate schedule
                 self.model.zero_grad()
                 global_step += 1
 
@@ -261,6 +263,8 @@ class TransformerAnswerExtractor:
         all_input_ids = torch.tensor([f.input_ids for f in features], dtype=torch.long)
         all_input_mask = torch.tensor([f.input_mask for f in features], dtype=torch.long)
         all_segment_ids = torch.tensor([f.segment_ids for f in features], dtype=torch.long)
+        all_cls_index = torch.tensor([f.cls_index for f in features], dtype=torch.long)
+        all_p_mask = torch.tensor([f.p_mask for f in features], dtype=torch.float)
 
         # This index is used to find the original data sample each
         # prediction comes from and add the unique_id to the prediction
@@ -268,7 +272,7 @@ class TransformerAnswerExtractor:
         # Don't use the unique_id directly because it could be string.
         all_example_index = torch.arange(all_input_ids.size(0), dtype=torch.long)
         test_dataset = TensorDataset(
-            all_input_ids, all_input_mask, all_segment_ids, all_example_index
+            all_input_ids, all_input_mask, all_segment_ids, all_example_index, all_cls_index, all_p_mask
         )
 
         test_sampler = SequentialSampler(test_dataset)
@@ -284,6 +288,10 @@ class TransformerAnswerExtractor:
                     "token_type_ids": batch[2],
                 }
                 example_indices = batch[3]
+
+                if self.model_type in [ModelType.XLNet]:
+                    inputs.update({'cls_index': batch[4],
+                                'p_mask':    batch[5]})
 
                 outputs = self.model(**inputs)
 
