@@ -73,7 +73,7 @@ PIP_BASE = {
     "ipywebrtc": "ipywebrtc==0.4.3",
     "pre-commit": "pre-commit>=1.14.4",
     "scikit-learn": "scikit-learn>=0.19.0,<=0.20.3",
-    "seaborn": "seaborn==0.9.0",
+    "seaborn": "seaborn>=0.9.0",
     "setuptools_scm": "setuptools_scm==3.2.0",
     "sklearn-crfsuite": "sklearn-crfsuite>=0.3.6",
     "spacy": "spacy>=2.1.4",
