@@ -45,6 +45,7 @@ The models submodule contains implementations of various algorithms that can be 
 A few highlights are
 * BERT
 * GenSen
+* XLNet
 
 
 ### [Model Explainability](interpreter)
