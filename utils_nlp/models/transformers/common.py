@@ -34,7 +34,8 @@ from torch.utils.data import (
 from utils_nlp.models.transformers.qa_utils import QAFeatures, QAExample
 
 # Max supported sequence length
-BERT_MAX_LEN = 512
+# TODO: need to figure this out for each model
+MAX_SEQ_LEN = 512
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +72,7 @@ class BERTSubModelType(str, Enum):
     ENGLISHLARGECASEDWWM: str = "bert-large-cased-whole-word-masking"
     CHINESE: str = "bert-base-chinese"
     MULTILINGUAL: str = "bert-base-multilingual-cased"
+
 
 class XLNetSubModelType(str, Enum):
     ENGLISHCASED: str = "xlnet-base-cased"
@@ -142,7 +144,7 @@ class Tokenizer:
 
         return [tokens_a, tokens_b]
 
-    def preprocess_classification_tokens(self, tokens, max_len=BERT_MAX_LEN):
+    def preprocess_classification_tokens(self, tokens, max_len=MAX_SEQ_LEN):
         """Preprocessing of input tokens:
             - add BERT sentence markers ([CLS] and [SEP])
             - map tokens to token indices in the BERT vocabulary
@@ -162,9 +164,9 @@ class Tokenizer:
                 list of input mask lists
                 list of token type id lists
         """
-        if max_len > BERT_MAX_LEN:
-            print("setting max_len to max allowed tokens: {}".format(BERT_MAX_LEN))
-            max_len = BERT_MAX_LEN
+        if max_len > MAX_SEQ_LEN:
+            print("setting max_len to max allowed tokens: {}".format(MAX_SEQ_LEN))
+            max_len = MAX_SEQ_LEN
 
         if isinstance(tokens[0][0], str):
             tokens = [x[0 : max_len - 2] + ["[SEP]"] for x in tokens]
@@ -199,7 +201,7 @@ class Tokenizer:
         input_mask = [[min(1, x) for x in y] for y in tokens]
         return tokens, input_mask, token_type_ids
 
-    def preprocess_encoder_tokens(self, tokens, max_len=BERT_MAX_LEN):
+    def preprocess_encoder_tokens(self, tokens, max_len=MAX_SEQ_LEN):
         """Preprocessing of input tokens:
             - add BERT sentence markers ([CLS] and [SEP])
             - map tokens to token indices in the BERT vocabulary
@@ -220,9 +222,9 @@ class Tokenizer:
                 list of input mask lists
                 list of token type id lists
         """
-        if max_len > BERT_MAX_LEN:
-            print("setting max_len to max allowed tokens: {}".format(BERT_MAX_LEN))
-            max_len = BERT_MAX_LEN
+        if max_len > MAX_SEQ_LEN:
+            print("setting max_len to max allowed tokens: {}".format(MAX_SEQ_LEN))
+            max_len = MAX_SEQ_LEN
 
         if isinstance(tokens[0][0], str):
             tokens = [x[0 : max_len - 2] + ["[SEP]"] for x in tokens]
@@ -258,7 +260,7 @@ class Tokenizer:
         return tokens, input_ids, input_mask, token_type_ids
 
     def tokenize_ner(
-        self, text, max_len=BERT_MAX_LEN, labels=None, label_map=None, trailing_piece_tag="X"
+        self, text, max_len=MAX_SEQ_LEN, labels=None, label_map=None, trailing_piece_tag="X"
     ):
         """
         Tokenize and preprocesses input word lists, involving the following steps
@@ -277,7 +279,7 @@ class Tokenizer:
                 input sentence.
             max_len (int, optional): Maximum length of the list of
                 tokens. Lists longer than this are truncated and shorter
-                ones are padded with "O"s. Default value is BERT_MAX_LEN=512.
+                ones are padded with "O"s. Default value is MAX_SEQ_LEN=512.
             labels (list, optional): List of word label lists. Each sublist
                 contains labels corresponding to the input word list. The lengths
                 of the label list and word list must be the same. Default
@@ -312,9 +314,9 @@ class Tokenizer:
                     argument is not provided, the value of this is None.
         """
 
-        if max_len > BERT_MAX_LEN:
-            warnings.warn("setting max_len to max allowed tokens: {}".format(BERT_MAX_LEN))
-            max_len = BERT_MAX_LEN
+        if max_len > MAX_SEQ_LEN:
+            warnings.warn("setting max_len to max allowed tokens: {}".format(MAX_SEQ_LEN))
+            max_len = MAX_SEQ_LEN
 
         if not _is_iterable_but_not_string(text):
             # The input text must be an non-string Iterable
@@ -415,7 +417,7 @@ class Tokenizer:
         answer_start=None,
         answer_text=None,
         max_question_length=64,
-        max_len=BERT_MAX_LEN,
+        max_len=MAX_SEQ_LEN,
         doc_stride=128,
         is_impossible=None,
         cache_results=False,
@@ -462,7 +464,7 @@ class Tokenizer:
                 allowed AFTER tokenization. Defaults to 64.
             max_len (int, optional): Maximum total sequence length allowed,
                 including question tokens, text tokens, 1 [CLS] token and 2
-                [SEP] tokens. Defaults to BERT_MAX_LEN, i.e. 512.
+                [SEP] tokens. Defaults to MAX_SEQ_LEN, i.e. 512.
             doc_stride (int, optional): When splitting up a long document into
                 chunks, how much stride to take between chunks. Defaults to
                 128.

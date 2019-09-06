@@ -10,9 +10,6 @@ import logging
 from tqdm import tqdm, trange
 
 import torch
-from torch.utils.data import DataLoader, RandomSampler, SequentialSampler, TensorDataset
-
-# from tensorboardX import SummaryWriter
 
 from pytorch_transformers import AdamW, WarmupLinearSchedule
 from pytorch_transformers import (
@@ -36,7 +33,7 @@ MODEL_CLASSES = {
 }
 
 
-class TransformerAnswerExtractor:
+class AnswerExtractor:
     """
     Question answer extractor based on
     :class:`pytorch_transformers.modeling_bert.BertForQuestionAnswering`
@@ -77,7 +74,9 @@ class TransformerAnswerExtractor:
 
     def fit(
         self,
-        features,
+        # features,
+        train_data_generator,
+        train_data_size,
         num_gpus=None,
         num_epochs=1,
         batch_size=32,
@@ -124,22 +123,23 @@ class TransformerAnswerExtractor:
         device = get_device("cpu" if num_gpus == 0 or not torch.cuda.is_available() else "gpu")
         self.model = move_to_device(self.model, device, num_gpus)
 
-        all_input_ids = torch.tensor([f.input_ids for f in features], dtype=torch.long)
-        all_input_mask = torch.tensor([f.input_mask for f in features], dtype=torch.long)
-        all_segment_ids = torch.tensor([f.segment_ids for f in features], dtype=torch.long)
-        all_cls_index = torch.tensor([f.cls_index for f in features], dtype=torch.long)
-        all_p_mask = torch.tensor([f.p_mask for f in features], dtype=torch.float)
+        # all_input_ids = torch.tensor([f.input_ids for f in features], dtype=torch.long)
+        # all_input_mask = torch.tensor([f.input_mask for f in features], dtype=torch.long)
+        # all_segment_ids = torch.tensor([f.segment_ids for f in features], dtype=torch.long)
+        # all_cls_index = torch.tensor([f.cls_index for f in features], dtype=torch.long)
+        # all_p_mask = torch.tensor([f.p_mask for f in features], dtype=torch.float)
 
-        all_start_positions = torch.tensor([f.start_position for f in features], dtype=torch.long)
-        all_end_positions = torch.tensor([f.end_position for f in features], dtype=torch.long)
-        train_dataset = TensorDataset(
-            all_input_ids, all_input_mask, all_segment_ids, all_start_positions, all_end_positions, all_cls_index, all_p_mask
-        )
+        # all_start_positions = torch.tensor([f.start_position for f in features], dtype=torch.long)
+        # all_end_positions = torch.tensor([f.end_position for f in features], dtype=torch.long)
+        # train_dataset = TensorDataset(
+        #     all_input_ids, all_input_mask, all_segment_ids, all_start_positions,
+        # all_end_positions, all_cls_index, all_p_mask
+        # )
 
-        train_sampler = RandomSampler(train_dataset)
-        train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=batch_size)
+        # train_sampler = RandomSampler(train_dataset)
+        # train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=batch_size)
 
-        t_total = len(train_dataloader) * num_epochs
+        t_total = train_data_size * num_epochs
 
         # Prepare optimizer and schedule (linear warmup and decay)
         no_decay = ["bias", "LayerNorm.weight"]
@@ -171,10 +171,12 @@ class TransformerAnswerExtractor:
         global_step = 0
         tr_loss = 0.0
         self.model.zero_grad()
+        self.model.train()
         train_iterator = trange(int(num_epochs), desc="Epoch")
         for _ in train_iterator:
-            for batch in tqdm(train_dataloader, desc="Iteration", mininterval=60):
-                self.model.train()
+            # for batch in tqdm(train_dataloader, desc="Iteration", mininterval=60):
+            for batch in train_data_generator:
+
                 batch = tuple(t.to(device) for t in batch)
                 inputs = {
                     "input_ids": batch[0],
@@ -198,7 +200,7 @@ class TransformerAnswerExtractor:
                 torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_grad_norm)
 
                 tr_loss += loss.item()
-                
+
                 optimizer.step()
                 scheduler.step()  # Update learning rate schedule
                 self.model.zero_grad()
@@ -226,7 +228,7 @@ class TransformerAnswerExtractor:
             model_to_save.save_pretrained(output_model_dir)
         torch.cuda.empty_cache()
 
-    def predict(self, features, num_gpus=None, batch_size=32):
+    def predict(self, test_dataloader, num_gpus=None, batch_size=32):
 
         """
         Predicts answer start and end logits using fine-tuned
@@ -260,23 +262,24 @@ class TransformerAnswerExtractor:
         # score
         self.model.eval()
 
-        all_input_ids = torch.tensor([f.input_ids for f in features], dtype=torch.long)
-        all_input_mask = torch.tensor([f.input_mask for f in features], dtype=torch.long)
-        all_segment_ids = torch.tensor([f.segment_ids for f in features], dtype=torch.long)
-        all_cls_index = torch.tensor([f.cls_index for f in features], dtype=torch.long)
-        all_p_mask = torch.tensor([f.p_mask for f in features], dtype=torch.float)
+        # all_input_ids = torch.tensor([f.input_ids for f in features], dtype=torch.long)
+        # all_input_mask = torch.tensor([f.input_mask for f in features], dtype=torch.long)
+        # all_segment_ids = torch.tensor([f.segment_ids for f in features], dtype=torch.long)
+        # all_cls_index = torch.tensor([f.cls_index for f in features], dtype=torch.long)
+        # all_p_mask = torch.tensor([f.p_mask for f in features], dtype=torch.float)
 
         # This index is used to find the original data sample each
         # prediction comes from and add the unique_id to the prediction
         # results.
         # Don't use the unique_id directly because it could be string.
-        all_example_index = torch.arange(all_input_ids.size(0), dtype=torch.long)
-        test_dataset = TensorDataset(
-            all_input_ids, all_input_mask, all_segment_ids, all_example_index, all_cls_index, all_p_mask
-        )
+        # all_example_index = torch.arange(all_input_ids.size(0), dtype=torch.long)
+        # test_dataset = TensorDataset(
+        #     all_input_ids, all_input_mask, all_segment_ids, all_example_index, all_cls_index,
+        # all_p_mask
+        # )
 
-        test_sampler = SequentialSampler(test_dataset)
-        test_dataloader = DataLoader(test_dataset, sampler=test_sampler, batch_size=batch_size)
+        # test_sampler = SequentialSampler(test_dataset)
+        # test_dataloader = DataLoader(test_dataset, sampler=test_sampler, batch_size=batch_size)
 
         all_results = []
         for batch in tqdm(test_dataloader, desc="Evaluating"):
@@ -287,21 +290,22 @@ class TransformerAnswerExtractor:
                     "attention_mask": batch[1],
                     "token_type_ids": batch[2],
                 }
-                example_indices = batch[3]
+                # example_indices = batch[3]
 
                 if self.model_type in [ModelType.XLNet]:
-                    inputs.update({'cls_index': batch[4],
-                                'p_mask':    batch[5]})
+                    inputs.update({"cls_index": batch[3], "p_mask": batch[4]})
 
                 outputs = self.model(**inputs)
 
-            for i, example_index in enumerate(example_indices):
-                test_feature = features[example_index.item()]
-                unique_id = int(test_feature.unique_id)
+                # unique_id_tensor = batch[5]
+
+            for i, u_id in enumerate(example_indices):
+                # test_feature = features[example_index.item()]
+                # unique_id = int(test_feature.unique_id)
 
                 if self.model_type in [ModelType.XLNet]:
                     result = QAResultExtended(
-                        unique_id=unique_id,
+                        unique_id=u_id.item(),
                         start_top_log_probs=_to_list(outputs[0][i]),
                         start_top_index=_to_list(outputs[1][i]),
                         end_top_log_probs=_to_list(outputs[2][i]),
@@ -310,7 +314,7 @@ class TransformerAnswerExtractor:
                     )
                 else:
                     result = QAResult(
-                        unique_id=unique_id,
+                        unique_id=u_id.item(),
                         start_logits=_to_list(outputs[0][i]),
                         end_logits=_to_list(outputs[1][i]),
                     )
