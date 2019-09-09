@@ -68,6 +68,7 @@ PIP_BASE = {
     "nteract-scrapbook": "nteract-scrapbook>=0.2.1",
     "pydocumentdb": "pydocumentdb>=2.3.3",
     "pytorch-pretrained-bert": "pytorch-pretrained-bert>=0.6",
+    "pytorch-transformers": "pytorch-transformers>=1.2.0",
     "tqdm": "tqdm==4.31.1",
     "pyemd": "pyemd==0.5.1",
     "ipywebrtc": "ipywebrtc==0.4.3",
