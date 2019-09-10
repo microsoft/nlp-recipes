@@ -27,8 +27,7 @@ from utils_nlp.common.pytorch_utils import get_device, move_to_device
 
 from utils_nlp.models.bert.qa_utils import QAResult
 
-from utils_nlp.azureml.azureml_bert_util import DistributedCommunicator, warmup_linear, adjust_gradient_accumulation_steps
-from azureml.core.run import Run
+# from azureml.core.run import Run
 
 
 logger = logging.getLogger(__name__)
@@ -44,14 +43,14 @@ class BERTQAExtractor:
             The value of this argument determines which BERT model is
             used. See :class:`~utils_nlp.models.bert.common.Language`
             for details. Defaults to Language.ENGLISH.
-        cache_dir (str, optional):  Location of BERT's cache directory. 
-            When calling the `fit` method, if `cache_model` is `True`, 
-            the fine-tuned model is saved to this directory. If `cache_dir` 
-            and `load_model_from_dir` are the same and `overwrite_model` is 
+        cache_dir (str, optional):  Location of BERT's cache directory.
+            When calling the `fit` method, if `cache_model` is `True`,
+            the fine-tuned model is saved to this directory. If `cache_dir`
+            and `load_model_from_dir` are the same and `overwrite_model` is
             `False`, the fitted model is saved to "cache_dir/fine_tuned".
             Defaults to ".".
         load_model_from_dir (str, optional): Directory to load the model from.
-            The directory must contain a model file "pytorch_model.bin" and a 
+            The directory must contain a model file "pytorch_model.bin" and a
             configuration file "config.json". Defaults to None.
 
     """
@@ -84,7 +83,7 @@ class BERTQAExtractor:
         gradient_accumulation_steps=1,
         cache_model=False,
         overwrite_model=False,
-        distributed=True
+        distributed=True,
     ):
         """
         Fine-tune pre-trained BertForQuestionAnswering model.
@@ -109,27 +108,34 @@ class BERTQAExtractor:
             max_grad_norm (float, optional): Maximum gradient norm for gradient
                 clipping. Defaults to 1.0.
             cache_model (bool, optional): Whether to save the fine-tuned
-                model to the `cache_dir` of the answer extractor. 
-                If `cache_dir` and `load_model_from_dir` are the same and 
-                `overwrite_model` is `False`, the fitted model is saved 
+                model to the `cache_dir` of the answer extractor.
+                If `cache_dir` and `load_model_from_dir` are the same and
+                `overwrite_model` is `False`, the fitted model is saved
                 to "cache_dir/fine_tuned". Defaults to False.
             overwrite_model (bool, optional): Whether to overwrite an existing model.
-                If `cache_dir` and `load_model_from_dir` are the same and 
-                `overwrite_model` is `False`, the fitted model is saved to 
+                If `cache_dir` and `load_model_from_dir` are the same and
+                `overwrite_model` is `False`, the fitted model is saved to
                 "cache_dir/fine_tuned". Defaults to False.
 
         """
-        ##dist
+        # dist
         step_per_log = 100
         is_master = False
 
         if distributed:
             hvd.init()
-            run = Run.get_context()
+            # run = Run.get_context()
 
-            rank  = hvd.rank()
+            rank = hvd.rank()
             local_rank = hvd.local_rank()
             world_size = hvd.size()
+
+            # torch.distributed.init_process_group(
+            #     backend="nccl",
+            #     init_method="tcp://127.0.0.1:6000",
+            #     world_size=world_size,
+            #     rank=local_rank,
+            # )
 
             torch.cuda.set_device(local_rank)
             device = torch.device("cuda", local_rank)
@@ -142,14 +148,13 @@ class BERTQAExtractor:
         else:
             device = get_device("cpu" if num_gpus == 0 or not torch.cuda.is_available() else "gpu")
             self.model = move_to_device(self.model, device, num_gpus)
-        ##dist ends
-        
+        # dist ends
+
         RANDOM_SEED = 42
         random.seed(RANDOM_SEED)
         np.random.seed(RANDOM_SEED)
         torch.manual_seed(RANDOM_SEED)
 
-        
         all_input_ids = torch.tensor([f.input_ids for f in features], dtype=torch.long)
         all_input_mask = torch.tensor([f.input_mask for f in features], dtype=torch.long)
         all_segment_ids = torch.tensor([f.segment_ids for f in features], dtype=torch.long)
@@ -159,17 +164,21 @@ class BERTQAExtractor:
         train_dataset = TensorDataset(
             all_input_ids, all_input_mask, all_segment_ids, all_start_positions, all_end_positions
         )
-        ##dist
+        # dist
         if distributed:
-            train_sampler = DistributedSampler(train_dataset, num_replicas=world_size, rank=rank)
+            # train_sampler = DistributedSampler(train_dataset, num_replicas=world_size, rank=rank)
+            train_sampler = DistributedSampler(
+                train_dataset, num_replicas=world_size, rank=local_rank
+            )
+
         else:
             train_sampler = RandomSampler(train_dataset)
-        ##dist ends
+        # dist ends
         train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=batch_size)
 
-        ##dist
+        # dist
         t_total = len(train_dataloader) // gradient_accumulation_steps * num_epochs
-        ##dist ends
+        # dist ends
 
         # Prepare optimizer and schedule (linear warmup and decay)
         no_decay = ["bias", "LayerNorm.weight"]
@@ -191,12 +200,12 @@ class BERTQAExtractor:
         ]
         optimizer = AdamW(optimizer_grouped_parameters, lr=learning_rate, eps=1e-6)
 
-
         if distributed:
             optimizer = hvd.DistributedOptimizer(
-                optimizer, 
+                optimizer,
                 named_parameters=self.model.named_parameters(),
-                backward_passes_per_step=gradient_accumulation_steps)
+                backward_passes_per_step=gradient_accumulation_steps,
+            )
 
             hvd.broadcast_parameters(self.model.state_dict(), root_rank=0)
             hvd.broadcast_optimizer_state(optimizer, root_rank=0)
@@ -230,13 +239,15 @@ class BERTQAExtractor:
                 if distributed:
                     loss = loss / gradient_accumulation_steps
                 else:
-                    loss = loss.mean()  # mean() to average on multi-gpu parallel (not distributed) training
+                    loss = (
+                        loss.mean()
+                    )  # mean() to average on multi-gpu parallel (not distributed) training
                     loss = loss / gradient_accumulation_steps
 
                 loss.backward()
 
                 if not distributed:
-                    ##TODO: should this be moved to after gradient accmulation? 
+                    # TODO: should this be moved to after gradient accmulation?
                     torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_grad_norm)
 
                 tr_loss += loss.item()
@@ -244,24 +255,28 @@ class BERTQAExtractor:
                 global_step += 1
 
                 if (global_step + 1) % gradient_accumulation_steps == 0:
-                    if distributed: 
+                    if distributed:
                         optimizer.synchronize()
                         torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_grad_norm)
                         with optimizer.skip_synchronize():
                             optimizer.step()
                     else:
                         optimizer.step()
-                
+
                     scheduler.step()  # Update learning rate schedule
                     self.model.zero_grad()
 
                 if (global_step + 1) % step_per_log == 0:
                     if distributed and is_master:
-                        run.log('train_loss', np.float(tr_loss / step_per_log))
-                    else: 
-                        logger.info(" global_step = %s, train loss = %s", global_step, tr_loss / step_per_log * gradient_accumulation_steps)
+                        pass
+                        # run.log('train_loss', np.float(tr_loss / step_per_log))
+                    else:
+                        logger.info(
+                            " global_step = %s, train loss = %s",
+                            global_step,
+                            tr_loss / step_per_log * gradient_accumulation_steps,
+                        )
                     tr_loss = 0
-
 
         if cache_model and (not distributed or is_master):
             if self.cache_dir == self.load_model_from_dir and not overwrite_model:

@@ -12,7 +12,9 @@ import numpy as np
 import random
 
 import torch
-from torch.utils.data import DataLoader, RandomSampler, SequentialSampler, TensorDataset
+from torch.utils.data import DataLoader, SequentialSampler, TensorDataset
+
+# from torch.utils.data import RandomSampler
 from torch.utils.data.distributed import DistributedSampler
 
 import horovod.torch as hvd
@@ -27,8 +29,7 @@ from utils_nlp.common.pytorch_utils import get_device, move_to_device
 
 from utils_nlp.models.bert.qa_utils import QAResult
 
-from utils_nlp.azureml.azureml_bert_util import DistributedCommunicator, warmup_linear, adjust_gradient_accumulation_steps
-from azureml.core.run import Run
+# from azureml.core.run import Run
 
 
 logger = logging.getLogger(__name__)
@@ -84,7 +85,7 @@ class BERTQAExtractor:
         gradient_accumulation_steps=1,
         cache_model=False,
         overwrite_model=False,
-        distributed=True
+        distributed=True,
     ):
         """
         Fine-tune pre-trained BertForQuestionAnswering model.
@@ -119,7 +120,7 @@ class BERTQAExtractor:
                 "cache_dir/fine_tuned". Defaults to False.
 
         """
-        ##dist
+        # dist
         step_per_log = 100
         is_master = False
 
@@ -127,7 +128,7 @@ class BERTQAExtractor:
             hvd.init()
             run = Run.get_context()
 
-            rank  = hvd.rank()
+            rank = hvd.rank()
             local_rank = hvd.local_rank()
             world_size = hvd.size()
 
@@ -140,42 +141,39 @@ class BERTQAExtractor:
             self.model = self.model.to(device)
 
         else:
-            hvd.init()
-            local_rank = hvd.local_rank()
-            world_size = hvd.size()
+            # hvd.init()
+            # local_rank = hvd.local_rank()
+            # world_size = hvd.size()
 
-            os.environ['MASTER_ADDR'] = '127.0.0.1'
-            os.environ['MASTER_PORT'] = '29500'
+            os.environ["MASTER_ADDR"] = "127.0.0.1"
+            os.environ["MASTER_PORT"] = "29500"
 
             torch.distributed.init_process_group(
                 backend="nccl",
-                rank=local_rank,
-                world_size=world_size
+                # rank=local_rank,
+                # world_size=world_size
             )
-            
-#             world_size = torch.distributed.get_world_size()
-#             local_rank = torch.distributed.get_rank()
-            # device = get_device("cpu" if num_gpus == 0 or not torch.cuda.is_available() else "gpu")
-            # self.model = move_to_device(self.model, device, num_gpus)
-            
-            device = torch.device('cuda', local_rank)
+
+            world_size = torch.distributed.get_world_size()
+            local_rank = torch.distributed.get_rank()
+            torch.cuda.set_device(local_rank)
+
+            device = torch.device("cuda", local_rank)
             self.model = self.model.to(device)
-            
+
             self.model = torch.nn.parallel.DistributedDataParallel(
                 self.model,
-#                 device_ids=[local_rank],
+                device_ids=[local_rank],
                 output_device=local_rank,
-                find_unused_parameters=True
-                )
+                find_unused_parameters=True,
+            )
 
-
-        ##dist ends
+        # dist ends
 
         RANDOM_SEED = 42
         random.seed(RANDOM_SEED)
         np.random.seed(RANDOM_SEED)
         torch.manual_seed(RANDOM_SEED)
-
 
         all_input_ids = torch.tensor([f.input_ids for f in features], dtype=torch.long)
         all_input_mask = torch.tensor([f.input_mask for f in features], dtype=torch.long)
@@ -186,17 +184,19 @@ class BERTQAExtractor:
         train_dataset = TensorDataset(
             all_input_ids, all_input_mask, all_segment_ids, all_start_positions, all_end_positions
         )
-        ##dist
+        # dist
         if distributed:
             train_sampler = DistributedSampler(train_dataset, num_replicas=world_size, rank=rank)
         else:
-            train_sampler = DistributedSampler(train_dataset, num_replicas=world_size, rank=local_rank)
-        ##dist ends
+            train_sampler = DistributedSampler(
+                train_dataset, num_replicas=world_size, rank=local_rank
+            )
+        # dist ends
         train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=batch_size)
 
-        ##dist
+        # dist
         t_total = len(train_dataloader) // gradient_accumulation_steps * num_epochs
-        ##dist ends
+        # dist ends
 
         # Prepare optimizer and schedule (linear warmup and decay)
         no_decay = ["bias", "LayerNorm.weight"]
@@ -218,12 +218,12 @@ class BERTQAExtractor:
         ]
         optimizer = AdamW(optimizer_grouped_parameters, lr=learning_rate, eps=1e-6)
 
-
         if distributed:
             optimizer = hvd.DistributedOptimizer(
                 optimizer,
                 named_parameters=self.model.named_parameters(),
-                backward_passes_per_step=gradient_accumulation_steps)
+                backward_passes_per_step=gradient_accumulation_steps,
+            )
 
             hvd.broadcast_parameters(self.model.state_dict(), root_rank=0)
             hvd.broadcast_optimizer_state(optimizer, root_rank=0)
@@ -238,10 +238,10 @@ class BERTQAExtractor:
         global_step = 0
         tr_loss = 0.0
         # self.model.zero_grad()
-        self.model.train()
         train_iterator = trange(int(num_epochs), desc="Epoch")
         for _ in train_iterator:
             for step, batch in enumerate(tqdm(train_dataloader, desc="Iteration", mininterval=60)):
+                self.model.train()
                 batch = tuple(t.to(device) for t in batch)
                 inputs = {
                     "input_ids": batch[0],
@@ -257,13 +257,14 @@ class BERTQAExtractor:
                 if distributed:
                     loss = loss / gradient_accumulation_steps
                 else:
-                    loss = loss.mean()  # mean() to average on multi-gpu parallel (not distributed) training
+                    # mean() to average on multi-gpu parallel (not distributed) training
+                    # loss = loss.mean()
                     loss = loss / gradient_accumulation_steps
 
                 loss.backward()
 
                 if not distributed:
-                    ##TODO: should this be moved to after gradient accmulation?
+                    # TODO: should this be moved to after gradient accmulation?
                     torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_grad_norm)
 
                 tr_loss += loss.item()
@@ -284,11 +285,14 @@ class BERTQAExtractor:
 
                 if (global_step + 1) % step_per_log == 0:
                     if distributed and is_master:
-                        run.log('train_loss', np.float(tr_loss / step_per_log))
+                        run.log("train_loss", np.float(tr_loss / step_per_log))
                     else:
-                        logger.info(" global_step = %s, train loss = %s", global_step, tr_loss / step_per_log * gradient_accumulation_steps)
+                        logger.info(
+                            " global_step = %s, train loss = %s",
+                            global_step,
+                            tr_loss / step_per_log * gradient_accumulation_steps,
+                        )
                     tr_loss = 0
-
 
         if cache_model and (not distributed or is_master):
             if self.cache_dir == self.load_model_from_dir and not overwrite_model:
