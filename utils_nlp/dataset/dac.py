@@ -27,11 +27,12 @@ def load_pandas_df(local_cache_path=None, num_rows=None):
     Returns:
         pd.DataFrame: pandas DataFrame containing the loaded dataset.
     """
-    zip_file = URL.split("/")[-1]
-    csv_file_path = os.path.join(local_cache_path, zip_file.replace(".zip", ""))
-
+    zip_file = URL.split("/")[-1]    
     maybe_download(URL, zip_file, local_cache_path)
 
+    zip_file_path = os.path.join(local_cache_path, zip_file)
+    csv_file_path = os.path.join(local_cache_path, zip_file.replace(".zip", ""))
+
     if not os.path.exists(csv_file_path):
-        extract_zip(file_path=csv_file_path, dest_path=local_cache_path)
+        extract_zip(file_path=zip_file_path, dest_path=local_cache_path)
     return pd.read_csv(csv_file_path, nrows=num_rows)
