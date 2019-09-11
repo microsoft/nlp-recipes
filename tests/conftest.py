@@ -73,6 +73,9 @@ def notebooks():
         "tc_dac_bert_ar": os.path.join(
             folder_notebooks, "text_classification", "tc_dac_bert_ar.ipynb"
         ),
+        "tc_bbc_bert_hi": os.path.join(
+            folder_notebooks, "text_classification", "tc_bbc_bert_hi.ipynb"
+        ),
         "ner_wikigold_bert": os.path.join(
             folder_notebooks, "named_entity_recognition", "ner_wikigold_bert.ipynb"
         ),

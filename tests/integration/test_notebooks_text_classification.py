@@ -56,6 +56,20 @@ def test_tc_dac_bert_ar(notebooks, tmp):
     )
 
 
+@pytest.mark.gpu
+@pytest.mark.integration
+def test_tc_bbc_bert_hi(notebooks, tmp):
+    notebook_path = notebooks["tc_bbc_bert_hi"]
+    pm.execute_notebook(
+        notebook_path,
+        OUTPUT_NOTEBOOK,
+        kernel_name=KERNEL_NAME,
+        parameters=dict(
+            NUM_GPUS=1, DATA_FOLDER=tmp, BERT_CACHE_DIR=tmp, NUM_EPOCHS=1, NUM_ROWS=5000
+        ),
+    )
+
+
 @pytest.mark.integration
 @pytest.mark.azureml
 @pytest.mark.gpu
