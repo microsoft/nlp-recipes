@@ -3,9 +3,18 @@
 
 """Utilities functions for computing general model evaluation metrics."""
 
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
-
+from sklearn.metrics import (
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    confusion_matrix,
+)
 from numpy import corrcoef
+
+from matplotlib import pyplot
+import seaborn as sn
+import numpy as np
 import pandas as pd
 
 
@@ -44,3 +53,36 @@ def compute_correlation_coefficients(x, y=None):
         pd.DataFrame : A pandas dataframe from the correlation coefficient matrix of the variables.
     """
     return pd.DataFrame(corrcoef(x, y))
+
+
+def plot_confusion_matrix(
+    y_true,
+    y_pred,
+    labels,
+    normalize=False,
+    title="Confusion matrix",
+    plot_size=(8, 5),
+    font_scale=1.1,
+):
+    """Function that prints out a graphical representation of confusion matrix using Seaborn Heatmap
+
+    Args:
+        y_true (1d array-like): True labels from dataset
+        y_pred (1d array-like): Predicted labels from the models
+        labels: A list of labels
+        normalize (Bool, optional): Boolean to Set Row Normalization for Confusion Matrix
+        title (String, optional): String that is the title of the plot
+        plot_size (tuple, optional): Tuple of Plot Dimensions Default "(8, 5)"
+        font_scale (float, optional): float type scale factor for font within plot
+    """
+    conf_matrix = np.array(confusion_matrix(y_true, y_pred))
+    if normalize:
+        conf_matrix = np.round(
+            conf_matrix.astype("float") / conf_matrix.sum(axis=1)[:, np.newaxis], 3
+        )
+    conf_dataframe = pd.DataFrame(conf_matrix, labels, labels)
+    fig, ax = pyplot.subplots(figsize=plot_size)
+    sn.set(font_scale=font_scale)
+    ax.set_title(title)
+    ax = sn.heatmap(conf_dataframe, cmap="Blues", annot=True, annot_kws={"size": 16}, fmt="g")
+    ax.set(xlabel="Predicted Labels", ylabel="True Labels")

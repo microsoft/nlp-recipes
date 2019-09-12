@@ -15,8 +15,10 @@ from tempfile import TemporaryDirectory
 import pytest
 from tests.notebooks_common import path_notebooks
 
-from utils_nlp.models.bert.common import Language
+from utils_nlp.models.bert.common import Language as BERTLanguage
+from utils_nlp.models.xlnet.common import Language as XLNetLanguage
 from utils_nlp.models.bert.common import Tokenizer as BERTTokenizer
+from utils_nlp.models.xlnet.common import Tokenizer as XLNetTokenizer
 from utils_nlp.azureml import azureml_utils
 from azureml.core.webservice import Webservice
 
@@ -68,6 +70,12 @@ def notebooks():
             folder_notebooks, "sentence_similarity", "bert_senteval.ipynb"
         ),
         "tc_mnli_bert": os.path.join(folder_notebooks, "text_classification", "tc_mnli_bert.ipynb"),
+        "tc_dac_bert_ar": os.path.join(
+            folder_notebooks, "text_classification", "tc_dac_bert_ar.ipynb"
+        ),
+        "tc_bbc_bert_hi": os.path.join(
+            folder_notebooks, "text_classification", "tc_bbc_bert_hi.ipynb"
+        ),
         "ner_wikigold_bert": os.path.join(
             folder_notebooks, "named_entity_recognition", "ner_wikigold_bert.ipynb"
         ),
@@ -190,7 +198,12 @@ def cluster_name(request):
 
 @pytest.fixture()
 def bert_english_tokenizer():
-    return BERTTokenizer(language=Language.ENGLISHCASED, to_lower=False)
+    return BERTTokenizer(language=BERTLanguage.ENGLISHCASED, to_lower=False)
+
+
+@pytest.fixture()
+def xlnet_english_tokenizer():
+    return XLNetTokenizer(language=XLNetLanguage.ENGLISHCASED)
 
 
 @pytest.fixture(scope="module")

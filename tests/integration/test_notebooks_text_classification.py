@@ -18,29 +18,79 @@ ABS_TOL = 0.1
 def test_tc_mnli_bert(notebooks, tmp):
     notebook_path = notebooks["tc_mnli_bert"]
     pm.execute_notebook(
-        notebook_path, 
-        OUTPUT_NOTEBOOK, 
-        kernel_name=KERNEL_NAME, 
-        parameters=dict(NUM_GPUS=1,
-                        DATA_FOLDER=tmp,
-                        BERT_CACHE_DIR=tmp,
-                        BATCH_SIZE=32,
-                        BATCH_SIZE_PRED=512,
-                        NUM_EPOCHS=1
-                       )
+        notebook_path,
+        OUTPUT_NOTEBOOK,
+        kernel_name=KERNEL_NAME,
+        parameters=dict(
+            NUM_GPUS=1,
+            DATA_FOLDER=tmp,
+            BERT_CACHE_DIR=tmp,
+            BATCH_SIZE=32,
+            BATCH_SIZE_PRED=512,
+            NUM_EPOCHS=1,
+        ),
     )
     result = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict
     assert pytest.approx(result["accuracy"], 0.93, abs=ABS_TOL)
     assert pytest.approx(result["precision"], 0.93, abs=ABS_TOL)
     assert pytest.approx(result["recall"], 0.93, abs=ABS_TOL)
     assert pytest.approx(result["f1"], 0.93, abs=ABS_TOL)
-    
+
+
+@pytest.mark.gpu
+@pytest.mark.integration
+def test_tc_dac_bert_ar(notebooks, tmp):
+    notebook_path = notebooks["tc_dac_bert_ar"]
+    pm.execute_notebook(
+        notebook_path,
+        OUTPUT_NOTEBOOK,
+        kernel_name=KERNEL_NAME,
+        parameters=dict(
+            NUM_GPUS=1,
+            DATA_FOLDER=tmp,
+            BERT_CACHE_DIR=tmp,
+            BATCH_SIZE=32,
+            NUM_EPOCHS=1,
+            TRAIN_SIZE=0.8,
+            NUM_ROWS=15000,
+            RANDOM_STATE=0,
+        ),
+    )
+    result = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict
+    assert pytest.approx(result["accuracy"], 0.93, abs=ABS_TOL)
+    assert pytest.approx(result["precision"], 0.91, abs=ABS_TOL)
+    assert pytest.approx(result["recall"], 0.91, abs=ABS_TOL)
+    assert pytest.approx(result["f1"], 0.91, abs=ABS_TOL)
+
+
+@pytest.mark.gpu
+@pytest.mark.integration
+def test_tc_bbc_bert_hi(notebooks, tmp):
+    notebook_path = notebooks["tc_bbc_bert_hi"]
+    pm.execute_notebook(
+        notebook_path,
+        OUTPUT_NOTEBOOK,
+        kernel_name=KERNEL_NAME,
+        parameters=dict(NUM_GPUS=1, DATA_FOLDER=tmp, BERT_CACHE_DIR=tmp, NUM_EPOCHS=1),
+    )
+    result = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict
+    assert pytest.approx(result["accuracy"], 0.71, abs=ABS_TOL)
+    assert pytest.approx(result["precision"], 0.25, abs=ABS_TOL)
+    assert pytest.approx(result["recall"], 0.28, abs=ABS_TOL)
+    assert pytest.approx(result["f1"], 0.26, abs=ABS_TOL)
+
 
 @pytest.mark.integration
 @pytest.mark.azureml
 @pytest.mark.gpu
 def test_tc_bert_azureml(
-    notebooks, subscription_id, resource_group, workspace_name, workspace_region, cluster_name, tmp
+    notebooks,
+    subscription_id,
+    resource_group,
+    workspace_name,
+    workspace_region,
+    cluster_name,
+    tmp,
 ):
     notebook_path = notebooks["tc_bert_azureml"]
 
@@ -68,7 +118,9 @@ def test_tc_bert_azureml(
 
     with open("outputs/results.json", "r") as handle:
         result_dict = json.load(handle)
-        assert result_dict["weighted avg"]["f1-score"] == pytest.approx(0.85, abs=ABS_TOL)
+        assert result_dict["weighted avg"]["f1-score"] == pytest.approx(
+            0.85, abs=ABS_TOL
+        )
 
     if os.path.exists("outputs"):
         shutil.rmtree("outputs")
