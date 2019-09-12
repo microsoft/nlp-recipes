@@ -297,9 +297,9 @@ class AnswerExtractor:
 
                 outputs = self.model(**inputs)
 
-                # unique_id_tensor = batch[5]
+                unique_id_tensor = batch[5]
 
-            for i, u_id in enumerate(example_indices):
+            for i, u_id in enumerate(unique_id_tensor):
                 # test_feature = features[example_index.item()]
                 # unique_id = int(test_feature.unique_id)
 
