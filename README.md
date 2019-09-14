@@ -13,8 +13,13 @@ We hope that the tools can significantly reduce the “time to market” by simp
 
 In an era of transfer learning, transformers, and deep architectures, we believe that pretrained models provide a unified solution to many real-world problems and allow handling different tasks and languages easily. We will, therefore, prioritize such models, as they achieve state-of-the-art results on several NLP benchmarks like [*GLUE*](https://gluebenchmark.com/leaderboard) and [*SQuAD*](https://rajpurkar.github.io/SQuAD-explorer/) leaderboards. The models can be used in a number of applications ranging from simple text classification to sophisticated intelligent chat bots.
 
->   
->
+Note that for certain kind of NLP problems, you may not need to build your own models. Instead, pre-built or easily customizable solutions exist which do not require any custom coding or machine learning expertise. We strongly recommend evaluating if these can sufficiently solve your problem. If these solutions are not applicable, or the accuracy of these solutions is not sufficient, then resorting to more complex and time-consuming custom approaches may be necessary. The following cognitive services offer simple solutions to address common NLP tasks: 
+<br><br><b>[Text Analytics](https://azure.microsoft.com/en-us/services/cognitive-services/text-analytics/) </b> are a set of pre-trained REST APIs which can be called for Sentiment Analysis, Key phrase extraction, Language detection and Named Entity Detection and more. These APIs work out of the box and require minimal expertise in machine learning, but have limited customization capabilities.
+<br><br><b>[QnA Maker](https://azure.microsoft.com/en-us/services/cognitive-services/qna-maker/) </b>is a cloud-based API service that lets you create a conversational question-and-answer layer over your existing data. Use it to build a knowledge base by extracting questions and answers from your semi-structured content, including FAQs, manuals, and documents.
+<br><br><b>[Language Understanding](https://azure.microsoft.com/en-us/services/cognitive-services/language-understanding-intelligent-service/)</b> is a SaaS service to train and deploy a model as a REST API given a user-provided training set. You could do Intent Classification as well as Named Entity Extraction by performing simple steps of providing example utterances and labelling them. It supports Active Learning, so your model always keeps learning and improving.
+
+## Target Audience
+For this repository our target audience includes data scientists and machine learning engineers with varying levels of NLP knowledge as our content is source-only and targets custom machine learning modelling. The utilities and examples provided are intended to be solution accelerators for real-world NLP problems. 
 
 ## Focus areas
 The repository aims to expand NLP capabilities along three separate dimensions
@@ -50,6 +55,7 @@ The following is a summary of the commonly used NLP scenarios covered in the rep
 ## Getting Started
 While solving NLP problems, it is always good to start with the prebuilt [Cognitive Services](https://azure.microsoft.com/en-us/services/cognitive-services/directory/lang/). When the needs are beyond the bounds of the prebuilt cognitive service and when you want to search for custom machine learning methods,  you will find this repository  very useful. To get started, navigate to the [Setup Guide](SETUP.md), which lists instructions on how to setup your environment and dependencies.
 
+
 ## Azure Machine Learning service
 [Azure Machine Learning service](https://azure.microsoft.com/en-us/services/machine-learning-service/) is a cloud service used to train, deploy, automate, and manage machine learning models, all at the broad scale that the cloud provides. AzureML is presented in notebooks across different scenarios to enhance the efficiency of developing Natural Language systems at scale and for various AI model development related tasks like:
   * [**Accessing Datastores**](https://docs.microsoft.com/en-us/azure/machine-learning/service/how-to-access-data) to easily read and write your data in Azure storage services such as blob storage or file share.
@@ -66,7 +72,7 @@ To successfully run these notebooks, you will need an [**Azure subscription**](h
 ## Contributing
 We hope that the open source community would contribute to the content and bring in the latest SOTA algorithm. This project welcomes contributions and suggestions. Before contributing, please see our [contribution guidelines](CONTRIBUTING.md).
 
-## Links
+## References
 The following is a list of related repositories that we like and think are useful for NLP tasks.
 
 |||
