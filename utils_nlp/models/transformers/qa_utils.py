@@ -190,9 +190,10 @@ def get_qa_dataloader(
             for f in features_cur:
                 features_json.append(
                     {
+                        "qa_id": f.qa_id,
                         "unique_id": f.unique_id,
                         "tokens": f.tokens,
-                        "token_to_orign_map": f.token_to_orig_map,
+                        "token_to_orig_map": f.token_to_orig_map,
                         "token_is_max_context": f.token_is_max_context,
                     }
                 )
@@ -268,8 +269,8 @@ class QAResult(QAResult_):
 
 def postprocess_answer(
     results,
-    examples,
-    features,
+    examples_file,
+    features_file,
     do_lower_case,
     n_best_size=20,
     max_answer_length=30,
@@ -480,14 +481,20 @@ def postprocess_answer(
     logger.info("Writing predictions to: %s" % (output_prediction_file))
     logger.info("Writing nbest to: %s" % (output_nbest_file))
 
+    with jsonlines.open(examples_file) as reader:
+        examples_all = list(reader.iter())
+        
+    with jsonlines.open(features_file) as reader:
+        features_all = list(reader.iter())
+
     # example_index_to_features = collections.defaultdict(list)
     qa_id_to_features = collections.defaultdict(list)
     # Map unique features to the original doc-question-answer triplet
     # Each doc-question-answer triplet can have multiple features because the doc
     # could be split into multiple spans
-    for f in features:
+    for f in features_all:
         # example_index_to_features[feature.example_index].append(feature)
-        qa_id_to_features[f.qa_id].append(f)
+        qa_id_to_features[f["qa_id"]].append(f)
 
     unique_id_to_result = {}
     for r in results:
@@ -503,10 +510,10 @@ def postprocess_answer(
     all_nbest_json = collections.OrderedDict()
     scores_diff_json = collections.OrderedDict()
 
-    for (example_index, example) in enumerate(examples):
+    for example in examples_all:
         # get all the features belonging to the same example,
         # i.e. paragaraph/question pair.
-        features = qa_id_to_features[example.qa_id]
+        features = qa_id_to_features[example["qa_id"]]
 
         prelim_predictions = []
         # keep track of the minimum score of null start+end of position 0
@@ -514,8 +521,8 @@ def postprocess_answer(
         min_null_feature_index = 0  # the paragraph slice with min null score
         null_start_logit = 0  # the start logit at the slice with min null score
         null_end_logit = 0  # the end logit at the slice with min null score
-        for (feature_index, feature) in enumerate(features):
-            result = unique_id_to_result[feature.unique_id]
+        for (feature_index, f) in enumerate(features):
+            result = unique_id_to_result[f["unique_id"]]
             start_indexes = _get_best_indexes(result.start_logits, n_best_size)
             end_indexes = _get_best_indexes(result.end_logits, n_best_size)
             # if we could have irrelevant answers, get the min score of irrelevant
@@ -535,15 +542,15 @@ def postprocess_answer(
                     # We could hypothetically create invalid predictions, e.g., predict
                     # that the start of the span is in the question. We throw out all
                     # invalid predictions.
-                    if start_index >= len(feature.tokens):
+                    if start_index >= len(f["tokens"]):
                         continue
-                    if end_index >= len(feature.tokens):
+                    if end_index >= len(f["tokens"]):
                         continue
-                    if start_index not in feature.token_to_orig_map:
+                    if start_index not in f["token_to_orig_map"]:
                         continue
-                    if end_index not in feature.token_to_orig_map:
+                    if end_index not in f["token_to_orig_map"]:
                         continue
-                    if not feature.token_is_max_context.get(start_index, False):
+                    if not f["token_is_max_context"].get(start_index, False):
                         continue
                     if end_index < start_index:
                         continue
@@ -585,12 +592,12 @@ def postprocess_answer(
         for pred in prelim_predictions:
             if len(nbest) >= n_best_size:
                 break
-            feature = features[pred.feature_index]
+            f = features[pred.feature_index]
             if pred.start_index > 0:  # this is a non-null prediction
-                tok_tokens = feature.tokens[pred.start_index : (pred.end_index + 1)]
-                orig_doc_start = feature.token_to_orig_map[pred.start_index]
-                orig_doc_end = feature.token_to_orig_map[pred.end_index]
-                orig_tokens = example.doc_tokens[orig_doc_start : (orig_doc_end + 1)]
+                tok_tokens = f["tokens"][pred.start_index : (pred.end_index + 1)]
+                orig_doc_start = f["token_to_orig_map"][pred.start_index]
+                orig_doc_end = f["token_to_orig_map"][pred.end_index]
+                orig_tokens = example["doc_tokens"][orig_doc_start : (orig_doc_end + 1)]
                 tok_text = " ".join(tok_tokens)
 
                 # De-tokenize WordPieces that have been split off.
@@ -663,22 +670,22 @@ def postprocess_answer(
         assert len(nbest_json) >= 1
 
         if not unanswerable_exists:
-            all_predictions[example.qa_id] = nbest_json[0]["text"]
-            all_probs[example.qa_id] = nbest_json[0]["probability"]
+            all_predictions[example["qa_id"]] = nbest_json[0]["text"]
+            all_probs[example["qa_id"]] = nbest_json[0]["probability"]
         else:
             # predict "" iff the null score - the score of best non-null > threshold
             score_diff = (
                 score_null - best_non_null_entry.start_logit - (best_non_null_entry.end_logit)
             )
-            scores_diff_json[example.qa_id] = score_diff
+            scores_diff_json[example["qa_id"]] = score_diff
             if score_diff > null_score_diff_threshold:
-                all_predictions[example.qa_id] = ""
+                all_predictions[example["qa_id"]] = ""
                 ## TODO: double check this
-                all_probs[example.qa_id] = probs[null_prediction_index]
+                all_probs[example["qa_id"]] = probs[null_prediction_index]
             else:
-                all_predictions[example.qa_id] = best_non_null_entry.text
-                all_probs[example.qa_id] = probs[best_non_null_entry_index]
-        all_nbest_json[example.qa_id] = nbest_json
+                all_predictions[example["qa_id"]] = best_non_null_entry.text
+                all_probs[example["qa_id"]] = probs[best_non_null_entry_index]
+        all_nbest_json[example["qa_id"]] = nbest_json
 
     with open(output_prediction_file, "w") as writer:
         writer.write(json.dumps(all_predictions, indent=4) + "\n")

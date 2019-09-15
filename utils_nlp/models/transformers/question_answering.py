@@ -280,7 +280,7 @@ class AnswerExtractor:
                 unique_id_tensor = batch[5]
 
             for i, u_id in enumerate(unique_id_tensor):
-                if self.model_type in [ModelType.XLNet]:
+                if self.model_type in ["xlnet"]:
                     result = QAResultExtended(
                         unique_id=u_id.item(),
                         start_top_log_probs=_to_list(outputs[0][i]),
