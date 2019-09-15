@@ -21,9 +21,7 @@ from pytorch_transformers import (
 
 from utils_nlp.common.pytorch_utils import get_device, move_to_device
 
-from utils_nlp.models.transformers.qa_utils import QAResult, QAResultExtended
-from utils_nlp.models.transformers.common import ModelType
-
+from utils_nlp.models.transformers.qa_utils import QAResult, QAResultExtended, get_qa_models
 
 logger = logging.getLogger(__name__)
 
@@ -55,28 +53,46 @@ class AnswerExtractor:
 
     """
 
-    def __init__(self, model_type, sub_model_type, cache_dir=".", load_model_from_dir=None):
+    def __init__(self, model_name, cache_dir=".", load_model_from_dir=None):
 
-        self.model_type = model_type
-        self.sub_model_type = sub_model_type
+        self.model_name = model_name
         self.cache_dir = cache_dir
         self.load_model_from_dir = load_model_from_dir
 
-        config_class, model_class = MODEL_CLASSES[self.model_type.value]
+        config_class, model_class = MODEL_CLASSES[self.model_type]
 
         if load_model_from_dir is None:
-            config = config_class.from_pretrained(self.sub_model_type.value)
-            self.model = model_class.from_pretrained(self.sub_model_type.value, config=config)
+            config = config_class.from_pretrained(self.model_name)
+            self.model = model_class.from_pretrained(self.model_name, config=config)
         else:
             logger.info("Loading cached model from {}".format(load_model_from_dir))
             config = config_class.from_pretrained(load_model_from_dir)
             self.model = model_class.from_pretrained(load_model_from_dir, config=config)
 
+    @property
+    def model_name(self):
+        return self._model_name
+
+    @model_name.setter
+    def model_name(self, value):
+        if value not in get_qa_models():
+            raise ValueError(
+                "Model name {} is not supported by AnswerExtractor. "
+                "Call 'get_qa_models' to get all supported model names.".format(
+                    value
+                )
+            )
+
+        self._model_name = value
+        self._model_type = value.split("-")[0]
+
+    @property
+    def model_type(self):
+        return self._model_type
+
     def fit(
         self,
-        # features,
-        train_data_generator,
-        train_data_size,
+        train_dataloader,
         num_gpus=None,
         num_epochs=1,
         batch_size=32,
@@ -123,23 +139,7 @@ class AnswerExtractor:
         device = get_device("cpu" if num_gpus == 0 or not torch.cuda.is_available() else "gpu")
         self.model = move_to_device(self.model, device, num_gpus)
 
-        # all_input_ids = torch.tensor([f.input_ids for f in features], dtype=torch.long)
-        # all_input_mask = torch.tensor([f.input_mask for f in features], dtype=torch.long)
-        # all_segment_ids = torch.tensor([f.segment_ids for f in features], dtype=torch.long)
-        # all_cls_index = torch.tensor([f.cls_index for f in features], dtype=torch.long)
-        # all_p_mask = torch.tensor([f.p_mask for f in features], dtype=torch.float)
-
-        # all_start_positions = torch.tensor([f.start_position for f in features], dtype=torch.long)
-        # all_end_positions = torch.tensor([f.end_position for f in features], dtype=torch.long)
-        # train_dataset = TensorDataset(
-        #     all_input_ids, all_input_mask, all_segment_ids, all_start_positions,
-        # all_end_positions, all_cls_index, all_p_mask
-        # )
-
-        # train_sampler = RandomSampler(train_dataset)
-        # train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=batch_size)
-
-        t_total = train_data_size * num_epochs
+        t_total = len(train_dataloader) * num_epochs
 
         # Prepare optimizer and schedule (linear warmup and decay)
         no_decay = ["bias", "LayerNorm.weight"]
@@ -174,9 +174,7 @@ class AnswerExtractor:
         self.model.train()
         train_iterator = trange(int(num_epochs), desc="Epoch")
         for _ in train_iterator:
-            # for batch in tqdm(train_dataloader, desc="Iteration", mininterval=60):
-            for batch in train_data_generator:
-
+            for batch in tqdm(train_dataloader, desc="Iteration", mininterval=60):
                 batch = tuple(t.to(device) for t in batch)
                 inputs = {
                     "input_ids": batch[0],
@@ -186,7 +184,7 @@ class AnswerExtractor:
                     "end_positions": batch[4],
                 }
 
-                if self.model_type in [ModelType.XLNet]:
+                if self.model_type in ["xlnet"]:
                     inputs.update({"cls_index": batch[5], "p_mask": batch[6]})
 
                 outputs = self.model(**inputs)
@@ -204,9 +202,11 @@ class AnswerExtractor:
                 optimizer.step()
                 scheduler.step()  # Update learning rate schedule
                 self.model.zero_grad()
-                global_step += 1
 
-        logger.info(" global_step = %s, average loss = %s", global_step, tr_loss / global_step)
+                global_step += 1
+                logger.info(
+                    " global_step = %s, average loss = %s", global_step, tr_loss / global_step
+                )
 
         if cache_model:
             if self.cache_dir == self.load_model_from_dir and not overwrite_model:
@@ -262,25 +262,6 @@ class AnswerExtractor:
         # score
         self.model.eval()
 
-        # all_input_ids = torch.tensor([f.input_ids for f in features], dtype=torch.long)
-        # all_input_mask = torch.tensor([f.input_mask for f in features], dtype=torch.long)
-        # all_segment_ids = torch.tensor([f.segment_ids for f in features], dtype=torch.long)
-        # all_cls_index = torch.tensor([f.cls_index for f in features], dtype=torch.long)
-        # all_p_mask = torch.tensor([f.p_mask for f in features], dtype=torch.float)
-
-        # This index is used to find the original data sample each
-        # prediction comes from and add the unique_id to the prediction
-        # results.
-        # Don't use the unique_id directly because it could be string.
-        # all_example_index = torch.arange(all_input_ids.size(0), dtype=torch.long)
-        # test_dataset = TensorDataset(
-        #     all_input_ids, all_input_mask, all_segment_ids, all_example_index, all_cls_index,
-        # all_p_mask
-        # )
-
-        # test_sampler = SequentialSampler(test_dataset)
-        # test_dataloader = DataLoader(test_dataset, sampler=test_sampler, batch_size=batch_size)
-
         all_results = []
         for batch in tqdm(test_dataloader, desc="Evaluating"):
             batch = tuple(t.to(device) for t in batch)
@@ -290,9 +271,8 @@ class AnswerExtractor:
                     "attention_mask": batch[1],
                     "token_type_ids": batch[2],
                 }
-                # example_indices = batch[3]
 
-                if self.model_type in [ModelType.XLNet]:
+                if self.model_type in ["xlnet"]:
                     inputs.update({"cls_index": batch[3], "p_mask": batch[4]})
 
                 outputs = self.model(**inputs)
@@ -300,9 +280,6 @@ class AnswerExtractor:
                 unique_id_tensor = batch[5]
 
             for i, u_id in enumerate(unique_id_tensor):
-                # test_feature = features[example_index.item()]
-                # unique_id = int(test_feature.unique_id)
-
                 if self.model_type in [ModelType.XLNet]:
                     result = QAResultExtended(
                         unique_id=u_id.item(),

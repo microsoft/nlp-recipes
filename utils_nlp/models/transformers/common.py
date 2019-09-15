@@ -19,8 +19,8 @@ import logging
 
 from pytorch_transformers.tokenization_bert import whitespace_tokenize
 from pytorch_transformers import BertTokenizer, XLNetTokenizer
-
-from enum import Enum
+from pytorch_transformers.modeling_bert import BERT_PRETRAINED_MODEL_ARCHIVE_MAP
+from pytorch_transformers.modeling_xlnet import XLNET_PRETRAINED_MODEL_ARCHIVE_MAP
 
 from torch.utils.data import (
     DataLoader,
@@ -31,52 +31,15 @@ from torch.utils.data import (
     ConcatDataset,
 )
 
-from utils_nlp.models.transformers.qa_utils import QAFeatures, QAExample
+BERT_PRETRAINED_MODEL_ALL = list(BERT_PRETRAINED_MODEL_ARCHIVE_MAP.keys())
+XLNET_PRETRAINED_MODEL_ALL = list(XLNET_PRETRAINED_MODEL_ARCHIVE_MAP.keys())
+
 
 # Max supported sequence length
 # TODO: need to figure this out for each model
 MAX_SEQ_LEN = 512
 
 logger = logging.getLogger(__name__)
-
-
-class Language(str, Enum):
-    """An enumeration of the supported pretrained models and languages."""
-
-    ENGLISH: str = "bert-base-uncased"
-    ENGLISHCASED: str = "bert-base-cased"
-    ENGLISHLARGE: str = "bert-large-uncased"
-    ENGLISHLARGECASED: str = "bert-large-cased"
-    ENGLISHLARGEWWM: str = "bert-large-uncased-whole-word-masking"
-    ENGLISHLARGECASEDWWM: str = "bert-large-cased-whole-word-masking"
-    CHINESE: str = "bert-base-chinese"
-    MULTILINGUAL: str = "bert-base-multilingual-cased"
-
-
-class ModelType(str, Enum):
-    """An enumeration of the supported pretrained models."""
-
-    BERT: str = "bert"
-    XLNet: str = "xlnet"
-    RoBERTa: str = "roberta"
-
-
-class BERTSubModelType(str, Enum):
-    """An enumeration of the supported BERT models"""
-
-    ENGLISH: str = "bert-base-uncased"
-    ENGLISHCASED: str = "bert-base-cased"
-    ENGLISHLARGE: str = "bert-large-uncased"
-    ENGLISHLARGECASED: str = "bert-large-cased"
-    ENGLISHLARGEWWM: str = "bert-large-uncased-whole-word-masking"
-    ENGLISHLARGECASEDWWM: str = "bert-large-cased-whole-word-masking"
-    CHINESE: str = "bert-base-chinese"
-    MULTILINGUAL: str = "bert-base-multilingual-cased"
-
-
-class XLNetSubModelType(str, Enum):
-    ENGLISHCASED: str = "xlnet-base-cased"
-    ENGLISHLARGECASED: str = "xlnet-large-cased"
 
 
 TOKENIZER_CLASSES = {"bert": BertTokenizer, "xlnet": XLNetTokenizer}
