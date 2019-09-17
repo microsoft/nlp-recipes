@@ -155,8 +155,8 @@ def get_qa_dataloader(
         examples_file = os.path.join(cache_dir, CACHED_EXAMPLES_TEST_FILE)
         features_file = os.path.join(cache_dir, CACHED_FEATURES_TEST_FILE)
 
-    with jsonlines.open(examples_file, "a") as examples_writer, jsonlines.open(
-        features_file, "a"
+    with jsonlines.open(examples_file, "w") as examples_writer, jsonlines.open(
+        features_file, "w"
     ) as features_writer:
 
         unique_id_all = []
@@ -195,6 +195,7 @@ def get_qa_dataloader(
                         "tokens": f.tokens,
                         "token_to_orig_map": f.token_to_orig_map,
                         "token_is_max_context": f.token_is_max_context,
+                        "paragraph_len": f.paragraph_len,
                     }
                 )
                 unique_id_cur = f.unique_id
@@ -271,7 +272,9 @@ def postprocess_answer(
     results,
     examples_file,
     features_file,
+    model_type,
     do_lower_case,
+    tokenizer=None,
     n_best_size=20,
     max_answer_length=30,
     output_prediction_file="./qa_predictions.json",
@@ -475,6 +478,351 @@ def postprocess_answer(
             probs.append(score / total_sum)
         return probs
 
+    def _get_final_results_bert(
+        examples_all,
+        qa_id_to_features,
+        unique_id_to_result,
+        do_lower_case,
+        n_best_size,
+        max_answer_length,
+        unanswerable_exists,
+        null_score_diff_threshold,
+        verbose_logging,
+    ):
+        all_predictions = collections.OrderedDict()
+        all_probs = collections.OrderedDict()
+        all_nbest_json = collections.OrderedDict()
+        scores_diff_json = collections.OrderedDict()
+
+        for example in examples_all:
+            # get all the features belonging to the same example,
+            # i.e. paragaraph/question pair.
+            features = qa_id_to_features[example["qa_id"]]
+
+            prelim_predictions = []
+            # keep track of the minimum score of null start+end of position 0
+            score_null = 1000000  # large and positive
+
+            min_null_feature_index = 0  # the paragraph slice with min null score
+            null_start_logit = 0  # the start logit at the slice with min null score
+            null_end_logit = 0  # the end logit at the slice with min null score
+            for (feature_index, f) in enumerate(features):
+                result = unique_id_to_result[f["unique_id"]]
+                start_indexes = _get_best_indexes(result.start_logits, n_best_size)
+                end_indexes = _get_best_indexes(result.end_logits, n_best_size)
+                # if we could have irrelevant answers, get the min score of irrelevant
+                if unanswerable_exists:
+                    # The first element of the start end end logits is the
+                    # probability of predicting the [CLS] token as the start and
+                    # end positions of the answer, which means the answer is
+                    # empty.
+                    feature_null_score = result.start_logits[0] + result.end_logits[0]
+                    if feature_null_score < score_null:
+                        score_null = feature_null_score
+                        min_null_feature_index = feature_index
+                        null_start_logit = result.start_logits[0]
+                        null_end_logit = result.end_logits[0]
+                for start_index in start_indexes:
+                    for end_index in end_indexes:
+                        # We could hypothetically create invalid predictions, e.g., predict
+                        # that the start of the span is in the question. We throw out all
+                        # invalid predictions.
+                        if start_index >= len(f["tokens"]):
+                            continue
+                        if end_index >= len(f["tokens"]):
+                            continue
+                        if str(start_index) not in f["token_to_orig_map"]:
+                            continue
+                        if str(end_index) not in f["token_to_orig_map"]:
+                            continue
+                        if not f["token_is_max_context"].get(str(start_index), False):
+                            continue
+                        if end_index < start_index:
+                            continue
+                        length = end_index - start_index + 1
+                        if length > max_answer_length:
+                            continue
+                        prelim_predictions.append(
+                            _PrelimPrediction(
+                                feature_index=feature_index,
+                                start_index=start_index,
+                                end_index=end_index,
+                                start_logit=result.start_logits[start_index],
+                                end_logit=result.end_logits[end_index],
+                            )
+                        )
+            if unanswerable_exists:
+                prelim_predictions.append(
+                    _PrelimPrediction(
+                        feature_index=min_null_feature_index,
+                        start_index=0,
+                        end_index=0,
+                        start_logit=null_start_logit,
+                        end_logit=null_end_logit,
+                    )
+                )
+
+            # Sort by the sum of the start and end logits in ascending order,
+            # so that the first element is the most probable answer
+            prelim_predictions = sorted(
+                prelim_predictions, key=lambda x: (x.start_logit + x.end_logit), reverse=True
+            )
+
+            seen_predictions = {}
+            nbest = []
+            for pred in prelim_predictions:
+                if len(nbest) >= n_best_size:
+                    break
+                f = features[pred.feature_index]
+                if pred.start_index > 0:  # this is a non-null prediction
+                    tok_tokens = f["tokens"][pred.start_index : (pred.end_index + 1)]
+                    orig_doc_start = f["token_to_orig_map"][str(pred.start_index)]
+                    orig_doc_end = f["token_to_orig_map"][str(pred.end_index)]
+                    orig_tokens = example["doc_tokens"][orig_doc_start : (orig_doc_end + 1)]
+                    tok_text = " ".join(tok_tokens)
+
+                    # De-tokenize WordPieces that have been split off.
+                    tok_text = tok_text.replace(" ##", "")
+                    tok_text = tok_text.replace("##", "")
+
+                    # Clean whitespace
+                    tok_text = tok_text.strip()
+                    tok_text = " ".join(tok_text.split())
+                    orig_text = " ".join(orig_tokens)
+
+                    final_text = _get_final_text(
+                        tok_text, orig_text, do_lower_case, verbose_logging
+                    )
+                    if final_text in seen_predictions:
+                        continue
+
+                    seen_predictions[final_text] = True
+                else:
+                    final_text = ""
+                    seen_predictions[final_text] = True
+
+                nbest.append(
+                    _NbestPrediction(
+                        text=final_text, start_logit=pred.start_logit, end_logit=pred.end_logit
+                    )
+                )
+            # if we didn't include the empty option in the n-best, include it
+            if unanswerable_exists:
+                if "" not in seen_predictions:
+                    nbest.append(
+                        _NbestPrediction(
+                            text="", start_logit=null_start_logit, end_logit=null_end_logit
+                        )
+                    )
+
+                # In very rare edge cases we could only have single null prediction.
+                # So we just create a nonce prediction in this case to avoid failure.
+                if len(nbest) == 1:
+                    nbest.insert(0, _NbestPrediction(text="empty", start_logit=0.0, end_logit=0.0))
+
+            # In very rare edge cases we could have no valid predictions. So we
+            # just create a nonce prediction in this case to avoid failure.
+            if not nbest:
+                nbest.append(_NbestPrediction(text="empty", start_logit=0.0, end_logit=0.0))
+
+            assert len(nbest) >= 1
+
+            total_scores = []
+            best_non_null_entry = None
+            for ie, entry in enumerate(nbest):
+                total_scores.append(entry.start_logit + entry.end_logit)
+                if not best_non_null_entry:
+                    if entry.text:
+                        best_non_null_entry = entry
+                        best_non_null_entry_index = ie
+
+            probs = _compute_softmax(total_scores)
+
+            nbest_json = []
+            for (i, entry) in enumerate(nbest):
+                output = collections.OrderedDict()
+                output["text"] = entry.text
+                output["probability"] = probs[i]
+                output["start_logit"] = entry.start_logit
+                output["end_logit"] = entry.end_logit
+                nbest_json.append(output)
+
+                if entry.text == "":
+                    null_prediction_index = i
+
+            assert len(nbest_json) >= 1
+
+            if not unanswerable_exists:
+                all_predictions[example["qa_id"]] = nbest_json[0]["text"]
+                all_probs[example["qa_id"]] = nbest_json[0]["probability"]
+            else:
+                # predict "" iff the null score - the score of best non-null > threshold
+                score_diff = (
+                    score_null - best_non_null_entry.start_logit - (best_non_null_entry.end_logit)
+                )
+                scores_diff_json[example["qa_id"]] = score_diff
+                if score_diff > null_score_diff_threshold:
+                    all_predictions[example["qa_id"]] = ""
+                    ## TODO: double check this
+                    all_probs[example["qa_id"]] = probs[null_prediction_index]
+                else:
+                    all_predictions[example["qa_id"]] = best_non_null_entry.text
+                    all_probs[example["qa_id"]] = probs[best_non_null_entry_index]
+            all_nbest_json[example["qa_id"]] = nbest_json
+
+        return all_predictions, all_probs, all_nbest_json, scores_diff_json
+
+    def _get_final_results_xlnet(
+        examples_all,
+        tokenizer,
+        qa_id_to_features,
+        unique_id_to_result,
+        do_lower_case,
+        n_best_size,
+        max_answer_length,
+        unanswerable_exists,
+        verbose_logging,
+    ):
+        all_predictions = collections.OrderedDict()
+        all_probs = collections.OrderedDict()
+        all_nbest_json = collections.OrderedDict()
+        scores_diff_json = collections.OrderedDict()
+
+        for example in examples_all:
+            features = qa_id_to_features[example["qa_id"]]
+
+            prelim_predictions = []
+            # keep track of the minimum score of null start+end of position 0
+            score_null = 1000000  # large and positive
+
+            for (feature_index, feature) in enumerate(features):
+                result = unique_id_to_result[feature["unique_id"]]
+
+                cur_null_score = result.cls_logits
+
+                # if we could have irrelevant answers, get the min score of irrelevant
+                score_null = min(score_null, cur_null_score)
+
+                for i in range(n_best_size):
+                    for j in range(n_best_size):
+                        start_log_prob = result.start_top_log_probs[i]
+                        start_index = result.start_top_index[i]
+
+                        j_index = i * n_best_size + j
+
+                        end_log_prob = result.end_top_log_probs[j_index]
+                        end_index = result.end_top_index[j_index]
+
+                        # We could hypothetically create invalid predictions, e.g., predict
+                        # that the start of the span is in the question. We throw out all
+                        # invalid predictions.
+                        if start_index >= feature["paragraph_len"] - 1:
+                            continue
+                        if end_index >= feature["paragraph_len"] - 1:
+                            continue
+
+                        if not feature["token_is_max_context"].get(str(start_index), False):
+                            continue
+                        if end_index < start_index:
+                            continue
+                        length = end_index - start_index + 1
+                        if length > max_answer_length:
+                            continue
+
+                        prelim_predictions.append(
+                            _PrelimPrediction(
+                                feature_index=feature_index,
+                                start_index=start_index,
+                                end_index=end_index,
+                                start_logit=start_log_prob,
+                                end_logit=end_log_prob,
+                            )
+                        )
+
+            prelim_predictions = sorted(
+                prelim_predictions, key=lambda x: (x.start_logit + x.end_logit), reverse=True
+            )
+
+            seen_predictions = {}
+            nbest = []
+            for pred in prelim_predictions:
+                if len(nbest) >= n_best_size:
+                    break
+                feature = features[pred.feature_index]
+
+                # XLNet un-tokenizer
+                # Let's keep it simple for now and see if we need all this later.
+                #
+                # tok_start_to_orig_index = feature.tok_start_to_orig_index
+                # tok_end_to_orig_index = feature.tok_end_to_orig_index
+                # start_orig_pos = tok_start_to_orig_index[pred.start_index]
+                # end_orig_pos = tok_end_to_orig_index[pred.end_index]
+                # paragraph_text = example.paragraph_text
+                # final_text = paragraph_text[start_orig_pos: end_orig_pos + 1].strip()
+
+                # Previously used Bert untokenizer
+                tok_tokens = feature["tokens"][pred.start_index : (pred.end_index + 1)]
+                orig_doc_start = feature["token_to_orig_map"][str(pred.start_index)]
+                orig_doc_end = feature["token_to_orig_map"][str(pred.end_index)]
+                orig_tokens = example["doc_tokens"][orig_doc_start : (orig_doc_end + 1)]
+                tok_text = tokenizer.convert_tokens_to_string(tok_tokens)
+
+                # Clean whitespace
+                tok_text = tok_text.strip()
+                tok_text = " ".join(tok_text.split())
+                orig_text = " ".join(orig_tokens)
+
+                final_text = _get_final_text(
+                    tok_text, orig_text, tokenizer.do_lower_case, verbose_logging
+                )
+
+                if final_text in seen_predictions:
+                    continue
+
+                seen_predictions[final_text] = True
+
+                nbest.append(
+                    _NbestPrediction(
+                        text=final_text, start_logit=pred.start_logit, end_logit=pred.end_logit
+                    )
+                )
+
+            # In very rare edge cases we could have no valid predictions. So we
+            # just create a nonce prediction in this case to avoid failure.
+            if not nbest:
+                nbest.append(_NbestPrediction(text="", start_logit=-1e6, end_logit=-1e6))
+
+            total_scores = []
+            best_non_null_entry = None
+            for entry in nbest:
+                total_scores.append(entry.start_logit + entry.end_logit)
+                if not best_non_null_entry:
+                    best_non_null_entry = entry
+
+            probs = _compute_softmax(total_scores)
+
+            nbest_json = []
+            for (i, entry) in enumerate(nbest):
+                output = collections.OrderedDict()
+                output["text"] = entry.text
+                output["probability"] = probs[i]
+                output["start_logit"] = entry.start_logit
+                output["end_logit"] = entry.end_logit
+                nbest_json.append(output)
+
+            assert len(nbest_json) >= 1
+            assert best_non_null_entry is not None
+
+            score_diff = score_null
+            scores_diff_json[example["qa_id"]] = score_diff
+            # note(zhiliny): always predict best_non_null_entry
+            # and the evaluation script will search for the best threshold
+            all_predictions[example["qa_id"]] = best_non_null_entry.text
+
+            all_nbest_json[example["qa_id"]] = nbest_json
+
+        return all_predictions, all_probs, all_nbest_json, scores_diff_json
+
     # Helper functions end
 
     """Write final predictions to the json file and log-odds of null if needed."""
@@ -483,7 +831,7 @@ def postprocess_answer(
 
     with jsonlines.open(examples_file) as reader:
         examples_all = list(reader.iter())
-        
+
     with jsonlines.open(features_file) as reader:
         features_all = list(reader.iter())
 
@@ -505,187 +853,41 @@ def postprocess_answer(
         ["feature_index", "start_index", "end_index", "start_logit", "end_logit"],
     )
 
-    all_predictions = collections.OrderedDict()
-    all_probs = collections.OrderedDict()
-    all_nbest_json = collections.OrderedDict()
-    scores_diff_json = collections.OrderedDict()
-
-    for example in examples_all:
-        # get all the features belonging to the same example,
-        # i.e. paragaraph/question pair.
-        features = qa_id_to_features[example["qa_id"]]
-
-        prelim_predictions = []
-        # keep track of the minimum score of null start+end of position 0
-        score_null = 1000000  # large and positive
-        min_null_feature_index = 0  # the paragraph slice with min null score
-        null_start_logit = 0  # the start logit at the slice with min null score
-        null_end_logit = 0  # the end logit at the slice with min null score
-        for (feature_index, f) in enumerate(features):
-            result = unique_id_to_result[f["unique_id"]]
-            start_indexes = _get_best_indexes(result.start_logits, n_best_size)
-            end_indexes = _get_best_indexes(result.end_logits, n_best_size)
-            # if we could have irrelevant answers, get the min score of irrelevant
-            if unanswerable_exists:
-                # The first element of the start end end logits is the
-                # probability of predicting the [CLS] token as the start and
-                # end positions of the answer, which means the answer is
-                # empty.
-                feature_null_score = result.start_logits[0] + result.end_logits[0]
-                if feature_null_score < score_null:
-                    score_null = feature_null_score
-                    min_null_feature_index = feature_index
-                    null_start_logit = result.start_logits[0]
-                    null_end_logit = result.end_logits[0]
-            for start_index in start_indexes:
-                for end_index in end_indexes:
-                    # We could hypothetically create invalid predictions, e.g., predict
-                    # that the start of the span is in the question. We throw out all
-                    # invalid predictions.
-                    if start_index >= len(f["tokens"]):
-                        continue
-                    if end_index >= len(f["tokens"]):
-                        continue
-                    if start_index not in f["token_to_orig_map"]:
-                        continue
-                    if end_index not in f["token_to_orig_map"]:
-                        continue
-                    if not f["token_is_max_context"].get(start_index, False):
-                        continue
-                    if end_index < start_index:
-                        continue
-                    length = end_index - start_index + 1
-                    if length > max_answer_length:
-                        continue
-                    prelim_predictions.append(
-                        _PrelimPrediction(
-                            feature_index=feature_index,
-                            start_index=start_index,
-                            end_index=end_index,
-                            start_logit=result.start_logits[start_index],
-                            end_logit=result.end_logits[end_index],
-                        )
-                    )
-        if unanswerable_exists:
-            prelim_predictions.append(
-                _PrelimPrediction(
-                    feature_index=min_null_feature_index,
-                    start_index=0,
-                    end_index=0,
-                    start_logit=null_start_logit,
-                    end_logit=null_end_logit,
-                )
-            )
-
-        # Sort by the sum of the start and end logits in ascending order,
-        # so that the first element is the most probable answer
-        prelim_predictions = sorted(
-            prelim_predictions, key=lambda x: (x.start_logit + x.end_logit), reverse=True
+    _NbestPrediction = collections.namedtuple(
+        "NbestPrediction", ["text", "start_logit", "end_logit"]
+    )
+    if model_type == "bert":
+        all_predictions, all_probs, all_nbest_json, scores_diff_json = _get_final_results_bert(
+            examples_all=examples_all,
+            qa_id_to_features=qa_id_to_features,
+            unique_id_to_result=unique_id_to_result,
+            do_lower_case=do_lower_case,
+            n_best_size=n_best_size,
+            max_answer_length=max_answer_length,
+            unanswerable_exists=unanswerable_exists,
+            null_score_diff_threshold=null_score_diff_threshold,
+            verbose_logging=verbose_logging,
         )
-
-        _NbestPrediction = collections.namedtuple(
-            "NbestPrediction", ["text", "start_logit", "end_logit"]
+    elif model_type == "xlnet":
+        if tokenizer is None:
+            raise Exception("tokenizer must be provided to postprocess xlnet results")
+        all_predictions, all_probs, all_nbest_json, scores_diff_json = _get_final_results_xlnet(
+            examples_all,
+            qa_id_to_features=qa_id_to_features,
+            tokenizer=tokenizer,
+            unique_id_to_result=unique_id_to_result,
+            do_lower_case=do_lower_case,
+            n_best_size=n_best_size,
+            max_answer_length=max_answer_length,
+            unanswerable_exists=unanswerable_exists,
+            verbose_logging=verbose_logging,
         )
-
-        seen_predictions = {}
-        nbest = []
-        for pred in prelim_predictions:
-            if len(nbest) >= n_best_size:
-                break
-            f = features[pred.feature_index]
-            if pred.start_index > 0:  # this is a non-null prediction
-                tok_tokens = f["tokens"][pred.start_index : (pred.end_index + 1)]
-                orig_doc_start = f["token_to_orig_map"][pred.start_index]
-                orig_doc_end = f["token_to_orig_map"][pred.end_index]
-                orig_tokens = example["doc_tokens"][orig_doc_start : (orig_doc_end + 1)]
-                tok_text = " ".join(tok_tokens)
-
-                # De-tokenize WordPieces that have been split off.
-                tok_text = tok_text.replace(" ##", "")
-                tok_text = tok_text.replace("##", "")
-
-                # Clean whitespace
-                tok_text = tok_text.strip()
-                tok_text = " ".join(tok_text.split())
-                orig_text = " ".join(orig_tokens)
-
-                final_text = _get_final_text(tok_text, orig_text, do_lower_case, verbose_logging)
-                if final_text in seen_predictions:
-                    continue
-
-                seen_predictions[final_text] = True
-            else:
-                final_text = ""
-                seen_predictions[final_text] = True
-
-            nbest.append(
-                _NbestPrediction(
-                    text=final_text, start_logit=pred.start_logit, end_logit=pred.end_logit
-                )
+    else:
+        raise ValueError(
+            "Model type {} is not supported. Supported model types are: 'bert', 'xlnet'.".format(
+                model_type
             )
-        # if we didn't include the empty option in the n-best, include it
-        if unanswerable_exists:
-            if "" not in seen_predictions:
-                nbest.append(
-                    _NbestPrediction(
-                        text="", start_logit=null_start_logit, end_logit=null_end_logit
-                    )
-                )
-
-            # In very rare edge cases we could only have single null prediction.
-            # So we just create a nonce prediction in this case to avoid failure.
-            if len(nbest) == 1:
-                nbest.insert(0, _NbestPrediction(text="empty", start_logit=0.0, end_logit=0.0))
-
-        # In very rare edge cases we could have no valid predictions. So we
-        # just create a nonce prediction in this case to avoid failure.
-        if not nbest:
-            nbest.append(_NbestPrediction(text="empty", start_logit=0.0, end_logit=0.0))
-
-        assert len(nbest) >= 1
-
-        total_scores = []
-        best_non_null_entry = None
-        for ie, entry in enumerate(nbest):
-            total_scores.append(entry.start_logit + entry.end_logit)
-            if not best_non_null_entry:
-                if entry.text:
-                    best_non_null_entry = entry
-                    best_non_null_entry_index = ie
-
-        probs = _compute_softmax(total_scores)
-
-        nbest_json = []
-        for (i, entry) in enumerate(nbest):
-            output = collections.OrderedDict()
-            output["text"] = entry.text
-            output["probability"] = probs[i]
-            output["start_logit"] = entry.start_logit
-            output["end_logit"] = entry.end_logit
-            nbest_json.append(output)
-
-            if entry.text == "":
-                null_prediction_index = i
-
-        assert len(nbest_json) >= 1
-
-        if not unanswerable_exists:
-            all_predictions[example["qa_id"]] = nbest_json[0]["text"]
-            all_probs[example["qa_id"]] = nbest_json[0]["probability"]
-        else:
-            # predict "" iff the null score - the score of best non-null > threshold
-            score_diff = (
-                score_null - best_non_null_entry.start_logit - (best_non_null_entry.end_logit)
-            )
-            scores_diff_json[example["qa_id"]] = score_diff
-            if score_diff > null_score_diff_threshold:
-                all_predictions[example["qa_id"]] = ""
-                ## TODO: double check this
-                all_probs[example["qa_id"]] = probs[null_prediction_index]
-            else:
-                all_predictions[example["qa_id"]] = best_non_null_entry.text
-                all_probs[example["qa_id"]] = probs[best_non_null_entry_index]
-        all_nbest_json[example["qa_id"]] = nbest_json
+        )
 
     with open(output_prediction_file, "w") as writer:
         writer.write(json.dumps(all_predictions, indent=4) + "\n")
@@ -1027,6 +1229,7 @@ def _create_qa_features(
             "end_position",
             "cls_index",
             "p_mask",
+            "paragraph_len",
         ],
     )
 
@@ -1221,6 +1424,7 @@ def _create_qa_features(
             tokens.append(all_doc_tokens[split_token_index])
             segment_ids.append(sequence_b_segment_id)
             p_mask.append(0)
+        paragraph_len = doc_span.length
 
         # SEP token
         tokens.append(sep_token)
@@ -1293,6 +1497,7 @@ def _create_qa_features(
                 end_position=end_position,
                 cls_index=cls_index,
                 p_mask=p_mask,
+                paragraph_len=paragraph_len,
             )
         )
 

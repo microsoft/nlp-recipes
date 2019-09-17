@@ -78,9 +78,7 @@ class AnswerExtractor:
         if value not in get_qa_models():
             raise ValueError(
                 "Model name {} is not supported by AnswerExtractor. "
-                "Call 'get_qa_models' to get all supported model names.".format(
-                    value
-                )
+                "Call 'get_qa_models' to get all supported model names.".format(value)
             )
 
         self._model_name = value
@@ -95,7 +93,6 @@ class AnswerExtractor:
         train_dataloader,
         num_gpus=None,
         num_epochs=1,
-        batch_size=32,
         learning_rate=2e-5,
         warmup_proportion=None,
         max_grad_norm=1.0,
