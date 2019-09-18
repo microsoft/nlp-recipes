@@ -16,6 +16,13 @@ LICENSE = __license__
 COPYRIGHT = __copyright__
 
 # Determine semantic versioning automatically
-# from git commits
-__version__ = get_version()
+# from git commits if the package is installed
+# into your environment, otherwise
+# we set version to default for development
+try:
+    __version__ = get_version()
+except LookupError:
+    __version__ = "0.0.0"
+
 VERSION = __version__
+

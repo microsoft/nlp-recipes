@@ -49,18 +49,19 @@ def test_tc_dac_bert_ar(notebooks, tmp):
             NUM_GPUS=1,
             DATA_FOLDER=tmp,
             BERT_CACHE_DIR=tmp,
-            BATCH_SIZE=32,
+            MAX_LEN=175,
+            BATCH_SIZE=16,
             NUM_EPOCHS=1,
             TRAIN_SIZE=0.8,
-            NUM_ROWS=15000,
+            NUM_ROWS=8000,
             RANDOM_STATE=0,
         ),
     )
     result = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict
-    assert pytest.approx(result["accuracy"], 0.93, abs=ABS_TOL)
-    assert pytest.approx(result["precision"], 0.91, abs=ABS_TOL)
-    assert pytest.approx(result["recall"], 0.91, abs=ABS_TOL)
-    assert pytest.approx(result["f1"], 0.91, abs=ABS_TOL)
+    assert pytest.approx(result["accuracy"], 0.871, abs=ABS_TOL)
+    assert pytest.approx(result["precision"], 0.865, abs=ABS_TOL)
+    assert pytest.approx(result["recall"], 0.852, abs=ABS_TOL)
+    assert pytest.approx(result["f1"], 0.845, abs=ABS_TOL)
 
 
 @pytest.mark.gpu
