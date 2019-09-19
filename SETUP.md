@@ -96,13 +96,15 @@ If you are using the DSVM, you can [connect to JupyterHub](https://docs.microsof
     <p>  
 A setup.py file is provided in order to simplify the installation of this utilities in this repo from the main directory.  
     
-To install, please run the command below
+To install the package, please run the command below (from directory root)
 
-    python setup.py install 
+    pip install -e . 
 
-It is also possible to install directly from Github, which is the best way to utilize the `utils_nlp` package in external projects. 
+Running the command tells pip to install the `utils_nlp` package from source in [development mode](https://setuptools.readthedocs.io/en/latest/setuptools.html#development-mode). This just means that any updates to `utils_nlp` source directory will immediately be reflected in the installed package without needing to reinstall; a very useful practice for a package with constant updates.   
 
-    pip install -e  git+git@github.com:microsoft/nlp.git@master#egg=utils_nlp  
+> It is also possible to install directly from Github, which is the best way to utilize the `utils_nlp` package in external projects (while still reflecting updates to the source as it's installed as an editable `'-e'` package). 
+
+>   `pip install -e  git+git@github.com:microsoft/nlp.git@master#egg=utils_nlp`  
 
 Either command, from above, makes `utils_nlp` available in your conda virtual environment. You can verify it was properly installed by running:  
 
