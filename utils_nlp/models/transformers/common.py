@@ -1,4 +1,16 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License.
 
+from pytorch_transformers.modeling_bert import BERT_PRETRAINED_MODEL_ARCHIVE_MAP
+from pytorch_transformers.modeling_xlnet import XLNET_PRETRAINED_MODEL_ARCHIVE_MAP
+from pytorch_transformers.modeling_roberta import ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP
+
+BERT_PRETRAINED_MODEL_ALL = list(BERT_PRETRAINED_MODEL_ARCHIVE_MAP.keys())
+XLNET_PRETRAINED_MODEL_ALL = list(XLNET_PRETRAINED_MODEL_ARCHIVE_MAP.keys())
+ROBERTA_PRETRAINED_MODEL_ALL = list(ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP.keys())
+
+
+MAX_SEQ_LEN = 512
 
 def fine_tune(
     model,
