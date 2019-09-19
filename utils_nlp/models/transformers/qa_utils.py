@@ -33,15 +33,12 @@ from torch.utils.data import Dataset, TensorDataset, DataLoader, RandomSampler, 
 from pytorch_transformers.tokenization_bert import BasicTokenizer
 from pytorch_transformers import BertTokenizer, XLNetTokenizer
 from pytorch_transformers.tokenization_bert import whitespace_tokenize
-from utils_nlp.models.transformers.common import (
-    BERT_PRETRAINED_MODEL_ALL,
-    XLNET_PRETRAINED_MODEL_ALL,
-)
 
 
-# from utils_nlp.models.transformers.common import MAX_SEQ_LEN
 
 MAX_SEQ_LEN = 512
+
+
 TOKENIZER_CLASSES = {"bert": BertTokenizer, "xlnet": XLNetTokenizer}
 
 CACHED_EXAMPLES_TRAIN_FILE = "cached_examples_train.jsonl"
@@ -54,10 +51,6 @@ CACHED_FEATURES_TEST_FILE = "cached_features_test.jsonl"
 def _is_iterable_but_not_string(obj):
     """Check whether obj is a non-string Iterable."""
     return isinstance(obj, collections.Iterable) and not isinstance(obj, str)
-
-
-def get_qa_models():
-    return BERT_PRETRAINED_MODEL_ALL + XLNET_PRETRAINED_MODEL_ALL
 
 
 QAInput = collections.namedtuple(

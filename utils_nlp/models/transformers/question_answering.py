@@ -21,7 +21,24 @@ from pytorch_transformers import (
 
 from utils_nlp.common.pytorch_utils import get_device, move_to_device
 
-from utils_nlp.models.transformers.qa_utils import QAResult, QAResultExtended, get_qa_models
+from utils_nlp.models.transformers.qa_utils import QAResult, QAResultExtended
+
+# from utils_nlp.models.transformers.common import (
+#     BERT_PRETRAINED_MODEL_ALL,
+#     XLNET_PRETRAINED_MODEL_ALL,
+# )
+
+
+# from utils_nlp.models.transformers.common import MAX_SEQ_LEN
+
+# TODO: Replace these with importing from common after common is updated in transformers branch
+from pytorch_transformers.modeling_bert import BERT_PRETRAINED_MODEL_ARCHIVE_MAP
+from pytorch_transformers.modeling_xlnet import XLNET_PRETRAINED_MODEL_ARCHIVE_MAP
+from pytorch_transformers.modeling_roberta import ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP
+
+BERT_PRETRAINED_MODEL_ALL = list(BERT_PRETRAINED_MODEL_ARCHIVE_MAP.keys())
+XLNET_PRETRAINED_MODEL_ALL = list(XLNET_PRETRAINED_MODEL_ARCHIVE_MAP.keys())
+ROBERTA_PRETRAINED_MODEL_ALL = list(ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP.keys())
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +92,7 @@ class AnswerExtractor:
 
     @model_name.setter
     def model_name(self, value):
-        if value not in get_qa_models():
+        if value not in self.get_qa_models():
             raise ValueError(
                 "Model name {} is not supported by AnswerExtractor. "
                 "Call 'get_qa_models' to get all supported model names.".format(value)
@@ -87,6 +104,10 @@ class AnswerExtractor:
     @property
     def model_type(self):
         return self._model_type
+
+    @classmethod
+    def get_qa_models(cls):
+        return BERT_PRETRAINED_MODEL_ALL + XLNET_PRETRAINED_MODEL_ALL
 
     def fit(
         self,
