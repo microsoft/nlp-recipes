@@ -92,10 +92,10 @@ class AnswerExtractor:
 
     @model_name.setter
     def model_name(self, value):
-        if value not in self.get_qa_models():
+        if value not in self.list_supported_models():
             raise ValueError(
                 "Model name {} is not supported by AnswerExtractor. "
-                "Call 'get_qa_models' to get all supported model names.".format(value)
+                "Call 'AnswerExtractor.list_supported_models()' to get all supported model names.".format(value)
             )
 
         self._model_name = value
@@ -106,7 +106,7 @@ class AnswerExtractor:
         return self._model_type
 
     @classmethod
-    def get_qa_models(cls):
+    def list_supported_models(cls):
         return BERT_PRETRAINED_MODEL_ALL + XLNET_PRETRAINED_MODEL_ALL
 
     def fit(
