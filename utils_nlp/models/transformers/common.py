@@ -1,28 +1,43 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License.
+
+# This script reuses some code from
+# https://github.com/huggingface/pytorch-transformers/blob/master/examples/run_glue.py
+
+
+from pytorch_transformers.modeling_bert import BERT_PRETRAINED_MODEL_ARCHIVE_MAP
+from pytorch_transformers.modeling_xlnet import XLNET_PRETRAINED_MODEL_ARCHIVE_MAP
+from pytorch_transformers.modeling_roberta import ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP
+from pytorch_transformers.modeling_distilbert import DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP
+
+
+TOKENIZER_CLASS = {}
+TOKENIZER_CLASS.update({k: BertTokenizer for k in BERT_PRETRAINED_MODEL_ARCHIVE_MAP})
+TOKENIZER_CLASS.update({k: RobertaTokenizer for k in ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP})
+TOKENIZER_CLASS.update({k: XLNetTokenizer for k in XLNET_PRETRAINED_MODEL_ARCHIVE_MAP})
+TOKENIZER_CLASS.update({k: DistilBertTokenizer for k in DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP})
 
 
 def fine_tune(
     model,
     model_type,
     train_dataloader,
+    num_epochs,
+    device,
     n_gpu,
     local_rank,
-    device,
-    gradient_accumulation_steps,    
+    gradient_accumulation_steps,
     fp16,
     seed,
 ):
     global_step = 0
     tr_loss = 0.0
     model.zero_grad()
-    train_iterator = trange(
-        int(num_epochs), desc="Epoch", disable=local_rank not in [-1, 0]
-    )
+    train_iterator = trange(int(num_epochs), desc="Epoch", disable=local_rank not in [-1, 0])
     set_seed(seed)
 
     for _ in train_iterator:
-        epoch_iterator = tqdm(
-            train_dataloader, desc="Iteration", disable=local_rank not in [-1, 0]
-        )
+        epoch_iterator = tqdm(train_dataloader, desc="Iteration", disable=local_rank not in [-1, 0])
         for step, batch in enumerate(epoch_iterator):
             model.train()
             batch = tuple(t.to(device) for t in batch)
@@ -43,9 +58,7 @@ def fine_tune(
             if fp16:
                 with amp.scale_loss(loss, optimizer) as scaled_loss:
                     scaled_loss.backward()
-                torch.nn.utils.clip_grad_norm_(
-                    amp.master_params(optimizer), args.max_grad_norm
-                )
+                torch.nn.utils.clip_grad_norm_(amp.master_params(optimizer), args.max_grad_norm)
             else:
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
