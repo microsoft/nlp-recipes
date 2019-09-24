@@ -20,7 +20,6 @@ from pytorch_transformers.modeling_xlnet import (
 )
 from torch.utils.data import DataLoader, DistributedSampler, RandomSampler, TensorDataset
 
-from utils_nlp.dataset.pytorch import SCDataSet
 from utils_nlp.models.transformers.common import MAX_SEQ_LEN, TOKENIZER_CLASS, fine_tune
 
 MODEL_CLASS = {}
@@ -34,6 +33,10 @@ MODEL_CLASS.update(
 )
 
 
+def _list_supported_models():
+    return list(MODEL_CLASS)
+
+
 class Processor:
     def __init__(self, model_name, tokenize=None, to_lower=False, cache_dir="."):
         self.tokenizer = TOKENIZER_CLASS[model_name].from_pretrained(
@@ -45,12 +48,8 @@ class Processor:
     def list_supported_models():
         return _list_supported_models()
 
-    def create_dataset_from_df(df, text_col, label_col):
-        return SCDataSet(df, text_col, label_col)
-
-    def preprocess(self, text, labels, max_len, batch_size=32, distributed=False):
+    def preprocess(self, text, labels, max_len):
         """preprocess data or batches"""
-
         if max_len > MAX_SEQ_LEN:
             print("setting max_len to max allowed sequence length: {}".format(MAX_SEQ_LEN))
             max_len = MAX_SEQ_LEN
@@ -70,30 +69,26 @@ class Processor:
         input_mask = [[min(1, x) for x in y] for y in input_ids]
         # create segment ids
         # segment_ids = None
-
         td = TensorDataset(
             torch.tensor(input_ids, dtype=torch.long),
             torch.tensor(input_mask, dtype=torch.long),
             torch.tensor(labels, dtype=torch.long),
         )
-
+        return td
 
 
 class SequenceClassifier:
-    def __init__(
-        self, model_name="bert-base-cased", num_labels=2, cache_dir=".", seed=0
-    ):
+    def __init__(self, model_name="bert-base-cased", num_labels=2, cache_dir=".", seed=0):
         self.model = MODEL_CLASS[model_name].from_pretrained(
             model_name, cache_dir=cache_dir, num_labels=num_labels
         )
         self.seed = seed
-        
+
     @staticmethod
     def list_supported_models():
         return _list_supported_models()
 
     def fit(self, train_dataset, device="cuda", num_epochs=1, batch_size=32, num_gpus=None):
-
         if local_rank == -1:
             device = torch.device(
                 "cuda" if torch.cuda.is_available() and device == "cuda" else "cpu"
@@ -123,6 +118,7 @@ class SequenceClassifier:
             fp16_opt_level="O1",
             local_rank=-1,
             seed=self.seed,
+        )
 
     def predict():
         pass
