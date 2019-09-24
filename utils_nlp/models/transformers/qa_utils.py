@@ -35,22 +35,21 @@ from pytorch_transformers import BertTokenizer, XLNetTokenizer
 from pytorch_transformers.tokenization_bert import whitespace_tokenize
 
 
-
+## TODO: import from common after merging with transformers branch
 MAX_SEQ_LEN = 512
 
+TOKENIZER_CLASS = {}
+TOKENIZER_CLASS.update({k: BertTokenizer for k in BERT_PRETRAINED_MODEL_ARCHIVE_MAP})
+TOKENIZER_CLASS.update({k: XLNetTokenizer for k in XLNET_PRETRAINED_MODEL_ARCHIVE_MAP})
+TOKENIZER_CLASS.update({k: DistilBertTokenizer for k in DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP})
+## import this from common ends
 
-TOKENIZER_CLASSES = {"bert": BertTokenizer, "xlnet": XLNetTokenizer}
 
 CACHED_EXAMPLES_TRAIN_FILE = "cached_examples_train.jsonl"
 CACHED_FEATURES_TRAIN_FILE = "cached_features_train.jsonl"
 
 CACHED_EXAMPLES_TEST_FILE = "cached_examples_test.jsonl"
 CACHED_FEATURES_TEST_FILE = "cached_features_test.jsonl"
-
-
-def _is_iterable_but_not_string(obj):
-    """Check whether obj is a non-string Iterable."""
-    return isinstance(obj, collections.Iterable) and not isinstance(obj, str)
 
 
 QAInput = collections.namedtuple(
@@ -76,6 +75,7 @@ class QADataset(Dataset):
         self.question_text_col = question_text_col
 
         ## TODO: can this be made optional???
+        ## Yes, if we make evaluate_qa takes QADataset.
         self.qa_id_col = qa_id_col
 
         if is_impossible_col is None:
@@ -92,7 +92,7 @@ class QADataset(Dataset):
         self.answer_text_col = answer_text_col
 
     def __getitem__(self, idx):
-        current_item = self.df.iloc[idx,]
+        current_item = self.df.iloc[idx, ]
         if self.actual_answer_available:
             return QAInput(
                 doc_text=current_item[self.doc_text_col],
@@ -131,9 +131,7 @@ def get_qa_dataloader(
     if not os.path.exists(cache_dir):
         os.makedirs(cache_dir)
 
-    model_type = model_name.split("-")[0]
-
-    tokenizer_class = TOKENIZER_CLASSES[model_type]
+    tokenizer_class = TOKENIZER_CLASS[model_name]
     tokenizer = tokenizer_class.from_pretrained(
         model_name, do_lower_case=to_lower, cache_dir=cache_dir
     )
@@ -456,9 +454,7 @@ def postprocess_bert_answer(
                 tok_text = " ".join(tok_text.split())
                 orig_text = " ".join(orig_tokens)
 
-                final_text = _get_final_text(
-                    tok_text, orig_text, do_lower_case, verbose_logging
-                )
+                final_text = _get_final_text(tok_text, orig_text, do_lower_case, verbose_logging)
                 if final_text in seen_predictions:
                     continue
 
@@ -575,9 +571,7 @@ def postprocess_xlnet_answer(
     with jsonlines.open(features_file) as reader:
         features_all = list(reader.iter())
 
-    tokenizer = XLNetTokenizer.from_pretrained(
-        model_name, do_lower_case=do_lower_case
-    )
+    tokenizer = XLNetTokenizer.from_pretrained(model_name, do_lower_case=do_lower_case)
 
     qa_id_to_features = collections.defaultdict(list)
     # Map unique features to the original doc-question-answer triplet
@@ -809,6 +803,7 @@ def get_raw_scores(qa_ids, actuals, preds):
         recall = 1.0 * num_same / len(gold_toks)
         f1 = (2 * precision * recall) / (precision + recall)
         return f1
+
     # Helper functions end
 
     exact_scores = {}
@@ -835,7 +830,7 @@ def find_best_thresh(preds, scores, na_probs, qid_to_has_ans, unanswerable_exist
     best_thresh = 0.0
     qid_list = sorted(na_probs, key=lambda k: na_probs[k])
     for i, qid in enumerate(qid_list):
-        if qid not in scores: 
+        if qid not in scores:
             continue
         if qid_to_has_ans[qid]:
             diff = scores[qid]
@@ -854,30 +849,41 @@ def find_best_thresh(preds, scores, na_probs, qid_to_has_ans, unanswerable_exist
     else:
         has_ans_score, has_ans_cnt = 0, 0
         for qid in qid_list:
-            if not qid_to_has_ans[qid]: 
+            if not qid_to_has_ans[qid]:
                 continue
             has_ans_cnt += 1
 
-            if qid not in scores: 
+            if qid not in scores:
                 continue
             has_ans_score += scores[qid]
 
         return 100.0 * best_score / len(scores), best_thresh, 1.0 * has_ans_score / has_ans_cnt
 
 
-def find_all_best_thresh(main_eval, preds, exact_raw, f1_raw, na_probs, qid_to_has_ans, unanswerable_exists=False):
+def find_all_best_thresh(
+    main_eval, preds, exact_raw, f1_raw, na_probs, qid_to_has_ans, unanswerable_exists=False
+):
     all_exact = find_best_thresh(preds, exact_raw, na_probs, qid_to_has_ans, unanswerable_exists)
     all_f1 = find_best_thresh(preds, f1_raw, na_probs, qid_to_has_ans, unanswerable_exists)
-    main_eval['best_exact'] = all_exact[0]
-    main_eval['best_exact_thresh'] = all_exact[1]
-    main_eval['best_f1'] = all_f1[0]
-    main_eval['best_f1_thresh'] = all_f1[1]
+    main_eval["best_exact"] = all_exact[0]
+    main_eval["best_exact_thresh"] = all_exact[1]
+    main_eval["best_f1"] = all_f1[0]
+    main_eval["best_f1_thresh"] = all_f1[1]
 
     if unanswerable_exists:
-        main_eval['has_ans_exact'] = all_exact[2]
-        main_eval['has_ans_f1'] = all_f1[2]
+        main_eval["has_ans_exact"] = all_exact[2]
+        main_eval["has_ans_f1"] = all_f1[2]
 
-def evaluate_qa(qa_ids, actuals, preds, na_probs=None, na_prob_thresh=0, unanswerable_exists=False, out_file=None):
+
+def evaluate_qa(
+    qa_ids,
+    actuals,
+    preds,
+    na_probs=None,
+    na_prob_thresh=0,
+    unanswerable_exists=False,
+    out_file=None,
+):
     """
     Evaluate question answering prediction results against ground truth answers.
 
@@ -962,7 +968,9 @@ def evaluate_qa(qa_ids, actuals, preds, na_probs=None, na_prob_thresh=0, unanswe
         _merge_eval(out_eval, no_ans_eval, "NoAns")
 
     if na_probs_available:
-        find_all_best_thresh(out_eval, preds, exact_raw, f1_raw, na_probs, qid_to_has_ans, unanswerable_exists)
+        find_all_best_thresh(
+            out_eval, preds, exact_raw, f1_raw, na_probs, qid_to_has_ans, unanswerable_exists
+        )
 
     if out_file:
         with open(out_file, "w") as f:
@@ -970,10 +978,17 @@ def evaluate_qa(qa_ids, actuals, preds, na_probs=None, na_prob_thresh=0, unanswe
     else:
         print(json.dumps(out_eval, indent=2))
     return out_eval
+
+
 # Evaluation functions end
 
 # -------------------------------------------------------------------------------------------------
 # Preprocessing helper functions
+def _is_iterable_but_not_string(obj):
+    """Check whether obj is a non-string Iterable."""
+    return isinstance(obj, collections.Iterable) and not isinstance(obj, str)
+
+
 def _create_qa_example(qa_input, is_training):
 
     # A data structure representing an unique document-question-answer triplet.
@@ -1410,18 +1425,18 @@ def _create_qa_features(
         )
 
         return qa_features
+
+
 # Preprocessing helper functions end
 
 # -------------------------------------------------------------------------------------------------
 # Post processing helper functions
 _PrelimPrediction = collections.namedtuple(
-    "PrelimPrediction",
-    ["feature_index", "start_index", "end_index", "start_logit", "end_logit"],
+    "PrelimPrediction", ["feature_index", "start_index", "end_index", "start_logit", "end_logit"]
 )
 
-_NbestPrediction = collections.namedtuple(
-    "NbestPrediction", ["text", "start_logit", "end_logit"]
-)
+_NbestPrediction = collections.namedtuple("NbestPrediction", ["text", "start_logit", "end_logit"])
+
 
 def _get_final_text(pred_text, orig_text, do_lower_case, verbose_logging=False):
     """Project the tokenized prediction back to the original text."""
@@ -1483,9 +1498,7 @@ def _get_final_text(pred_text, orig_text, do_lower_case, verbose_logging=False):
     if len(orig_ns_text) != len(tok_ns_text):
         if verbose_logging:
             logger.info(
-                "Length not equal after stripping spaces: '%s' vs '%s'",
-                orig_ns_text,
-                tok_ns_text,
+                "Length not equal after stripping spaces: '%s' vs '%s'", orig_ns_text, tok_ns_text
             )
         return orig_text
 
@@ -1520,6 +1533,7 @@ def _get_final_text(pred_text, orig_text, do_lower_case, verbose_logging=False):
     output_text = orig_text[orig_start_position : (orig_end_position + 1)]
     return output_text
 
+
 def _get_best_indexes(logits, n_best_size):
     """Get the n-best logits from a list."""
     index_and_score = sorted(enumerate(logits), key=lambda x: x[1], reverse=True)
@@ -1530,6 +1544,7 @@ def _get_best_indexes(logits, n_best_size):
             break
         best_indexes.append(index_and_score[i][0])
     return best_indexes
+
 
 def _compute_softmax(scores):
     """Compute softmax probability over raw logits."""
@@ -1553,7 +1568,5 @@ def _compute_softmax(scores):
         probs.append(score / total_sum)
     return probs
 
+
 # Post processing helper functions end
-
-
-
