@@ -34,20 +34,19 @@ MODEL_CLASS.update(
 )
 
 
-def _list_supported_models():
-    return list(MODEL_CLASS)
-
-
-def create_dataset_from_df(df, text_col, label_col):
-    return SCDataSet(df, text_col, label_col)
-
-
 class Processor:
-    def __init__(self, pt_model_name, tokenize=None, to_lower=False, cache_dir="."):
-        self.tokenizer = TOKENIZER_CLASS[pt_model_name].from_pretrained(
-            pt_model_name, do_lower_case=to_lower, cache_dir=cache_dir
+    def __init__(self, model_name, tokenize=None, to_lower=False, cache_dir="."):
+        self.tokenizer = TOKENIZER_CLASS[model_name].from_pretrained(
+            model_name, do_lower_case=to_lower, cache_dir=cache_dir
         )
         self.custom_tokenize = tokenize
+
+    @staticmethod
+    def list_supported_models():
+        return _list_supported_models()
+
+    def create_dataset_from_df(df, text_col, label_col):
+        return SCDataSet(df, text_col, label_col)
 
     def preprocess(self, text, labels, max_len, batch_size=32, distributed=False):
         """preprocess data or batches"""
@@ -78,40 +77,52 @@ class Processor:
             torch.tensor(labels, dtype=torch.long),
         )
 
-        sampler = DistributedSampler(td) if distributed else RandomSampler(td)
-        data_loader = DataLoader(td, sampler=sampler, batch_size=batch_size)
-        return data_loader
-
-    def list_supported_models():
-        return _list_supported_models()
 
 
 class SequenceClassifier:
     def __init__(
-        self, pt_model_name="bert-base-cased", num_labels=2, cache_dir=".", fp16=False, seed=0
+        self, model_name="bert-base-cased", num_labels=2, cache_dir=".", seed=0
     ):
-        self.model = MODEL_CLASS[pt_model_name].from_pretrained(
-            pt_model_name, cache_dir=cache_dir, num_labels=num_labels
+        self.model = MODEL_CLASS[model_name].from_pretrained(
+            model_name, cache_dir=cache_dir, num_labels=num_labels
         )
         self.seed = seed
-        self.fp16 = fp16
-
+        
+    @staticmethod
     def list_supported_models():
         return _list_supported_models()
 
-    def fit(train_dataloader, num_epochs, num_gpus, device):
+    def fit(self, train_dataset, device="cuda", num_epochs=1, batch_size=32, num_gpus=None):
+
+        if local_rank == -1:
+            device = torch.device(
+                "cuda" if torch.cuda.is_available() and device == "cuda" else "cpu"
+            )
+            num_gpus = torch.cuda.device_count()
+        else:
+            torch.cuda.set_device(local_rank)
+            device = torch.device("cuda", local_rank)
+            torch.distributed.init_process_group(backend="nccl")
+            num_gpus = 1
+
         fine_tune(
-            model=self.model,
-            model_type=pt_model_name.split["-"][0],
-            train_dataloader=train_dataloader,
-            num_epochs=num_epochs,
-            n_gpus=num_gpus,
-            local_rank=local_rank,
+            model=self.model.to(device),
+            model_type=model_name.split["-"][0],
+            train_dataset=train_dataset,
             device=device,
-            gradient_accumulation_steps=gradient_accumulation_steps,
-            fp16=self.fp16,
+            max_steps=num_epochs,
+            num_train_epochs=num_epochs,
+            gradient_accumulation_steps=1,
+            per_gpu_train_batch_size=batch_size,
+            n_gpu=num_gpus,
+            weight_decay=0.0,
+            learning_rate=5e-5,
+            adam_epsilon=1e-8,
+            warmup_steps=0,
+            fp16=False,
+            fp16_opt_level="O1",
+            local_rank=-1,
             seed=self.seed,
-        )
 
     def predict():
         pass
