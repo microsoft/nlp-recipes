@@ -29,22 +29,11 @@ TOKENIZER_CLASS.update({k: DistilBertTokenizer for k in DISTILBERT_PRETRAINED_MO
 MAX_SEQ_LEN = 512
 
 
-def get_inputs(batch, model_type):
-    if model_type == "bert":
-        return {
-            "input_ids": batch[0],
-            "attention_mask": batch[1],
-            "token_type_ids": batch[2],
-            "labels": batch[3],
-        }
-    else:
-        raise ValueError("Model not supported.")
-
-
 def fine_tune(
     model,
     model_type,
     train_dataset,
+    get_inputs,
     device,
     max_steps,
     num_train_epochs,
@@ -88,9 +77,9 @@ def fine_tune(
             "weight_decay": 0.0,
         },
     ]
-    self.optimizer = AdamW(optimizer_grouped_parameters, lr=learning_rate, eps=adam_epsilon)
-    self.scheduler = WarmupLinearSchedule(
-        self.optimizer, warmup_steps=warmup_steps, t_total=t_total
+    optimizer = AdamW(optimizer_grouped_parameters, lr=learning_rate, eps=adam_epsilon)
+    scheduler = WarmupLinearSchedule(
+        optimizer, warmup_steps=warmup_steps, t_total=t_total
     )
 
     if fp16:
@@ -122,7 +111,7 @@ def fine_tune(
         for step, batch in enumerate(epoch_iterator):
             model.train()
             batch = tuple(t.to(device) for t in batch)
-            inputs = self.get_inputs(batch)
+            inputs = get_inputs(batch, model_type)
             outputs = model(**inputs)
             loss = outputs[0]
 

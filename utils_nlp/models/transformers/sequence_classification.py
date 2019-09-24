@@ -45,6 +45,18 @@ class Processor:
         self.custom_tokenize = tokenize
 
     @staticmethod
+    def get_inputs(batch, model_type):
+        if model_type == "bert":
+            return {
+                "input_ids": batch[0],
+                "attention_mask": batch[1],
+                "token_type_ids": batch[2],
+                "labels": batch[3],
+            }
+        else:
+            raise ValueError("Model not supported.")
+
+    @staticmethod
     def list_supported_models():
         return _list_supported_models()
 
@@ -101,9 +113,11 @@ class SequenceClassifier:
             num_gpus = 1
 
         fine_tune(
+          
             model=self.model.to(device),
             model_type=model_name.split["-"][0],
             train_dataset=train_dataset,
+            get_inputs=Processor.get_inputs,
             device=device,
             max_steps=num_epochs,
             num_train_epochs=num_epochs,
