@@ -10,8 +10,8 @@ For training at scale, operationalization or hyperparameter tuning, it is recomm
 ## Table of Contents
 
 * [Compute environments](#compute-environments)
-* [Create a cloud-based workstation](#Create-a-cloud-based-workstation)
-* [Setup guide for Local or DSVM](#setup-guide-for-local-or-dsvm-machines)
+* [Create a cloud-based workstation (Optional)](#Create-a-cloud-based-workstation-optional)
+* [Setup guide for Local or Virtual Machines](#setup-guide-for-local-or-virtual-machines)
   * [Requirements](#requirements)
   * [Dependencies setup](#dependencies-setup)
   * [Register the conda environment in the DSVM JupyterHub](#register-conda-environment-in-dsvm-jupyterhub)
@@ -22,12 +22,13 @@ For training at scale, operationalization or hyperparameter tuning, it is recomm
 
 Depending on the type of NLP system and the notebook that needs to be run, there are different computational requirements. Currently, this repository supports **Python CPU** and **Python GPU**. A conda environment YAML file can be generated for either CPU or GPU environments as shown below in the *Dependencies Setup* section.
 
-## Create a cloud-based workstation 
+## Create a cloud-based workstation (Optional)
+
 [Azure Machine Learning service](https://azure.microsoft.com/en-us/services/machine-learning-service/)’s Notebook Virtual Machine (VM), is a cloud-based workstation created specifically for data scientists. Notebook VM based authoring is directly integrated into Azure Machine Learning service, providing a code-first experience for Python developers to conveniently build and deploy models in the workspace. Developers and data scientists can perform every operation supported by the Azure Machine Learning Python SDK using a familiar Jupyter notebook in a secure, enterprise-ready environment. Notebook VM is secure and easy-to-use, preconfigured for machine learning, and fully customizable. 
 
-You can learn how to create a Notebook VM [here](https://docs.microsoft.com/en-us/azure/machine-learning/service/tutorial-1st-experiment-sdk-setup#azure) and then follow the same setup as in the [Setup guide for Local or DSVM](#setup-guide-for-local-or-dsvm-machines).
+You can learn how to create a Notebook VM [here](https://docs.microsoft.com/en-us/azure/machine-learning/service/tutorial-1st-experiment-sdk-setup#azure) and then follow the same setup as in the [Setup guide for Local or DSVM](#setup-guide-for-local-or-dsvm-machines) directly using the terminal in the Notebook VM.
 
-## Setup Guide for Local or DSVM Machines
+## Setup Guide for Local or Virtual Machines
 
 ### Requirements
 
