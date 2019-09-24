@@ -142,26 +142,6 @@ class QADataset(Dataset):
         return self.df.shape[0]
 
 
-def create_qa_dataset_from_df(
-    df,
-    doc_text_col,
-    question_text_col,
-    qa_id_col,
-    is_impossible_col=None,
-    answer_start_col=None,
-    answer_text_col=None,
-):
-    return QADataset(
-        df,
-        doc_text_col,
-        question_text_col,
-        qa_id_col,
-        is_impossible_col,
-        answer_start_col,
-        answer_text_col,
-    )
-
-
 def get_qa_dataloader(
     qa_dataset,
     model_name,
@@ -268,8 +248,11 @@ def get_qa_dataloader(
             )
             sampler = SequentialSampler(qa_dataset)
 
-        dataloader = DataLoader(qa_dataset, sampler=sampler, batch_size=batch_size)
-        return dataloader
+        logger.info("QA examples are saved to {}".format(examples_file))
+        logger.info("QA features are saved to {}".format(features_file))
+
+    dataloader = DataLoader(qa_dataset, sampler=sampler, batch_size=batch_size)
+    return dataloader
 
 
 QAResult_ = collections.namedtuple("QAResult", ["unique_id", "start_logits", "end_logits"])
