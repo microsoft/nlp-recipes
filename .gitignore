@@ -127,6 +127,7 @@ nlp_*.yaml
 nohup.out
 temp/
 tmp/
+logs
 
 # Data
 data/
@@ -136,6 +137,8 @@ data/
 */question_answering/score.py
 */question_answering/vocabulary/
 */question_answering/weights.th
+squad
+bidaf-question-answering/
 
 # AML Config
 aml_config/
