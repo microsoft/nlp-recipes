@@ -48,11 +48,7 @@ class Processor:
     @staticmethod
     def get_inputs(batch, model_name):
         if model_name.split("-")[0] == "bert":
-            return {
-                "input_ids": batch[0],
-                "attention_mask": batch[1],                
-                "labels": batch[2],
-            }
+            return {"input_ids": batch[0], "attention_mask": batch[1], "labels": batch[2]}
         else:
             raise ValueError("Model not supported.")
 
@@ -123,13 +119,15 @@ class SequenceClassifier:
             torch.distributed.init_process_group(backend="nccl")
             num_gpus = 1
 
+        self.model.to(device)
+
         fine_tune(
-            model=self.model.to(device),
+            model=self.model,
             model_name=self.model_name,
             train_dataset=train_dataset,
             get_inputs=Processor.get_inputs,
             device=device,
-            max_steps=num_epochs,
+            max_steps=-1,
             num_train_epochs=num_epochs,
             gradient_accumulation_steps=1,
             per_gpu_train_batch_size=batch_size,
