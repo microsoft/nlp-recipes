@@ -2,39 +2,29 @@
 # -*- encoding: utf-8 -*-
 from __future__ import absolute_import
 from __future__ import print_function
-
 import io
-
 import re
-from glob import glob
-from os.path import basename, dirname, join, splitext
+from os.path import dirname, join
+from setuptools import setup
+from utils_nlp import VERSION, AUTHOR, TITLE, LICENSE
 
-from setuptools import find_packages, setup
-
-__version__ = "2019.08"
-VERSION = __version__
 
 def read(*names, **kwargs):
-    with io.open(
-        join(dirname(__file__), *names),
-        encoding=kwargs.get("encoding", "utf8"),
-    ) as fh:
+    with io.open(join(dirname(__file__), *names), encoding=kwargs.get("encoding", "utf8")) as fh:
         return fh.read()
 
 
 setup(
     name="utils_nlp",
     version=VERSION,
-    license="MIT License",
+    license=LICENSE,
     description="NLP Utility functions that are used for best practices in building state-of-the-art NLP methods and scenarios. Developed by Microsoft AI CAT",
     long_description="%s\n%s"
     % (
-        re.compile("^.. start-badges.*^.. end-badges", re.M | re.S).sub(
-            "", read("README.md")
-        ),
+        re.compile("^.. start-badges.*^.. end-badges", re.M | re.S).sub("", read("README.md")),
         re.sub(":[a-z]+:`~?(.*?)`", r"``\1``", read("CONTRIBUTING.md")),
     ),
-    author="AI CAT",
+    author=AUTHOR,
     author_email="teamsharat@microsoft.com",
     url="https://github.com/microsoft/nlp",
     packages=["utils_nlp"],
@@ -66,15 +56,11 @@ setup(
         "Documentation": "https://github.com/microsoft/nlp/",
         "Issue Tracker": "https://github.com/microsoft/nlp/issues",
     },
-    keywords=[
-        "Microsoft NLP",
-        "Natural Language Processing",
-        "Text Processing",
-        "Word Embedding",
-    ],
+    keywords=["Microsoft NLP", "Natural Language Processing", "Text Processing", "Word Embedding"],
     python_requires=">=3.6",
     install_requires=[],
     dependency_links=[],
     extras_require={},
+    use_scm_version=False,
     setup_requires=[],
 )

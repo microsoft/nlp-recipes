@@ -15,11 +15,12 @@ from tempfile import TemporaryDirectory
 import pytest
 from tests.notebooks_common import path_notebooks
 
-from utils_nlp.models.bert.common import Language
+from utils_nlp.models.bert.common import Language as BERTLanguage
+from utils_nlp.models.xlnet.common import Language as XLNetLanguage
 from utils_nlp.models.bert.common import Tokenizer as BERTTokenizer
+from utils_nlp.models.xlnet.common import Tokenizer as XLNetTokenizer
 from utils_nlp.azureml import azureml_utils
 from azureml.core.webservice import Webservice
-
 
 
 @pytest.fixture(scope="module")
@@ -34,29 +35,19 @@ def notebooks():
         "similarity_embeddings_baseline": os.path.join(
             folder_notebooks, "sentence_similarity", "baseline_deep_dive.ipynb"
         ),
-        "bert_encoder": os.path.join(
-            folder_notebooks, "sentence_similarity", "bert_encoder.ipynb"
-        ),
-        "gensen_local": os.path.join(
-            folder_notebooks, "sentence_similarity", "gensen_local.ipynb"
-        ),
+        "bert_encoder": os.path.join(folder_notebooks, "sentence_similarity", "bert_encoder.ipynb"),
+        "gensen_local": os.path.join(folder_notebooks, "sentence_similarity", "gensen_local.ipynb"),
         "gensen_azureml": os.path.join(
             folder_notebooks, "sentence_similarity", "gensen_aml_deep_dive.ipynb"
         ),
         "similarity_automl_local": os.path.join(
-            folder_notebooks,
-            "sentence_similarity",
-            "automl_local_deployment_aci.ipynb",
+            folder_notebooks, "sentence_similarity", "automl_local_deployment_aci.ipynb"
         ),
         "automl_with_pipelines_deployment_aks": os.path.join(
-            folder_notebooks,
-            "sentence_similarity",
-            "automl_with_pipelines_deployment_aks.ipynb",
-        ),        
+            folder_notebooks, "sentence_similarity", "automl_with_pipelines_deployment_aks.ipynb"
+        ),
         "bert_qa_trainer": os.path.join(
-            folder_notebooks,
-            "question_answering",
-            "pretrained-BERT-SQuAD-deep-dive-aml.ipynb",
+            folder_notebooks, "question_answering", "pretrained-BERT-SQuAD-deep-dive-aml.ipynb"
         ),
         "bidaf_deep_dive": os.path.join(
             folder_notebooks, "question_answering", "bidaf_aml_deep_dive.ipynb"
@@ -69,14 +60,27 @@ def notebooks():
         "entailment_multinli_bert": os.path.join(
             folder_notebooks, "entailment", "entailment_multinli_bert.ipynb"
         ),
+        "entailment_bert_azureml": os.path.join(
+            folder_notebooks, "entailment", "entailment_xnli_bert_azureml.ipynb"
+        ),
         "tc_bert_azureml": os.path.join(
             folder_notebooks, "text_classification", "tc_bert_azureml.ipynb"
         ),
-        "tc_mnli_bert": os.path.join(
-            folder_notebooks, "text_classification", "tc_mnli_bert.ipynb"
+        "bert_senteval": os.path.join(
+            folder_notebooks, "sentence_similarity", "bert_senteval.ipynb"
+        ),
+        "tc_mnli_bert": os.path.join(folder_notebooks, "text_classification", "tc_mnli_bert.ipynb"),
+        "tc_dac_bert_ar": os.path.join(
+            folder_notebooks, "text_classification", "tc_dac_bert_ar.ipynb"
+        ),
+        "tc_bbc_bert_hi": os.path.join(
+            folder_notebooks, "text_classification", "tc_bbc_bert_hi.ipynb"
+        ),
+        "ner_wikigold_bert": os.path.join(
+            folder_notebooks, "named_entity_recognition", "ner_wikigold_bert.ipynb"
         ),
         "deep_and_unified_understanding": os.path.join(
-            folder_notebooks, "interpret_NLP_models", "understand_models.ipynb"
+            folder_notebooks, "model_explainability", "interpret_dnn_layers.ipynb"
         ),
     }
     return paths
@@ -194,13 +198,16 @@ def cluster_name(request):
 
 @pytest.fixture()
 def bert_english_tokenizer():
-    return BERTTokenizer(language=Language.ENGLISHCASED, to_lower=False)
+    return BERTTokenizer(language=BERTLanguage.ENGLISHCASED, to_lower=False)
+
+
+@pytest.fixture()
+def xlnet_english_tokenizer():
+    return XLNetTokenizer(language=XLNetLanguage.ENGLISHCASED)
 
 
 @pytest.fixture(scope="module")
-def teardown_service(
-    subscription_id, resource_group, workspace_name, workspace_region
-):
+def teardown_service(subscription_id, resource_group, workspace_name, workspace_region):
 
     yield
 

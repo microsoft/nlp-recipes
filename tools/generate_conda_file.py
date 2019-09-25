@@ -46,8 +46,8 @@ CONDA_BASE = {
     "h5py": "h5py>=2.8.0",
     "tensorflow-hub": "tensorflow-hub==0.5.0",
     "py-xgboost": "py-xgboost<=0.80",
+    "dask": "dask[dataframe]==1.2.2",
 }
-
 CONDA_GPU = {
     "numba": "numba>=0.38.1",
     "pytorch": "pytorch>=1.0.0",
@@ -57,21 +57,24 @@ CONDA_GPU = {
 
 PIP_BASE = {
     "allennlp": "allennlp==0.8.4",
-    "azureml-sdk[automl]": "azureml-sdk[automl]==1.0.48",
-    "azureml-train-automl": "azureml-train-automl==1.0.48",
+    "azureml-sdk": "azureml-sdk[automl,notebooks,contrib]==1.0.57",
+    "azureml-train-automl": "azureml-train-automl==1.0.57",
     "azureml-dataprep": "azureml-dataprep==1.1.8",
-    "azureml-widgets": "azureml-widgets==1.0.48",
+    "azureml-widgets": "azureml-widgets==1.0.57",
     "azureml-mlflow": "azureml-mlflow>=1.0.43.1",
     "black": "black>=18.6b4",
-    "dask": "dask[dataframe]==1.2.2",
+    "cached-property": "cached-property==1.5.1",
     "papermill": "papermill>=1.0.1",
     "nteract-scrapbook": "nteract-scrapbook>=0.2.1",
     "pydocumentdb": "pydocumentdb>=2.3.3",
+    "pytorch-pretrained-bert": "pytorch-pretrained-bert>=0.6",
+    "pytorch-transformers": "pytorch-transformers>=1.2.0",
     "tqdm": "tqdm==4.31.1",
     "pyemd": "pyemd==0.5.1",
     "ipywebrtc": "ipywebrtc==0.4.3",
     "pre-commit": "pre-commit>=1.14.4",
     "scikit-learn": "scikit-learn>=0.19.0,<=0.20.3",
+    "seaborn": "seaborn>=0.9.0",
     "sklearn-crfsuite": "sklearn-crfsuite>=0.3.6",
     "spacy": "spacy>=2.1.4",
     "spacy-models": (
@@ -80,23 +83,28 @@ PIP_BASE = {
     ),
     "gensim": "gensim>=3.7.0",
     "nltk": "nltk>=3.4",
-    "pytorch-pretrained-bert": "pytorch-pretrained-bert>=0.6",
     "seqeval": "seqeval>=0.0.12",
     "allennlp": "allennlp>=0.8.4",
 }
-
 PIP_GPU = {}
 
 PIP_DARWIN = {}
-PIP_DARWIN_GPU = {"horovod": "horovod>=0.16.1"}
+PIP_DARWIN_GPU = {}
 
 PIP_LINUX = {}
-PIP_LINUX_GPU = {"horovod": "horovod>=0.16.1"}
+PIP_LINUX_GPU = {}
 
 PIP_WIN32 = {}
 PIP_WIN32_GPU = {}
 
-CONDA_WIN32 = {"pytorch": "pytorch==1.0.0", "cudatoolkit": "cuda90"}
+CONDA_DARWIN = {}
+CONDA_DARWIN_GPU = {}
+
+CONDA_LINUX = {}
+CONDA_LINUX_GPU = {}
+
+CONDA_WIN32 = {}
+CONDA_WIN32_GPU = {"pytorch": "pytorch==1.0.0", "cudatoolkit": "cuda90"}
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -110,9 +118,7 @@ if __name__ == "__main__":
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--name", help="specify name of conda environment")
-    parser.add_argument(
-        "--gpu", action="store_true", help="include packages for GPU support"
-    )
+    parser.add_argument("--gpu", action="store_true", help="include packages for GPU support")
     args = parser.parse_args()
 
     # set name for environment and output yaml file
@@ -124,29 +130,36 @@ if __name__ == "__main__":
     if args.name is not None:
         conda_env = args.name
 
-    # update conda and pip packages based on flags provided
+    # add conda and pip base packages
     conda_packages = CONDA_BASE
     pip_packages = PIP_BASE
 
-    # check for os platform support
-    if platform == "darwin":
-        pip_packages.update(PIP_DARWIN)
-        PIP_GPU.update(PIP_DARWIN_GPU)
-    elif platform.startswith("linux"):
-        pip_packages.update(PIP_LINUX)
-        PIP_GPU.update(PIP_LINUX_GPU)
-    elif platform == "win32":
-        conda_packages.update(CONDA_WIN32)
-        pip_packages.update(PIP_WIN32)
-        PIP_GPU.update(PIP_WIN32_GPU)
-    else:
-        raise Exception(
-            "Unsupported platform, must be Windows, Linux, or macOS"
-        )
-
+    # update conda and pip packages based on flags provided
     if args.gpu:
         conda_packages.update(CONDA_GPU)
         pip_packages.update(PIP_GPU)
+
+    # update conda and pip packages based on os platform support
+    if platform == "darwin":
+        conda_packages.update(CONDA_DARWIN)
+        pip_packages.update(PIP_DARWIN)
+        if args.gpu:
+            conda_packages.update(CONDA_DARWIN_GPU)
+            pip_packages.update(PIP_DARWIN_GPU)
+    elif platform.startswith("linux"):
+        conda_packages.update(CONDA_LINUX)
+        pip_packages.update(PIP_LINUX)
+        if args.gpu:
+            conda_packages.update(CONDA_LINUX_GPU)
+            pip_packages.update(PIP_LINUX_GPU)
+    elif platform == "win32":
+        conda_packages.update(CONDA_WIN32)
+        pip_packages.update(PIP_WIN32)
+        if args.gpu:
+            conda_packages.update(CONDA_WIN32_GPU)
+            pip_packages.update(PIP_WIN32_GPU)
+    else:
+        raise Exception("Unsupported platform. Must be Windows, Linux, or macOS")
 
     # write out yaml file
     conda_file = "{}.yaml".format(conda_env)
