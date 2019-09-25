@@ -154,4 +154,7 @@ def fine_tune(
             train_iterator.close()
             break
 
+        # empty cache
+        del [batch]
+        torch.cuda.empty_cache()
     return global_step, tr_loss / global_step

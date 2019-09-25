@@ -106,6 +106,7 @@ class SequenceClassifier:
         num_gpus=None,
         local_rank=-1,
     ):
+        # get device
         if local_rank == -1:
             device = torch.device(
                 "cuda" if torch.cuda.is_available() and device == "cuda" else "cpu"
