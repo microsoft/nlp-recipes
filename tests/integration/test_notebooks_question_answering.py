@@ -61,11 +61,7 @@ def test_bidaf_quickstart(
 @pytest.mark.integration
 @pytest.mark.azureml
 @pytest.mark.gpu
-def test_bert_qa_runs(notebooks,
-                      subscription_id,
-                      resource_group,
-                      workspace_name,
-                      workspace_region):
+def test_bert_qa_runs(notebooks, subscription_id, resource_group, workspace_name, workspace_region):
     notebook_path = notebooks["bert_qa_trainer"]
     pm.execute_notebook(
         notebook_path,
@@ -88,7 +84,7 @@ def test_bert_qa_runs(notebooks,
             subscription_id=subscription_id,
             resource_group=resource_group,
             workspace_name=workspace_name,
-            workspace_region=workspace_region
+            workspace_region=workspace_region,
         ),
     )
     result = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict
