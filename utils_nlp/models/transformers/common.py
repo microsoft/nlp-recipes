@@ -5,8 +5,10 @@
 # https://github.com/huggingface/pytorch-transformers/blob/master/examples/run_glue.py
 
 
-from torch.utils.data.distributed import DistributedSampler
+import random
 
+import numpy as np
+import torch
 from pytorch_transformers import (
     AdamW,
     BertTokenizer,
@@ -19,6 +21,9 @@ from pytorch_transformers.modeling_bert import BERT_PRETRAINED_MODEL_ARCHIVE_MAP
 from pytorch_transformers.modeling_distilbert import DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP
 from pytorch_transformers.modeling_roberta import ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP
 from pytorch_transformers.modeling_xlnet import XLNET_PRETRAINED_MODEL_ARCHIVE_MAP
+from torch.utils.data import DataLoader, RandomSampler
+from torch.utils.data.distributed import DistributedSampler
+from tqdm import tqdm, trange
 
 TOKENIZER_CLASS = {}
 TOKENIZER_CLASS.update({k: BertTokenizer for k in BERT_PRETRAINED_MODEL_ARCHIVE_MAP})
@@ -29,14 +34,23 @@ TOKENIZER_CLASS.update({k: DistilBertTokenizer for k in DISTILBERT_PRETRAINED_MO
 MAX_SEQ_LEN = 512
 
 
+def set_seed(seed, cuda=True):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if cuda and torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+
+
 def fine_tune(
     model,
-    model_type,
+    model_name,
     train_dataset,
     get_inputs,
     device,
     max_steps,
     num_train_epochs,
+    max_grad_norm=1.0,
     gradient_accumulation_steps=1,
     per_gpu_train_batch_size=8,
     n_gpu=1,
@@ -50,7 +64,7 @@ def fine_tune(
     seed=0,
 ):
 
-    set_seed(seed)
+    set_seed(seed, n_gpu > 0)
 
     train_batch_size = per_gpu_train_batch_size * max(1, n_gpu)
     train_sampler = (
@@ -78,9 +92,7 @@ def fine_tune(
         },
     ]
     optimizer = AdamW(optimizer_grouped_parameters, lr=learning_rate, eps=adam_epsilon)
-    scheduler = WarmupLinearSchedule(
-        optimizer, warmup_steps=warmup_steps, t_total=t_total
-    )
+    scheduler = WarmupLinearSchedule(optimizer, warmup_steps=warmup_steps, t_total=t_total)
 
     if fp16:
         try:
@@ -111,7 +123,7 @@ def fine_tune(
         for step, batch in enumerate(epoch_iterator):
             model.train()
             batch = tuple(t.to(device) for t in batch)
-            inputs = get_inputs(batch, model_type)
+            inputs = get_inputs(batch, model_name)
             outputs = model(**inputs)
             loss = outputs[0]
 
@@ -123,10 +135,10 @@ def fine_tune(
             if fp16:
                 with amp.scale_loss(loss, optimizer) as scaled_loss:
                     scaled_loss.backward()
-                torch.nn.utils.clip_grad_norm_(amp.master_params(optimizer), args.max_grad_norm)
+                torch.nn.utils.clip_grad_norm_(amp.master_params(optimizer), max_grad_norm)
             else:
                 loss.backward()
-                torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)
 
             tr_loss += loss.item()
             if (step + 1) % gradient_accumulation_steps == 0:
@@ -135,7 +147,7 @@ def fine_tune(
                 model.zero_grad()
                 global_step += 1
 
-            if max_steps > 0 and global_step > args.max_steps:
+            if max_steps > 0 and global_step > max_steps:
                 epoch_iterator.close()
                 break
         if max_steps > 0 and global_step > max_steps:

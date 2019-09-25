@@ -2,6 +2,8 @@
 # Licensed under the MIT License.
 
 import torch
+from torch.utils.data import TensorDataset
+
 from pytorch_transformers.modeling_bert import (
     BERT_PRETRAINED_MODEL_ARCHIVE_MAP,
     BertForSequenceClassification,
@@ -18,7 +20,6 @@ from pytorch_transformers.modeling_xlnet import (
     XLNET_PRETRAINED_MODEL_ARCHIVE_MAP,
     XLNetForSequenceClassification,
 )
-from torch.utils.data import DataLoader, DistributedSampler, RandomSampler, TensorDataset
 
 from utils_nlp.models.transformers.common import MAX_SEQ_LEN, TOKENIZER_CLASS, fine_tune
 
@@ -45,13 +46,12 @@ class Processor:
         self.custom_tokenize = tokenize
 
     @staticmethod
-    def get_inputs(batch, model_type):
-        if model_type == "bert":
+    def get_inputs(batch, model_name):
+        if model_name.split("-")[0] == "bert":
             return {
                 "input_ids": batch[0],
-                "attention_mask": batch[1],
-                "token_type_ids": batch[2],
-                "labels": batch[3],
+                "attention_mask": batch[1],                
+                "labels": batch[2],
             }
         else:
             raise ValueError("Model not supported.")
@@ -91,6 +91,7 @@ class Processor:
 
 class SequenceClassifier:
     def __init__(self, model_name="bert-base-cased", num_labels=2, cache_dir=".", seed=0):
+        self.model_name = model_name
         self.model = MODEL_CLASS[model_name].from_pretrained(
             model_name, cache_dir=cache_dir, num_labels=num_labels
         )
@@ -100,12 +101,22 @@ class SequenceClassifier:
     def list_supported_models():
         return _list_supported_models()
 
-    def fit(self, train_dataset, device="cuda", num_epochs=1, batch_size=32, num_gpus=None):
+    def fit(
+        self,
+        train_dataset,
+        device="cuda",
+        num_epochs=1,
+        batch_size=32,
+        num_gpus=None,
+        local_rank=-1,
+    ):
         if local_rank == -1:
             device = torch.device(
                 "cuda" if torch.cuda.is_available() and device == "cuda" else "cpu"
             )
-            num_gpus = torch.cuda.device_count()
+            num_gpus = (
+                min(num_gpus, torch.cuda.device_count()) if num_gpus else torch.cuda.device_count()
+            )
         else:
             torch.cuda.set_device(local_rank)
             device = torch.device("cuda", local_rank)
@@ -113,9 +124,8 @@ class SequenceClassifier:
             num_gpus = 1
 
         fine_tune(
-          
             model=self.model.to(device),
-            model_type=model_name.split["-"][0],
+            model_name=self.model_name,
             train_dataset=train_dataset,
             get_inputs=Processor.get_inputs,
             device=device,
