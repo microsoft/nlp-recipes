@@ -34,12 +34,20 @@ MODEL_CLASS.update(
 )
 
 
-def _list_supported_models():
-    return list(MODEL_CLASS)
+class SupportedModels:
+    """Generic Class to be inherited by classes that want to support PyTorch Transformers
+    
+    Returns:
+        list -- list of supported PyTorch Transformers
+    """
+
+    @staticmethod
+    def list_supported_models():
+        return list(MODEL_CLASS)
 
 
-class Processor:
-    def __init__(self, model_name, tokenize=None, to_lower=False, cache_dir="."):
+class Processor(SupportedModels):
+    def __init__(self, model_name="bert-base-cased", tokenize=None, to_lower=False, cache_dir="."):
         self.tokenizer = TOKENIZER_CLASS[model_name].from_pretrained(
             model_name, do_lower_case=to_lower, cache_dir=cache_dir
         )
@@ -51,10 +59,6 @@ class Processor:
             return {"input_ids": batch[0], "attention_mask": batch[1], "labels": batch[2]}
         else:
             raise ValueError("Model not supported.")
-
-    @staticmethod
-    def list_supported_models():
-        return _list_supported_models()
 
     def preprocess(self, text, labels, max_len):
         """preprocess data or batches"""
@@ -85,17 +89,13 @@ class Processor:
         return td
 
 
-class SequenceClassifier:
+class SequenceClassifier(SupportedModels):
     def __init__(self, model_name="bert-base-cased", num_labels=2, cache_dir=".", seed=0):
         self.model_name = model_name
         self.model = MODEL_CLASS[model_name].from_pretrained(
             model_name, cache_dir=cache_dir, num_labels=num_labels
         )
         self.seed = seed
-
-    @staticmethod
-    def list_supported_models():
-        return _list_supported_models()
 
     def fit(
         self,
@@ -145,3 +145,4 @@ class SequenceClassifier:
 
     def predict():
         pass
+
