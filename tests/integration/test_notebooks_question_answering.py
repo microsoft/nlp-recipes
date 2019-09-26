@@ -67,7 +67,7 @@ def test_bert_qa_runs(notebooks, subscription_id, resource_group, workspace_name
         notebook_path,
         OUTPUT_NOTEBOOK,
         parameters=dict(
-            AZUREML_CONFIG_PATH=None,
+            AZUREML_CONFIG_PATH=".",
             DATA_FOLDER="./tests/integration/squad",
             PROJECT_FOLDER="./tests/integration/pytorch-transformers",
             EXPERIMENT_NAME="NLP-QA-BERT-deepdive",
