@@ -69,7 +69,7 @@ def _list_supported_models():
     return list(MODEL_CLASS)
 
 
-class QAProcessor():
+class QAProcessor:
     def __init__(self, model_name, custom_tokenize=None, to_lower=False, cache_dir="."):
         self.tokenizer = TOKENIZER_CLASS[model_name].from_pretrained(
             model_name, do_lower_case=to_lower, cache_dir=cache_dir
@@ -114,11 +114,7 @@ class QAProcessor():
 
     @staticmethod
     def get_test_inputs(batch, model_name):
-        inputs = {
-            "input_ids": batch[0],
-            "attention_mask": batch[1],
-            "token_type_ids": batch[2],
-        }
+        inputs = {"input_ids": batch[0], "attention_mask": batch[1], "token_type_ids": batch[2]}
 
         if model_name.split("-")[0] in ["xlnet"]:
             inputs.update({"cls_index": batch[3], "p_mask": batch[4]})
@@ -182,7 +178,7 @@ class QAProcessor():
                     max_question_length=max_question_length,
                     max_seq_len=max_seq_len,
                     doc_stride=doc_stride,
-                    custom_tokenize=self.custom_tokenize
+                    custom_tokenize=self.custom_tokenize,
                 )
                 features += features_cur
 
@@ -211,7 +207,9 @@ class QAProcessor():
             p_mask = torch.tensor([f.p_mask for f in features], dtype=torch.float)
 
             if is_training:
-                start_positions = torch.tensor([f.start_position for f in features], dtype=torch.long)
+                start_positions = torch.tensor(
+                    [f.start_position for f in features], dtype=torch.long
+                )
                 end_positions = torch.tensor([f.end_position for f in features], dtype=torch.long)
                 qa_dataset = TensorDataset(
                     input_ids,
@@ -489,7 +487,9 @@ class AnswerExtractor:
             )  # Take care of distributed/parallel training
             model_to_save.save_pretrained(output_model_dir)
 
-    def predict(self, test_dataset, per_gpu_batch_size=8, device="cuda", num_gpus=None, local_rank=-1):
+    def predict(
+        self, test_dataset, per_gpu_batch_size=8, device="cuda", num_gpus=None, local_rank=-1
+    ):
 
         """
         Predicts answer start and end logits using fine-tuned
@@ -1151,7 +1151,15 @@ def _create_qa_example(qa_input, is_training):
 
 
 def _create_qa_features(
-    example, model_type, tokenizer, unique_id, is_training, max_question_length, max_seq_len, doc_stride, custom_tokenize=None
+    example,
+    model_type,
+    tokenizer,
+    unique_id,
+    is_training,
+    max_question_length,
+    max_seq_len,
+    doc_stride,
+    custom_tokenize=None,
 ):
 
     # BERT-format features of an unique document span-question-answer triplet.
@@ -1348,10 +1356,7 @@ def _create_qa_features(
         else:
             tok_end_position = len(all_doc_tokens) - 1
         (tok_start_position, tok_end_position) = _improve_answer_span(
-            all_doc_tokens,
-            tok_start_position,
-            tok_end_position,
-            example.orig_answer_text,
+            all_doc_tokens, tok_start_position, tok_end_position, example.orig_answer_text
         )
 
     # The -3 accounts for [CLS], [SEP] and [SEP]

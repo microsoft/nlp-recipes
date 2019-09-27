@@ -1,4 +1,3 @@
-
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
@@ -71,7 +70,7 @@ class QADataset(Dataset):
         self.answer_text_col = answer_text_col
 
     def __getitem__(self, idx):
-        current_item = self.df.iloc[idx, ]
+        current_item = self.df.iloc[idx,]
         if self.actual_answer_available:
             return QAInput(
                 doc_text=current_item[self.doc_text_col],
