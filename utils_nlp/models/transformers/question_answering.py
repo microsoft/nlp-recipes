@@ -19,19 +19,18 @@
 
 import os
 import logging
-from tqdm import tqdm, trange
+from tqdm import tqdm
 import collections
 import json
 import math
 import jsonlines
 
 import torch
-from torch.utils.data import Dataset, TensorDataset, DataLoader, RandomSampler, SequentialSampler
+from torch.utils.data import TensorDataset, SequentialSampler
 
 from pytorch_transformers.tokenization_bert import BasicTokenizer
-from pytorch_transformers import BertTokenizer, XLNetTokenizer
+from pytorch_transformers import XLNetTokenizer
 from pytorch_transformers.tokenization_bert import whitespace_tokenize
-from pytorch_transformers import AdamW, WarmupLinearSchedule
 
 from pytorch_transformers.modeling_bert import (
     BertConfig,
@@ -45,8 +44,7 @@ from pytorch_transformers.modeling_xlnet import (
     XLNetForQuestionAnswering,
 )
 
-from utils_nlp.common.pytorch_utils import get_device, move_to_device
-
+from utils_nlp.models.transformers.common import MAX_SEQ_LEN, TOKENIZER_CLASS, get_device, fine_tune
 
 MODEL_CLASS = {}
 MODEL_CLASS.update({k: BertForQuestionAnswering for k in BERT_PRETRAINED_MODEL_ARCHIVE_MAP})
@@ -55,14 +53,6 @@ MODEL_CLASS.update({k: XLNetForQuestionAnswering for k in XLNET_PRETRAINED_MODEL
 CONFIG_CLASS = {}
 CONFIG_CLASS.update({k: BertConfig for k in BERT_PRETRAINED_MODEL_ARCHIVE_MAP})
 CONFIG_CLASS.update({k: XLNetConfig for k in XLNET_PRETRAINED_MODEL_ARCHIVE_MAP})
-
-## TODO: import from common after merging with transformers branch
-MAX_SEQ_LEN = 512
-
-TOKENIZER_CLASS = {}
-TOKENIZER_CLASS.update({k: BertTokenizer for k in BERT_PRETRAINED_MODEL_ARCHIVE_MAP})
-TOKENIZER_CLASS.update({k: XLNetTokenizer for k in XLNET_PRETRAINED_MODEL_ARCHIVE_MAP})
-## import this from common ends
 
 
 CACHED_EXAMPLES_TRAIN_FILE = "cached_examples_train.jsonl"
@@ -78,181 +68,168 @@ def _list_supported_models():
     return list(MODEL_CLASS)
 
 
-QAInput = collections.namedtuple(
-    "QAInput",
-    ["doc_text", "question_text", "qa_id", "is_impossible", "answer_start", "answer_text"],
-)
+class QAProcessor():
+    def __init__(self, model_name, custom_tokenize=None, to_lower=False, cache_dir="."):
+        self.tokenizer = TOKENIZER_CLASS[model_name].from_pretrained(
+            model_name, do_lower_case=to_lower, cache_dir=cache_dir
+        )
+        self.custom_tokenize = custom_tokenize
+        self.model_name = model_name
+
+    @property
+    def model_name(self):
+        return self._model_name
+
+    @model_name.setter
+    def model_name(self, value):
+        if value not in self.list_supported_models():
+            raise ValueError(
+                "Model name {} is not supported by QAProcessor. "
+                "Call 'QAProcessor.list_supported_models()' to get all supported model "
+                "names.".format(value)
+            )
+
+        self._model_name = value
+        self._model_type = value.split("-")[0]
+
+    @property
+    def model_type(self):
+        return self._model_type
+
+    @staticmethod
+    def get_train_inputs(batch, model_name):
+        inputs = {
+            "input_ids": batch[0],
+            "attention_mask": batch[1],
+            "token_type_ids": batch[2],
+            "start_positions": batch[3],
+            "end_positions": batch[4],
+        }
+
+        if model_name.split("-")[0] in ["xlnet"]:
+            inputs.update({"cls_index": batch[5], "p_mask": batch[6]})
+
+        return inputs
+
+    @staticmethod
+    def get_test_inputs(batch, model_name):
+        inputs = {
+            "input_ids": batch[0],
+            "attention_mask": batch[1],
+            "token_type_ids": batch[2],
+        }
+
+        if model_name.split("-")[0] in ["xlnet"]:
+            inputs.update({"cls_index": batch[3], "p_mask": batch[4]})
 
 
-class QADataset(Dataset):
-    def __init__(
+    @staticmethod
+    def list_supported_models():
+        return _list_supported_models()
+
+    def preprocess(
         self,
-        df,
-        doc_text_col,
-        question_text_col,
-        qa_id_col,
-        is_impossible_col=None,
-        answer_start_col=None,
-        answer_text_col=None,
+        qa_dataset,
+        is_training,
+        to_lower=False,
+        max_question_length=64,
+        max_seq_len=MAX_SEQ_LEN,
+        doc_stride=128,
+        cache_dir="./cached_qa_features",
     ):
 
-        self.df = df.copy()
-        self.doc_text_col = doc_text_col
-        self.question_text_col = question_text_col
+        if not os.path.exists(cache_dir):
+            os.makedirs(cache_dir)
 
-        ## TODO: can this be made optional???
-        ## Yes, if we make evaluate_qa takes QADataset.
-        self.qa_id_col = qa_id_col
-
-        if is_impossible_col is None:
-            self.is_impossible_col = "is_impossible"
-            df[self.is_impossible_col] = False
-        else:
-            self.is_impossible_col = is_impossible_col
-
-        if answer_start_col is not None and answer_text_col is not None:
-            self.actual_answer_available = True
-        else:
-            self.actual_answer_available = False
-        self.answer_start_col = answer_start_col
-        self.answer_text_col = answer_text_col
-
-    def __getitem__(self, idx):
-        current_item = self.df.iloc[idx, ]
-        if self.actual_answer_available:
-            return QAInput(
-                doc_text=current_item[self.doc_text_col],
-                question_text=current_item[self.question_text_col],
-                qa_id=current_item[self.qa_id_col],
-                is_impossible=current_item[self.is_impossible_col],
-                answer_start=current_item[self.answer_start_col],
-                answer_text=current_item[self.answer_text_col],
-            )
-        else:
-            return QAInput(
-                doc_text=current_item[self.doc_text_col],
-                question_text=current_item[self.question_text_col],
-                qa_id=current_item[self.qa_id_col],
-                is_impossible=current_item[self.is_impossible_col],
-                answer_start=-1,
-                answer_text="",
-            )
-
-    def __len__(self):
-        return self.df.shape[0]
-
-
-def get_qa_dataloader(
-    qa_dataset,
-    model_name,
-    is_training,
-    batch_size=32,
-    to_lower=False,
-    max_question_length=64,
-    max_seq_len=MAX_SEQ_LEN,
-    doc_stride=128,
-    cache_dir="./cached_qa_features",
-):
-
-    if not os.path.exists(cache_dir):
-        os.makedirs(cache_dir)
-
-    tokenizer_class = TOKENIZER_CLASS[model_name]
-    tokenizer = tokenizer_class.from_pretrained(
-        model_name, do_lower_case=to_lower, cache_dir=cache_dir
-    )
-
-    if is_training and not qa_dataset.actual_answer_available:
-        raise Exception("answer_start and answer_text must be provided for training data.")
-
-    if is_training:
-        examples_file = os.path.join(cache_dir, CACHED_EXAMPLES_TRAIN_FILE)
-        features_file = os.path.join(cache_dir, CACHED_FEATURES_TRAIN_FILE)
-    else:
-        examples_file = os.path.join(cache_dir, CACHED_EXAMPLES_TEST_FILE)
-        features_file = os.path.join(cache_dir, CACHED_FEATURES_TEST_FILE)
-
-    with jsonlines.open(examples_file, "w") as examples_writer, jsonlines.open(
-        features_file, "w"
-    ) as features_writer:
-
-        unique_id_all = []
-        unique_id_cur = 1000000000
-
-        features = []
-        qa_examples = []
-        qa_examples_json = []
-        features_json = []
-
-        for qa_input in qa_dataset:
-            qa_example_cur = _create_qa_example(qa_input, is_training=is_training)
-
-            qa_examples.append(qa_example_cur)
-
-            qa_examples_json.append(
-                {"qa_id": qa_example_cur.qa_id, "doc_tokens": qa_example_cur.doc_tokens}
-            )
-
-            features_cur = _create_qa_features(
-                qa_example_cur,
-                tokenizer=tokenizer,
-                unique_id=unique_id_cur,
-                is_training=is_training,
-                max_question_length=max_question_length,
-                max_seq_len=max_seq_len,
-                doc_stride=doc_stride,
-            )
-            features += features_cur
-
-            for f in features_cur:
-                features_json.append(
-                    {
-                        "qa_id": f.qa_id,
-                        "unique_id": f.unique_id,
-                        "tokens": f.tokens,
-                        "token_to_orig_map": f.token_to_orig_map,
-                        "token_is_max_context": f.token_is_max_context,
-                        "paragraph_len": f.paragraph_len,
-                    }
-                )
-                unique_id_cur = f.unique_id
-                unique_id_all.append(unique_id_cur)
-
-        examples_writer.write_all(qa_examples_json)
-        features_writer.write_all(features_json)
-
-        # TODO: maybe generalize the following code
-        input_ids = torch.tensor([f.input_ids for f in features], dtype=torch.long)
-        input_mask = torch.tensor([f.input_mask for f in features], dtype=torch.long)
-        segment_ids = torch.tensor([f.segment_ids for f in features], dtype=torch.long)
-        cls_index = torch.tensor([f.cls_index for f in features], dtype=torch.long)
-        p_mask = torch.tensor([f.p_mask for f in features], dtype=torch.float)
+        if is_training and not qa_dataset.actual_answer_available:
+            raise Exception("answer_start and answer_text must be provided for training data.")
 
         if is_training:
-            start_positions = torch.tensor([f.start_position for f in features], dtype=torch.long)
-            end_positions = torch.tensor([f.end_position for f in features], dtype=torch.long)
-            qa_dataset = TensorDataset(
-                input_ids,
-                input_mask,
-                segment_ids,
-                start_positions,
-                end_positions,
-                cls_index,
-                p_mask,
-            )
-            sampler = RandomSampler(qa_dataset)
+            examples_file = os.path.join(cache_dir, CACHED_EXAMPLES_TRAIN_FILE)
+            features_file = os.path.join(cache_dir, CACHED_FEATURES_TRAIN_FILE)
         else:
-            unique_id_all = torch.tensor(unique_id_all, dtype=torch.long)
-            qa_dataset = TensorDataset(
-                input_ids, input_mask, segment_ids, cls_index, p_mask, unique_id_all
-            )
-            sampler = SequentialSampler(qa_dataset)
+            examples_file = os.path.join(cache_dir, CACHED_EXAMPLES_TEST_FILE)
+            features_file = os.path.join(cache_dir, CACHED_FEATURES_TEST_FILE)
 
-        logger.info("QA examples are saved to {}".format(examples_file))
-        logger.info("QA features are saved to {}".format(features_file))
+        with jsonlines.open(examples_file, "w") as examples_writer, jsonlines.open(
+            features_file, "w"
+        ) as features_writer:
 
-    dataloader = DataLoader(qa_dataset, sampler=sampler, batch_size=batch_size)
-    return dataloader
+            unique_id_all = []
+            unique_id_cur = 1000000000
+
+            features = []
+            qa_examples = []
+            qa_examples_json = []
+            features_json = []
+
+            for qa_input in qa_dataset:
+                qa_example_cur = _create_qa_example(qa_input, is_training=is_training)
+
+                qa_examples.append(qa_example_cur)
+
+                qa_examples_json.append(
+                    {"qa_id": qa_example_cur.qa_id, "doc_tokens": qa_example_cur.doc_tokens}
+                )
+
+                features_cur = _create_qa_features(
+                    qa_example_cur,
+                    tokenizer=self.tokenizer,
+                    unique_id=unique_id_cur,
+                    is_training=is_training,
+                    max_question_length=max_question_length,
+                    max_seq_len=max_seq_len,
+                    doc_stride=doc_stride,
+                    custom_tokenize=self.custom_tokenize
+                )
+                features += features_cur
+
+                for f in features_cur:
+                    features_json.append(
+                        {
+                            "qa_id": f.qa_id,
+                            "unique_id": f.unique_id,
+                            "tokens": f.tokens,
+                            "token_to_orig_map": f.token_to_orig_map,
+                            "token_is_max_context": f.token_is_max_context,
+                            "paragraph_len": f.paragraph_len,
+                        }
+                    )
+                    unique_id_cur = f.unique_id
+                    unique_id_all.append(unique_id_cur)
+
+            examples_writer.write_all(qa_examples_json)
+            features_writer.write_all(features_json)
+
+            # TODO: maybe generalize the following code
+            input_ids = torch.tensor([f.input_ids for f in features], dtype=torch.long)
+            input_mask = torch.tensor([f.input_mask for f in features], dtype=torch.long)
+            segment_ids = torch.tensor([f.segment_ids for f in features], dtype=torch.long)
+            cls_index = torch.tensor([f.cls_index for f in features], dtype=torch.long)
+            p_mask = torch.tensor([f.p_mask for f in features], dtype=torch.float)
+
+            if is_training:
+                start_positions = torch.tensor([f.start_position for f in features], dtype=torch.long)
+                end_positions = torch.tensor([f.end_position for f in features], dtype=torch.long)
+                qa_dataset = TensorDataset(
+                    input_ids,
+                    input_mask,
+                    segment_ids,
+                    start_positions,
+                    end_positions,
+                    cls_index,
+                    p_mask,
+                )
+            else:
+                unique_id_all = torch.tensor(unique_id_all, dtype=torch.long)
+                qa_dataset = TensorDataset(
+                    input_ids, input_mask, segment_ids, cls_index, p_mask, unique_id_all
+                )
+
+            logger.info("QA examples are saved to {}".format(examples_file))
+            logger.info("QA features are saved to {}".format(features_file))
+
+        return qa_dataset
 
 
 QAResult_ = collections.namedtuple("QAResult", ["unique_id", "start_logits", "end_logits"])
@@ -347,20 +324,29 @@ class AnswerExtractor:
     def model_type(self):
         return self._model_type
 
-    @classmethod
-    def list_supported_models(cls):
+    @staticmethod
+    def list_supported_models():
         return _list_supported_models()
 
     def fit(
         self,
-        train_dataloader,
+        train_dataset,
+        device="cuda",
         num_gpus=None,
         num_epochs=1,
         learning_rate=2e-5,
-        warmup_proportion=None,
         max_grad_norm=1.0,
+        max_steps=-1,
+        gradient_accumulation_steps=1,
+        per_gpu_train_batch_size=8,
+        weight_decay=0.0,
+        adam_epsilon=1e-8,
+        warmup_steps=0,
+        fp16=False,
+        fp16_opt_level="O1",
+        local_rank=-1,
+        seed=0,
         cache_model=False,
-        overwrite_model=False,
     ):
         """
         Fine-tune pre-trained BertForQuestionAnswering model.
@@ -395,84 +381,98 @@ class AnswerExtractor:
                 "cache_dir/fine_tuned". Defaults to False.
 
         """
-        # tb_writer = SummaryWriter()
-        device = get_device("cpu" if num_gpus == 0 or not torch.cuda.is_available() else "gpu")
-        self.model = move_to_device(self.model, device, num_gpus)
+        # # tb_writer = SummaryWriter()
+        # device = get_device("cpu" if num_gpus == 0 or not torch.cuda.is_available() else "gpu")
+        # self.model = move_to_device(self.model, device, num_gpus)
 
-        t_total = len(train_dataloader) * num_epochs
+        # t_total = len(train_dataloader) * num_epochs
 
-        # Prepare optimizer and schedule (linear warmup and decay)
-        no_decay = ["bias", "LayerNorm.weight"]
-        optimizer_grouped_parameters = [
-            {
-                "params": [
-                    p
-                    for n, p in self.model.named_parameters()
-                    if not any(nd in n for nd in no_decay)
-                ],
-                "weight_decay": 0.01,
-            },
-            {
-                "params": [
-                    p for n, p in self.model.named_parameters() if any(nd in n for nd in no_decay)
-                ],
-                "weight_decay": 0.0,
-            },
-        ]
-        optimizer = AdamW(optimizer_grouped_parameters, lr=learning_rate, eps=1e-8)
+        # # Prepare optimizer and schedule (linear warmup and decay)
+        # no_decay = ["bias", "LayerNorm.weight"]
+        # optimizer_grouped_parameters = [
+        #     {
+        #         "params": [
+        #             p
+        #             for n, p in self.model.named_parameters()
+        #             if not any(nd in n for nd in no_decay)
+        #         ],
+        #         "weight_decay": 0.01,
+        #     },
+        #     {
+        #         "params": [
+        #             p for n, p in self.model.named_parameters() if any(nd in n for nd in no_decay)
+        #         ],
+        #         "weight_decay": 0.0,
+        #     },
+        # ]
+        # optimizer = AdamW(optimizer_grouped_parameters, lr=learning_rate, eps=1e-8)
 
-        if warmup_proportion:
-            warmup_steps = t_total * warmup_proportion
-        else:
-            warmup_steps = 0
+        # if warmup_proportion:
+        #     warmup_steps = t_total * warmup_proportion
+        # else:
+        #     warmup_steps = 0
 
-        scheduler = WarmupLinearSchedule(optimizer, warmup_steps=warmup_steps, t_total=t_total)
+        # scheduler = WarmupLinearSchedule(optimizer, warmup_steps=warmup_steps, t_total=t_total)
 
-        global_step = 0
-        tr_loss = 0.0
-        self.model.zero_grad()
-        self.model.train()
-        train_iterator = trange(int(num_epochs), desc="Epoch")
-        for _ in train_iterator:
-            for batch in tqdm(train_dataloader, desc="Iteration", mininterval=60):
-                batch = tuple(t.to(device) for t in batch)
-                inputs = {
-                    "input_ids": batch[0],
-                    "attention_mask": batch[1],
-                    "token_type_ids": batch[2],
-                    "start_positions": batch[3],
-                    "end_positions": batch[4],
-                }
+        # global_step = 0
+        # tr_loss = 0.0
+        # self.model.zero_grad()
+        # self.model.train()
+        # train_iterator = trange(int(num_epochs), desc="Epoch")
+        # for _ in train_iterator:
+        #     for batch in tqdm(train_dataloader, desc="Iteration", mininterval=60):
+        #         batch = tuple(t.to(device) for t in batch)
+        #         inputs = Processor.get_inputs(batch, model_name=self.model_name)
 
-                if self.model_type in ["xlnet"]:
-                    inputs.update({"cls_index": batch[5], "p_mask": batch[6]})
+        #         outputs = self.model(**inputs)
+        #         loss = outputs[0]  # model outputs are always tuple in pytorch-transformers
 
-                outputs = self.model(**inputs)
-                loss = outputs[0]  # model outputs are always tuple in pytorch-transformers
+        #         loss = (
+        #             loss.mean()
+        #         )  # mean() to average on multi-gpu parallel (not distributed) training
 
-                loss = (
-                    loss.mean()
-                )  # mean() to average on multi-gpu parallel (not distributed) training
+        #         loss.backward()
+        #         torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_grad_norm)
 
-                loss.backward()
-                torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_grad_norm)
+        #         tr_loss += loss.item()
 
-                tr_loss += loss.item()
+        #         optimizer.step()
+        #         scheduler.step()  # Update learning rate schedule
+        #         self.model.zero_grad()
 
-                optimizer.step()
-                scheduler.step()  # Update learning rate schedule
-                self.model.zero_grad()
+        #         global_step += 1
+        #         logger.info(
+        #             " global_step = %s, average loss = %s", global_step, tr_loss / global_step
+        #         )
 
-                global_step += 1
-                logger.info(
-                    " global_step = %s, average loss = %s", global_step, tr_loss / global_step
-                )
+        # get device
 
+        device, num_gpus = get_device(device=device, num_gpus=num_gpus, local_rank=local_rank)
+
+        self.model.to(device)
+        fine_tune(
+            model=self.model,
+            model_name=self.model_name,
+            train_dataset=train_dataset,
+            get_inputs=Processor.get_train_inputs,
+            device=device,
+            max_steps=max_steps,
+            num_train_epochs=num_epochs,
+            max_grad_norm=max_grad_norm,
+            gradient_accumulation_steps=gradient_accumulation_steps,
+            per_gpu_train_batch_size=per_gpu_train_batch_size,
+            n_gpu=num_gpus,
+            weight_decay=weight_decay,
+            learning_rate=learning_rate,
+            adam_epsilon=adam_epsilon,
+            warmup_steps=warmup_steps,
+            fp16=fp16,
+            fp16_opt_level=fp16_opt_level,
+            local_rank=local_rank,
+            seed=seed,
+        )
         if cache_model:
-            if self.cache_dir == self.load_model_from_dir and not overwrite_model:
-                output_model_dir = os.path.join(self.cache_dir, "fine_tuned")
-            else:
-                output_model_dir = self.cache_dir
+            output_model_dir = os.path.join(self.cache_dir, "fine_tuned")
 
             if not os.path.exists(self.cache_dir):
                 os.makedirs(self.cache_dir)
@@ -486,9 +486,8 @@ class AnswerExtractor:
                 self.model.module if hasattr(self.model, "module") else self.model
             )  # Take care of distributed/parallel training
             model_to_save.save_pretrained(output_model_dir)
-        torch.cuda.empty_cache()
 
-    def predict(self, test_dataloader, num_gpus=None, batch_size=32):
+    def predict(self, test_dataset, batch_size=32, device="cuda", num_gpus=None, local_rank=-1):
 
         """
         Predicts answer start and end logits using fine-tuned
@@ -516,24 +515,21 @@ class AnswerExtractor:
         def _to_list(tensor):
             return tensor.detach().cpu().tolist()
 
-        device = get_device("cpu" if num_gpus == 0 or not torch.cuda.is_available() else "gpu")
-        self.model = move_to_device(self.model, device, num_gpus)
+        device, num_gpus = get_device(device=device, num_gpus=num_gpus, local_rank=local_rank)
+
+        self.model.to(device)
 
         # score
         self.model.eval()
+
+        sampler = SequentialSampler(test_dataset)
+        test_dataloader = DataLoader(test_dataset, sampler=sampler, batch_size=batch_size)
 
         all_results = []
         for batch in tqdm(test_dataloader, desc="Evaluating"):
             batch = tuple(t.to(device) for t in batch)
             with torch.no_grad():
-                inputs = {
-                    "input_ids": batch[0],
-                    "attention_mask": batch[1],
-                    "token_type_ids": batch[2],
-                }
-
-                if self.model_type in ["xlnet"]:
-                    inputs.update({"cls_index": batch[3], "p_mask": batch[4]})
+                inputs = QAProcessor.get_test_inputs(batch, self.model_name)
 
                 outputs = self.model(**inputs)
 
@@ -556,7 +552,7 @@ class AnswerExtractor:
                         end_logits=_to_list(outputs[1][i]),
                     )
                 all_results.append(result)
-        torch.cuda.empty_cache()
+            torch.cuda.empty_cache()
 
         return all_results
 
@@ -1153,7 +1149,8 @@ def _create_qa_example(qa_input, is_training):
 
 
 def _create_qa_features(
-    example, tokenizer, unique_id, is_training, max_question_length, max_seq_len, doc_stride
+    example, tokenizer, unique_id, is_training, max_question_length, max_seq_len, doc_stride,
+    custom_tokenize=None
 ):
 
     # BERT-format features of an unique document span-question-answer triplet.
@@ -1199,6 +1196,10 @@ def _create_qa_features(
     #         the question text (0) or paragraph text (1).
     #     start_position (int): Index of the starting token of the answer span.
     #     end_position (int): Index of the ending token of the answer span.
+    if custom_tokenize:
+        tokenize_func = custom_tokenize
+    else:
+        tokenize_func = tokenizer.tokenize
 
     _QAFeatures = collections.namedtuple(
         "_QAFeatures",
@@ -1219,7 +1220,7 @@ def _create_qa_features(
         ],
     )
 
-    def _improve_answer_span(doc_tokens, input_start, input_end, tokenizer, orig_answer_text):
+    def _improve_answer_span(doc_tokens, input_start, input_end, orig_answer_text):
         """Returns tokenized answer spans that better match the annotated answer."""
 
         # We first project character-based annotations to
@@ -1244,7 +1245,7 @@ def _create_qa_features(
         # the word "Japanese". Since our WordPiece tokenizer does not split
         # "Japanese", we just use "Japanese" as the annotation. This is fairly rare,
         # but does happen.
-        tok_answer_text = " ".join(tokenizer.tokenize(orig_answer_text))
+        tok_answer_text = " ".join(tokenize_func(orig_answer_text))
 
         for new_start in range(input_start, input_end + 1):
             for new_end in range(input_end, new_start - 1, -1):
@@ -1306,7 +1307,7 @@ def _create_qa_features(
     # from qa_id in that each qa_example can be broken down into
     # multiple feature samples if the paragraph length is longer than
     # maximum sequence length allowed
-    query_tokens = tokenizer.tokenize(example.question_text)
+    query_tokens = tokenize_func(example.question_text)
 
     if len(query_tokens) > max_question_length:
         query_tokens = query_tokens[0:max_question_length]
@@ -1317,7 +1318,7 @@ def _create_qa_features(
     all_doc_tokens = []
     for (i, token) in enumerate(example.doc_tokens):
         orig_to_tok_index.append(len(all_doc_tokens))
-        sub_tokens = tokenizer.tokenize(token)
+        sub_tokens = tokenize_func(token)
         for sub_token in sub_tokens:
             tok_to_orig_index.append(i)
             all_doc_tokens.append(sub_token)
@@ -1342,7 +1343,6 @@ def _create_qa_features(
             all_doc_tokens,
             tok_start_position,
             tok_end_position,
-            tokenizer,
             example.orig_answer_text,
         )
 
