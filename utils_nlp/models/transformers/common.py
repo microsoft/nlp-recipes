@@ -42,6 +42,21 @@ def set_seed(seed, cuda=True):
         torch.cuda.manual_seed_all(seed)
 
 
+def get_device(device, num_gpus, local_rank):
+    if local_rank == -1:
+        device = torch.device("cuda" if torch.cuda.is_available() and device == "cuda" else "cpu")
+        num_gpus = (
+            min(num_gpus, torch.cuda.device_count()) if num_gpus else torch.cuda.device_count()
+        )
+    else:
+        torch.cuda.set_device(local_rank)
+        device = torch.device("cuda", local_rank)
+        torch.distributed.init_process_group(backend="nccl")
+        num_gpus = 1
+
+    return device, num_gpus
+
+
 def fine_tune(
     model,
     model_name,
