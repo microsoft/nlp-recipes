@@ -9,7 +9,7 @@ import random
 
 import numpy as np
 import torch
-from pytorch_transformers import (
+from transformers import (
     AdamW,
     BertTokenizer,
     DistilBertTokenizer,
@@ -17,10 +17,10 @@ from pytorch_transformers import (
     WarmupLinearSchedule,
     XLNetTokenizer,
 )
-from pytorch_transformers.modeling_bert import BERT_PRETRAINED_MODEL_ARCHIVE_MAP
-from pytorch_transformers.modeling_distilbert import DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP
-from pytorch_transformers.modeling_roberta import ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP
-from pytorch_transformers.modeling_xlnet import XLNET_PRETRAINED_MODEL_ARCHIVE_MAP
+from transformers.modeling_bert import BERT_PRETRAINED_MODEL_ARCHIVE_MAP
+from transformers.modeling_distilbert import DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP
+from transformers.modeling_roberta import ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP
+from transformers.modeling_xlnet import XLNET_PRETRAINED_MODEL_ARCHIVE_MAP
 from torch.utils.data import DataLoader, RandomSampler
 from torch.utils.data.distributed import DistributedSampler
 from tqdm import tqdm, trange
@@ -61,6 +61,7 @@ def fine_tune(
     fp16=False,
     fp16_opt_level="O1",
     local_rank=-1,
+    verbose=True,
     seed=0,
 ):
 
@@ -116,10 +117,10 @@ def fine_tune(
     global_step = 0
     tr_loss = 0.0
     model.zero_grad()
-    train_iterator = trange(int(num_train_epochs), desc="Epoch", disable=local_rank not in [-1, 0])
+    train_iterator = trange(int(num_train_epochs), desc="Epoch", disable=local_rank not in [-1, 0] or not verbose)
 
     for _ in train_iterator:
-        epoch_iterator = tqdm(train_dataloader, desc="Iteration", disable=local_rank not in [-1, 0])
+        epoch_iterator = tqdm(train_dataloader, desc="Iteration", disable=local_rank not in [-1, 0] or not verbose)
         for step, batch in enumerate(epoch_iterator):
             model.train()
             batch = tuple(t.to(device) for t in batch)
@@ -131,6 +132,9 @@ def fine_tune(
                 loss = loss.mean()
             if gradient_accumulation_steps > 1:
                 loss = loss / gradient_accumulation_steps
+
+            if step % 10 == 0:
+                tqdm.write("Loss:{:.6f}".format(loss))
 
             if fp16:
                 with amp.scale_loss(loss, optimizer) as scaled_loss:

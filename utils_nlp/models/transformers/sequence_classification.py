@@ -4,19 +4,19 @@
 import torch
 from torch.utils.data import TensorDataset
 
-from pytorch_transformers.modeling_bert import (
+from transformers.modeling_bert import (
     BERT_PRETRAINED_MODEL_ARCHIVE_MAP,
     BertForSequenceClassification,
 )
-from pytorch_transformers.modeling_distilbert import (
+from transformers.modeling_distilbert import (
     DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP,
     DistilBertForSequenceClassification,
 )
-from pytorch_transformers.modeling_roberta import (
+from transformers.modeling_roberta import (
     ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP,
     RobertaForSequenceClassification,
 )
-from pytorch_transformers.modeling_xlnet import (
+from transformers.modeling_xlnet import (
     XLNET_PRETRAINED_MODEL_ARCHIVE_MAP,
     XLNetForSequenceClassification,
 )
@@ -47,10 +47,10 @@ class Processor:
 
     @staticmethod
     def get_inputs(batch, model_name):
-        if model_name.split("-")[0] == "bert":
+        if model_name.split("-")[0] in ["bert", "xlnet", "roberta"]:
             return {"input_ids": batch[0], "attention_mask": batch[1], "labels": batch[2]}
         else:
-            raise ValueError("Model not supported.")
+            raise ValueError("Model not supported: {}".format(model_name))
 
     @staticmethod
     def list_supported_models():
@@ -105,6 +105,7 @@ class SequenceClassifier:
         batch_size=32,
         num_gpus=None,
         local_rank=-1,
+        verbose=True,
     ):
         # get device
         if local_rank == -1:
@@ -140,6 +141,7 @@ class SequenceClassifier:
             fp16=False,
             fp16_opt_level="O1",
             local_rank=-1,
+            verbose=verbose,
             seed=self.seed,
         )
 
