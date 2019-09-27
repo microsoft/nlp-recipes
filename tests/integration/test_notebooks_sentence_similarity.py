@@ -33,7 +33,6 @@ def baseline_results():
     }
 
 
-
 @pytest.mark.integration
 def test_similarity_embeddings_baseline_runs(notebooks, baseline_results):
     notebook_path = notebooks["similarity_embeddings_baseline"]
@@ -42,10 +41,12 @@ def test_similarity_embeddings_baseline_runs(notebooks, baseline_results):
     for key, value in baseline_results.items():
         assert results[key] == pytest.approx(value, abs=ABS_TOL)
 
-        
+
 @pytest.mark.gpu
 @pytest.mark.integration
-@pytest.mark.skip(reason="push for release, no horovod installation automation or documentation yet")
+@pytest.mark.skip(
+    reason="push for release, no horovod installation automation or documentation yet"
+)
 def test_gensen_local(notebooks):
     notebook_path = notebooks["gensen_local"]
     pm.execute_notebook(
@@ -119,10 +120,10 @@ def test_similarity_embeddings_baseline_runs(notebooks, baseline_results):
 @pytest.mark.usefixtures("teardown_service")
 @pytest.mark.integration
 @pytest.mark.azureml
-def test_automl_local_runs(
+def test_automl_local_deployment_aci(
     notebooks, subscription_id, resource_group, workspace_name, workspace_region
 ):
-    notebook_path = notebooks["similarity_automl_local"]
+    notebook_path = notebooks["automl_local_deployment_aci"]
     pm.execute_notebook(
         notebook_path,
         OUTPUT_NOTEBOOK,
@@ -143,9 +144,11 @@ def test_automl_local_runs(
 
 @pytest.mark.integration
 @pytest.mark.azureml
-@pytest.mark.skip(reason="push for release, no horovod installation automation or documentation yet")
-def test_similarity_gensen_azureml_runs(notebooks):
-    notebook_path = notebooks["gensen_azureml"]
+@pytest.mark.skip(
+    reason="push for release, no horovod installation automation or documentation yet"
+)
+def test_gensen_aml_deep_dive(notebooks):
+    notebook_path = notebooks["gensen_aml_deep_dive"]
     pm.execute_notebook(
         notebook_path,
         OUTPUT_NOTEBOOK,

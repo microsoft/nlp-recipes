@@ -37,10 +37,10 @@ def notebooks():
         ),
         "bert_encoder": os.path.join(folder_notebooks, "sentence_similarity", "bert_encoder.ipynb"),
         "gensen_local": os.path.join(folder_notebooks, "sentence_similarity", "gensen_local.ipynb"),
-        "gensen_azureml": os.path.join(
+        "gensen_aml_deep_dive": os.path.join(
             folder_notebooks, "sentence_similarity", "gensen_aml_deep_dive.ipynb"
         ),
-        "similarity_automl_local": os.path.join(
+        "automl_local_deployment_aci": os.path.join(
             folder_notebooks, "sentence_similarity", "automl_local_deployment_aci.ipynb"
         ),
         "automl_with_pipelines_deployment_aks": os.path.join(
