@@ -106,7 +106,7 @@ def test_bert_senteval(
         ),
     )
     pearson = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict["pearson"]
-    mse = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict["pearson"]
+    mse = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict["mse"]
     assert pearson == pytest.approx(0.6, abs=ABS_TOL)
     assert mse < 1.8
 
