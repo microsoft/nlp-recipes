@@ -105,6 +105,10 @@ def test_bert_senteval(
             MAX_NODES=1,
         ),
     )
+    pearson = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict["pearson"]
+    mse = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict["pearson"]
+    assert pearson == pytest.approx(0.6, abs=ABS_TOL)
+    assert mse < 1.8
 
 
 @pytest.mark.integration
