@@ -55,7 +55,7 @@ class Processor(SupportedModels):
 
     @staticmethod
     def get_inputs(batch, model_name):
-        if model_name.split("-")[0] == "bert":
+        if model_name.split("-")[0] in ["bert", "xlnet", "robert"]:
             return {"input_ids": batch[0], "attention_mask": batch[1], "labels": batch[2]}
         else:
             raise ValueError("Model not supported.")
