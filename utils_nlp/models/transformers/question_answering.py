@@ -26,7 +26,8 @@ import math
 import jsonlines
 
 import torch
-from torch.utils.data import TensorDataset, SequentialSampler
+from torch.utils.data import TensorDataset, SequentialSampler, DataLoader
+
 
 from pytorch_transformers.tokenization_bert import BasicTokenizer
 from pytorch_transformers import XLNetTokenizer
@@ -122,6 +123,7 @@ class QAProcessor():
         if model_name.split("-")[0] in ["xlnet"]:
             inputs.update({"cls_index": batch[3], "p_mask": batch[4]})
 
+        return inputs
 
     @staticmethod
     def list_supported_models():
@@ -131,7 +133,6 @@ class QAProcessor():
         self,
         qa_dataset,
         is_training,
-        to_lower=False,
         max_question_length=64,
         max_seq_len=MAX_SEQ_LEN,
         doc_stride=128,
@@ -174,6 +175,7 @@ class QAProcessor():
 
                 features_cur = _create_qa_features(
                     qa_example_cur,
+                    model_type=self.model_type,
                     tokenizer=self.tokenizer,
                     unique_id=unique_id_cur,
                     is_training=is_training,
@@ -338,7 +340,7 @@ class AnswerExtractor:
         max_grad_norm=1.0,
         max_steps=-1,
         gradient_accumulation_steps=1,
-        per_gpu_train_batch_size=8,
+        per_gpu_batch_size=8,
         weight_decay=0.0,
         adam_epsilon=1e-8,
         warmup_steps=0,
@@ -346,7 +348,7 @@ class AnswerExtractor:
         fp16_opt_level="O1",
         local_rank=-1,
         seed=0,
-        cache_model=False,
+        cache_model=True,
     ):
         """
         Fine-tune pre-trained BertForQuestionAnswering model.
@@ -454,13 +456,13 @@ class AnswerExtractor:
             model=self.model,
             model_name=self.model_name,
             train_dataset=train_dataset,
-            get_inputs=Processor.get_train_inputs,
+            get_inputs=QAProcessor.get_train_inputs,
             device=device,
             max_steps=max_steps,
             num_train_epochs=num_epochs,
             max_grad_norm=max_grad_norm,
             gradient_accumulation_steps=gradient_accumulation_steps,
-            per_gpu_train_batch_size=per_gpu_train_batch_size,
+            per_gpu_train_batch_size=per_gpu_batch_size,
             n_gpu=num_gpus,
             weight_decay=weight_decay,
             learning_rate=learning_rate,
@@ -487,7 +489,7 @@ class AnswerExtractor:
             )  # Take care of distributed/parallel training
             model_to_save.save_pretrained(output_model_dir)
 
-    def predict(self, test_dataset, batch_size=32, device="cuda", num_gpus=None, local_rank=-1):
+    def predict(self, test_dataset, per_gpu_batch_size=8, device="cuda", num_gpus=None, local_rank=-1):
 
         """
         Predicts answer start and end logits using fine-tuned
@@ -516,6 +518,7 @@ class AnswerExtractor:
             return tensor.detach().cpu().tolist()
 
         device, num_gpus = get_device(device=device, num_gpus=num_gpus, local_rank=local_rank)
+        batch_size = per_gpu_batch_size * max(1, num_gpus)
 
         self.model.to(device)
 
@@ -854,13 +857,12 @@ def postprocess_xlnet_answer(
     features_file,
     model_name,
     do_lower_case,
-    n_best_size=20,
+    n_best_size=5,
     max_answer_length=30,
     unanswerable_exists=False,
     output_prediction_file="./qa_predictions.json",
     output_nbest_file="./nbest_predictions.json",
     output_null_log_odds_file="./null_odds.json",
-    null_score_diff_threshold=0.0,
     verbose_logging=False,
 ):
     with jsonlines.open(examples_file) as reader:
@@ -1149,8 +1151,7 @@ def _create_qa_example(qa_input, is_training):
 
 
 def _create_qa_features(
-    example, tokenizer, unique_id, is_training, max_question_length, max_seq_len, doc_stride,
-    custom_tokenize=None
+    example, model_type, tokenizer, unique_id, is_training, max_question_length, max_seq_len, doc_stride, custom_tokenize=None
 ):
 
     # BERT-format features of an unique document span-question-answer triplet.
@@ -1296,10 +1297,17 @@ def _create_qa_features(
     pad_token = 0
     sequence_a_segment_id = 0
     sequence_b_segment_id = 1
-    cls_token_segment_id = 0
-    pad_token_segment_id = 0
-    cls_token_at_end = False
     mask_padding_with_zero = True
+
+    if model_type == "xlnet":
+        cls_token_segment_id = 2
+        # Should this be 4, or it doesn't matter?
+        pad_token_segment_id = 3
+        cls_token_at_end = True
+    else:
+        cls_token_segment_id = 0
+        pad_token_segment_id = 0
+        cls_token_at_end = False
 
     qa_features = []
 
@@ -1388,15 +1396,18 @@ def _create_qa_features(
             p_mask.append(0)
             cls_index = 0
 
-        # Query
-        tokens += query_tokens
-        segment_ids += [sequence_a_segment_id] * len(query_tokens)
-        p_mask += [1] * len(query_tokens)
+        # XLNet: P SEP Q SEP CLS
+        # Others: CLS Q SEP P SEP
+        if model_type != "xlnet":
+            # Query
+            tokens += query_tokens
+            segment_ids += [sequence_a_segment_id] * len(query_tokens)
+            p_mask += [1] * len(query_tokens)
 
-        # SEP token
-        tokens.append(sep_token)
-        segment_ids.append(sequence_a_segment_id)
-        p_mask.append(1)
+            # SEP token
+            tokens.append(sep_token)
+            segment_ids.append(sequence_a_segment_id)
+            p_mask.append(1)
 
         # Paragraph
         for i in range(doc_span.length):
@@ -1408,9 +1419,22 @@ def _create_qa_features(
             is_max_context = _check_is_max_context(doc_spans, doc_span_index, split_token_index)
             token_is_max_context[len(tokens)] = is_max_context
             tokens.append(all_doc_tokens[split_token_index])
-            segment_ids.append(sequence_b_segment_id)
+            if model_type == "xlnet":
+                segment_ids.append(sequence_a_segment_id)
+            else:
+                segment_ids.append(sequence_b_segment_id)
             p_mask.append(0)
         paragraph_len = doc_span.length
+
+        if model_type == "xlnet":
+            # SEP token
+            tokens.append(sep_token)
+            segment_ids.append(sequence_a_segment_id)
+            p_mask.append(1)
+
+            tokens += query_tokens
+            segment_ids += [sequence_b_segment_id] * len(query_tokens)
+            p_mask += [1] * len(query_tokens)
 
         # SEP token
         tokens.append(sep_token)
@@ -1460,8 +1484,11 @@ def _create_qa_features(
                 span_is_impossible = True
             else:
                 # +1 for [CLS] token
-                # +1 for [SEP] toekn
-                doc_offset = len(query_tokens) + 2
+                # +1 for [SEP] token
+                if model_type == "xlnet":
+                    doc_offset = 0
+                else:
+                    doc_offset = len(query_tokens) + 2
                 start_position = tok_start_position - doc_start + doc_offset
                 end_position = tok_end_position - doc_start + doc_offset
 
