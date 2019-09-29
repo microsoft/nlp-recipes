@@ -28,7 +28,7 @@ if QUICK_RUN:
 if torch.cuda.is_available() and torch.cuda.device_count() >= 4:
     MAX_SEQ_LENGTH = 384
     DOC_STRIDE = 128
-    BATCH_SIZE = 4
+    BATCH_SIZE = 16
 else:
     MAX_SEQ_LENGTH = 128
     DOC_STRIDE = 64
@@ -69,60 +69,37 @@ dev_df = dev_df.sample(frac=DEV_DATA_USED_PERCENT).reset_index(drop=True)
 
 tokenizer = Tokenizer(language=LANGUAGE, to_lower=DO_LOWER_CASE, cache_dir=CACHE_DIR)
 
-train_features, qa_examples = tokenizer.tokenize_qa(
-    doc_text=train_df[DOC_TEXT_COL], 
-    question_text=train_df[QUESTION_TEXT_COL], 
-    answer_start=train_df[ANSWER_START_COL], 
-    answer_text=train_df[ANSWER_TEXT_COL],
-    qa_id=train_df[QA_ID_COL],
-    is_impossible=train_df[IS_IMPOSSIBLE_COL],
-    is_training=True,
+qa_extractor=BERTQAExtractor(language=LANGUAGE, cache_dir=CACHE_DIR, load_model_from_dir="./temp/distributed_0")
+
+dev_features, dev_examples = tokenizer.tokenize_qa(
+    doc_text=dev_df[DOC_TEXT_COL], 
+    question_text=dev_df[QUESTION_TEXT_COL], 
+    answer_start=dev_df[ANSWER_START_COL], 
+    answer_text=dev_df[ANSWER_TEXT_COL],
+    qa_id=dev_df[QA_ID_COL],
+    is_impossible=dev_df[IS_IMPOSSIBLE_COL],
+    is_training=False,
     max_len=MAX_SEQ_LENGTH,
     max_question_length=MAX_QUESTION_LENGTH,
     doc_stride=DOC_STRIDE,
     cache_results=True)
 
-#dev_features, dev_examples = tokenizer.tokenize_qa(
-#    doc_text=dev_df[DOC_TEXT_COL], 
-#    question_text=dev_df[QUESTION_TEXT_COL], 
-#    answer_start=dev_df[ANSWER_START_COL], 
-#    answer_text=dev_df[ANSWER_TEXT_COL],
-#    qa_id=dev_df[QA_ID_COL],
-#    is_impossible=dev_df[IS_IMPOSSIBLE_COL],
-#    is_training=False,
-#    max_len=MAX_SEQ_LENGTH,
-#    max_question_length=MAX_QUESTION_LENGTH,
-#    doc_stride=DOC_STRIDE,
-#    cache_results=True)
-
 #train_features = torch.load("./temp/cached_features_train")
 #qa_examples = torch.load("./temp/cached_examples_train")
 
-print(len(train_features))
-print(train_features[0].input_ids)
+#print(len(train_features))
+#print(train_features[0].input_ids)
 # dev_features = torch.load("./temp/cached_features")
 # dev_examples = torch.load("./temp/cached_examples")
 
-qa_extractor = BERTQAExtractor(language=LANGUAGE, cache_dir=CACHE_DIR)
+#qa_extractor = BERTQAExtractor(language=LANGUAGE, cache_dir=CACHE_DIR, load_model_from_dir="./temp/distributed_0")
 
-with Timer() as t:
-    qa_extractor.fit(
-        train_features,
-        num_epochs=NUM_EPOCHS,
-        batch_size=BATCH_SIZE,
-        learning_rate=LEARNING_RATE,
-        gradient_accumulation_steps=1,
-        cache_model=True,
-        distributed=True,
-    )
-print("Training time : {:.3f} hrs".format(t.interval / 3600))
 
-# qa_results = qa_extractor.predict(dev_features, batch_size=BATCH_SIZE)
+qa_results = qa_extractor.predict(dev_features, batch_size=BATCH_SIZE)
 
-# final_answers, answer_probs, nbest_answers = postprocess_answer(
-#     qa_results, dev_examples, dev_features, do_lower_case=DO_LOWER_CASE
-# )
+final_answers, answer_probs, nbest_answers = postprocess_answer(
+     qa_results, dev_examples, dev_features, do_lower_case=DO_LOWER_CASE)
 
-# evaluation_result = evaluate_qa(
-#     qa_ids=dev_df["qa_id"], actuals=dev_df["answer_text"], preds=final_answers
-# )
+evaluation_result = evaluate_qa(
+     qa_ids=dev_df["qa_id"], actuals=dev_df["answer_text"], preds=final_answers
+)
