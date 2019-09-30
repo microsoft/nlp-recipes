@@ -361,19 +361,15 @@ class AnswerExtractor:
     Answer extractor based on pre-trained transformers models.
 
     Args:
-        model_name (model_name, optional): The pre-trained model's language.
-            The value of this argument determines which BERT model is
-            used. See :class:`~utils_nlp.models.bert.common.Language`
-            for details. Defaults to "bert-base-cased".
+        model_name (model_name, optional): Name of the pre-trained transformers model. Call
+            AnswerExtractor.list_supported_models() to see all the models supported. Defaults to
+            "bert-base-cased".
         cache_dir (str, optional):  Location of BERT's cache directory.
-            When calling the `fit` method, if `cache_model` is `True`,
-            the fine-tuned model is saved to this directory. If `cache_dir`
-            and `load_model_from_dir` are the same and `overwrite_model` is
-            `False`, the fitted model is saved to "cache_dir/fine_tuned".
-            Defaults to ".".
-        load_model_from_dir (str, optional): Directory to load the model from.
-            The directory must contain a model file "pytorch_model.bin" and a
-            configuration file "config.json". Defaults to None.
+            When calling the `fit` method, if `cache_model` is `True`, the fine-tuned model is
+            saved to a `fine_tuned` folder under this directory. Defaults to ".".
+        load_model_from_dir (str, optional): Directory to load the model from. The directory must
+            contain a model file "pytorch_model.bin" and a configuration file "config.json".
+            Defaults to None.
 
     """
 
@@ -423,52 +419,57 @@ class AnswerExtractor:
         train_dataset,
         device="cuda",
         num_gpus=None,
+        per_gpu_batch_size=8,
         num_epochs=1,
         learning_rate=2e-5,
         max_grad_norm=1.0,
         max_steps=-1,
         gradient_accumulation_steps=1,
-        per_gpu_batch_size=8,
+        warmup_steps=0,
         weight_decay=0.0,
         adam_epsilon=1e-8,
-        warmup_steps=0,
         fp16=False,
         fp16_opt_level="O1",
         local_rank=-1,
-        seed=0,
+        seed=None,
         cache_model=True,
     ):
         """
         Fine-tune pre-trained BertForQuestionAnswering model.
 
         Args:
-            features (list): List of QAFeatures containing features of
-                training data. Use
-                :meth:`utils_nlp.models.bert.common.Tokenizer.tokenize_qa`
-                to generate training features. See
-                :class:`~utils_nlp.models.bert.qa_utils.QAFeatures` for
-                details of QAFeatures.
-            num_gpus (int, optional): The number of GPUs to use.
-                If None, all available GPUs will be used. Defaults to None.
-            num_epochs (int, optional): Number of training epochs. Defaults
-                to 1.
-            batch_size (int, optional): Training batch size. Defaults to 32.
-            learning_rate (float, optional):  Learning rate of the AdamW
-                optimizer. Defaults to 2e-5.
-            warmup_proportion (float, optional): Proportion of training to
-                perform linear learning rate warmup for. E.g., 0.1 = 10% of
-                training. Defaults to None.
-            max_grad_norm (float, optional): Maximum gradient norm for gradient
-                clipping. Defaults to 1.0.
-            cache_model (bool, optional): Whether to save the fine-tuned
-                model to the `cache_dir` of the answer extractor.
-                If `cache_dir` and `load_model_from_dir` are the same and
-                `overwrite_model` is `False`, the fitted model is saved
-                to "cache_dir/fine_tuned". Defaults to False.
-            overwrite_model (bool, optional): Whether to overwrite an existing model.
-                If `cache_dir` and `load_model_from_dir` are the same and
-                `overwrite_model` is `False`, the fitted model is saved to
-                "cache_dir/fine_tuned". Defaults to False.
+            train_dataset (QADataset): Training dataset of type
+                :class:`utils_nlp.dataset.pytorch.QADataset`.
+            device (str, optional): Device to use. Accepted values are "cuda" and "cpu".
+                Defaults to "cuda".
+            num_gpus (int, optional): The number of GPUs to use. If None, all available GPUs will
+                be used. Defaults to None.
+            per_gpu_batch_size (int, optional): Training batch size on each GPU. Defaults to 8.
+            num_epochs (int, optional): Number of training epochs. Defaults to 1.
+            learning_rate (float, optional):  Learning rate of the AdamW optimizer. Defaults to
+                2e-5.
+            max_grad_norm (float, optional): Maximum gradient norm for gradient clipping.
+                Defaults to 1.0.
+            max_steps (int, optional): Maximum number of training steps. If specified,
+                `num_epochs` will be ignored. Defaults to -1.
+            gradient_accumulation_steps (int, optional): Number of batches to accumulate
+                gradients on between each model parameter update. Defaults to 1.
+            warmup_steps (int, optional): Number of steps taken to increase learning rate from 0
+                to `learning rate`. Defaults to 0.
+            weight_decay (float, optional): Weight decay to apply after each parameter update.
+                Defaults to 0.0.
+            adam_epsilon (float, optional): Epsilon of the AdamW optimizer. Defaults to 1e-8.
+            fp16 (bool, optional): Whether to use 16-bit (mixed) precision (through NVIDIA apex)
+                instead of 32-bit. Defaults to False.
+            fp16_opt_level (str, optional): For fp16: Apex AMP optimization level selected in
+                ['O0', 'O1', 'O2', and 'O3']. See details at https://nvidia.github.io/apex/amp.html.
+                Defaults to "O1",
+            local_rank (int, optional): Local_rank for distributed training on GPUs. Defaults to
+                -1, which means non-distributed training.
+            seed (int, optional): Random seed used to improve reproducibility. Defaults to None.
+            cache_model (bool, optional): Whether to save the fine-tuned model. If True,
+                the fine-tuned model is saved to a `fine_tuned` folder under of the `cache_dir`
+                of AnswerExtractor. Defaults to True.
 
         """
 
@@ -517,26 +518,21 @@ class AnswerExtractor:
     ):
 
         """
-        Predicts answer start and end logits using fine-tuned
-        BertForQuestionAnswering model.
+        Predicts answer start and end logits.
 
         Args:
-            features (list): List of QAFeatures containing features of
-                testing data. Use
-                :meth:`utils_nlp.models.bert.common.Tokenizer.tokenize_qa`
-                to generate training features. See
-                :class:`~utils_nlp.models.bert.qa_utils.QAFeatures` for
-                details of QAFeatures.
-            num_gpus (int, optional): The number of GPUs to use.
-                If None, all available GPUs will be used. Defaults to None.
-            batch_size (int, optional): Training batch size. Defaults to 32.
+            test_dataset (QADataset): Testing dataset of type
+            :class:`utils_nlp.dataset.pytorch.QADataset`.
+            per_gpu_batch_size (int, optional): Testing batch size on each GPU. Defaults to 8.
+            device (str, optional): Device to use. Accepted values are "cuda" and "cpu".
+                Defaults to "cuda".
+            num_gpus (int, optional): The number of GPUs to use. If None, all available GPUs will
+                be used. Defaults to None.
+            local_rank (int, optional): Local_rank for distributed training on GPUs. Defaults to
+                -1, which means non-distributed.
 
         Returns:
-            list: List of QAResults. Each QAResult contains the unique id,
-                answer start logits, and answer end logits of the tokens in
-                QAFeatures.tokens of the input features. Use
-                :func:`utils_nlp.models.bert.qa_utils.postprocess_answer` to
-                generate the final predicted answers.
+            list: List of :class:`QAResult` or :class:`QAResultExtended`.
         """
 
         def _to_list(tensor):
