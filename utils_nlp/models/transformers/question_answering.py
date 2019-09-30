@@ -150,8 +150,7 @@ class QAProcessor:
     def get_test_inputs(batch, model_name):
         model_type = model_name.split("-")[0]
 
-        inputs = {"input_ids": batch[0],
-                  "attention_mask": batch[1]}
+        inputs = {"input_ids": batch[0], "attention_mask": batch[1]}
 
         if model_type not in ["distilbert"]:
             inputs.update({"token_type_ids": batch[2]})
@@ -170,7 +169,7 @@ class QAProcessor:
         qa_dataset,
         is_training,
         max_question_length=64,
-        max_seq_len=MAX_SEQ_LEN,
+        max_seq_length=MAX_SEQ_LEN,
         doc_stride=128,
         cache_dir="./cached_qa_features",
     ):
@@ -184,7 +183,7 @@ class QAProcessor:
             max_question_length (int, optional): Maximum number of tokens of the question sequence
                 after tokenization, so the number of words in the raw question is usually less than
                 max_question_length. Defaults to 64.
-            max_seq_len (int, optional): Maximum number of tokens of the entire feature token
+            max_seq_length (int, optional): Maximum number of tokens of the entire feature token
                 sequence after tokenization. The entire feature token sequence is composed
                 of [CLS] + [Question tokens] + [SEP] + [Document tokens] + [SEP] for models other
                 than XLNet, and [Document tokens] + [SEP] + [Question tokens] + [SEP] + [CLS} for
@@ -242,7 +241,7 @@ class QAProcessor:
                     unique_id=unique_id_cur,
                     is_training=is_training,
                     max_question_length=max_question_length,
-                    max_seq_len=max_seq_len,
+                    max_seq_length=max_seq_length,
                     doc_stride=doc_stride,
                     custom_tokenize=self.custom_tokenize,
                 )
@@ -1183,7 +1182,7 @@ def _create_qa_features(
     unique_id,
     is_training,
     max_question_length,
-    max_seq_len,
+    max_seq_length,
     doc_stride,
     custom_tokenize=None,
 ):
@@ -1386,7 +1385,7 @@ def _create_qa_features(
         )
 
     # The -3 accounts for [CLS], [SEP] and [SEP]
-    max_tokens_for_doc = max_seq_len - len(query_tokens) - 3
+    max_tokens_for_doc = max_seq_length - len(query_tokens) - 3
 
     # We can have documents that are longer than the maximum sequence length.
     # To deal with this we do a sliding window approach, where we take chunks
@@ -1486,17 +1485,17 @@ def _create_qa_features(
         input_mask = [1 if mask_padding_with_zero else 0] * len(input_ids)
 
         # Zero-pad up to the sequence length.
-        if len(input_ids) < max_seq_len:
-            pad_token_length = max_seq_len - len(input_ids)
+        if len(input_ids) < max_seq_length:
+            pad_token_length = max_seq_length - len(input_ids)
             pad_mask = 0 if mask_padding_with_zero else 1
             input_ids += [pad_token] * pad_token_length
             input_mask += [pad_mask] * pad_token_length
             segment_ids += [pad_token_segment_id] * pad_token_length
             p_mask += [1] * pad_token_length
 
-        assert len(input_ids) == max_seq_len
-        assert len(input_mask) == max_seq_len
-        assert len(segment_ids) == max_seq_len
+        assert len(input_ids) == max_seq_length
+        assert len(input_mask) == max_seq_length
+        assert len(segment_ids) == max_seq_length
 
         span_is_impossible = example.is_impossible
         start_position = None
