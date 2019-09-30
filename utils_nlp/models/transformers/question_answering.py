@@ -43,7 +43,7 @@ from pytorch_transformers.modeling_xlnet import (
     XLNetForQuestionAnswering,
 )
 
-from pytorch_transformers.modeling_distillbert import (
+from pytorch_transformers.modeling_distilbert import (
     DistilBertConfig,
     DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP,
     DistilBertForQuestionAnswering,
@@ -129,24 +129,34 @@ class QAProcessor:
 
     @staticmethod
     def get_train_inputs(batch, model_name):
+        model_type = model_name.split("-")[0]
+
         inputs = {
             "input_ids": batch[0],
             "attention_mask": batch[1],
-            "token_type_ids": batch[2],
             "start_positions": batch[3],
             "end_positions": batch[4],
         }
 
-        if model_name.split("-")[0] in ["xlnet"]:
+        if model_type not in ["distilbert"]:
+            inputs.update({"token_type_ids": batch[2]})
+
+        if model_type in ["xlnet"]:
             inputs.update({"cls_index": batch[5], "p_mask": batch[6]})
 
         return inputs
 
     @staticmethod
     def get_test_inputs(batch, model_name):
-        inputs = {"input_ids": batch[0], "attention_mask": batch[1], "token_type_ids": batch[2]}
+        model_type = model_name.split("-")[0]
 
-        if model_name.split("-")[0] in ["xlnet"]:
+        inputs = {"input_ids": batch[0],
+                  "attention_mask": batch[1]}
+
+        if model_type not in ["distilbert"]:
+            inputs.update({"token_type_ids": batch[2]})
+
+        if model_type in ["xlnet"]:
             inputs.update({"cls_index": batch[3], "p_mask": batch[4]})
 
         return inputs
