@@ -43,15 +43,25 @@ from pytorch_transformers.modeling_xlnet import (
     XLNetForQuestionAnswering,
 )
 
+from pytorch_transformers.modeling_distillbert import (
+    DistilBertConfig,
+    DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP,
+    DistilBertForQuestionAnswering,
+)
+
 from utils_nlp.models.transformers.common import MAX_SEQ_LEN, TOKENIZER_CLASS, get_device, fine_tune
 
 MODEL_CLASS = {}
 MODEL_CLASS.update({k: BertForQuestionAnswering for k in BERT_PRETRAINED_MODEL_ARCHIVE_MAP})
 MODEL_CLASS.update({k: XLNetForQuestionAnswering for k in XLNET_PRETRAINED_MODEL_ARCHIVE_MAP})
+MODEL_CLASS.update(
+    {k: DistilBertForQuestionAnswering for k in DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP}
+)
 
 CONFIG_CLASS = {}
 CONFIG_CLASS.update({k: BertConfig for k in BERT_PRETRAINED_MODEL_ARCHIVE_MAP})
 CONFIG_CLASS.update({k: XLNetConfig for k in XLNET_PRETRAINED_MODEL_ARCHIVE_MAP})
+CONFIG_CLASS.update({k: DistilBertConfig for k in DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP})
 
 # cached files during preprocessing
 # these are used in postprocessing to generate the final answer texts
