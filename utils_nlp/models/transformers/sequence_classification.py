@@ -138,4 +138,6 @@ class SequenceClassifier(Transformer):
                 **kwargs,
             )
         )
+        preds = np.concatenate(preds)
+        # todo generator & probs
         return np.argmax(preds, axis=1)
