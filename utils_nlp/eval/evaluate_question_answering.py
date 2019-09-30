@@ -139,13 +139,7 @@ def find_all_best_thresh(
 
 
 def evaluate_qa(
-    qa_ids,
-    actuals,
-    preds,
-    na_probs=None,
-    na_prob_thresh=0,
-    unanswerable_exists=False,
-    out_file=None,
+    actual_dataset, preds, na_probs=None, na_prob_thresh=0, unanswerable_exists=False, out_file=None
 ):
     """
     Evaluate question answering prediction results against ground truth answers.
@@ -215,6 +209,9 @@ def evaluate_qa(
         na_probs = {k: 0.0 for k in preds}
     else:
         na_probs_available = True
+
+    qa_ids = [item.qa_id for item in actual_dataset]
+    actuals = [item.answer_text for item in actual_dataset]
 
     qid_to_has_ans = {qa_id: bool(ans) for (qa_id, ans) in zip(qa_ids, actuals)}
     has_ans_qids = [k for k, v in qid_to_has_ans.items() if v]

@@ -42,7 +42,7 @@ class QADataset(Dataset):
         df,
         doc_text_col,
         question_text_col,
-        qa_id_col,
+        qa_id_col=None,
         is_impossible_col=None,
         answer_start_col=None,
         answer_text_col=None,
@@ -52,9 +52,11 @@ class QADataset(Dataset):
         self.doc_text_col = doc_text_col
         self.question_text_col = question_text_col
 
-        ## TODO: can this be made optional???
-        ## Yes, if we make evaluate_qa takes QADataset.
-        self.qa_id_col = qa_id_col
+        if qa_id_col is None:
+            self.qa_id_col = "qa_id"
+            df[self.qa_id_col] = list(range(df.shape[0]))
+        else:
+            self.qa_id_col = qa_id_col
 
         if is_impossible_col is None:
             self.is_impossible_col = "is_impossible"
