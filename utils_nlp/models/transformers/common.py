@@ -9,7 +9,6 @@ import random
 
 import numpy as np
 import torch
-import torch.nn as nn
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
 from torch.utils.data.distributed import DistributedSampler
 from tqdm import tqdm, trange
@@ -50,7 +49,6 @@ def get_device(device, num_gpus, local_rank):
 class Transformer:
     def __init__(self, model_class, model_name="bert-base-cased", cache_dir=".", seed=0, **kwargs):
         self.model_name = model_name
-        print(kwargs)
         self.model = model_class[model_name].from_pretrained(
             model_name, cache_dir=cache_dir, num_labels=kwargs["num_labels"]
         )
@@ -66,8 +64,6 @@ class Transformer:
 
     def fine_tune(
         self,
-        model,
-        model_name,
         train_dataset,
         get_inputs,
         device,
@@ -87,7 +83,6 @@ class Transformer:
         verbose=True,
         seed=0,
     ):
-        print("weight_decay: ({})".format(weight_decay))
         Transformer.set_seed(seed, n_gpu > 0)
         train_batch_size = per_gpu_train_batch_size * max(1, n_gpu)
         train_sampler = (
@@ -109,13 +104,15 @@ class Transformer:
         optimizer_grouped_parameters = [
             {
                 "params": [
-                    p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)
+                    p
+                    for n, p in self.model.named_parameters()
+                    if not any(nd in n for nd in no_decay)
                 ],
                 "weight_decay": weight_decay,
             },
             {
                 "params": [
-                    p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)
+                    p for n, p in self.model.named_parameters() if any(nd in n for nd in no_decay)
                 ],
                 "weight_decay": 0.0,
             },
@@ -127,19 +124,17 @@ class Transformer:
             try:
                 from apex import amp
             except ImportError:
-                raise ImportError(
-                    "Please install apex from https://www.github.com/nvidia/apex"
-                )
-            model, optimizer = amp.initialize(model, optimizer, opt_level=fp16_opt_level)
+                raise ImportError("Please install apex from https://www.github.com/nvidia/apex")
+            self.model, optimizer = amp.initialize(self.model, optimizer, opt_level=fp16_opt_level)
 
         # multi-gpu training (should be after apex fp16 initialization)
         if n_gpu > 1:
-            model = torch.nn.DataParallel(model)
+            self.model = torch.nn.DataParallel(self.model)
 
         # Distributed training (should be after apex fp16 initialization)
         if local_rank != -1:
-            model = torch.nn.parallel.DistributedDataParallel(
-                model,
+            self.model = torch.nn.parallel.DistributedDataParallel(
+                self.model,
                 device_ids=[local_rank],
                 output_device=local_rank,
                 find_unused_parameters=True,
@@ -147,7 +142,7 @@ class Transformer:
 
         global_step = 0
         tr_loss = 0.0
-        model.zero_grad()
+        self.model.zero_grad()
         train_iterator = trange(
             int(num_train_epochs), desc="Epoch", disable=local_rank not in [-1, 0] or not verbose
         )
@@ -157,10 +152,10 @@ class Transformer:
                 train_dataloader, desc="Iteration", disable=local_rank not in [-1, 0] or not verbose
             )
             for step, batch in enumerate(epoch_iterator):
-                model.train()
+                self.model.train()
                 batch = tuple(t.to(device) for t in batch)
-                inputs = get_inputs(batch, model_name)
-                outputs = model(**inputs)
+                inputs = get_inputs(batch, self.model_name)
+                outputs = self.model(**inputs)
                 loss = outputs[0]
 
                 if n_gpu > 1:
@@ -177,13 +172,13 @@ class Transformer:
                     torch.nn.utils.clip_grad_norm_(amp.master_params(optimizer), max_grad_norm)
                 else:
                     loss.backward()
-                    torch.nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)
+                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_grad_norm)
 
                 tr_loss += loss.item()
                 if (step + 1) % gradient_accumulation_steps == 0:
                     optimizer.step()
                     scheduler.step()
-                    model.zero_grad()
+                    self.model.zero_grad()
                     global_step += 1
 
                 if max_steps > 0 and global_step > max_steps:
@@ -200,7 +195,6 @@ class Transformer:
 
     def predict(
         self,
-        model,
         eval_dataset,
         get_inputs,
         device,
@@ -216,13 +210,13 @@ class Transformer:
             else DistributedSampler(eval_dataset)
         )
         eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=eval_batch_size)
-        
+
         for batch in tqdm(eval_dataloader, desc="Evaluating", disable=not verbose):
-            model.eval()
+            self.model.eval()
             batch = tuple(t.to(device) for t in batch)
             with torch.no_grad():
                 inputs = get_inputs(batch, self.model_name, train_mode=False)
-                outputs = model(**inputs)
+                outputs = self.model(**inputs)
                 logits = outputs[0]
 
             yield logits.detach().cpu().numpy()
