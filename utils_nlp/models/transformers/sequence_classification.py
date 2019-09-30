@@ -113,9 +113,7 @@ class SequenceClassifier(Transformer):
     ):
         device, num_gpus = get_device(device=device, num_gpus=num_gpus, local_rank=local_rank)
         self.model.to(device)
-        super().fine_tune(
-            model=self.model,
-            model_name=self.model_name,
+        super().fine_tune(            
             train_dataset=train_dataset,
             get_inputs=Processor.get_inputs,
             device=device,
@@ -128,7 +126,6 @@ class SequenceClassifier(Transformer):
     def predict(self, eval_dataset, device, batch_size=16, num_gpus=1, verbose=True, **kwargs):
         preds = list(
             super().predict(
-                model=self.model,
                 eval_dataset=eval_dataset,
                 get_inputs=Processor.get_inputs,
                 device=device,
