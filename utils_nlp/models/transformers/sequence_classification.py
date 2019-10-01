@@ -91,9 +91,12 @@ class Processor:
 
 
 class SequenceClassifier(Transformer):
-    def __init__(self, model_name="bert-base-cased", num_labels=2, **kwargs):
+    def __init__(self, model_name="bert-base-cased", num_labels=2, cache_dir="."):
         super().__init__(
-            model_class=MODEL_CLASS, model_name=model_name, num_labels=num_labels, **kwargs
+            model_class=MODEL_CLASS,
+            model_name=model_name,
+            num_labels=num_labels,
+            cache_dir=cache_dir,
         )
 
     @staticmethod
@@ -108,22 +111,29 @@ class SequenceClassifier(Transformer):
         batch_size=32,
         num_gpus=None,
         local_rank=-1,
+        weight_decay=0.0,
+        learning_rate=5e-5,
+        adam_epsilon=1e-8,
+        warmup_steps=0,
         verbose=True,
-        **kwargs,
+        seed=None,
     ):
         device, num_gpus = get_device(device=device, num_gpus=num_gpus, local_rank=local_rank)
         self.model.to(device)
-        super().fine_tune(            
+        super().fine_tune(
             train_dataset=train_dataset,
             get_inputs=Processor.get_inputs,
             device=device,
             num_train_epochs=num_epochs,
+            weight_decay=weight_decay,
+            learning_rate=learning_rate,
+            adam_epsilon=adam_epsilon,
+            warmup_steps=warmup_steps,
             verbose=verbose,
-            seed=self.seed,
-            **kwargs,
+            seed=seed,
         )
 
-    def predict(self, eval_dataset, device, batch_size=16, num_gpus=1, verbose=True, **kwargs):
+    def predict(self, eval_dataset, device, batch_size=16, num_gpus=1, verbose=True):
         preds = list(
             super().predict(
                 eval_dataset=eval_dataset,
@@ -132,7 +142,6 @@ class SequenceClassifier(Transformer):
                 per_gpu_eval_batch_size=batch_size,
                 n_gpu=num_gpus,
                 verbose=True,
-                **kwargs,
             )
         )
         preds = np.concatenate(preds)

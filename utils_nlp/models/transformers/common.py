@@ -47,12 +47,11 @@ def get_device(device, num_gpus, local_rank):
 
 
 class Transformer:
-    def __init__(self, model_class, model_name="bert-base-cased", cache_dir=".", seed=0, **kwargs):
+    def __init__(self, model_class, model_name="bert-base-cased", num_labels=2, cache_dir="."):
         self.model_name = model_name
         self.model = model_class[model_name].from_pretrained(
-            model_name, cache_dir=cache_dir, num_labels=kwargs["num_labels"]
+            model_name, cache_dir=cache_dir, num_labels=num_labels
         )
-        self.seed = seed
 
     @staticmethod
     def set_seed(seed, cuda=True):
@@ -81,9 +80,11 @@ class Transformer:
         fp16_opt_level="O1",
         local_rank=-1,
         verbose=True,
-        seed=0,
+        seed=None,
     ):
-        Transformer.set_seed(seed, n_gpu > 0)
+        if seed is not None:
+            Transformer.set_seed(seed, n_gpu > 0)
+
         train_batch_size = per_gpu_train_batch_size * max(1, n_gpu)
         train_sampler = (
             RandomSampler(train_dataset) if local_rank == -1 else DistributedSampler(train_dataset)
