@@ -28,28 +28,33 @@ import jsonlines
 import torch
 from torch.utils.data import TensorDataset, SequentialSampler, DataLoader
 
-from pytorch_transformers.tokenization_bert import BasicTokenizer, whitespace_tokenize
-from pytorch_transformers import XLNetTokenizer
+from transformers.tokenization_bert import BasicTokenizer, whitespace_tokenize
+from transformers import XLNetTokenizer
 
-from pytorch_transformers.modeling_bert import (
+from transformers.modeling_bert import (
     BertConfig,
     BERT_PRETRAINED_MODEL_ARCHIVE_MAP,
     BertForQuestionAnswering,
 )
 
-from pytorch_transformers.modeling_xlnet import (
+from transformers.modeling_xlnet import (
     XLNetConfig,
     XLNET_PRETRAINED_MODEL_ARCHIVE_MAP,
     XLNetForQuestionAnswering,
 )
 
-from pytorch_transformers.modeling_distilbert import (
+from transformers.modeling_distilbert import (
     DistilBertConfig,
     DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP,
     DistilBertForQuestionAnswering,
 )
 
-from utils_nlp.models.transformers.common import MAX_SEQ_LEN, TOKENIZER_CLASS, get_device, fine_tune
+from utils_nlp.models.transformers.common import (
+    MAX_SEQ_LEN,
+    TOKENIZER_CLASS,
+    Transformer,
+    get_device,
+)
 
 MODEL_CLASS = {}
 MODEL_CLASS.update({k: BertForQuestionAnswering for k in BERT_PRETRAINED_MODEL_ARCHIVE_MAP})
@@ -128,35 +133,22 @@ class QAProcessor:
         return self._model_type
 
     @staticmethod
-    def get_train_inputs(batch, model_name):
-        model_type = model_name.split("-")[0]
-
-        inputs = {
-            "input_ids": batch[0],
-            "attention_mask": batch[1],
-            "start_positions": batch[3],
-            "end_positions": batch[4],
-        }
-
-        if model_type not in ["distilbert"]:
-            inputs.update({"token_type_ids": batch[2]})
-
-        if model_type in ["xlnet"]:
-            inputs.update({"cls_index": batch[5], "p_mask": batch[6]})
-
-        return inputs
-
-    @staticmethod
-    def get_test_inputs(batch, model_name):
+    def get_inputs(batch, model_name, train_mode=True):
         model_type = model_name.split("-")[0]
 
         inputs = {"input_ids": batch[0], "attention_mask": batch[1]}
 
+        if train_mode:
+            inputs.update({"start_positions": batch[3], "end_positions": batch[4]})
+
         if model_type not in ["distilbert"]:
             inputs.update({"token_type_ids": batch[2]})
 
         if model_type in ["xlnet"]:
-            inputs.update({"cls_index": batch[3], "p_mask": batch[4]})
+            if train_mode:
+                inputs.update({"cls_index": batch[5], "p_mask": batch[6]})
+            else:
+                inputs.update({"cls_index": batch[3], "p_mask": batch[4]})
 
         return inputs
 
@@ -356,7 +348,7 @@ class QAResultExtended(QAResultExtended_):
     pass
 
 
-class AnswerExtractor:
+class AnswerExtractor(Transformer):
     """
     Answer extractor based on pre-trained transformers models.
 
@@ -375,40 +367,14 @@ class AnswerExtractor:
 
     def __init__(self, model_name="bert-base-cased", cache_dir=".", load_model_from_dir=None):
 
-        self.model_name = model_name
-        self.cache_dir = cache_dir
-        self.load_model_from_dir = load_model_from_dir
-
-        config_class = CONFIG_CLASS[self.model_name]
-        model_class = MODEL_CLASS[self.model_name]
-
-        if load_model_from_dir is None:
-            config = config_class.from_pretrained(self.model_name)
-            self.model = model_class.from_pretrained(self.model_name, config=config)
-        else:
-            logger.info("Loading cached model from {}".format(load_model_from_dir))
-            config = config_class.from_pretrained(load_model_from_dir)
-            self.model = model_class.from_pretrained(load_model_from_dir, config=config)
-
-    @property
-    def model_name(self):
-        return self._model_name
-
-    @model_name.setter
-    def model_name(self, value):
-        if value not in self.list_supported_models():
-            raise ValueError(
-                "Model name {} is not supported by AnswerExtractor. "
-                "Call 'AnswerExtractor.list_supported_models()' to get all supported model "
-                "names.".format(value)
-            )
-
-        self._model_name = value
-        self._model_type = value.split("-")[0]
-
-    @property
-    def model_type(self):
-        return self._model_type
+        super().__init__(
+            model_class=MODEL_CLASS,
+            model_name=model_name,
+            num_labels=2,
+            cache_dir=cache_dir,
+            load_model_from_dir=load_model_from_dir,
+            config_class=CONFIG_CLASS,
+        )
 
     @staticmethod
     def list_supported_models():
@@ -421,7 +387,7 @@ class AnswerExtractor:
         num_gpus=None,
         per_gpu_batch_size=8,
         num_epochs=1,
-        learning_rate=2e-5,
+        learning_rate=5e-5,
         max_grad_norm=1.0,
         max_steps=-1,
         gradient_accumulation_steps=1,
@@ -431,6 +397,7 @@ class AnswerExtractor:
         fp16=False,
         fp16_opt_level="O1",
         local_rank=-1,
+        verbose=True,
         seed=None,
         cache_model=True,
     ):
@@ -447,7 +414,7 @@ class AnswerExtractor:
             per_gpu_batch_size (int, optional): Training batch size on each GPU. Defaults to 8.
             num_epochs (int, optional): Number of training epochs. Defaults to 1.
             learning_rate (float, optional):  Learning rate of the AdamW optimizer. Defaults to
-                2e-5.
+                5e-5.
             max_grad_norm (float, optional): Maximum gradient norm for gradient clipping.
                 Defaults to 1.0.
             max_steps (int, optional): Maximum number of training steps. If specified,
@@ -476,11 +443,9 @@ class AnswerExtractor:
         device, num_gpus = get_device(device=device, num_gpus=num_gpus, local_rank=local_rank)
 
         self.model.to(device)
-        fine_tune(
-            model=self.model,
-            model_name=self.model_name,
+        super().fine_tune(
             train_dataset=train_dataset,
-            get_inputs=QAProcessor.get_train_inputs,
+            get_inputs=QAProcessor.get_inputs,
             device=device,
             max_steps=max_steps,
             num_train_epochs=num_epochs,
@@ -495,26 +460,20 @@ class AnswerExtractor:
             fp16=fp16,
             fp16_opt_level=fp16_opt_level,
             local_rank=local_rank,
+            verbose=verbose,
             seed=seed,
         )
         if cache_model:
-            output_model_dir = os.path.join(self.cache_dir, "fine_tuned")
-
-            if not os.path.exists(self.cache_dir):
-                os.makedirs(self.cache_dir)
-            if not os.path.exists(output_model_dir):
-                os.makedirs(output_model_dir)
-
-            logger.info("Saving model checkpoint to %s", output_model_dir)
-            # Save a trained model, configuration and tokenizer using `save_pretrained()`.
-            # They can then be reloaded using `from_pretrained()`
-            model_to_save = (
-                self.model.module if hasattr(self.model, "module") else self.model
-            )  # Take care of distributed/parallel training
-            model_to_save.save_pretrained(output_model_dir)
+            self.save_model()
 
     def predict(
-        self, test_dataset, per_gpu_batch_size=8, device="cuda", num_gpus=None, local_rank=-1
+        self,
+        test_dataset,
+        per_gpu_batch_size=16,
+        device="cuda",
+        num_gpus=None,
+        local_rank=-1,
+        verbose=True,
     ):
 
         """
@@ -550,10 +509,10 @@ class AnswerExtractor:
         test_dataloader = DataLoader(test_dataset, sampler=sampler, batch_size=batch_size)
 
         all_results = []
-        for batch in tqdm(test_dataloader, desc="Evaluating"):
+        for batch in tqdm(test_dataloader, desc="Evaluating", disable=not verbose):
             batch = tuple(t.to(device) for t in batch)
             with torch.no_grad():
-                inputs = QAProcessor.get_test_inputs(batch, self.model_name)
+                inputs = QAProcessor.get_inputs(batch, self.model_name, train_mode=False)
 
                 outputs = self.model(**inputs)
 
