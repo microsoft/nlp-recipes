@@ -124,6 +124,7 @@ class SequenceClassifier(Transformer):
             train_dataset=train_dataset,
             get_inputs=Processor.get_inputs,
             device=device,
+            n_gpu=num_gpus,
             num_train_epochs=num_epochs,
             weight_decay=weight_decay,
             learning_rate=learning_rate,
