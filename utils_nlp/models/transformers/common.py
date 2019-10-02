@@ -4,9 +4,10 @@
 # This script reuses some code from
 # https://github.com/huggingface/pytorch-transformers/blob/master/examples/run_glue.py
 
+import logging
 import os
 import random
-import logging
+
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
