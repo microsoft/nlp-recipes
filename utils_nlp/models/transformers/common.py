@@ -164,7 +164,7 @@ class Transformer:
                 if gradient_accumulation_steps > 1:
                     loss = loss / gradient_accumulation_steps
 
-                if step % 10 == 0:
+                if step % 10 == 0 and verbose:
                     tqdm.write("Loss:{:.6f}".format(loss))
 
                 if fp16:
