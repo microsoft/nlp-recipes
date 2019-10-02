@@ -56,7 +56,6 @@ class Transformer:
         num_labels=2,
         cache_dir=".",
         load_model_from_dir=None,
-        config_class=None,
     ):
         self.model_name = model_name
         self.cache_dir = cache_dir
@@ -67,9 +66,8 @@ class Transformer:
             )
         else:
             logger.info("Loading cached model from {}".format(load_model_from_dir))
-            config = config_class[model_name].from_pretrained(load_model_from_dir)
             self.model = model_class[model_name].from_pretrained(
-                load_model_from_dir, config=config, num_labels=num_labels
+                load_model_from_dir, num_labels=num_labels
             )
 
     @property
