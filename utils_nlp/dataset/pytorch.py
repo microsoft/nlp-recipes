@@ -1,3 +1,7 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License.
+
+import collections
 from torch.utils.data import Dataset
 
 
@@ -21,6 +25,72 @@ class SCDataSet(Dataset):
 
     def __getitem__(self, idx):
         return (self.df.iloc[idx, self.text_col], self.df.iloc[idx, self.label_col])
+
+    def __len__(self):
+        return self.df.shape[0]
+
+
+QAInput = collections.namedtuple(
+    "QAInput",
+    ["doc_text", "question_text", "qa_id", "is_impossible", "answer_start", "answer_text"],
+)
+
+
+class QADataset(Dataset):
+    def __init__(
+        self,
+        df,
+        doc_text_col,
+        question_text_col,
+        qa_id_col=None,
+        is_impossible_col=None,
+        answer_start_col=None,
+        answer_text_col=None,
+    ):
+
+        self.df = df.copy()
+        self.doc_text_col = doc_text_col
+        self.question_text_col = question_text_col
+
+        if qa_id_col is None:
+            self.qa_id_col = "qa_id"
+            df[self.qa_id_col] = list(range(df.shape[0]))
+        else:
+            self.qa_id_col = qa_id_col
+
+        if is_impossible_col is None:
+            self.is_impossible_col = "is_impossible"
+            df[self.is_impossible_col] = False
+        else:
+            self.is_impossible_col = is_impossible_col
+
+        if answer_start_col is not None and answer_text_col is not None:
+            self.actual_answer_available = True
+        else:
+            self.actual_answer_available = False
+        self.answer_start_col = answer_start_col
+        self.answer_text_col = answer_text_col
+
+    def __getitem__(self, idx):
+        current_item = self.df.iloc[idx,]
+        if self.actual_answer_available:
+            return QAInput(
+                doc_text=current_item[self.doc_text_col],
+                question_text=current_item[self.question_text_col],
+                qa_id=current_item[self.qa_id_col],
+                is_impossible=current_item[self.is_impossible_col],
+                answer_start=current_item[self.answer_start_col],
+                answer_text=current_item[self.answer_text_col],
+            )
+        else:
+            return QAInput(
+                doc_text=current_item[self.doc_text_col],
+                question_text=current_item[self.question_text_col],
+                qa_id=current_item[self.qa_id_col],
+                is_impossible=current_item[self.is_impossible_col],
+                answer_start=-1,
+                answer_text="",
+            )
 
     def __len__(self):
         return self.df.shape[0]
