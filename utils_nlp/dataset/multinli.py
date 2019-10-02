@@ -53,7 +53,6 @@ def get_generator(
             One of: {"train", "dev_matched", "dev_mismatched"}
             Defaults to "train".
         block_size (int, optional): Size of partition in bytes.
-        random_seed (int, optional): Random seed. See random.seed().Defaults to None.
         num_batches (int): Number of batches to generate.
         batch_size (int]): Batch size.
     Returns:
