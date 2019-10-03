@@ -49,7 +49,7 @@ class TokenClassificationProcessor():
     @staticmethod
     def get_inputs(batch, model_name, train_mode=True):
         """
-        Produce a dictional object for model training or prediction.
+        Produce a dictionary object for model training or prediction.
 
         Args:
             model_name (str): The pretained model name.
@@ -58,7 +58,7 @@ class TokenClassificationProcessor():
                 Defaults to True, for model training.
         
         Returns:
-            A dictional object contains all needed information for training or testing.
+            dict: A dictionary object contains all needed information for training or testing.
         """
 
         if model_name.split("-")[0] not in ["bert"]:
@@ -73,7 +73,7 @@ class TokenClassificationProcessor():
     @staticmethod
     def create_label_map(label_lists, trailing_piece_tag="X"):
         """
-        Create a dictional object to map a label (str) to an ID (int).
+        Create a dictionary object to map a label (str) to an ID (int).
 
         Args:
             label_lists (list): A list of label lists. Each element is a list of labels
@@ -82,7 +82,7 @@ class TokenClassificationProcessor():
                 Defaults to "X".
             
         Returns:
-            A dictional object to map a label (str) to an ID (int). 
+            dict: A dictionary object to map a label (str) to an ID (int). 
         """
 
         label_set = set()
@@ -360,7 +360,7 @@ class TokenClassifier(Transformer):
                 Defaults to False.
         
         Returns:
-            Numpy ndarray of raw predictions. The shape of the ndarray is
+            ndarray: Numpy ndarray of raw predictions. The shape of the ndarray is
             [number_of_examples, sequence_length, number_of_labels]. Each
             value in the ndarray is not normalized. Post-process will be needed
             to get the probability for each class label.
@@ -393,17 +393,21 @@ class TokenClassifier(Transformer):
         Args:
             predictions (ndarray): A numpy ndarray produced from the `predict` function call.
                 The shape of the ndarray is [number_of_examples, sequence_length, number_of_labels].
-            label_map (dict): A dictional object to map a label (str) to an ID (int). 
+            label_map (dict): A dictionary object to map a label (str) to an ID (int). 
                 dataset (TensorDataset): The TensorDataset for evaluation.
 
         Returns:
-            List of lists. The size of the retured list is the number of testing samples.
-                Each sublist represents the predicted label for each token. 
+            list: A list of lists. The size of the retured list is the number of testing samples.
+            Each sublist represents the predicted label for each token. 
         """
 
         num_samples = len(dataset.tensors[0])
         if num_samples != predictions.shape[0]:
-            raise ValueError("Predictions have {0} samples, but got {1} samples in dataset".format(predictions.shape[0], num_samples))
+            raise ValueError("Predictions have {0} samples, but got {1} samples in dataset".format(
+                    predictions.shape[0],
+                    num_samples
+                )
+            )
 
         label_id2str = {v: k for k, v in label_map.items()}
         attention_mask_all = dataset.tensors[1].data.numpy()
