@@ -10,6 +10,7 @@ from utils_nlp.dataset import wikigold
 from utils_nlp.dataset import xnli
 from utils_nlp.dataset import snli
 from utils_nlp.dataset import Split
+from utils_nlp.dataset import squad
 from utils_nlp.dataset.ner_utils import preprocess_conll
 
 
@@ -123,7 +124,7 @@ def test_ner_utils(ner_utils_test_data):
 
 
 def test_xnli(tmp_path):
-    # only test for the dev df as the train dataset takes several
+    # Only test for the dev df as the train dataset takes several
     # minutes to download
     dev_df = xnli.load_pandas_df(local_cache_path=tmp_path, file_split="dev")
     assert dev_df.shape == (2490, 2)
@@ -142,4 +143,17 @@ def test_snli(tmp_path):
         local_cache_path=tmp_path, file_split=Split.DEV
     )
     assert df_dev.shape == (10000, 14)
+
+def test_squad(tmp_path):
+    v1_train_df = squad.load_pandas_df(local_cache_path=tmp_path, squad_version="v1.1", file_split="train")
+    assert v1_train_df.shape == (87599, 6)
+
+    v1_dev_df = squad.load_pandas_df(local_cache_path=tmp_path, squad_version="v1.1", file_split="dev")
+    assert v1_dev_df.shape == (10570, 6)
+
+    v2_train_df = squad.load_pandas_df(local_cache_path=tmp_path, squad_version="v2.0", file_split="train")
+    assert v2_train_df.shape == (130319, 6)
+
+    v2_dev_df = squad.load_pandas_df(local_cache_path=tmp_path, squad_version="v2.0", file_split="dev")
+    assert v2_dev_df.shape == (11873, 6)
 
