@@ -31,20 +31,14 @@ from torch.utils.data import TensorDataset, SequentialSampler, DataLoader
 from transformers.tokenization_bert import BasicTokenizer, whitespace_tokenize
 from transformers import XLNetTokenizer
 
-from transformers.modeling_bert import (
-    BertConfig,
-    BERT_PRETRAINED_MODEL_ARCHIVE_MAP,
-    BertForQuestionAnswering,
-)
+from transformers.modeling_bert import BERT_PRETRAINED_MODEL_ARCHIVE_MAP, BertForQuestionAnswering
 
 from transformers.modeling_xlnet import (
-    XLNetConfig,
     XLNET_PRETRAINED_MODEL_ARCHIVE_MAP,
     XLNetForQuestionAnswering,
 )
 
 from transformers.modeling_distilbert import (
-    DistilBertConfig,
     DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP,
     DistilBertForQuestionAnswering,
 )
@@ -62,11 +56,6 @@ MODEL_CLASS.update({k: XLNetForQuestionAnswering for k in XLNET_PRETRAINED_MODEL
 MODEL_CLASS.update(
     {k: DistilBertForQuestionAnswering for k in DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP}
 )
-
-CONFIG_CLASS = {}
-CONFIG_CLASS.update({k: BertConfig for k in BERT_PRETRAINED_MODEL_ARCHIVE_MAP})
-CONFIG_CLASS.update({k: XLNetConfig for k in XLNET_PRETRAINED_MODEL_ARCHIVE_MAP})
-CONFIG_CLASS.update({k: DistilBertConfig for k in DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP})
 
 # cached files during preprocessing
 # these are used in postprocessing to generate the final answer texts
@@ -373,7 +362,6 @@ class AnswerExtractor(Transformer):
             num_labels=2,
             cache_dir=cache_dir,
             load_model_from_dir=load_model_from_dir,
-            config_class=CONFIG_CLASS,
         )
 
     @staticmethod
