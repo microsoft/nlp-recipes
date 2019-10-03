@@ -26,8 +26,7 @@ TC_MODEL_CLASS = {k: BertForTokenClassification for k in BERT_PRETRAINED_MODEL_A
 
 class TokenClassificationProcessor():
     """
-    Process raw dataset for training and testing, and post-process prediction
-    for token classification.
+    Process raw dataset for training and testing.
 
     Args:
         model_name (str, optional): The pretained model name.
@@ -96,7 +95,14 @@ class TokenClassificationProcessor():
         return label_map
 
 
-    def preprocessForBERT(self, text, max_len=MAX_SEQ_LEN, labels=None, label_map=None, trailing_piece_tag="X"):
+    def preprocess_for_bert(
+        self,
+        text,
+        max_len=MAX_SEQ_LEN,
+        labels=None,
+        label_map=None,
+        trailing_piece_tag="X"
+    ):
         """
         Tokenize and preprocesses input word lists, involving the following steps
             0. WordPiece tokenization.
