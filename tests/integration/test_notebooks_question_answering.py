@@ -19,8 +19,8 @@ def test_bidaf_deep_dive(
         notebook_path,
         OUTPUT_NOTEBOOK,
         parameters={
-            "NUM_EPOCHS": 2,
-            "config_path": "tests/ci",
+            "NUM_EPOCHS": 1,
+            "config_path": None,
             "PROJECT_FOLDER": "examples/question_answering/bidaf-question-answering",
             "SQUAD_FOLDER": "examples/question_answering/squad",
             "LOGS_FOLDER": "examples/question_answering/",
@@ -46,7 +46,7 @@ def test_bidaf_quickstart(
         notebook_path,
         OUTPUT_NOTEBOOK,
         parameters={
-            "config_path": "tests/ci",
+            "config_path": None,
             "subscription_id": subscription_id,
             "resource_group": resource_group,
             "workspace_name": workspace_name,
@@ -61,13 +61,13 @@ def test_bidaf_quickstart(
 @pytest.mark.integration
 @pytest.mark.azureml
 @pytest.mark.gpu
-def test_bert_qa_runs(notebooks):
+def test_bert_qa_runs(notebooks, subscription_id, resource_group, workspace_name, workspace_region):
     notebook_path = notebooks["bert_qa_trainer"]
     pm.execute_notebook(
         notebook_path,
         OUTPUT_NOTEBOOK,
         parameters=dict(
-            AZUREML_CONFIG_PATH="./tests/integration/.azureml",
+            AZUREML_CONFIG_PATH=".",
             DATA_FOLDER="./tests/integration/squad",
             PROJECT_FOLDER="./tests/integration/pytorch-transformers",
             EXPERIMENT_NAME="NLP-QA-BERT-deepdive",
@@ -81,6 +81,10 @@ def test_bert_qa_runs(notebooks):
             MAX_CONCURRENT_RUNS=1,
             TARGET_GRADIENT_STEPS=1,
             INIT_GRADIENT_STEPS=1,
+            subscription_id=subscription_id,
+            resource_group=resource_group,
+            workspace_name=workspace_name,
+            workspace_region=workspace_region,
         ),
     )
     result = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict
