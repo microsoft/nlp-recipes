@@ -22,10 +22,27 @@ DATA_FILES = {
 }
 
 
-def load_pandas_df(local_cache_path=".", file_split="train"):
-    """Downloads and extracts the dataset files
+def download_file_and_extract(local_cache_path: str = ".", file_split: str = "train") -> None:
+    """Download and extract the dataset files
+
     Args:
-        local_cache_path ([type], optional): [description]. Defaults to None.
+        local_cache_path (str [optional]) -- Directory to cache files to. Defaults to current working directory (default: {"."})
+        file_split {str} -- [description] (default: {"train"})
+    
+    Returns:
+        None -- Nothing is returned
+    """
+    file_name = URL.split("/")[-1]
+    maybe_download(URL, file_name, local_cache_path)
+
+    if not os.path.exists(os.path.join(local_cache_path, DATA_FILES[file_split])):
+        extract_zip(os.path.join(local_cache_path, file_name), local_cache_path)
+
+
+def load_pandas_df(local_cache_path=".", file_split="train"):
+    """Loads extracted dataset into pandas
+    Args:
+        local_cache_path ([type], optional): [description]. Defaults to current working directory.
         file_split (str, optional): The subset to load.
             One of: {"train", "dev_matched", "dev_mismatched"}
             Defaults to "train".
@@ -33,19 +50,17 @@ def load_pandas_df(local_cache_path=".", file_split="train"):
         pd.DataFrame: pandas DataFrame containing the specified
             MultiNLI subset.
     """
-
-    file_name = URL.split("/")[-1]
-    maybe_download(URL, file_name, local_cache_path)
-
-    if not os.path.exists(os.path.join(local_cache_path, DATA_FILES[file_split])):
-        extract_zip(os.path.join(local_cache_path, file_name), local_cache_path)
+    try:
+        download_file_and_extract(local_cache_path, file_split)
+    except Exception as e:
+        raise e
     return pd.read_json(os.path.join(local_cache_path, DATA_FILES[file_split]), lines=True)
 
 
 def get_generator(
     local_cache_path=".", file_split="train", block_size=10e6, batch_size=10e6, num_batches=None
 ):
-    """ Downloads and extracts the dataset files and then returns a random batch generator that
+    """ Returns an extracted dataset as a random batch generator that
     yields pandas dataframes.
     Args:
         local_cache_path ([type], optional): [description]. Defaults to None.
@@ -53,18 +68,16 @@ def get_generator(
             One of: {"train", "dev_matched", "dev_mismatched"}
             Defaults to "train".
         block_size (int, optional): Size of partition in bytes.
-        random_seed (int, optional): Random seed. See random.seed().Defaults to None.
         num_batches (int): Number of batches to generate.
         batch_size (int]): Batch size.
     Returns:
         Generator[pd.Dataframe, None, None] : Random batch generator that yields pandas dataframes.
     """
 
-    file_name = URL.split("/")[-1]
-    maybe_download(URL, file_name, local_cache_path)
-
-    if not os.path.exists(os.path.join(local_cache_path, DATA_FILES[file_split])):
-        extract_zip(os.path.join(local_cache_path, file_name), local_cache_path)
+    try:
+        download_file_and_extract(local_cache_path, file_split)
+    except Exception as e:
+        raise e
 
     loader = DaskJSONLoader(
         os.path.join(local_cache_path, DATA_FILES[file_split]), block_size=block_size

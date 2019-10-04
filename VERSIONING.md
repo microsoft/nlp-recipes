@@ -1,9 +1,10 @@
 # Semantic Versioning
+> NOTE: Support for `setuptools_scm` is currently removed due to a known [issue](https://github.com/pypa/setuptools_scm/issues/357) with the way pip installations restrict access to certain SCM metadata during package installation. Support will be restored when `setuptools_scm` and `pip` developers fix this with a patch.
 
 This library is configured to use
 [setuptools_scm](https://github.com/pypa/setuptools_scm/) to automatically get package version from git commit histories.
 
-> NOTE: **There shouldn't be any references to manually coded versions**.
+**There shouldn't be any references to manually coded versions**.
 
 Verify what git tag to use by running:
 
