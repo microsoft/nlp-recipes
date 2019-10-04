@@ -54,13 +54,13 @@ class QADataset(Dataset):
 
         if qa_id_col is None:
             self.qa_id_col = "qa_id"
-            df[self.qa_id_col] = list(range(df.shape[0]))
+            self.df[self.qa_id_col] = list(range(self.df.shape[0]))
         else:
             self.qa_id_col = qa_id_col
 
         if is_impossible_col is None:
             self.is_impossible_col = "is_impossible"
-            df[self.is_impossible_col] = False
+            self.df[self.is_impossible_col] = False
         else:
             self.is_impossible_col = is_impossible_col
 
