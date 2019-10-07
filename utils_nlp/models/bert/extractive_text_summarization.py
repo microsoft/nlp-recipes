@@ -39,7 +39,7 @@ def tokenize_to_list(client, input_text):
         tokens_list.append(tokens)
     return tokens_list
 
-def bertify(source, target=None, oracle_mode='combination', selection=3):
+def bertify(bertdata, source, target=None, oracle_mode='combination', selection=3):
     if target:
         oracle_ids = combination_selection(source, target, selection)
         b_data = bertdata.preprocess(source, target, oracle_ids)
