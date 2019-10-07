@@ -16,21 +16,23 @@ def preprocess(param):
     return [word_tokenize(sentence) for sentence in sentences]
 
 
-def harvardnlp_cnndm_preprocess(n_cpus, source_file, target_file):
+def harvardnlp_cnndm_preprocess(n_cpus, source_file, target_file, top_n=-1):
     def _remove_ttags(line):
         line = re.sub(r'<t>', '', line)
-        line = re.sub(r'</t>', '', line)
+        # change </t> to <q>
+        # pyrouge test requires <q> as  sentence splitter
+        line = re.sub(r'</t>', '<q>', line)
         return line
 
     def _cnndm_target_sentence_tokenization(line):
+        return line.split("<q>")
 
-        return line.split("</t>")
     src_list = []
     with open(source_file, 'r') as fd:
         for line in  fd:  
-            src_list.append((line, [tokenize.sent_tokenize], nltk.word_tokenize))
+            src_list.append((line, [clean, tokenize.sent_tokenize], nltk.word_tokenize))
     pool = Pool(n_cpus)
-    tokenized_src_data =  pool.map(preprocess, src_list, int(len(src_list)/n_cpus))
+    tokenized_src_data =  pool.map(preprocess, src_list[0:top_n], int(len(src_list[0:top_n])/n_cpus))
     pool.close()
     pool.join()
     
@@ -40,7 +42,7 @@ def harvardnlp_cnndm_preprocess(n_cpus, source_file, target_file):
             tgt_list.append((line, [clean, _remove_ttags, _cnndm_target_sentence_tokenization], nltk.word_tokenize))
 
     pool = Pool(n_cpus)
-    tokenized_tgt_data =  pool.map(preprocess, tgt_list, int(len(tgt_list)/n_cpus))
+    tokenized_tgt_data =  pool.map(preprocess, tgt_list[0:top_n], int(len(tgt_list[0:top_n])/n_cpus))
     pool.close()
     pool.join()
 
