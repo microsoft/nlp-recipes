@@ -1,6 +1,6 @@
 import os
 from random import random, seed
-from others.utils import test_rouge
+from bertsum.others.utils import test_rouge
 
 def get_rouge(predictions, targets, temp_dir):
     def _write_list_to_file(list_items, filename):
