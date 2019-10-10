@@ -4,8 +4,7 @@ nltk.download('punkt')
 from nltk import tokenize
 import torch
 import sys
-sys.path.insert(0, '../src')
-from others.utils import clean
+from bertsum.others.utils import clean
 from multiprocess import Pool
 
 import regex as re

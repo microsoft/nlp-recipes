@@ -1,16 +1,16 @@
 from pytorch_pretrained_bert import BertConfig
 
-from models.model_builder import Summarizer
-from models import  model_builder, data_loader
-from others.logging import logger, init_logger
-from train import model_flags
-from models.trainer import build_trainer
-from prepro.data_builder import BertData
+from bertsum.models.model_builder import Summarizer
+from bertsum.models import  model_builder, data_loader
+from bertsum.others.logging import logger, init_logger
+from bertsum.train import model_flags
+from bertsum.models.trainer import build_trainer
+from bertsum.prepro.data_builder import BertData
 
 from cached_property import cached_property
 import torch
 import random
-from prepro.data_builder import greedy_selection, combination_selection
+from bertsum.prepro.data_builder import greedy_selection, combination_selection
 import gc
 from multiprocessing import Pool
 
@@ -97,7 +97,7 @@ class BertSumExtractiveSummarizer:
                   log_file = "./logs/baseline",
                   temp_dir = './temp',
                   bert_config_path="./bert_config_uncased_base.json",
-                  device_id=0,
+                  device_id=1,
                   work_size=1,
                   gpu_ranks="1"
                   ):
@@ -128,17 +128,15 @@ class BertSumExtractiveSummarizer:
         self.args.log_file = log_file
         self.args.temp_dir = temp_dir
         self.args.bert_config_path=bert_config_path
-        self.args.worls_size = 1
+        
         self.args.gpu_ranks = gpu_ranks
         self.args.gpu_ranks_map = __map_gpu_ranks(self.args.gpu_ranks) 
+        self.args.world_size = len(self.args.gpu_ranks_map.keys())
         print(self.args.gpu_ranks_map)
     
-        init_logger(self.args.log_file)
 
         self.has_cuda = self.cuda
-        self.device = torch.device("cuda:{}".format(device_id))
-        #"cpu" if not self.has_cuda else "cuda"
-        
+        init_logger(self.args.log_file) 
         torch.manual_seed(self.args.seed)
         random.seed(self.args.seed)
         torch.backends.cudnn.deterministic = True
@@ -155,14 +153,16 @@ class BertSumExtractiveSummarizer:
     
     def fit(self, device_id, train_file_list, train_steps=5000, train_from='', batch_size=3000, 
                warmup_proportion=0.2, decay_method='noam', lr=0.002,accum_count=2):
-        if device_id not in self.args.gpu_ranks_map.keys(): 
-             print(error)
+
+        if self.args.gpu_ranks_map[device_id] != 0:
+            logger.disabled = True
+        if device_id not in list(self.args.gpu_ranks_map.keys()): 
+             raise Exception("need to use device id that's in the gpu ranks")
         device = None
-        logger.info('Device ID %d' % device_id)
         if device_id >= 0:
-            torch.cuda.set_device(device_id)
+            #torch.cuda.set_device(device_id)
             torch.cuda.manual_seed(self.args.seed)
-            device = torch.device("cuda:{}".format(device_id))  
+            device = device_id #torch.device("cuda:{}".format(device_id))  
         
         self.args.decay_method=decay_method
         self.args.lr=lr
@@ -172,11 +172,10 @@ class BertSumExtractiveSummarizer:
         self.args.accum_count= accum_count
         print(self.args.__dict__)
         
-        self.model = Summarizer(self.args, self.device, load_pretrained_bert=True)
+        self.model = Summarizer(self.args, device, load_pretrained_bert=True)
     
     
         if train_from != '':
-            logger.info('Loading checkpoint from %s' % args.train_from)
             checkpoint = torch.load(train_from,
                                     map_location=lambda storage, loc: storage)
             opt = vars(checkpoint['opt'])
@@ -188,7 +187,6 @@ class BertSumExtractiveSummarizer:
         else:
             optim = model_builder.build_optim(self.args, self.model, None)
 
-        logger.info(self.model)
         
         def get_dataset(file_list):
             random.shuffle(file_list)
@@ -197,8 +195,8 @@ class BertSumExtractiveSummarizer:
         
 
         def train_iter_fct():
-            return data_loader.Dataloader(self.args, get_dataset(train_file_list), batch_size, self.device,
-                                             shuffle=True, is_test=False)
+            return data_loader.Dataloader(self.args, get_dataset(train_file_list), batch_size, device,
+                                             shuffle=True, is_test=True)
         
 
 
@@ -210,7 +208,6 @@ class BertSumExtractiveSummarizer:
         #if self.args.world_size=1 or len(self.args.gpu_ranks.split(",")==1):
         #    device_id = 0
             
-        logger.info('Device ID %d' % device_id)
         device = None
         if device_id >= 0:
             torch.cuda.set_device(device_id)
@@ -220,7 +217,6 @@ class BertSumExtractiveSummarizer:
         if self.model is None and test_from == '':
             raise Exception("Need to train or specify the model for testing")
         if test_from != '':
-            logger.info('Loading checkpoint from %s' % test_from)
             checkpoint = torch.load(test_from, map_location=lambda storage, loc: storage)
             opt = vars(checkpoint['opt'])
             for k in opt.keys():
