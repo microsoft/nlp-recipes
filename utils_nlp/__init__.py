@@ -13,4 +13,3 @@ AUTHOR = __author__
 LICENSE = __license__
 COPYRIGHT = __copyright__
 VERSION = __version__
-

@@ -48,10 +48,10 @@ The following is a summary of the commonly used NLP scenarios covered in the rep
 
 | Scenario                              |  Models | Description|Languages|
 |-------------------------|  ------------------- |-------|---|
-|Text Classification                     |BERT <br> XLNet| Text classification is a supervised learning method of learning and predicting the category or the class of a document given its text content. |English, Hindi, Arabic|
+|Text Classification                     |BERT, XLNet, RoBERTa| Text classification is a supervised learning method of learning and predicting the category or the class of a document given its text content. |English, Hindi, Arabic|
 |Named Entity Recognition                |BERT| Named entity recognition (NER) is the task of classifying words or key phrases of a text into predefined entities of interest. |English|
-|Entailment                              |BERT| Textual entailment is the task of classifying the binary relation between two natural-language texts,  ‘text’ and ‘hypothesis’,  to determine if the `text' agrees with the `hypothesis` or not. |English|
-|Question Answering                      |BiDAF <br> BERT| Question answering (QA) is the task of retrieving or generating a valid answer for a given query in natural language, provided with a passage related to the query. |English|
+|Entailment                              |BERT, XLNet, RoBERTa| Textual entailment is the task of classifying the binary relation between two natural-language texts,  *text* and *hypothesis*, to determine if the *text* agrees with the *hypothesis* or not. |English|
+|Question Answering                      |BiDAF, BERT, XLNet| Question answering (QA) is the task of retrieving or generating a valid answer for a given query in natural language, provided with a passage related to the query. |English|
 |Sentence Similarity                     |Representation: TF-IDF, Word Embeddings, Doc Embeddings<br>Metrics: Cosine Similarity, Word Mover's Distance<br>Models: BERT, GenSen| Sentence similarity is the process of computing a similarity score given a pair of text documents. |English|
 |Embeddings| Word2Vec<br>fastText<br>GloVe| Embedding is the process of converting a word or a piece of text to a continuous vector space of real number, usually, in low dimension.|English|
 

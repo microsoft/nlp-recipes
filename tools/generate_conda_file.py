@@ -49,6 +49,7 @@ CONDA_BASE = {
     "dask": "dask[dataframe]==1.2.2",
     "papermill": "papermill>=1.0.1",
 }
+
 CONDA_GPU = {
     "numba": "numba>=0.38.1",
     "pytorch": "pytorch>=1.0.0",
@@ -65,6 +66,7 @@ PIP_BASE = {
     "azureml-mlflow": "azureml-mlflow>=1.0.43.1",
     "black": "black>=18.6b4",
     "cached-property": "cached-property==1.5.1",
+    "jsonlines": "jsonlines>=1.2.0",
     "nteract-scrapbook": "nteract-scrapbook>=0.2.1",
     "pydocumentdb": "pydocumentdb>=2.3.3",
     "pytorch-pretrained-bert": "pytorch-pretrained-bert>=0.6",
@@ -81,11 +83,12 @@ PIP_BASE = {
         "https://github.com/explosion/spacy-models/releases/download/"
         "en_core_web_sm-2.1.0/en_core_web_sm-2.1.0.tar.gz"
     ),
+    "transformers": "transformers>=2.0.0",
     "gensim": "gensim>=3.7.0",
     "nltk": "nltk>=3.4",
     "seqeval": "seqeval>=0.0.12",
-    "allennlp": "allennlp>=0.8.4",
 }
+
 PIP_GPU = {}
 
 PIP_DARWIN = {}

@@ -4,10 +4,10 @@ This folder contains examples and best practices, written in Jupyter notebooks, 
 
 |Category|Applications|Methods|Languages|
 |---| ------------------------ | ------------------- |---|
-|[Text Classification](text_classification)|Topic Classification|BERT, XLNet|en, hi, ar|
+|[Text Classification](text_classification)|Topic Classification|BERT, XLNet, RoBERTa, DistilBERT|en, hi, ar|
 |[Named Entity Recognition](named_entity_recognition) |Wikipedia NER|BERT|en|
 |[Entailment](entailment)|MultiNLI Natural Language Inference|BERT|en|
-|[Question Answering](question_answering) |SQuAD|BiDAF, BERT|en|
+|[Question Answering](question_answering) |SQuAD|BiDAF, BERT, XLNet, DistilBERT|en|
 |[Sentence Similarity](sentence_similarity)|STS Benchmark|BERT, GenSen|en|
 |[Embeddings](embeddings)|Custom Embeddings Training|Word2Vec, fastText, GloVe|en|
 |[Annotation](annotation)|Text Annotation|Doccano|en|
