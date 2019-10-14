@@ -47,6 +47,7 @@ CONDA_BASE = {
     "tensorflow-hub": "tensorflow-hub==0.5.0",
     "py-xgboost": "py-xgboost<=0.80",
     "dask": "dask[dataframe]==1.2.2",
+    "papermill": "papermill>=1.0.1",
 }
 
 CONDA_GPU = {
@@ -66,7 +67,6 @@ PIP_BASE = {
     "black": "black>=18.6b4",
     "cached-property": "cached-property==1.5.1",
     "jsonlines": "jsonlines>=1.2.0",
-    "papermill": "papermill>=1.0.1",
     "nteract-scrapbook": "nteract-scrapbook>=0.2.1",
     "pydocumentdb": "pydocumentdb>=2.3.3",
     "pytorch-pretrained-bert": "pytorch-pretrained-bert>=0.6",
