@@ -1,3 +1,7 @@
+"""
+this code is  a modified version of the code in bertsum 
+"""
+
 from pytorch_pretrained_bert import BertConfig
 
 from bertsum.models.model_builder import Summarizer
@@ -22,36 +26,6 @@ class Bunch(object):
 default_parameters = {"accum_count": 1, "batch_size": 3000, "beta1": 0.9, "beta2": 0.999, "block_trigram": True, "decay_method": "noam", "dropout": 0.1, "encoder": "baseline", "ff_size": 512, "gpu_ranks": "0123", "heads": 4, "hidden_size": 128, "inter_layers": 2, "lr": 0.002, "max_grad_norm": 0, "max_nsents": 100, "max_src_ntokens": 200, "min_nsents": 3, "min_src_ntokens": 10, "optim": "adam", "oracle_mode": "combination", "param_init": 0.0, "param_init_glorot": True, "recall_eval": False, "report_every": 50, "report_rouge": True, "rnn_size": 512, "save_checkpoint_steps": 500, "seed": 666, "temp_dir": "./temp", "test_all": False, "test_from": "", "train_from": "", "use_interval": True, "visible_gpus": "0", "warmup_steps": 10000, "world_size": 1}
 
 default_preprocessing_parameters = {"max_nsents": 100, "max_src_ntokens": 200, "min_nsents": 3, "min_src_ntokens": 10, "use_interval": True}
-
-def preprocess(client, source, target):
-    pre_source = tokenize_to_list(source, client)
-    pre_target = tokenize_to_list(target, client)
-    return bertify(pre_source, pre_target)
-
-def tokenize_to_list(client, input_text):
-    annotation = client.annotate(input_text)
-    sentences = annotation.sentence
-    tokens_list = []
-    for sentence in sentences:
-        tokens = []
-        for token in sentence.token:
-            tokens.append(token.originalText)
-        tokens_list.append(tokens)
-    return tokens_list
-
-def bertify(bertdata, source, target=None, oracle_mode='combination', selection=3):
-    if target:
-        oracle_ids = combination_selection(source, target, selection)
-        b_data = bertdata.preprocess(source, target, oracle_ids)
-    else:
-        b_data = bertdata.preprocess(source, None, None)
-    if b_data is None:
-        return None
-    indexed_tokens, labels, segments_ids, cls_ids, src_txt, tgt_txt = b_data
-    b_data_dict = {"src": indexed_tokens, "labels": labels, "segs": segments_ids, 'clss': cls_ids,
-                   'src_txt': src_txt, "tgt_txt": tgt_txt}
-    return b_data_dict
-    #gc.collect()
 
 
 def bertsum_formatting(n_cpus, bertdata, oracle_mode, jobs, output_file):
@@ -88,8 +62,6 @@ def modified_format_to_bert(param):
 
 class BertSumExtractiveSummarizer:
     """BERT-based Extractive Summarization --BertSum"""
-    
-    
     def __init__(self, language="english",  
                   mode = "train",
                   encoder="baseline",
@@ -162,7 +134,8 @@ class BertSumExtractiveSummarizer:
         if device_id >= 0:
             #torch.cuda.set_device(device_id)
             torch.cuda.manual_seed(self.args.seed)
-            device = device_id #torch.device("cuda:{}".format(device_id))  
+            device = torch.device("cuda:{}".format(device_id))  
+            self.device = device
         
         self.args.decay_method=decay_method
         self.args.lr=lr
@@ -173,7 +146,10 @@ class BertSumExtractiveSummarizer:
         print(self.args.__dict__)
         
         self.model = Summarizer(self.args, device, load_pretrained_bert=True)
-    
+        from torch.nn.parallel import DataParallel as DP
+        self.model.to(device)
+        self.model = DP(self.model, device_ids=[device]) 
+  
     
         if train_from != '':
             checkpoint = torch.load(train_from,
@@ -210,7 +186,7 @@ class BertSumExtractiveSummarizer:
             
         device = None
         if device_id >= 0:
-            torch.cuda.set_device(device_id)
+            #torch.cuda.set_device(device_id)
             torch.cuda.manual_seed(self.args.seed)
             device = torch.device("cuda:{}".format(device_id)) 
             
@@ -225,11 +201,26 @@ class BertSumExtractiveSummarizer:
                     
             config = BertConfig.from_json_file(self.args.bert_config_path)
             self.model = Summarizer(self.args, device, load_pretrained_bert=False, bert_config=config)
-            self.model.load_cp(checkpoint)
+            from torch import nn
+            class WrappedModel(nn.Module):
+                def __init__(self, module):
+                    super(WrappedModel, self).__init__()
+                    self.module = module # that I actually define.
+                def forward(self, x):
+                    return self.module(x)
+            model = WrappedModel(self.model)
+            #self.model.load_cp(checkpoint)
+            model.load_state_dict(checkpoint['model'])
+            self.model = model.module
         else:
             #model = self.model
             self.model.eval()
         self.model.eval()
+
+
+        from torch.nn.parallel import DataParallel as DP
+        self.model.to(device)
+        self.model = DP(self.model, device_ids=[device])
 
         trainer = build_trainer(self.args, device_id, self.model, None)
         return trainer.predict(data_iter, sentence_seperator, cal_lead)
