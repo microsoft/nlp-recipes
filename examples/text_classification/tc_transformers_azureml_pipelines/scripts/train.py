@@ -3,11 +3,8 @@ import pickle
 import shutil
 import sys
 
-import pandas as pd
-from sklearn.preprocessing import LabelEncoder
-
-from utils_nlp.models.transformers.sequence_classification import Processor, SequenceClassifier
 import torch
+from utils_nlp.models.transformers.sequence_classification import SequenceClassifier
 
 print("CUDA is{} available".format("" if torch.cuda.is_available() else " not"))
 
@@ -26,11 +23,10 @@ if output_dir is not None:
 ds = pickle.load(open(os.path.join(input_dir, model_name + "_ds"), "rb"))
 # fine-tune
 classifier = SequenceClassifier(model_name=model_name, num_labels=num_labels, cache_dir=cache_dir)
-classifier.fit(ds, batch_size=batch_size, num_gpus=num_gpus, verbose=True)
+classifier.fit(ds, batch_size=batch_size, num_gpus=num_gpus, verbose=False)
 # write classifier
 pickle.dump(classifier, open(os.path.join(output_dir, model_name + "_clf"), "wb"))
 # write label encoder
 shutil.move(
     os.path.join(input_dir, model_name + "_le"), os.path.join(output_dir, model_name + "_le")
 )
-
