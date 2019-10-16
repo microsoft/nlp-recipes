@@ -14,10 +14,10 @@ import urllib.request
 
 #@pytest.fixture()
 def source_data():
-    return """boston, MA -lrb- msft -rrb- welcome to Microsoft/nlp. Welcome to text summarization. Welcome to Microsoft NERD. Look out, beautiful Charlse River fall view."""
+    return """Boston, MA -lrb- msft -rrb- welcome to Microsoft/nlp. Welcome to text summarization. Welcome to Microsoft NERD. Look outside, waht a beautiful Charlse River fall view."""
 #@pytest.fixture()
 def target_data():
-    return """<t> welcome to microsfot/nlp. </t> <t>  Welcome to text summarization.</t> <t> Welcome to Microsoft NERD.</t> """
+    return """<t> welcome to microsoft/nlp. </t> <t>  Welcome to text summarization.</t> <t> Welcome to Microsoft NERD.</t> """
 
 @pytest.fixture()
 def bertdata_file():
