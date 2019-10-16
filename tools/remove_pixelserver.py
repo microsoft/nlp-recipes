@@ -10,7 +10,7 @@ SIGNATURE = "![Impressions](https://PixelServer20190423114238.azurewebsites.net/
 def remove_pixelserver_from_notebook(file_path):
     """
     Remove pixelserver tracking from a notebook. If the pixcelserver signature found in
-    the notebook, the pixelserver cell will be remove from the notebook file. File will
+    the notebook, the pixelserver cell will be removed from the notebook file. File will
     be modified only when the pixelserver signature is found in it.
 
     Args:
