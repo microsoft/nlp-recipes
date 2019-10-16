@@ -78,7 +78,6 @@ def test_training(bertdata_file):
                                             model_path = model_base_path + encoder + str(random_number),
                                             log_file = log_base_path + encoder + str(random_number),
                                             bert_config_path = BERT_CONFIG_PATH,
-                                            device_id = device_id,
                                             gpu_ranks = gpu_ranks,)
     bertsum_model.args.save_checkpoint_steps = 50
     train_steps = 100
