@@ -85,6 +85,10 @@ PIP_BASE = {
     "nltk": "nltk>=3.4",
     "seqeval": "seqeval>=0.0.12",
     "allennlp": "allennlp>=0.8.4",
+    "bertsum": "--editable=git+https://github.com/daden-ms/BertSum.git",
+    "pyrouge": "pyrouge==0.1.3",
+    "multiprocess": "multiprocess==0.70.9",
+    "tensorboardX": "tensorboardX==1.8",
 }
 PIP_GPU = {}
 
