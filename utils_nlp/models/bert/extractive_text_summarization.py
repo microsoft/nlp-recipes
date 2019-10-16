@@ -10,7 +10,7 @@ from bertsum.others.logging import logger, init_logger
 from bertsum.train import model_flags
 from bertsum.models.trainer import build_trainer
 from bertsum.prepro.data_builder import BertData
-
+from bertsum.models.data_loader  import DataIterator,Batch,Dataloader
 from cached_property import cached_property
 import torch
 import random
@@ -59,6 +59,13 @@ def modified_format_to_bert(param):
     return b_data_dict
     gc.collect()
 
+def get_data_iter(dataset,is_test=False, batch_size=3000):
+    args = Bunch({})
+    args.use_interval = True
+    args.batch_size = batch_size
+    test_data_iter = None
+    test_data_iter  = DataIterator(args, dataset, args.batch_size, 'cuda', is_test=is_test, shuffle=False, sort=False)
+    return test_data_iter
 
 class BertSumExtractiveSummarizer:
     """BERT-based Extractive Summarization --BertSum"""
