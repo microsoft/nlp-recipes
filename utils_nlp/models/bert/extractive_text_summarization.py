@@ -1,5 +1,8 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License.
+
 """
-this code is  a modified version of the code in bertsum 
+Wrapper for extractive summarization algorithm based on BERT, i.e. BERTSum. The code in this file reused some code  listed in https://github.com/nlpyang/BertSum/tree/master/src
 """
 
 from pytorch_pretrained_bert import BertConfig
@@ -20,8 +23,10 @@ from multiprocessing import Pool
 
 
 class Bunch(object):
-  def __init__(self, adict):
-    self.__dict__.update(adict)
+    """ Class which convert a dictionary to an object """
+
+    def __init__(self, adict):
+        self.__dict__.update(adict)
 
 default_parameters = {"accum_count": 1, "batch_size": 3000, "beta1": 0.9, "beta2": 0.999, "block_trigram": True, "decay_method": "noam", "dropout": 0.1, "encoder": "baseline", "ff_size": 512, "gpu_ranks": "0123", "heads": 4, "hidden_size": 128, "inter_layers": 2, "lr": 0.002, "max_grad_norm": 0, "max_nsents": 100, "max_src_ntokens": 200, "min_nsents": 3, "min_src_ntokens": 10, "optim": "adam", "oracle_mode": "combination", "param_init": 0.0, "param_init_glorot": True, "recall_eval": False, "report_every": 50, "report_rouge": True, "rnn_size": 512, "save_checkpoint_steps": 500, "seed": 666, "temp_dir": "./temp", "test_all": False, "test_from": "", "train_from": "", "use_interval": True, "visible_gpus": "0", "warmup_steps": 10000, "world_size": 1}
 
@@ -29,6 +34,17 @@ default_preprocessing_parameters = {"max_nsents": 100, "max_src_ntokens": 200, "
 
 
 def bertsum_formatting(n_cpus, bertdata, oracle_mode, jobs, output_file):
+    """
+    Function to preprocess data for BERTSum algorithm.
+
+    Args:
+        n_cpus (int): number of cpus used for preprocessing in parallel
+        bertdata (BertData): object which loads the pretrained BERT tokenizer to preprocess data.
+        oracle_mode (string): name of the algorithm to select sentences in the source as labeled data correposonding to the target.  Options are "combination" and "greedy".
+        jobs (list of dictionaries): list of dictionaries with "src" and "tgt" fields. Both fields should be filled with list of list of tokens/words.
+        output_file (string): name of the file to save the processed data.
+    """
+
     params = []
     for i in jobs:
         params.append((oracle_mode, bertdata, i))
@@ -43,6 +59,17 @@ def bertsum_formatting(n_cpus, bertdata, oracle_mode, jobs, output_file):
     torch.save(filtered_bert_data, output_file)
 
 def modified_format_to_bert(param):
+    """
+    Helper function to preprocess data for BERTSum algorithm.
+
+    Args: 
+        param (Tuple): params are tuple of (string, BertData object, and dictionary). The first string specifies the oracle mode. The last dictionary should contain src" and "tgt" fields withc each filled with list of list of tokens/words.
+
+    Returns:
+        Dictionary: it has "src", "lables", "segs", "clss", "src_txt" and "tgt_txt" field.
+
+    """
+
     oracle_mode, bert, data = param
     #return data
     source, tgt = data['src'], data['tgt']
@@ -60,6 +87,18 @@ def modified_format_to_bert(param):
     gc.collect()
 
 def get_data_iter(dataset,is_test=False, batch_size=3000):
+    """
+    Function to get data iterator over a list of data objects.
+
+    Args:
+        dataset (list of objects): a list of data objects.
+        is_test (bool): it specifies whether the data objects are labeled data.
+        batch_size (int): number of tokens per batch.
+        
+    Returns:
+        DataIterator
+
+    """
     args = Bunch({})
     args.use_interval = True
     args.batch_size = batch_size
@@ -68,26 +107,28 @@ def get_data_iter(dataset,is_test=False, batch_size=3000):
     return test_data_iter
 
 class BertSumExtractiveSummarizer:
-    """BERT-based Extractive Summarization --BertSum"""
+    """ Wrapper class for BERT-based Extractive Summarization, i.e. BertSum"""
+
     def __init__(self, language="english",  
-                  mode = "train",
                   encoder="baseline",
                   model_path = "./models/baseline",
                   log_file = "./logs/baseline",
                   temp_dir = './temp',
                   bert_config_path="./bert_config_uncased_base.json",
-                  device_id=1,
-                  work_size=1,
-                  gpu_ranks="1"
+                  gpu_ranks="0"
                   ):
-        """Initializes the classifier and the underlying pretrained model.
+        """Initializes the wrapper and the underlying pretrained model.
         Args:
             language (Language, optional): The pretrained model's language.
                                            Defaults to Language.ENGLISH.
-            num_labels (int, optional): The number of unique labels in the
-                training data. Defaults to 2.
-            cache_dir (str, optional): Location of BERT's cache directory.
+            encoder (string, optional): the algorithm used for the Summarization layers. 
+                                        Options are: baseline, transformer, rnn, classifier
+            model_path (string, optional): path to save the checkpoints of the model for each training session
+            log_files (string, optional): path to save the running logs for each session.
+            temp_dir (string, optional): Location of BERT's cache directory.
                 Defaults to ".".
+            bert_config_path (string, optional): path of the config file for the BERT model
+            gpu_ranks (string, optional): string with each character the string value of each GPU devices ID that can be used. Defaults to "0".
         """
         def __map_gpu_ranks(gpu_ranks):
             gpu_ranks_list=gpu_ranks.split(',')
@@ -101,7 +142,6 @@ class BertSumExtractiveSummarizer:
         # copy all the arguments from the input argument
         self.args = Bunch(default_parameters)
         self.args.seed = 42
-        self.args.mode = mode
         self.args.encoder = encoder
         self.args.model_path = model_path
         self.args.log_file = log_file
@@ -111,7 +151,6 @@ class BertSumExtractiveSummarizer:
         self.args.gpu_ranks = gpu_ranks
         self.args.gpu_ranks_map = __map_gpu_ranks(self.args.gpu_ranks) 
         self.args.world_size = len(self.args.gpu_ranks_map.keys())
-        print(self.args.gpu_ranks_map)
     
 
         self.has_cuda = self.cuda
@@ -132,6 +171,23 @@ class BertSumExtractiveSummarizer:
     
     def fit(self, device_id, train_file_list, train_steps=5000, train_from='', batch_size=3000, 
                warmup_proportion=0.2, decay_method='noam', lr=0.002,accum_count=2):
+        """
+        Train a summarization model with specified training data files.
+
+        Args:
+            device_id (string): GPU Device ID to be used.
+            train_file_list (string): files used for training a model.
+            train_steps (int, optional): number of times that the model parameters get updated. The number of data items for each model parameters update is the number of data items in a batch times times the accumulation counts (accum_count). Defaults to 5e5.
+            train_from (string, optional): the path of saved checkpoints from which the model starts to train. Defaults to empty string.
+            batch_size (int, options): maximum number of tokens in each batch.
+            warmup_propotion (float, optional): Proportion of training to
+                perform linear learning rate warmup for. E.g., 0.1 = 10% of
+                training. Defaults to 0.2.
+            decay_method (string, optional): learning rate decrease method. Default to 'noam'.
+            lr (float, optional): Learning rate of the Adam optimizer. Defaults to 2e-3.
+            accu_count (int, optional): number of batches waited until an update of the model paraeters happens. Defaults to 2.
+        """
+
 
         if self.args.gpu_ranks_map[device_id] != 0:
             logger.disabled = True
@@ -187,13 +243,19 @@ class BertSumExtractiveSummarizer:
         trainer.train(train_iter_fct, train_steps)
 
     def predict(self, device_id, data_iter, sentence_seperator='', test_from='', cal_lead=False):
-        ## until a fix comes in
-        #if self.args.world_size=1 or len(self.args.gpu_ranks.split(",")==1):
-        #    device_id = 0
-            
+        """
+        Predict the summarization for the input data iterator.
+
+        Args:
+            device_id (string): GPU Device ID to be used.
+            data_iter (DataIterator): data iterator over the dataset to be predicted
+            sentence_seperator (string, optional): strings to be inserted between sentences in the prediction per data item. Defaults to empty string.
+            test_from(string, optional): the path of saved checkpoints used for prediction. 
+            cal_lead (boolean, optional): wheather use the first three sentences as the prediction.
+        """
+    
         device = None
         if device_id >= 0:
-            #torch.cuda.set_device(device_id)
             torch.cuda.manual_seed(self.args.seed)
             device = torch.device("cuda:{}".format(device_id)) 
             
@@ -212,7 +274,7 @@ class BertSumExtractiveSummarizer:
             class WrappedModel(nn.Module):
                 def __init__(self, module):
                     super(WrappedModel, self).__init__()
-                    self.module = module # that I actually define.
+                    self.module = module
                 def forward(self, x):
                     return self.module(x)
             model = WrappedModel(self.model)
@@ -220,7 +282,6 @@ class BertSumExtractiveSummarizer:
             model.load_state_dict(checkpoint['model'])
             self.model = model.module
         else:
-            #model = self.model
             self.model.eval()
         self.model.eval()
 
