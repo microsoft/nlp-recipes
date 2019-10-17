@@ -47,6 +47,9 @@ def notebooks():
         "automl_with_pipelines_deployment_aks": os.path.join(
             folder_notebooks, "sentence_similarity", "automl_with_pipelines_deployment_aks.ipynb"
         ),
+        "question_answering_squad_transformers": os.path.join(
+            folder_notebooks, "question_answering", "question_answering_squad_transformers.ipynb"
+        ),
         "bert_qa_trainer": os.path.join(
             folder_notebooks, "question_answering", "pretrained-BERT-SQuAD-deep-dive-aml.ipynb"
         ),
@@ -184,8 +187,8 @@ def qa_test_df():
                 "What's the color of the sky?",
                 "To whom did the Virgin Mary allegedly appear in 1858 in Lourdes France?",
             ],
-            "answer_start": [24, 515],
-            "answer_text": ["blue", "Saint Bernadette Soubirous"],
+            "answer_start": [[24], [515]],
+            "answer_text": [["blue"], ["Saint Bernadette Soubirous"]],
             "qa_id": ["1", "2"],
             "is_impossible": [False, False],
         }
