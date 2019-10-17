@@ -29,7 +29,6 @@ import torch
 from torch.utils.data import TensorDataset, SequentialSampler, DataLoader
 
 from transformers.tokenization_bert import BasicTokenizer, whitespace_tokenize
-from transformers import XLNetTokenizer
 
 from transformers.modeling_bert import BERT_PRETRAINED_MODEL_ARCHIVE_MAP, BertForQuestionAnswering
 
@@ -99,6 +98,7 @@ class QAProcessor:
         self.tokenizer = TOKENIZER_CLASS[model_name].from_pretrained(
             model_name, do_lower_case=to_lower, cache_dir=cache_dir
         )
+        self.do_lower_case = to_lower
         self.custom_tokenize = custom_tokenize
 
     @property
@@ -152,7 +152,7 @@ class QAProcessor:
         max_question_length=64,
         max_seq_length=MAX_SEQ_LEN,
         doc_stride=128,
-        cache_dir="./cached_qa_features",
+        feature_cache_dir="./cached_qa_features",
     ):
         """
         Preprocesses raw question answering data and generates train/test features.
@@ -172,7 +172,8 @@ class QAProcessor:
             doc_stride (int, optional): Size (number of tokens) of the sliding window when
                 breaking down a long document paragraph in to multiple document spans. Defaults
                 to 128.
-            cache_dir (int, optional): Directory to save some intermediate preprocessing results.
+            feature_cache_dir (int, optional): Directory to save some intermediate preprocessing
+                results.
                 If `is_training` is True, CACHED_EXAMPLES_TRAIN_FILE and
                 CACHED_FEATURES_TRAIN_FILE are saved to this directory. Otherwise,
                 CACHED_EXAMPLES_TEST_FILE and CACHED_FEATURES_TEST_FILE are saved to this
@@ -181,18 +182,18 @@ class QAProcessor:
                 "./cached_qa_features".
         """
 
-        if not os.path.exists(cache_dir):
-            os.makedirs(cache_dir)
+        if not os.path.exists(feature_cache_dir):
+            os.makedirs(feature_cache_dir)
 
         if is_training and not qa_dataset.actual_answer_available:
             raise Exception("answer_start and answer_text must be provided for training data.")
 
         if is_training:
-            examples_file = os.path.join(cache_dir, CACHED_EXAMPLES_TRAIN_FILE)
-            features_file = os.path.join(cache_dir, CACHED_FEATURES_TRAIN_FILE)
+            examples_file = os.path.join(feature_cache_dir, CACHED_EXAMPLES_TRAIN_FILE)
+            features_file = os.path.join(feature_cache_dir, CACHED_FEATURES_TRAIN_FILE)
         else:
-            examples_file = os.path.join(cache_dir, CACHED_EXAMPLES_TEST_FILE)
-            features_file = os.path.join(cache_dir, CACHED_FEATURES_TEST_FILE)
+            examples_file = os.path.join(feature_cache_dir, CACHED_EXAMPLES_TEST_FILE)
+            features_file = os.path.join(feature_cache_dir, CACHED_FEATURES_TEST_FILE)
 
         with jsonlines.open(examples_file, "w") as examples_writer, jsonlines.open(
             features_file, "w"
@@ -276,6 +277,56 @@ class QAProcessor:
             logger.info("QA features are saved to {}".format(features_file))
 
         return qa_dataset
+
+    def postprocess(
+        self,
+        results,
+        examples_file,
+        features_file,
+        unanswerable_exists=False,
+        max_answer_length=30,
+        n_best_size=20,
+        n_top_start=5,
+        n_top_end=5,
+        output_prediction_file="./qa_predictions.json",
+        output_nbest_file="./nbest_predictions.json",
+        output_null_log_odds_file="./null_odds.json",
+        null_score_diff_threshold=0.0,
+        verbose_logging=False,
+    ):
+
+        if self.model_type == "xlnet":
+            postprocess_xlnet_answer(
+                results=results,
+                examples_file=examples_file,
+                features_file=features_file,
+                do_lower_case=self.do_lower_case,
+                tokenizer=self.tokenizer,
+                n_best_size=n_best_size,
+                n_top_start=n_top_start,
+                n_top_end=n_top_end,
+                max_answer_length=max_answer_length,
+                unanswerable_exists=unanswerable_exists,
+                output_prediction_file=output_prediction_file,
+                output_nbest_file=output_nbest_file,
+                output_null_log_odds_file=output_null_log_odds_file,
+                verbose_logging=verbose_logging,
+            )
+        else:
+            postprocess_bert_answer(
+                results=results,
+                examples_file=examples_file,
+                features_file=features_file,
+                do_lower_case=self.do_lower_case,
+                n_best_size=n_best_size,
+                max_answer_length=max_answer_length,
+                unanswerable_exists=unanswerable_exists,
+                output_prediction_file=output_prediction_file,
+                output_nbest_file=output_nbest_file,
+                output_null_log_odds_file=output_null_log_odds_file,
+                null_score_diff_threshold=null_score_diff_threshold,
+                verbose_logging=verbose_logging,
+            )
 
 
 QAResult_ = collections.namedtuple("QAResult", ["unique_id", "start_logits", "end_logits"])
@@ -810,9 +861,11 @@ def postprocess_xlnet_answer(
     results,
     examples_file,
     features_file,
-    model_name,
     do_lower_case,
-    n_best_size=5,
+    tokenizer,
+    n_best_size=20,
+    n_top_start=5,
+    n_top_end=5,
     max_answer_length=30,
     unanswerable_exists=False,
     output_prediction_file="./qa_predictions.json",
@@ -841,8 +894,6 @@ def postprocess_xlnet_answer(
 
     with jsonlines.open(features_file) as reader:
         features_all = list(reader.iter())
-
-    tokenizer = XLNetTokenizer.from_pretrained(model_name, do_lower_case=do_lower_case)
 
     qa_id_to_features = collections.defaultdict(list)
     # Map unique features to the original doc-question-answer triplet
@@ -875,12 +926,12 @@ def postprocess_xlnet_answer(
             # if we could have irrelevant answers, get the min score of irrelevant
             score_null = min(score_null, cur_null_score)
 
-            for i in range(n_best_size):
-                for j in range(n_best_size):
+            for i in range(n_top_start):
+                for j in range(n_top_end):
                     start_log_prob = result.start_top_log_probs[i]
                     start_index = result.start_top_index[i]
 
-                    j_index = i * n_best_size + j
+                    j_index = i * n_top_end + j
 
                     end_log_prob = result.end_top_log_probs[j_index]
                     end_index = result.end_top_index[j_index]
