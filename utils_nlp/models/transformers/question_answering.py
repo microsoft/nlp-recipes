@@ -296,7 +296,7 @@ class QAProcessor:
     ):
 
         if self.model_type == "xlnet":
-            postprocess_xlnet_answer(
+            final_answers, answer_probs, nbest_answers = postprocess_xlnet_answer(
                 results=results,
                 examples_file=examples_file,
                 features_file=features_file,
@@ -313,7 +313,7 @@ class QAProcessor:
                 verbose_logging=verbose_logging,
             )
         else:
-            postprocess_bert_answer(
+            final_answers, answer_probs, nbest_answers = postprocess_bert_answer(
                 results=results,
                 examples_file=examples_file,
                 features_file=features_file,
@@ -327,7 +327,7 @@ class QAProcessor:
                 null_score_diff_threshold=null_score_diff_threshold,
                 verbose_logging=verbose_logging,
             )
-
+        return final_answers, answer_probs, nbest_answers
 
 QAResult_ = collections.namedtuple("QAResult", ["unique_id", "start_logits", "end_logits"])
 
