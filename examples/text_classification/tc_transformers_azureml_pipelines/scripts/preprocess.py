@@ -14,6 +14,8 @@ label_col = sys.argv[5]
 model_name = sys.argv[6]
 max_len = 150
 cache_dir = "."
+dataset_suffix = "_ds"
+label_encoder_suffix = "_le"
 
 
 if output_dir is not None:
@@ -32,9 +34,9 @@ processor = Processor(model_name=model_name, cache_dir=cache_dir)
 ds = processor.preprocess(df[text_col], labels, max_len=max_len)
 
 # write preprocessed dataset
-output_data_file = model_name + "_ds"
+output_data_file = model_name + dataset_suffix
 pickle.dump(ds, open(os.path.join(output_dir, output_data_file), "wb"))
 
 # write label encoder
-label_encoder_file = model_name + "_le"
+label_encoder_file = model_name + label_encoder_suffix
 pickle.dump(label_encoder, open(os.path.join(output_dir, label_encoder_file), "wb"))
