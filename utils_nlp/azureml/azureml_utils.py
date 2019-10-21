@@ -49,12 +49,12 @@ def get_or_create_workspace(
     Returns:
         obj: AzureML workspace if one exists already with the name otherwise creates a new one.
     """
+    config_file_path = "."
 
-    config_dir, config_file_name = os.path.split(config_path)
-    config_file_path = None
-
-    if config_file_name != "config.json":
-        config_file_path = os.path.join(config_path, "config.json")
+    if config_path is not None:
+        config_dir, config_file_name = os.path.split(config_path)
+        if config_file_name != "config.json":
+            config_file_path = os.path.join(config_path, "config.json")
 
     try:
         # get existing azure ml workspace

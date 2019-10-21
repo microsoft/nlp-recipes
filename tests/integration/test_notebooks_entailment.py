@@ -30,22 +30,23 @@ def test_entailment_multinli_bert(notebooks, tmp):
 
 @pytest.mark.integration
 @pytest.mark.azureml
-def test_entailment_bert_azureml(notebooks,
-                                 subscription_id,
-                                 resource_group,
-                                 workspace_name,
-                                 workspace_region,
-                                 cluster_name):
-    notebook_path = notebooks["entailment_bert_azureml"]
-    pm.execute_notebook(notebook_path,
-                        OUTPUT_NOTEBOOK,
-                        parameters={'DATA_PERCENT_USED': 0.0025,
-                                    "subscription_id": subscription_id,
-                                    "resource_group": resource_group,
-                                    "workspace_name": workspace_name,
-                                    "workspace_region": workspace_region,
-                                    "cluster_name": cluster_name},
-                        kernel_name=KERNEL_NAME,)
+def test_entailment_xnli_bert_azureml(
+    notebooks, subscription_id, resource_group, workspace_name, workspace_region, cluster_name
+):
+    notebook_path = notebooks["entailment_xnli_bert_azureml"]
+    pm.execute_notebook(
+        notebook_path,
+        OUTPUT_NOTEBOOK,
+        parameters={
+            "DATA_PERCENT_USED": 0.0025,
+            "subscription_id": subscription_id,
+            "resource_group": resource_group,
+            "workspace_name": workspace_name,
+            "workspace_region": workspace_region,
+            "cluster_name": cluster_name,
+        },
+        kernel_name=KERNEL_NAME,
+    )
 
     with open("outputs/results.json", "r") as handle:
         result_dict = json.load(handle)
