@@ -12,7 +12,7 @@ from bertsum.models import  model_builder, data_loader
 from bertsum.others.logging import logger, init_logger
 from bertsum.train import model_flags
 from bertsum.models.trainer import build_trainer
-from bertsum.prepro.data_builder import BertData
+from bertsum.prepro.data_builder import TransformerData
 from bertsum.models.data_loader  import DataIterator,Batch,Dataloader
 from cached_property import cached_property
 import torch
@@ -169,7 +169,7 @@ class BertSumExtractiveSummarizer:
         return self.has_cuda
         
     
-    def fit(self, device_id, train_file_list, train_steps=5000, train_from='', batch_size=3000, 
+    def fit(self, device_id, train_file_list, model_class, pretrained_model_name, pretrained_config=None, train_steps=5000, train_from='', batch_size=3000, 
                warmup_proportion=0.2, decay_method='noam', lr=0.002,accum_count=2):
         """
         Train a summarization model with specified training data files.
@@ -208,11 +208,12 @@ class BertSumExtractiveSummarizer:
         self.args.accum_count= accum_count
         print(self.args.__dict__)
         
-        self.model = Summarizer(self.args, device, load_pretrained_bert=True)
+        self.model = Summarizer(self.args, device, model_class, pretrained_model_name, pretrained_config)
         from torch.nn.parallel import DataParallel as DP
         self.model.to(device)
         self.model = DP(self.model, device_ids=[device]) 
-  
+        
+        self.model.train()
     
         if train_from != '':
             checkpoint = torch.load(train_from,
@@ -242,7 +243,7 @@ class BertSumExtractiveSummarizer:
         trainer = build_trainer(self.args, device_id, self.model, optim)
         trainer.train(train_iter_fct, train_steps)
 
-    def predict(self, device_id, data_iter, sentence_seperator='', test_from='', cal_lead=False):
+    def predict(self, device_id, data_iter, model_class, pretrained_model_name, pretrained_config=None, sentence_seperator='', test_from='', cal_lead=False):
         """
         Predict the summarization for the input data iterator.
 
@@ -269,7 +270,7 @@ class BertSumExtractiveSummarizer:
                     setattr(self.args, k, opt[k])
                     
             config = BertConfig.from_json_file(self.args.bert_config_path)
-            self.model = Summarizer(self.args, device, load_pretrained_bert=False, bert_config=config)
+            self.model = Summarizer(self.args, device, model_class, pretrained_model_name, pretrained_config)
             from torch import nn
             class WrappedModel(nn.Module):
                 def __init__(self, module):
