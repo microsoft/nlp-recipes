@@ -187,8 +187,15 @@ def qa_test_df():
                 "What's the color of the sky?",
                 "To whom did the Virgin Mary allegedly appear in 1858 in Lourdes France?",
             ],
-            "answer_start": [[24], [515]],
-            "answer_text": [["blue"], ["Saint Bernadette Soubirous"]],
+            "answer_start": [24, 515],
+            "answer_text": ["blue", "Saint Bernadette Soubirous"],
+            "answer_start_list": [[24], [515]],
+            "answer_text_list": [["blue"], ["Saint Bernadette Soubirous"]],
+            "answer_start_multi": [[24, 25], [515, 516]],
+            "answer_text_multi": [
+                ["blue", "grey"],
+                ["Saint Bernadette Soubirous", "Bernadette Soubirous"],
+            ],
             "qa_id": ["1", "2"],
             "is_impossible": [False, False],
         }
@@ -200,6 +207,10 @@ def qa_test_df():
         "question_text_col": "question_text",
         "answer_start_col": "answer_start",
         "answer_text_col": "answer_text",
+        "answer_start_list_col": "answer_start_list",
+        "answer_text_list_col": "answer_text_list",
+        "answer_start_multi_col": "answer_start_multi",
+        "answer_text_multi_col": "answer_text_multi",
         "qa_id_col": "qa_id",
         "is_impossible_col": "is_impossible",
     }

@@ -89,6 +89,9 @@ def get_raw_scores(qa_ids, actuals, preds):
             continue
         a_pred = preds[qid]
         # Take max over all gold answers
+        if isinstance(gold_answers, str):
+            gold_answers = [gold_answers]
+
         exact_scores[qid] = max(_compute_exact(a, a_pred) for a in gold_answers)
         f1_scores[qid] = max(_compute_f1(a, a_pred) for a in gold_answers)
     return exact_scores, f1_scores

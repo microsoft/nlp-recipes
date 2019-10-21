@@ -7,8 +7,6 @@ from utils_nlp.dataset.pytorch import QADataset
 from utils_nlp.models.transformers.question_answering import (
     QAProcessor,
     AnswerExtractor,
-    postprocess_xlnet_answer,
-    postprocess_bert_answer,
     CACHED_EXAMPLES_TEST_FILE,
     CACHED_FEATURES_TEST_FILE,
 )
@@ -23,6 +21,33 @@ def qa_test_data(qa_test_df, tmp):
         question_text_col=qa_test_df["question_text_col"],
         answer_start_col=qa_test_df["answer_start_col"],
         answer_text_col=qa_test_df["answer_text_col"],
+        qa_id_col=qa_test_df["qa_id_col"],
+    )
+
+    train_dataset_list = QADataset(
+        df=qa_test_df["test_df"],
+        doc_text_col=qa_test_df["doc_text_col"],
+        question_text_col=qa_test_df["question_text_col"],
+        answer_start_col=qa_test_df["answer_start_list_col"],
+        answer_text_col=qa_test_df["answer_text_list_col"],
+        qa_id_col=qa_test_df["qa_id_col"],
+    )
+
+    train_dataset_start_text_mismatch = QADataset(
+        df=qa_test_df["test_df"],
+        doc_text_col=qa_test_df["doc_text_col"],
+        question_text_col=qa_test_df["question_text_col"],
+        answer_start_col=qa_test_df["answer_start_list_col"],
+        answer_text_col=qa_test_df["answer_text_col"],
+        qa_id_col=qa_test_df["qa_id_col"],
+    )
+
+    train_dataset_multi_answers = QADataset(
+        df=qa_test_df["test_df"],
+        doc_text_col=qa_test_df["doc_text_col"],
+        question_text_col=qa_test_df["question_text_col"],
+        answer_start_col=qa_test_df["answer_start_multi_col"],
+        answer_text_col=qa_test_df["answer_text_multi_col"],
         qa_id_col=qa_test_df["qa_id_col"],
     )
 
@@ -92,6 +117,9 @@ def qa_test_data(qa_test_df, tmp):
 
     return {
         "train_dataset": train_dataset,
+        "train_dataset_list": train_dataset_list,
+        "train_dataset_start_text_mismatch": train_dataset_start_text_mismatch,
+        "train_dataset_multi_answers": train_dataset_multi_answers,
         "test_dataset": test_dataset,
         "train_features_bert": train_features_bert,
         "test_features_bert": test_features_bert,
@@ -106,15 +134,24 @@ def test_QAProcessor(qa_test_data, tmp):
     for model_name in ["bert-base-cased", "xlnet-base-cased", "distilbert-base-uncased"]:
         qa_processor = QAProcessor(model_name=model_name)
         qa_processor.preprocess(qa_test_data["train_dataset"], is_training=True)
+        qa_processor.preprocess(qa_test_data["train_dataset_list"], is_training=True)
         qa_processor.preprocess(qa_test_data["test_dataset"], is_training=False)
 
-    # test unsupproted model type
+    # test unsupported model type
     with pytest.raises(ValueError):
         qa_processor = QAProcessor(model_name="abc")
 
     # test training data has no ground truth exception
     with pytest.raises(Exception):
         qa_processor.preprocess(qa_test_data["test_dataset"], is_training=True)
+
+    # test when answer start is a list, but answer text is not
+    with pytest.raises(Exception):
+        qa_processor.preprocess(qa_test_data["train_dataset_start_text_mismatch"], is_training=True)
+
+    # test when training data has multiple answers
+    with pytest.raises(Exception):
+        qa_processor.preprocess(qa_test_data["train_dataset_multi_answers"], is_training=True)
 
 
 def test_AnswerExtractor(qa_test_data, tmp):
@@ -129,9 +166,7 @@ def test_AnswerExtractor(qa_test_data, tmp):
     assert os.path.exists(os.path.join(model_output_dir, "pytorch_model.bin"))
     assert os.path.exists(os.path.join(model_output_dir, "config.json"))
 
-    qa_extractor_from_cache = AnswerExtractor(
-        cache_dir=tmp, load_model_from_dir=model_output_dir
-    )
+    qa_extractor_from_cache = AnswerExtractor(cache_dir=tmp, load_model_from_dir=model_output_dir)
     qa_extractor_from_cache.predict(qa_test_data["test_features_bert"])
 
     qa_extractor_xlnet = AnswerExtractor(model_name="xlnet-base-cased", cache_dir=tmp)
@@ -140,9 +175,7 @@ def test_AnswerExtractor(qa_test_data, tmp):
     )
     qa_extractor_xlnet.predict(qa_test_data["test_features_xlnet"])
 
-    qa_extractor_distilbert = AnswerExtractor(
-        model_name="distilbert-base-uncased", cache_dir=tmp
-    )
+    qa_extractor_distilbert = AnswerExtractor(model_name="distilbert-base-uncased", cache_dir=tmp)
     qa_extractor_distilbert.fit(
         qa_test_data["train_features_distilbert"], cache_model=False, per_gpu_batch_size=8
     )
