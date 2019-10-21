@@ -49,6 +49,7 @@ def notebooks():
         ),
         "question_answering_squad_transformers": os.path.join(
             folder_notebooks, "question_answering", "question_answering_squad_transformers.ipynb"
+        ),
         "bert_senteval": os.path.join(
             folder_notebooks, "sentence_similarity", "bert_senteval.ipynb"
         ),
