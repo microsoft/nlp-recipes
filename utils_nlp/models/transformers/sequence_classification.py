@@ -135,7 +135,7 @@ class SequenceClassifier(Transformer):
             seed=seed,
         )
 
-    def predict(self, eval_dataset, device, batch_size=16, num_gpus=1, verbose=True):
+    def predict(self, eval_dataset, device="cuda", batch_size=16, num_gpus=1, verbose=True):
         preds = list(
             super().predict(
                 eval_dataset=eval_dataset,
