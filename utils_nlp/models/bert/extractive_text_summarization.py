@@ -177,6 +177,7 @@ class BertSumExtractiveSummarizer:
         temp_dir="./temp",
         bert_config_path="./bert_config_uncased_base.json",
         gpu_ranks="0",
+        seed=42,
     ):
         """Initializes the wrapper and the underlying pretrained model.
         Args:
@@ -202,7 +203,7 @@ class BertSumExtractiveSummarizer:
 
         # copy all the arguments from the input argument
         self.args = Bunch(default_parameters)
-        self.args.seed = 42
+        self.args.seed = seed
         self.args.encoder = encoder
         self.args.model_path = model_path
         self.args.log_file = log_file
