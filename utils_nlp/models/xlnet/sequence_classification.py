@@ -1,3 +1,7 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License.
+
+"""Utilities for Xlnet Sequence Classification"""
 import numpy as np
 from collections import namedtuple
 import torch
@@ -6,19 +10,16 @@ from pytorch_transformers import (
     XLNetConfig,
     XLNetForSequenceClassification,
     AdamW,
-    WarmupLinearSchedule
+    WarmupLinearSchedule,
 )
 from tqdm import tqdm
-from torch.utils.data import (
-    DataLoader,
-    RandomSampler,
-    TensorDataset,
-)
+from torch.utils.data import DataLoader, RandomSampler, TensorDataset
 from utils_nlp.common.pytorch_utils import get_device, move_to_device
 from utils_nlp.models.xlnet.common import Language
 import mlflow
 import mlflow.pytorch
 import os
+
 
 class XLNetSequenceClassifier:
     """XLNet-based sequence classifier"""
@@ -161,15 +162,11 @@ class XLNetSequenceClassifier:
         ]
 
         val_sampler = RandomSampler(val_dataset)
-        
-        val_dataloader = DataLoader(
-            val_dataset,
-            sampler=val_sampler,
-            batch_size=self.batch_size
-        )
+
+        val_dataloader = DataLoader(val_dataset, sampler=val_sampler, batch_size=self.batch_size)
 
         num_examples = len(token_ids)
-        num_batches = int(np.ceil(num_examples/self.batch_size))
+        num_batches = int(np.ceil(num_examples / self.batch_size))
         num_train_optimization_steps = num_batches * self.num_epochs
 
         optimizer = AdamW(optimizer_grouped_parameters, lr=self.lr, eps=self.adam_eps)
@@ -243,8 +240,7 @@ class XLNetSequenceClassifier:
                     val_loss = 0.0
                     for j, val_batch in enumerate(val_dataloader):
                         if token_type_ids:
-                            val_x_batch, val_mask_batch, val_token_type_ids_batch, \
-                            val_y_batch = tuple(
+                            val_x_batch, val_mask_batch, val_token_type_ids_batch, val_y_batch = tuple(
                                 t.to(device) for t in val_batch
                             )
                         else:
@@ -278,7 +274,7 @@ class XLNetSequenceClassifier:
                                     num_batches,
                                     tr_loss / (i + 1),
                                     val_loss / (j + 1),
-                                ),
+                                )
                             )
                         else:
                             print(

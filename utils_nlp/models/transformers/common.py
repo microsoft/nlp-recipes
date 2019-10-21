@@ -4,9 +4,10 @@
 # This script reuses some code from
 # https://github.com/huggingface/pytorch-transformers/blob/master/examples/run_glue.py
 
+import logging
 import os
 import random
-import logging
+
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
@@ -201,7 +202,7 @@ class Transformer:
                 if gradient_accumulation_steps > 1:
                     loss = loss / gradient_accumulation_steps
 
-                if step % 10 == 0:
+                if step % 10 == 0 and verbose:
                     tqdm.write("Loss:{:.6f}".format(loss / train_batch_size))
 
                 if fp16:

@@ -85,13 +85,7 @@ def test_tc_bbc_bert_hi(notebooks, tmp):
 @pytest.mark.azureml
 @pytest.mark.gpu
 def test_tc_bert_azureml(
-    notebooks,
-    subscription_id,
-    resource_group,
-    workspace_name,
-    workspace_region,
-    cluster_name,
-    tmp,
+    notebooks, subscription_id, resource_group, workspace_name, workspace_region, tmp
 ):
     notebook_path = notebooks["tc_bert_azureml"]
 
@@ -99,16 +93,16 @@ def test_tc_bert_azureml(
     test_folder = os.path.join(tmp, "test")
 
     parameters = {
-        "config_path": "tests/ci",
+        "config_path": None,
         "subscription_id": subscription_id,
         "resource_group": resource_group,
         "workspace_name": workspace_name,
         "workspace_region": workspace_region,
-        "cluster_name": cluster_name,
+        "cluster_name": "tc-bert-cluster",
         "DATA_FOLDER": tmp,
         "TRAIN_FOLDER": train_folder,
         "TEST_FOLDER": test_folder,
-        "PROJECT_FOLDER": "./",
+        "PROJECT_FOLDER": ".",
         "NUM_PARTITIONS": 1,
         "NODE_COUNT": 1,
     }
@@ -119,9 +113,7 @@ def test_tc_bert_azureml(
 
     with open("outputs/results.json", "r") as handle:
         result_dict = json.load(handle)
-        assert result_dict["weighted avg"]["f1-score"] == pytest.approx(
-            0.85, abs=ABS_TOL
-        )
+        assert result_dict["weighted avg"]["f1-score"] == pytest.approx(0.85, abs=ABS_TOL)
 
     if os.path.exists("outputs"):
         shutil.rmtree("outputs")

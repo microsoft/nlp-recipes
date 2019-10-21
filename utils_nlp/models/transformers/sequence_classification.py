@@ -124,6 +124,7 @@ class SequenceClassifier(Transformer):
             train_dataset=train_dataset,
             get_inputs=Processor.get_inputs,
             device=device,
+            per_gpu_train_batch_size=batch_size,
             n_gpu=num_gpus,
             num_train_epochs=num_epochs,
             weight_decay=weight_decay,
@@ -134,7 +135,7 @@ class SequenceClassifier(Transformer):
             seed=seed,
         )
 
-    def predict(self, eval_dataset, device, batch_size=16, num_gpus=1, verbose=True):
+    def predict(self, eval_dataset, device="cuda", batch_size=16, num_gpus=1, verbose=True):
         preds = list(
             super().predict(
                 eval_dataset=eval_dataset,

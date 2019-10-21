@@ -15,15 +15,11 @@ def calculate_regularization(sampled_x, Phi, reduced_axes=None, device=None):
     """ Calculate the variance that is used for Interpreter
 
     Args:
-        sample_x (list of torch.FloatTensor):
+        sampled_x (list of torch.FloatTensor):
             A list of sampled input embeddings $x$, each $x$ is of shape
             ``[length, dimension]``. All the $x$s can have different length,
             but should have the same dimension. Sampled number should be
             higher to get a good estimation.
-        Phi (function):
-            The $Phi$ we studied. A function whose input is x (element in
-            the first parameter) and returns a hidden state (of type
-            ``torch.FloatTensor``, of any shape)
         reduced_axes (list of ints, Optional):
             The axes that is variable in Phi (e.g., the sentence length axis).
             We will reduce these axes by mean along them.

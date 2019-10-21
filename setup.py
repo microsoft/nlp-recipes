@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License.
+
 #!/usr/bin/env python
 # -*- encoding: utf-8 -*-
 from __future__ import absolute_import
@@ -58,9 +61,9 @@ setup(
     },
     keywords=["Microsoft NLP", "Natural Language Processing", "Text Processing", "Word Embedding"],
     python_requires=">=3.6",
-    install_requires=["setuptools_scm>=3.2.0"],
+    install_requires=[],
     dependency_links=[],
     extras_require={},
-    use_scm_version={"root": ".", "relative_to": __file__},
-    setup_requires=["setuptools_scm"],
+    use_scm_version=False,
+    setup_requires=[],
 )
