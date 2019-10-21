@@ -40,11 +40,13 @@ CONDA_BASE = {
     "numpy": "numpy>=1.13.3",
     "pandas": "pandas>=0.24.2",
     "pytest": "pytest>=3.6.4",
+    "pytorch": "pytorch-cpu>=1.0.0",
     "scipy": "scipy>=1.0.0",
     "tensorflow": "tensorflow==1.12.0",
     "h5py": "h5py>=2.8.0",
     "tensorflow-hub": "tensorflow-hub==0.5.0",
     "py-xgboost": "py-xgboost<=0.80",
+    "dask": "dask[dataframe]==1.2.2",
 }
 CONDA_GPU = {
     "numba": "numba>=0.38.1",
@@ -54,19 +56,26 @@ CONDA_GPU = {
 }
 
 PIP_BASE = {
+    "allennlp": "allennlp==0.8.4",
     "azureml-sdk": "azureml-sdk[automl,notebooks,contrib]==1.0.57",
     "azureml-train-automl": "azureml-train-automl==1.0.57",
+    "azureml-dataprep": "azureml-dataprep==1.1.8",
     "azureml-widgets": "azureml-widgets==1.0.57",
+    "azureml-mlflow": "azureml-mlflow>=1.0.43.1",
     "black": "black>=18.6b4",
     "cached-property": "cached-property==1.5.1",
     "papermill": "papermill>=1.0.1",
     "nteract-scrapbook": "nteract-scrapbook>=0.2.1",
     "pydocumentdb": "pydocumentdb>=2.3.3",
+    "pytorch-pretrained-bert": "pytorch-pretrained-bert>=0.6",
+    "pytorch-transformers": "pytorch-transformers>=1.2.0",
     "tqdm": "tqdm==4.31.1",
     "pyemd": "pyemd==0.5.1",
     "ipywebrtc": "ipywebrtc==0.4.3",
     "pre-commit": "pre-commit>=1.14.4",
     "scikit-learn": "scikit-learn>=0.19.0,<=0.20.3",
+    "seaborn": "seaborn>=0.9.0",
+    "sklearn-crfsuite": "sklearn-crfsuite>=0.3.6",
     "spacy": "spacy>=2.1.4",
     "spacy-models": (
         "https://github.com/explosion/spacy-models/releases/download/"
@@ -74,6 +83,7 @@ PIP_BASE = {
     ),
     "gensim": "gensim>=3.7.0",
     "nltk": "nltk>=3.4",
+    "seqeval": "seqeval>=0.0.12",
 }
 PIP_GPU = {}
 
