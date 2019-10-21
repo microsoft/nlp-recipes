@@ -33,20 +33,9 @@ def baseline_results():
     }
 
 
-@pytest.mark.integration
-def test_similarity_embeddings_baseline_runs(notebooks, baseline_results):
-    notebook_path = notebooks["similarity_embeddings_baseline"]
-    pm.execute_notebook(notebook_path, OUTPUT_NOTEBOOK, kernel_name=KERNEL_NAME)
-    results = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict["results"]
-    for key, value in baseline_results.items():
-        assert results[key] == pytest.approx(value, abs=ABS_TOL)
-
-
 @pytest.mark.gpu
 @pytest.mark.integration
-@pytest.mark.skip(
-    reason="push for release, no horovod installation automation or documentation yet"
-)
+@pytest.mark.skip(reason="push for release, no horovod installation automation or documentation yet")
 def test_gensen_local(notebooks):
     notebook_path = notebooks["gensen_local"]
     pm.execute_notebook(
@@ -105,10 +94,6 @@ def test_bert_senteval(
             MAX_NODES=1,
         ),
     )
-    pearson = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict["pearson"]
-    mse = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict["mse"]
-    assert pearson == pytest.approx(0.6, abs=ABS_TOL)
-    assert mse < 1.8
 
 
 @pytest.mark.integration
@@ -124,17 +109,18 @@ def test_similarity_embeddings_baseline_runs(notebooks, baseline_results):
 @pytest.mark.usefixtures("teardown_service")
 @pytest.mark.integration
 @pytest.mark.azureml
-def test_automl_local_deployment_aci(
+def test_automl_local_runs(
     notebooks, subscription_id, resource_group, workspace_name, workspace_region
 ):
-    notebook_path = notebooks["automl_local_deployment_aci"]
+    notebook_path = notebooks["similarity_automl_local"]
+
     pm.execute_notebook(
         notebook_path,
         OUTPUT_NOTEBOOK,
         parameters={
-            "automl_iterations": 1,
+            "automl_iterations": 2,
             "automl_iteration_timeout": 7,
-            "config_path": None,
+            "config_path": "tests/ci",
             "webservice_name": "aci-test-service",
             "subscription_id": subscription_id,
             "resource_group": resource_group,
@@ -148,11 +134,9 @@ def test_automl_local_deployment_aci(
 
 @pytest.mark.integration
 @pytest.mark.azureml
-@pytest.mark.skip(
-    reason="push for release, no horovod installation automation or documentation yet"
-)
-def test_gensen_aml_deep_dive(notebooks):
-    notebook_path = notebooks["gensen_aml_deep_dive"]
+@pytest.mark.skip(reason="push for release, no horovod installation automation or documentation yet")
+def test_similarity_gensen_azureml_runs(notebooks):
+    notebook_path = notebooks["gensen_azureml"]
     pm.execute_notebook(
         notebook_path,
         OUTPUT_NOTEBOOK,

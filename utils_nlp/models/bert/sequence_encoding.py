@@ -161,7 +161,8 @@ class BERTSentenceEncoder:
         
         Args:
             df: pd.DataFrame with columns text_index (int), token (str), layer_index (int), values (list[float])
-
+            pooling_strategy: The pooling strategy to use
+        
         Returns:
             pd.DataFrame grouped by text index and layer index
         """

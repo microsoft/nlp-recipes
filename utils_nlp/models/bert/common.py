@@ -10,7 +10,7 @@ import csv
 import linecache
 import subprocess
 import warnings
-from collections.abc import Iterable
+from collections import Iterable
 from enum import Enum
 
 import torch
