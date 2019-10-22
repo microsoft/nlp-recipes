@@ -4,9 +4,28 @@
 import pytest
 import papermill as pm
 import scrapbook as sb
-from tests.notebooks_common import OUTPUT_NOTEBOOK
+from tests.notebooks_common import OUTPUT_NOTEBOOK, KERNEL_NAME
 
 ABS_TOL = 0.2
+
+@pytest.mark.gpu
+@pytest.mark.integration
+def test_question_answering_squad_transformers(notebooks, tmp):
+    notebook_path = notebooks["question_answering_squad_transformers"]
+    pm.execute_notebook(
+        notebook_path,
+        OUTPUT_NOTEBOOK,
+        parameters={
+            "TRAIN_DATA_USED_PERCENT": 0.001,
+            "DEV_DATA_USED_PERCENT": 0.01,
+            "NUM_EPOCHS": 1,
+            "MAX_SEQ_LENGTH": 128,
+            "DOC_STRIDE": 64,
+            "PER_GPU_BATCH_SIZE": 1,
+            "CACHE_DIR": tmp
+        },
+        kernel_name=KERNEL_NAME,
+    )
 
 
 @pytest.mark.integration

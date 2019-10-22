@@ -10,6 +10,7 @@
 # automatically gets discovered by pytest."
 
 import os
+import pandas as pd
 from tempfile import TemporaryDirectory
 
 import pytest
@@ -45,6 +46,9 @@ def notebooks():
         ),
         "automl_with_pipelines_deployment_aks": os.path.join(
             folder_notebooks, "sentence_similarity", "automl_with_pipelines_deployment_aks.ipynb"
+        ),
+        "question_answering_squad_transformers": os.path.join(
+            folder_notebooks, "question_answering", "question_answering_squad_transformers.ipynb"
         ),
         "bert_senteval": os.path.join(
             folder_notebooks, "sentence_similarity", "bert_senteval.ipynb"
@@ -160,6 +164,55 @@ def ner_test_data():
         ],
         "EXPECTED_TRAILING_TOKEN_MASK": TRAILING_TOKEN_MASK,
         "EXPECTED_LABEL_IDS": INPUT_LABEL_IDS,
+    }
+
+
+@pytest.fixture(scope="module")
+def qa_test_df():
+    test_df = pd.DataFrame(
+        {
+            "doc_text": [
+                "The color of the sky is blue.",
+                "Architecturally, the school has a Catholic character. Atop the Main Building's "
+                "gold dome is a golden statue of the Virgin Mary. Immediately in front of the Main "
+                "Building and facing it, is a copper statue of Christ with arms upraised with the "
+                'legend "Venite Ad Me Omnes". Next to the Main Building is the Basilica of the '
+                "Sacred Heart. Immediately behind the basilica is the Grotto, a Marian place of "
+                "prayer and reflection. It is a replica of the grotto at Lourdes, France where "
+                "the Virgin Mary reputedly appeared to Saint Bernadette Soubirous in 1858. At "
+                "the end of the main drive (and in a direct line that connects through 3 statues "
+                "and the Gold Dome), is a simple, modern stone statue of Mary.",
+            ],
+            "question_text": [
+                "What's the color of the sky?",
+                "To whom did the Virgin Mary allegedly appear in 1858 in Lourdes France?",
+            ],
+            "answer_start": [24, 515],
+            "answer_text": ["blue", "Saint Bernadette Soubirous"],
+            "answer_start_list": [[24], [515]],
+            "answer_text_list": [["blue"], ["Saint Bernadette Soubirous"]],
+            "answer_start_multi": [[24, 25], [515, 516]],
+            "answer_text_multi": [
+                ["blue", "grey"],
+                ["Saint Bernadette Soubirous", "Bernadette Soubirous"],
+            ],
+            "qa_id": ["1", "2"],
+            "is_impossible": [False, False],
+        }
+    )
+
+    return {
+        "test_df": test_df,
+        "doc_text_col": "doc_text",
+        "question_text_col": "question_text",
+        "answer_start_col": "answer_start",
+        "answer_text_col": "answer_text",
+        "answer_start_list_col": "answer_start_list",
+        "answer_text_list_col": "answer_text_list",
+        "answer_start_multi_col": "answer_start_multi",
+        "answer_text_multi_col": "answer_text_multi",
+        "qa_id_col": "qa_id",
+        "is_impossible_col": "is_impossible",
     }
 
 

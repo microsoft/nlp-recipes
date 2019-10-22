@@ -13,7 +13,7 @@ ABS_TOL = 0.1
 
 @pytest.mark.gpu
 @pytest.mark.integration
-def test_entailment_multinli_bert(notebooks):
+def test_entailment_multinli_bert(notebooks, tmp):
     notebook_path = notebooks["entailment_multinli_bert"]
     pm.execute_notebook(
         notebook_path,
@@ -22,6 +22,7 @@ def test_entailment_multinli_bert(notebooks):
             "TRAIN_DATA_USED_PERCENT": 0.001,
             "DEV_DATA_USED_PERCENT": 0.01,
             "NUM_EPOCHS": 1,
+            "CACHE_DIR": tmp
         },
         kernel_name=KERNEL_NAME,
     )

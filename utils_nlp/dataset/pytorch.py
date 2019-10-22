@@ -30,6 +30,16 @@ class SCDataSet(Dataset):
         return self.df.shape[0]
 
 
+# QAInput is a data structure representing an unique document-question-answer triplet.
+# Args:
+#    doc_text (str): Input document text.
+#    question_text(str): Input question text.
+#    qa_id (int or str): An unique id identifying a document-question-answer sample.
+#    is_impossible (bool): If the question is impossible to answer based on the input document.
+#    answer_start (int or list): Index of the answer start word in doc_text. For testing data,
+#        this can be a list of integers for multiple ground truth answers.
+#    answer_text (str or list): Text of the answer. For testing data, this can be a list of strings
+#        for multiple ground truth answers.
 QAInput = collections.namedtuple(
     "QAInput",
     ["doc_text", "question_text", "qa_id", "is_impossible", "answer_start", "answer_text"],
@@ -43,11 +53,32 @@ class QADataset(Dataset):
         doc_text_col,
         question_text_col,
         qa_id_col=None,
-        is_impossible_col=None,
         answer_start_col=None,
         answer_text_col=None,
+        is_impossible_col=None,
     ):
+        """
+        A standard dataset structure for question answering that can be processed by
+        :meth:`utils_nlp.models.transformers.question_answering.QAProcessor.preprocess`
 
+        Args:
+            df (pandas.DataFrame): Input data frame.
+            doc_text_col (str): Name of the column containing the document texts.
+            question_text_col (str): Name of the column containing the question texts.
+            qa_id_col (str, optional): Name of the column containing the unique ids identifying
+                document-question-answer samples. If not provided, a "qa_id" column is
+                automatically created. Defaults to None.
+            answer_start_col (str, optional): Name of the column containing answer start indices.
+                For testing data, each value in the column can be a list of integers for multiple
+                ground truth answers. Defaults to None.
+            answer_text_col (str, optional): Name of the column containing answer texts. For
+                testing data, each value in the column can be a list of strings for multiple
+                ground truth answers. Defaults to None.
+            is_impossible_col (str, optional): Name of the column containing boolean values
+                indicating if the question is impossible to answer. If not provided,
+                a "is_impossible" column is automatically created and populated with False.
+                Defaults to None.
+        """
         self.df = df.copy()
         self.doc_text_col = doc_text_col
         self.question_text_col = question_text_col
