@@ -72,7 +72,7 @@ def ner_utils_test_data(scope="module"):
 
 def test_maybe_download():
     # ToDo: Change this url when repo goes public.
-    file_url = "https://github.com/microsoft/nlp/blob/master/LICENSE"
+    file_url = "https://raw.githubusercontent.com/microsoft/nlp/master/LICENSE"
     filepath = "license.txt"
     assert not os.path.exists(filepath)
     filepath = maybe_download(file_url, "license.txt", expected_bytes=1162)
