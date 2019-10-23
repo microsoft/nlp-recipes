@@ -34,9 +34,9 @@ MAX_SEQ_LEN = 512
 logger = logging.getLogger(__name__)
 
 
-def get_device(device, num_gpus, local_rank):
+def get_device(num_gpus=None, local_rank=-1):
     if local_rank == -1:
-        device = torch.device("cuda" if torch.cuda.is_available() and device == "cuda" else "cpu")
+        device = torch.device("cuda" if torch.cuda.is_available() and num_gpus > 0 else "cpu")
         num_gpus = (
             min(num_gpus, torch.cuda.device_count()) if num_gpus else torch.cuda.device_count()
         )
@@ -45,7 +45,6 @@ def get_device(device, num_gpus, local_rank):
         device = torch.device("cuda", local_rank)
         torch.distributed.init_process_group(backend="nccl")
         num_gpus = 1
-
     return device, num_gpus
 
 
@@ -58,34 +57,30 @@ class Transformer:
         cache_dir=".",
         load_model_from_dir=None,
     ):
-        self.model_name = model_name
-        self.cache_dir = cache_dir
-        self.load_model_from_dir = load_model_from_dir
-        if load_model_from_dir is None:
-            self.model = model_class[model_name].from_pretrained(
-                model_name, cache_dir=cache_dir, num_labels=num_labels
-            )
-        else:
-            logger.info("Loading cached model from {}".format(load_model_from_dir))
-            self.model = model_class[model_name].from_pretrained(
-                load_model_from_dir, num_labels=num_labels
-            )
 
-    @property
-    def model_name(self):
-        return self._model_name
-
-    @model_name.setter
-    def model_name(self, value):
-        if value not in self.list_supported_models():
+        if model_name not in self.list_supported_models():
             raise ValueError(
                 "Model name {0} is not supported by {1}. "
                 "Call '{2}.list_supported_models()' to get all supported model "
                 "names.".format(value, self.__class__.__name__, self.__class__.__name__)
             )
+        self._model_name = model_name
+        self._model_type = model_name.split("-")[0]
+        self.cache_dir = cache_dir
+        self.load_model_from_dir = load_model_from_dir
+        if load_model_from_dir is None:
+            self.model = model_class[model_name].from_pretrained(
+                model_name, cache_dir=cache_dir, num_labels=num_labels, output_loading_info=False
+            )
+        else:
+            logger.info("Loading cached model from {}".format(load_model_from_dir))
+            self.model = model_class[model_name].from_pretrained(
+                load_model_from_dir, num_labels=num_labels, output_loading_info=False
+            )
 
-        self._model_name = value
-        self._model_type = value.split("-")[0]
+    @property
+    def model_name(self):
+        return self._model_name
 
     @property
     def model_type(self):
@@ -263,10 +258,8 @@ class Transformer:
     def save_model(self):
         output_model_dir = os.path.join(self.cache_dir, "fine_tuned")
 
-        if not os.path.exists(self.cache_dir):
-            os.makedirs(self.cache_dir)
-        if not os.path.exists(output_model_dir):
-            os.makedirs(output_model_dir)
+        os.makedirs(self.cache_dir, exist_ok=True)
+        os.makedirs(output_model_dir, exist_ok=True)
 
         logger.info("Saving model checkpoint to %s", output_model_dir)
         # Save a trained model, configuration and tokenizer using `save_pretrained()`.

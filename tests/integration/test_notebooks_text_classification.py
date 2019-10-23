@@ -15,8 +15,8 @@ ABS_TOL = 0.1
 
 @pytest.mark.gpu
 @pytest.mark.integration
-def test_tc_mnli_bert(notebooks, tmp):
-    notebook_path = notebooks["tc_mnli_bert"]
+def test_tc_mnli_transformers(notebooks, tmp):
+    notebook_path = notebooks["tc_mnli_transformers"]
     pm.execute_notebook(
         notebook_path,
         OUTPUT_NOTEBOOK,
@@ -24,17 +24,17 @@ def test_tc_mnli_bert(notebooks, tmp):
         parameters=dict(
             NUM_GPUS=1,
             DATA_FOLDER=tmp,
-            BERT_CACHE_DIR=tmp,
-            BATCH_SIZE=32,
-            BATCH_SIZE_PRED=512,
+            CACHE_DIR=tmp,
+            BATCH_SIZE=16,
             NUM_EPOCHS=1,
+            TRAIN_DATA_FRACTION=0.05,
+            TEST_DATA_FRACTION=0.05,
+            MODEL_NAMES=["distilbert-base-uncased"],
         ),
     )
     result = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict
-    assert pytest.approx(result["accuracy"], 0.93, abs=ABS_TOL)
-    assert pytest.approx(result["precision"], 0.93, abs=ABS_TOL)
-    assert pytest.approx(result["recall"], 0.93, abs=ABS_TOL)
-    assert pytest.approx(result["f1"], 0.93, abs=ABS_TOL)
+    assert pytest.approx(result["accuracy"], 0.87, abs=ABS_TOL)
+    assert pytest.approx(result["f1"], 0.87, abs=ABS_TOL)
 
 
 @pytest.mark.gpu

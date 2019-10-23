@@ -42,7 +42,7 @@ MODEL_CLASS.update(
 class Processor:
     def __init__(self, model_name="bert-base-cased", to_lower=False, cache_dir="."):
         self.tokenizer = TOKENIZER_CLASS[model_name].from_pretrained(
-            model_name, do_lower_case=to_lower, cache_dir=cache_dir
+            model_name, do_lower_case=to_lower, cache_dir=cache_dir, output_loading_info=False
         )
 
     @staticmethod
@@ -106,7 +106,6 @@ class SequenceClassifier(Transformer):
     def fit(
         self,
         train_dataset,
-        device="cuda",
         num_epochs=1,
         batch_size=32,
         num_gpus=None,
@@ -118,7 +117,11 @@ class SequenceClassifier(Transformer):
         verbose=True,
         seed=None,
     ):
-        device, num_gpus = get_device(device=device, num_gpus=num_gpus, local_rank=local_rank)
+        """
+        Fine-tunes a pre-trained sequence classification model.
+        """
+
+        device, num_gpus = get_device(num_gpus=num_gpus, local_rank=local_rank)
         self.model.to(device)
         super().fine_tune(
             train_dataset=train_dataset,
@@ -135,7 +138,8 @@ class SequenceClassifier(Transformer):
             seed=seed,
         )
 
-    def predict(self, eval_dataset, device="cuda", batch_size=16, num_gpus=1, verbose=True):
+    def predict(self, eval_dataset, batch_size=16, num_gpus=1, verbose=True):
+        device, num_gpus = get_device(num_gpus=num_gpus, local_rank=-1)
         preds = list(
             super().predict(
                 eval_dataset=eval_dataset,
@@ -143,7 +147,7 @@ class SequenceClassifier(Transformer):
                 device=device,
                 per_gpu_eval_batch_size=batch_size,
                 n_gpu=num_gpus,
-                verbose=True,
+                verbose=verbose,
             )
         )
         preds = np.concatenate(preds)

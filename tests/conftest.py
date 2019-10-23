@@ -69,7 +69,9 @@ def notebooks():
         "tc_bert_azureml": os.path.join(
             folder_notebooks, "text_classification", "tc_bert_azureml.ipynb"
         ),
-        "tc_mnli_bert": os.path.join(folder_notebooks, "text_classification", "tc_mnli_bert.ipynb"),
+        "tc_mnli_transformers": os.path.join(
+            folder_notebooks, "text_classification", "tc_mnli_transformers.ipynb"
+        ),
         "tc_dac_bert_ar": os.path.join(
             folder_notebooks, "text_classification", "tc_dac_bert_ar.ipynb"
         ),

@@ -96,7 +96,7 @@ class QAProcessor:
         self, model_name="bert-base-cased", to_lower=False, custom_tokenize=None, cache_dir="."
     ):
         self.tokenizer = TOKENIZER_CLASS[model_name].from_pretrained(
-            model_name, do_lower_case=to_lower, cache_dir=cache_dir
+            model_name, do_lower_case=to_lower, cache_dir=cache_dir, output_loading_info=False
         )
         self.custom_tokenize = custom_tokenize
         self.model_name = model_name
@@ -371,7 +371,6 @@ class AnswerExtractor(Transformer):
     def fit(
         self,
         train_dataset,
-        device="cuda",
         num_gpus=None,
         per_gpu_batch_size=8,
         num_epochs=1,
@@ -395,9 +394,8 @@ class AnswerExtractor(Transformer):
         Args:
             train_dataset (QADataset): Training dataset of type
                 :class:`utils_nlp.dataset.pytorch.QADataset`.
-            device (str, optional): Device to use. Accepted values are "cuda" and "cpu".
-                Defaults to "cuda".
             num_gpus (int, optional): The number of GPUs to use. If None, all available GPUs will
+                be used. If set to 0 or GPUs are not available, CPU device will
                 be used. Defaults to None.
             per_gpu_batch_size (int, optional): Training batch size on each GPU. Defaults to 8.
             num_epochs (int, optional): Number of training epochs. Defaults to 1.
@@ -428,7 +426,7 @@ class AnswerExtractor(Transformer):
 
         """
 
-        device, num_gpus = get_device(device=device, num_gpus=num_gpus, local_rank=local_rank)
+        device, num_gpus = get_device(num_gpus=num_gpus, local_rank=local_rank)
 
         self.model.to(device)
         super().fine_tune(
@@ -458,7 +456,6 @@ class AnswerExtractor(Transformer):
         self,
         test_dataset,
         per_gpu_batch_size=16,
-        device="cuda",
         num_gpus=None,
         local_rank=-1,
         verbose=True,
@@ -471,9 +468,8 @@ class AnswerExtractor(Transformer):
             test_dataset (QADataset): Testing dataset of type
             :class:`utils_nlp.dataset.pytorch.QADataset`.
             per_gpu_batch_size (int, optional): Testing batch size on each GPU. Defaults to 8.
-            device (str, optional): Device to use. Accepted values are "cuda" and "cpu".
-                Defaults to "cuda".
             num_gpus (int, optional): The number of GPUs to use. If None, all available GPUs will
+                be used. If set to 0 or GPUs are not available, CPU device will
                 be used. Defaults to None.
             local_rank (int, optional): Local_rank for distributed training on GPUs. Defaults to
                 -1, which means non-distributed.
@@ -485,7 +481,7 @@ class AnswerExtractor(Transformer):
         def _to_list(tensor):
             return tensor.detach().cpu().tolist()
 
-        device, num_gpus = get_device(device=device, num_gpus=num_gpus, local_rank=local_rank)
+        device, num_gpus = get_device(num_gpus=num_gpus, local_rank=local_rank)
         batch_size = per_gpu_batch_size * max(1, num_gpus)
 
         self.model.to(device)
