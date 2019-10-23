@@ -37,3 +37,4 @@ can also be labeled with custom entities as required by the use case.
 |Notebook|Environment|Description|Dataset|
 |---|:---:|---|---|
 |[BERT](ner_wikigold_bert.ipynb)|Local| Fine-tune a pretrained BERT model for token classification.|[wikigold](https://www.aclweb.org/anthology/W09-3302)|
+|[Transformer](ner_wikigold_transformer.ipynb)|Local| Fine-tune a pretrained Pytorch transformer model of BERT architecture for token classification.|[wikigold](https://www.aclweb.org/anthology/W09-3302)|
