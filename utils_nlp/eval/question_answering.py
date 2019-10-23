@@ -10,8 +10,16 @@ import string
 
 def get_raw_scores(qa_ids, actuals, preds):
     """
-        Compute exact match and F1 scores without applying any
-        unanswerable probability threshold.
+        Computes exact match and F1 scores without applying any unanswerable probability threshold.
+
+        Args:
+            qa_ids (list): Unique ids corresponding to the answers in `actuals`.
+            actuals (list): List of ground truth answers.
+            preds (dict): Dictionary with qa_id as keys and predicted answers as values.
+
+        Returns:
+            tuple: (exact_match, f1)
+
     """
     # Helper functions
     def _normalize_answer(s):
@@ -81,29 +89,71 @@ def get_raw_scores(qa_ids, actuals, preds):
             continue
         a_pred = preds[qid]
         # Take max over all gold answers
+        if isinstance(gold_answers, str):
+            gold_answers = [gold_answers]
+
         exact_scores[qid] = max(_compute_exact(a, a_pred) for a in gold_answers)
         f1_scores[qid] = max(_compute_f1(a, a_pred) for a in gold_answers)
     return exact_scores, f1_scores
 
 
 def find_best_thresh(preds, scores, na_probs, qid_to_has_ans, unanswerable_exists=False):
+    """
+    Find the best threshold to determine a question is impossible to answer.
+
+    Args:
+        preds (dict): Dictionary with qa_id as keys and predicted answers as values.
+        scores (dict): Dictionary with qa_id as keys and raw evaluation scores (exact_match or
+            f1) as values.
+        na_probs (dict): Dictionary with qa_id as keys and unanswerable probabilities as values.
+        qid_to_has_ans (dict): Dictionary with qa_id as keys boolean values indicating if the
+            question has answer as values.
+        unanswerable_exists (bool, optional): Whether there is unanswerable questions in the data.
+            Defaults to False.
+
+    Returns:
+        tuple: score after applying best threshold, best threshold, (score for answerable
+            questions after applying best threshold, if unanswerable_exists=True)
+    """
     num_no_ans = sum(1 for k in qid_to_has_ans if not qid_to_has_ans[k])
+    # If na_prob > threshold, the question is considered as unanswerable by the prediction.
+    # Initially, the threshold is 0. All questions are considered as unanswerable by the
+    # predictions. So cur_score is the number of actual unanswerable questions (i.e. correctly
+    # predicted as unanswerable in the data.
     cur_score = num_no_ans
     best_score = cur_score
     best_thresh = 0.0
+
+    # Sorted in ascending order
     qid_list = sorted(na_probs, key=lambda k: na_probs[k])
     for i, qid in enumerate(qid_list):
+        # When using the cur_na_prob as threshold, all predictions with na_prob > na_prob_cur are
+        # considered as unanswerable. Current question is considered answerable.
         if qid not in scores:
             continue
         if qid_to_has_ans[qid]:
+            # Current question has ground truth answer, the prediction is correct. The raw score
+            # is added to cur_score
             diff = scores[qid]
         else:
+            # Current question doesn't have ground truth answer.
             if preds[qid]:
+                # Prediction is not empty, incorrect. cur_score -= 1
                 diff = -1
             else:
+                # Prediction is empty, correct, the original score 1 from num_no_ans is preserved.
                 diff = 0
         cur_score += diff
         if cur_score > best_score:
+            # When cur_score > best_score, the threshold can increase so that more questions are
+            # considered as answerable and fewer questions are considered as unanswerable.
+            # Imagine a PDF with two humps with some overlapping, the x axis is the na_prob. The
+            # hump on the left is answerable questions and the hump on the right is unanswerable
+            # questions.
+            # At some point, the number of actual answerable questions decreases, and we got more
+            # penalty from considering unanswerable questions as answerable than the score added
+            # from actual answerable questions, we will not change the threshold anymore and the
+            # optimal threshold is found.
             best_score = cur_score
             best_thresh = na_probs[qid]
 
@@ -126,6 +176,25 @@ def find_best_thresh(preds, scores, na_probs, qid_to_has_ans, unanswerable_exist
 def find_all_best_thresh(
     main_eval, preds, exact_raw, f1_raw, na_probs, qid_to_has_ans, unanswerable_exists=False
 ):
+    """
+    Update raw evaluation scores by finding the best threshold to determine a question is
+    impossible to answer.
+
+    Args:
+        main_eval (dict): Dictionary with raw evaluation scores without apply any threshold.
+        preds (dict): Dictionary with qa_id as keys and predicted answers as values.
+        exact_raw (dict): Dictionary with qa_id as keys and raw exact_match scores as values.
+        f1_raw (dict): Dictionary with qa_id as keys and raw f1 scores as values.
+        na_probs (dict): Dictionary with qa_id as keys and unanswerable probabilities as values.
+        qid_to_has_ans (dict): Dictionary with qa_id as keys boolean values indicating if the
+            question has answer as values.
+        unanswerable_exists (bool, optional): Whether there is unanswerable questions in the data.
+            Defaults to False.
+
+    Returns:
+        dict: Updated `main_eval` with scores after applying best threshold and best threshold
+            for each score.
+    """
     all_exact = find_best_thresh(preds, exact_raw, na_probs, qid_to_has_ans, unanswerable_exists)
     all_f1 = find_best_thresh(preds, f1_raw, na_probs, qid_to_has_ans, unanswerable_exists)
     main_eval["best_exact"] = all_exact[0]
@@ -145,22 +214,25 @@ def evaluate_qa(
     Evaluate question answering prediction results against ground truth answers.
 
     Args:
-        qa_ids (list): List of ids identifying unique document-question pairs.
-        actuals (list): List of ground truth answer texts corresponding the
-            qa_ids.
-        preds (dict): Dictionary of qa_id and predicted answer pairs. This
-            is a dictionary because the data order is not preserved during
-            pre- and post-processing.
-        na_probs (dict, optional): Dictionary of qa_id and unanswerable
-            probability pairs. If None, unanswerable probabilities are all
-            set to zero. Defaults to None.
-        na_prob_thresh (float, optional): Probability threshold to predict a
-            question to be unanswerable. If `na_probs` > `na_prob_thresh`,
-            the prediction is considered as correct if the question
-            is unanswerable. Otherwise, the prediction is considered as
-            incorrect. Defaults to 0.
-        out_file (str, optional): Path of the file to save the evaluation
-            results to. Defaults to None.
+        Evaluates question answering model performance.
+
+        Args:
+            actual_dataset (:class:`utils_nlp.dataset.pytorch.QADataset`): Input question answering
+                dataset with ground truth answers.
+            preds (dict): The key of the dictionary is the qa_id in the original
+                :class:`utils_nlp.dataset.pytorch.QADataset`. The values of the dictionary are
+                the predicted answer texts in string type.
+            na_probs (dict, optional): Dictionary of qa_id and unanswerable probability pairs.
+                If None, unanswerable probabilities are all set to zero. Defaults to None.
+            na_prob_thresh (float, optional): Probability threshold to predict a question to be
+                unanswerable. For an unanswerable question, if `na_probs` > `na_prob_thresh`,
+                the prediction is considered as correct. Otherwise, the prediction is considered as
+                incorrect. Defaults to 0.
+            out_file (str, optional): Path of the file to save the evaluation results to.
+                Defaults to None.
+
+        Returns:
+            dict: A dictionary with exact_match and f1 values.
     """
 
     # Helper functions

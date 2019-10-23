@@ -19,6 +19,7 @@ df = load_pandas_df(DATA_FOLDER, file_split ="train", nrows = 1000)
 |[Wikigold NER](https://github.com/juand-r/entity-recognition-datasets/tree/master/data/wikigold/CONLL-format/data)|[wikigold.py](./wikigold.py)|
 |[The Cross-Lingual NLI (XNLI) Corpus](https://www.nyu.edu/projects/bowman/xnli/)|[xnli.py](./xnli.py)|
 |[The STSbenchmark dataset](http://ixa2.si.ehu.es/stswiki/index.php/STSbenchmark)|[stsbenchmark.py](./stsbenchmark.py)|
+|[The Stanford Question Answering Dataset (SQuAD)](https://rajpurkar.github.io/SQuAD-explorer/)|[squad.py](./squad.py)|
 
 ## Dataset References
 Please see [Dataset References](../../DatasetReferences.md) for notice and information regarding datasets used.
