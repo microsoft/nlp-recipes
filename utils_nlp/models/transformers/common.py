@@ -58,16 +58,16 @@ class Transformer:
         cache_dir=".",
         load_model_from_dir=None,
     ):
-        self.model_name = model_name
+        self._model_name = model_name
         self.cache_dir = cache_dir
         self.load_model_from_dir = load_model_from_dir
         if load_model_from_dir is None:
-            self.model = model_class[model_name].from_pretrained(
+            self._model = model_class[model_name].from_pretrained(
                 model_name, cache_dir=cache_dir, num_labels=num_labels
             )
         else:
             logger.info("Loading cached model from {}".format(load_model_from_dir))
-            self.model = model_class[model_name].from_pretrained(
+            self._model = model_class[model_name].from_pretrained(
                 load_model_from_dir, num_labels=num_labels
             )
 
@@ -77,7 +77,7 @@ class Transformer:
 
     @property
     def model(self):
-        return self.model.module if hasattr(self.model, "module") else self.model
+        return self._model.module if hasattr(self._model, "module") else self._model
 
     @model_name.setter
     def model_name(self, value):
@@ -172,12 +172,12 @@ class Transformer:
 
         # multi-gpu training (should be after apex fp16 initialization)
         if n_gpu > 1:
-            self.model = torch.nn.DataParallel(self.model)
+            self._model = torch.nn.DataParallel(self._model)
 
         # Distributed training (should be after apex fp16 initialization)
         if local_rank != -1:
-            self.model = torch.nn.parallel.DistributedDataParallel(
-                self.model,
+            self._model = torch.nn.parallel.DistributedDataParallel(
+                self._model,
                 device_ids=[local_rank],
                 output_device=local_rank,
                 find_unused_parameters=True,
@@ -273,9 +273,4 @@ class Transformer:
             os.makedirs(output_model_dir)
 
         logger.info("Saving model checkpoint to %s", output_model_dir)
-        # Save a trained model, configuration and tokenizer using `save_pretrained()`.
-        # They can then be reloaded using `from_pretrained()`
-        model_to_save = (
-            self.model.module if hasattr(self.model, "module") else self.model
-        )  # Take care of distributed/parallel training
-        model_to_save.save_pretrained(output_model_dir)
+        self.model.save_pretrained(output_model_dir)
