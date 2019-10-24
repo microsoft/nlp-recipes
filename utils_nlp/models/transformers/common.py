@@ -62,12 +62,12 @@ class Transformer:
         self.cache_dir = cache_dir
         self.load_model_from_dir = load_model_from_dir
         if load_model_from_dir is None:
-            self._model = model_class[model_name].from_pretrained(
+            self.model = model_class[model_name].from_pretrained(
                 model_name, cache_dir=cache_dir, num_labels=num_labels
             )
         else:
             logger.info("Loading cached model from {}".format(load_model_from_dir))
-            self._model = model_class[model_name].from_pretrained(
+            self.model = model_class[model_name].from_pretrained(
                 load_model_from_dir, num_labels=num_labels
             )
 
@@ -75,9 +75,7 @@ class Transformer:
     def model_name(self):
         return self._model_name
 
-    @property
-    def model(self):
-        return self._model.module if hasattr(self._model, "module") else self._model
+
 
     @model_name.setter
     def model_name(self, value):
@@ -172,12 +170,12 @@ class Transformer:
 
         # multi-gpu training (should be after apex fp16 initialization)
         if n_gpu > 1:
-            self._model = torch.nn.DataParallel(self._model)
+            self.model = torch.nn.DataParallel(self.model)
 
         # Distributed training (should be after apex fp16 initialization)
         if local_rank != -1:
-            self._model = torch.nn.parallel.DistributedDataParallel(
-                self._model,
+            self.model = torch.nn.parallel.DistributedDataParallel(
+                self.model,
                 device_ids=[local_rank],
                 output_device=local_rank,
                 find_unused_parameters=True,
