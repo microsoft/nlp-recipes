@@ -30,7 +30,7 @@ classifier = SequenceClassifier(model_name=model_name, num_labels=num_labels, ca
 classifier.fit(ds, batch_size=batch_size, num_gpus=num_gpus, verbose=False)
 # write classifier
 if write_to_cpu:
-    classifier.model.to(torch.device("cpu"))
+    classifier.model.module.to(torch.device("cpu"))
 pickle.dump(classifier, open(os.path.join(output_dir, model_name + trained_model_suffix), "wb"))
 # write label encoder
 shutil.move(
