@@ -75,6 +75,10 @@ class Transformer:
     def model_name(self):
         return self._model_name
 
+    @property
+    def model(self):
+        return self.model.module if hasattr(self.model, "module") else self.model
+
     @model_name.setter
     def model_name(self, value):
         if value not in self.list_supported_models():
