@@ -105,6 +105,8 @@ class Transformer:
         gradient_accumulation_steps=1,
         per_gpu_train_batch_size=8,
         n_gpu=1,
+        optimizer=None,
+        scheduler=None,
         weight_decay=0.0,
         learning_rate=5e-5,
         adam_epsilon=1e-8,
@@ -134,25 +136,28 @@ class Transformer:
         else:
             t_total = len(train_dataloader) // gradient_accumulation_steps * num_train_epochs
 
-        no_decay = ["bias", "LayerNorm.weight"]
-        optimizer_grouped_parameters = [
-            {
-                "params": [
-                    p
-                    for n, p in self.model.named_parameters()
-                    if not any(nd in n for nd in no_decay)
-                ],
-                "weight_decay": weight_decay,
-            },
-            {
-                "params": [
-                    p for n, p in self.model.named_parameters() if any(nd in n for nd in no_decay)
-                ],
-                "weight_decay": 0.0,
-            },
-        ]
-        optimizer = AdamW(optimizer_grouped_parameters, lr=learning_rate, eps=adam_epsilon)
-        scheduler = WarmupLinearSchedule(optimizer, warmup_steps=warmup_steps, t_total=t_total)
+        if optimizer is None:
+            no_decay = ["bias", "LayerNorm.weight"]
+            optimizer_grouped_parameters = [
+                {
+                    "params": [
+                        p
+                        for n, p in self.model.named_parameters()
+                        if not any(nd in n for nd in no_decay)
+                    ],
+                    "weight_decay": weight_decay,
+                },
+                {
+                    "params": [
+                        p for n, p in self.model.named_parameters() if any(nd in n for nd in no_decay)
+                    ],
+                    "weight_decay": 0.0,
+                },
+            ]
+            optimizer = AdamW(optimizer_grouped_parameters, lr=learning_rate, eps=adam_epsilon)
+        
+        if scheduler is None:
+            scheduler = WarmupLinearSchedule(optimizer, warmup_steps=warmup_steps, t_total=t_total)
 
         if fp16:
             try:
