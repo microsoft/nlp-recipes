@@ -119,6 +119,7 @@ class Transformer:
         local_rank=-1,
         verbose=True,
         seed=None,
+        **kwargs
     ):
         if seed is not None:
             Transformer.set_seed(seed, n_gpu > 0)
@@ -127,18 +128,23 @@ class Transformer:
         train_sampler = (
             RandomSampler(train_dataset) if local_rank == -1 else DistributedSampler(train_dataset)
         )
+        #train_dataloader = DataLoader(
+        #    train_dataset, sampler=train_sampler, batch_size=train_batch_size
+        #)
+        
         train_dataloader = DataLoader(
-            train_dataset, sampler=train_sampler, batch_size=train_batch_size
+            train_dataset,  batch_size=train_batch_size
         )
 
         if max_steps > 0:
             t_total = max_steps
-            num_train_epochs = (
-                max_steps // (len(train_dataloader) // gradient_accumulation_steps) + 1
-            )
+            #num_train_epochs = 
+            #(
+            #    max_steps // (len(train_dataloader) // gradient_accumulation_steps) + 1
+            #)
         else:
-            t_total = len(train_dataloader) // gradient_accumulation_steps * num_train_epochs
-
+            t_total = 1e3 #len(train_dataloader) // gradient_accumulation_steps * num_train_epochs
+        #t_total = max_steps
         no_decay = ["bias", "LayerNorm.weight"]
         optimizer_grouped_parameters = [
             {
@@ -186,13 +192,14 @@ class Transformer:
             int(num_train_epochs), desc="Epoch", disable=local_rank not in [-1, 0] or not verbose
         )
 
-        for _ in train_iterator:
+        #for _ in train_iterator:
+        self.model.train()
+        while 1:  
             epoch_iterator = tqdm(
                 train_dataloader, desc="Iteration", disable=local_rank not in [-1, 0] or not verbose
             )
             for step, batch in enumerate(epoch_iterator):
-                self.model.train()
-                batch = tuple(t.to(device) for t in batch)
+                batch = tuple(t.to(device) for t in batch if type(t)==torch.Tensor)
                 inputs = get_inputs(batch, self.model_name)
                 outputs = self.model(**inputs)
                 loss = outputs[0]
@@ -248,11 +255,13 @@ class Transformer:
             if local_rank == -1
             else DistributedSampler(eval_dataset)
         )
-        eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=eval_batch_size)
+        #eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=eval_batch_size)
+        eval_dataloader = DataLoader(eval_dataset, batch_size=eval_batch_size)
 
         for batch in tqdm(eval_dataloader, desc="Evaluating", disable=not verbose):
             self.model.eval()
-            batch = tuple(t.to(device) for t in batch)
+            #batch = tuple(t.to(device) for t in batch)
+            batch = tuple(t.to(device) for t in batch if type(t)==torch.Tensor)
             with torch.no_grad():
                 inputs = get_inputs(batch, self.model_name, train_mode=False)
                 outputs = self.model(**inputs)
