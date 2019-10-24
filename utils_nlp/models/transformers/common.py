@@ -5,7 +5,6 @@
 # https://github.com/huggingface/pytorch-transformers/blob/master/examples/run_glue.py
 
 import logging
-import os
 import random
 
 import numpy as np
@@ -74,8 +73,6 @@ class Transformer:
     @property
     def model_name(self):
         return self._model_name
-
-
 
     @model_name.setter
     def model_name(self, value):
@@ -261,14 +258,3 @@ class Transformer:
                 logits = outputs[0]
 
             yield logits.detach().cpu().numpy()
-
-    def save_model(self):
-        output_model_dir = os.path.join(self.cache_dir, "fine_tuned")
-
-        if not os.path.exists(self.cache_dir):
-            os.makedirs(self.cache_dir)
-        if not os.path.exists(output_model_dir):
-            os.makedirs(output_model_dir)
-
-        logger.info("Saving model checkpoint to %s", output_model_dir)
-        self.model.save_pretrained(output_model_dir)
