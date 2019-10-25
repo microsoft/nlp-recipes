@@ -3,6 +3,7 @@
 
 import pytest
 import papermill as pm
+import scrapbook as sb
 import os
 import json
 import shutil
@@ -19,14 +20,20 @@ def test_entailment_multinli_bert(notebooks, tmp):
         notebook_path,
         OUTPUT_NOTEBOOK,
         parameters={
-            "TRAIN_DATA_USED_PERCENT": 0.001,
-            "DEV_DATA_USED_PERCENT": 0.01,
+            "TRAIN_DATA_USED_PERCENT": 0.05,
+            "DEV_DATA_USED_PERCENT": 0.05,
             "NUM_EPOCHS": 1,
             "CACHE_DIR": tmp
         },
         kernel_name=KERNEL_NAME,
     )
-
+    result = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict
+    assert pytest.approx(result["matched_precision"], 0.76, abs=ABS_TOL)
+    assert pytest.approx(result["matched_recall"], 0.76, abs=ABS_TOL)
+    assert pytest.approx(result["matched_f1"], 0.76, abs=ABS_TOL)
+    assert pytest.approx(result["mismatched_precision"], 0.76, abs=ABS_TOL)
+    assert pytest.approx(result["mismatched_recall"], 0.76, abs=ABS_TOL)
+    assert pytest.approx(result["mismatched_f1"], 0.76, abs=ABS_TOL)
 
 @pytest.mark.integration
 @pytest.mark.azureml
