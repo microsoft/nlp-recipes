@@ -34,20 +34,6 @@ MAX_SEQ_LEN = 512
 logger = logging.getLogger(__name__)
 
 
-def get_device(num_gpus=None, local_rank=-1):
-    if local_rank == -1:
-        device = torch.device("cuda" if torch.cuda.is_available() and num_gpus > 0 else "cpu")
-        num_gpus = (
-            min(num_gpus, torch.cuda.device_count()) if num_gpus else torch.cuda.device_count()
-        )
-    else:
-        torch.cuda.set_device(local_rank)
-        device = torch.device("cuda", local_rank)
-        torch.distributed.init_process_group(backend="nccl")
-        num_gpus = 1
-    return device, num_gpus
-
-
 class Transformer:
     def __init__(
         self,
@@ -149,13 +135,15 @@ class Transformer:
                 },
                 {
                     "params": [
-                        p for n, p in self.model.named_parameters() if any(nd in n for nd in no_decay)
+                        p
+                        for n, p in self.model.named_parameters()
+                        if any(nd in n for nd in no_decay)
                     ],
                     "weight_decay": 0.0,
                 },
             ]
             optimizer = AdamW(optimizer_grouped_parameters, lr=learning_rate, eps=adam_epsilon)
-        
+
         if scheduler is None:
             scheduler = WarmupLinearSchedule(optimizer, warmup_steps=warmup_steps, t_total=t_total)
 

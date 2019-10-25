@@ -8,23 +8,28 @@ import torch.nn as nn
 import warnings
 
 
-def get_device(device="gpu"):
-    """Gets a PyTorch device.
-
-    Args:
-        device (str, optional): Device string: "cpu" or "gpu". Defaults to "gpu".
-
-    Returns:
-        torch.device: A PyTorch device (cpu or gpu).
-    """
-    if device == "gpu":
-        if torch.cuda.is_available():
-            return torch.device("cuda:0")
-        raise Exception("CUDA device not available")
-    elif device == "cpu":
-        return torch.device("cpu")
+def get_device(
+    num_gpus=None,
+    local_rank=-1,
+    #    backend="nccl",
+    #    rank=0,
+    #    world_size=1,
+    #    init_method="file:///distributed",
+):
+    if local_rank == -1:
+        num_gpus = (
+            min(num_gpus, torch.cuda.device_count())
+            if num_gpus is not None
+            else torch.cuda.device_count()
+        )
+        device = torch.device("cuda" if torch.cuda.is_available() and num_gpus > 0 else "cpu")
     else:
-        raise ValueError("Only 'cpu' and 'gpu' devices are supported.")
+        torch.cuda.set_device(local_rank)
+        device = torch.device("cuda", local_rank)
+        # torch.distributed.init_process_group(backend="nccl")
+        # torch.distributed.init_process_group(backend=backend, rank=rank, world_size=world_size, init_method=init_method)
+        num_gpus = 1
+    return device, num_gpus
 
 
 def move_to_device(model, device, num_gpus=None):
