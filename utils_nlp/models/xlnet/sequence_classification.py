@@ -113,7 +113,7 @@ class XLNetSequenceClassifier:
                 loss values. Defaults to True.
         """
 
-        device = get_device("cpu" if self.num_gpus == 0 or not torch.cuda.is_available() else "gpu")
+        device, num_gpus = get_device(self.num_gpus)
         self.model = move_to_device(self.model, device, self.num_gpus)
 
         token_ids_tensor = torch.tensor(token_ids, dtype=torch.long)
@@ -329,7 +329,7 @@ class XLNetSequenceClassifier:
                 (classes, probabilities) if probabilities is True.
         """
 
-        device = get_device("cpu" if num_gpus == 0 or not torch.cuda.is_available() else "gpu")
+        device, num_gpus = get_device(num_gpus)
         self.model = move_to_device(self.model, device, num_gpus)
 
         self.model.eval()

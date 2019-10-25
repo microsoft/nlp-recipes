@@ -7,12 +7,7 @@ from collections import namedtuple
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.utils.data import (
-    DataLoader,
-    RandomSampler,
-    SequentialSampler,
-    TensorDataset,
-)
+from torch.utils.data import DataLoader, RandomSampler, SequentialSampler, TensorDataset
 from pytorch_pretrained_bert.modeling import BertForSequenceClassification
 from pytorch_pretrained_bert.optimization import BertAdam
 from tqdm import tqdm
@@ -21,6 +16,7 @@ from utils_nlp.models.bert.common import Language
 from utils_nlp.common.pytorch_utils import get_device, move_to_device
 
 from cached_property import cached_property
+
 
 class BERTSequenceClassifier:
     """BERT-based sequence classifier"""
@@ -55,7 +51,7 @@ class BERTSequenceClassifier:
 
         self.has_cuda = torch.cuda.is_available()
         return self.has_cuda
-        
+
     def fit(
         self,
         token_ids,
@@ -93,9 +89,8 @@ class BERTSequenceClassifier:
                 loss values. Defaults to True.
         """
 
-        device = get_device(
-            "cpu" if num_gpus == 0 or not self.cuda else "gpu"
-        )
+        device, num_gpus = get_device(num_gpus)
+
         self.model = move_to_device(self.model, device, num_gpus)
 
         token_ids_tensor = torch.tensor(token_ids, dtype=torch.long)
@@ -103,42 +98,25 @@ class BERTSequenceClassifier:
         labels_tensor = torch.tensor(labels, dtype=torch.long)
 
         if token_type_ids:
-            token_type_ids_tensor = torch.tensor(
-                token_type_ids, dtype=torch.long
-            )
+            token_type_ids_tensor = torch.tensor(token_type_ids, dtype=torch.long)
             train_dataset = TensorDataset(
-                token_ids_tensor,
-                input_mask_tensor,
-                token_type_ids_tensor,
-                labels_tensor,
+                token_ids_tensor, input_mask_tensor, token_type_ids_tensor, labels_tensor
             )
         else:
-            train_dataset = TensorDataset(
-                token_ids_tensor, input_mask_tensor, labels_tensor
-            )
+            train_dataset = TensorDataset(token_ids_tensor, input_mask_tensor, labels_tensor)
         train_sampler = RandomSampler(train_dataset)
 
-        train_dataloader = DataLoader(
-            train_dataset, sampler=train_sampler, batch_size=batch_size
-        )
+        train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=batch_size)
         # define optimizer and model parameters
         param_optimizer = list(self.model.named_parameters())
         no_decay = ["bias", "LayerNorm.bias", "LayerNorm.weight"]
         optimizer_grouped_parameters = [
             {
-                "params": [
-                    p
-                    for n, p in param_optimizer
-                    if not any(nd in n for nd in no_decay)
-                ],
+                "params": [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)],
                 "weight_decay": 0.01,
             },
             {
-                "params": [
-                    p
-                    for n, p in param_optimizer
-                    if any(nd in n for nd in no_decay)
-                ],
+                "params": [p for n, p in param_optimizer if any(nd in n for nd in no_decay)],
                 "weight_decay": 0.0,
             },
         ]
@@ -164,18 +142,14 @@ class BERTSequenceClassifier:
 
         for epoch in range(num_epochs):
             training_loss = 0
-            for i, batch in enumerate(
-                tqdm(train_dataloader, desc="Iteration")
-            ):
+            for i, batch in enumerate(tqdm(train_dataloader, desc="Iteration")):
                 if token_type_ids:
                     x_batch, mask_batch, token_type_ids_batch, y_batch = tuple(
                         t.to(device) for t in batch
                     )
                 else:
                     token_type_ids_batch = None
-                    x_batch, mask_batch, y_batch = tuple(
-                        t.to(device) for t in batch
-                    )
+                    x_batch, mask_batch, y_batch = tuple(t.to(device) for t in batch)
 
                 opt.zero_grad()
 
@@ -236,9 +210,7 @@ class BERTSequenceClassifier:
             1darray, namedtuple(1darray, ndarray): Predicted classes or
                 (classes, probabilities) if probabilities is True.
         """
-        device = get_device(
-            "cpu" if num_gpus == 0 or not self.cuda else "gpu"
-        )
+        device, num_gpus = get_device(num_gpus)
         self.model = move_to_device(self.model, device, num_gpus)
 
         # score
@@ -248,26 +220,18 @@ class BERTSequenceClassifier:
         input_mask_tensor = torch.tensor(input_mask, dtype=torch.long)
 
         if token_type_ids:
-            token_type_ids_tensor = torch.tensor(
-                token_type_ids, dtype=torch.long
-            )
-            test_dataset = TensorDataset(
-                token_ids_tensor, input_mask_tensor, token_type_ids_tensor
-            )
+            token_type_ids_tensor = torch.tensor(token_type_ids, dtype=torch.long)
+            test_dataset = TensorDataset(token_ids_tensor, input_mask_tensor, token_type_ids_tensor)
         else:
             test_dataset = TensorDataset(token_ids_tensor, input_mask_tensor)
 
         test_sampler = SequentialSampler(test_dataset)
-        test_dataloader = DataLoader(
-            test_dataset, sampler=test_sampler, batch_size=batch_size
-        )
+        test_dataloader = DataLoader(test_dataset, sampler=test_sampler, batch_size=batch_size)
 
         preds = []
         for i, batch in enumerate(tqdm(test_dataloader, desc="Iteration")):
             if token_type_ids:
-                x_batch, mask_batch, token_type_ids_batch = tuple(
-                    t.to(device) for t in batch
-                )
+                x_batch, mask_batch, token_type_ids_batch = tuple(t.to(device) for t in batch)
             else:
                 token_type_ids_batch = None
                 x_batch, mask_batch = tuple(t.to(device) for t in batch)
@@ -285,8 +249,7 @@ class BERTSequenceClassifier:
 
         if probabilities:
             return namedtuple("Predictions", "classes probabilities")(
-                preds.argmax(axis=1),
-                nn.Softmax(dim=1)(torch.Tensor(preds)).numpy(),
+                preds.argmax(axis=1), nn.Softmax(dim=1)(torch.Tensor(preds)).numpy()
             )
         else:
             return preds.argmax(axis=1)
