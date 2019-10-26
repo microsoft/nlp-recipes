@@ -48,8 +48,10 @@ def get_device(device, num_gpus, local_rank):
 
     return device, num_gpus
 
+from abc import ABC, abstractmethod
+from tensorboardX import SummaryWriter
 
-class Transformer:
+class Transformer(ABC):
     def __init__(
         self,
         model_class,
@@ -61,7 +63,7 @@ class Transformer:
         self.model_name = model_name
         self.cache_dir = cache_dir
         self.load_model_from_dir = load_model_from_dir
-        if load_model_from_dir is None:
+        """if load_model_from_dir is None:
             self.model = model_class[model_name].from_pretrained(
                 model_name, cache_dir=cache_dir, num_labels=num_labels
             )
@@ -70,7 +72,8 @@ class Transformer:
             self.model = model_class[model_name].from_pretrained(
                 load_model_from_dir, num_labels=num_labels
             )
-
+        """
+        writer = SummaryWriter()
     @property
     def model_name(self):
         return self._model_name
@@ -101,14 +104,14 @@ class Transformer:
 
     def fine_tune(
         self,
-        train_dataset,
+        #train_dataset,
+        train_data_iterator_function,
         get_inputs,
         device,
         max_steps=-1,
         num_train_epochs=1,
         max_grad_norm=1.0,
         gradient_accumulation_steps=1,
-        per_gpu_train_batch_size=8,
         n_gpu=1,
         weight_decay=0.0,
         learning_rate=5e-5,
@@ -119,29 +122,17 @@ class Transformer:
         local_rank=-1,
         verbose=True,
         seed=None,
+        report_every=50,
         **kwargs
     ):
         if seed is not None:
             Transformer.set_seed(seed, n_gpu > 0)
-
-        train_batch_size = per_gpu_train_batch_size * max(1, n_gpu)
-        train_sampler = (
-            RandomSampler(train_dataset) if local_rank == -1 else DistributedSampler(train_dataset)
-        )
-        #train_dataloader = DataLoader(
-        #    train_dataset, sampler=train_sampler, batch_size=train_batch_size
-        #)
         
-        train_dataloader = DataLoader(
-            train_dataset,  batch_size=train_batch_size
-        )
-
+        train_batch_size = 1,
+        
         if max_steps > 0:
             t_total = max_steps
-            #num_train_epochs = 
-            #(
-            #    max_steps // (len(train_dataloader) // gradient_accumulation_steps) + 1
-            #)
+   
         else:
             t_total = 1e3 #len(train_dataloader) // gradient_accumulation_steps * num_train_epochs
         #t_total = max_steps
@@ -188,37 +179,45 @@ class Transformer:
         global_step = 0
         tr_loss = 0.0
         self.model.zero_grad()
-        train_iterator = trange(
-            int(num_train_epochs), desc="Epoch", disable=local_rank not in [-1, 0] or not verbose
-        )
-
-        #for _ in train_iterator:
+      
         self.model.train()
-        while 1:  
-            epoch_iterator = tqdm(
-                train_dataloader, desc="Iteration", disable=local_rank not in [-1, 0] or not verbose
-            )
-            for step, batch in enumerate(epoch_iterator):
-                batch = tuple(t.to(device) for t in batch if type(t)==torch.Tensor)
-                inputs = get_inputs(batch, self.model_name)
-                outputs = self.model(**inputs)
-                loss = outputs[0]
+        import time
+        start = time.time()
+        
+        
 
+        train_data_iterator = train_data_iterator_function()
+        accum_loss = 0
+        while 1:  
+            for step, batch in enumerate(train_data_iterator):
+                batch = batch.to(device)
+
+                #batch = tuple(t.to(device) for t in batch if type(t)==torch.Tensor)
+                inputs = get_inputs(batch, self.model_name)
+                outputs = self.model(**inputs) 
+                loss = outputs[0]
                 if n_gpu > 1:
                     loss = loss.mean()
                 if gradient_accumulation_steps > 1:
                     loss = loss / gradient_accumulation_steps
-
-                if step % 10 == 0 and verbose:
-                    tqdm.write("Loss:{:.6f}".format(loss / train_batch_size))
+                
+                accum_loss += loss.item()
+                if step % report_every == 0 and verbose:
+                    #tqdm.write(loss)
+                    end = time.time()
+                    print("loss: {0:.6f}, time: {1:.2f}, step {2:f} out of total {3:f}".format(
+                        accum_loss/report_every, end-start, global_step, max_steps))
+                    accum_loss = 0
+                    start = end
 
                 if fp16:
                     with amp.scale_loss(loss, optimizer) as scaled_loss:
                         scaled_loss.backward()
-                    torch.nn.utils.clip_grad_norm_(amp.master_params(optimizer), max_grad_norm)
+                    torch.nn.utils.clip_grad_norm_(amp.master_params(optimizer), 0)
                 else:
-                    loss.backward()
-                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_grad_norm)
+                    #loss.backward()
+                    (loss/loss.numel()).backward()
+                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), 0)
 
                 tr_loss += loss.item()
                 if (step + 1) % gradient_accumulation_steps == 0:
@@ -228,20 +227,18 @@ class Transformer:
                     global_step += 1
 
                 if max_steps > 0 and global_step > max_steps:
-                    epoch_iterator.close()
                     break
             if max_steps > 0 and global_step > max_steps:
-                train_iterator.close()
                 break
 
             # empty cache
-            del [batch]
+            #del [batch]
             torch.cuda.empty_cache()
         return global_step, tr_loss / global_step
 
     def predict(
         self,
-        eval_dataset,
+        eval_data_iterator,
         get_inputs,
         device,
         per_gpu_eval_batch_size=16,
@@ -249,19 +246,14 @@ class Transformer:
         local_rank=-1,
         verbose=True,
     ):
-        eval_batch_size = per_gpu_eval_batch_size * max(1, n_gpu)
-        eval_sampler = (
-            SequentialSampler(eval_dataset)
-            if local_rank == -1
-            else DistributedSampler(eval_dataset)
-        )
-        #eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=eval_batch_size)
-        eval_dataloader = DataLoader(eval_dataset, batch_size=eval_batch_size)
+       
 
-        for batch in tqdm(eval_dataloader, desc="Evaluating", disable=not verbose):
-            self.model.eval()
+        #for batch in tqdm(eval_data_iterator, desc="Evaluating", disable=not verbose):
+        self.model.eval()
+        for batch in eval_data_iterator():
+            batch = batch.to(device)
             #batch = tuple(t.to(device) for t in batch)
-            batch = tuple(t.to(device) for t in batch if type(t)==torch.Tensor)
+            #batch = tuple(t.to(device) for t in batch if type(t)==torch.Tensor)
             with torch.no_grad():
                 inputs = get_inputs(batch, self.model_name, train_mode=False)
                 outputs = self.model(**inputs)
