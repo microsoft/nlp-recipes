@@ -103,9 +103,25 @@ class ExtSumProcessor:
         }
         args = Bunch(default_preprocessing_parameters)
         self.preprossor = TransformerData(args, self.tokenizer)
-
+        
+        
     @staticmethod
     def get_inputs(batch, model_name, train_mode=True):
+        if model_name.split("-")[0] in ["bert", "xlnet", "roberta", "distilbert"]:
+            if train_mode:
+               # return {"input_ids": batch[0], "attention_mask": batch[1], "labels": batch[2]}
+            #src, segs, clss, mask, mask_cls, src_str
+            # labels must be the last
+                return {"x": batch.src, "segs": batch.segs, "clss": batch.clss,
+                        "mask": batch.mask, "mask_cls": batch.mask_cls, "labels": batch.labels}
+            else:
+                return {"x": batch.src, "segs": batch.segs, "clss": batch.clss,
+                        "mask": batch.mask, "mask_cls": batch.mask_cls}
+        else:
+            raise ValueError("Model not supported: {}".format(model_name))
+
+    @staticmethod
+    def get_inputs_2(batch, model_name, train_mode=True):
         if model_name.split("-")[0] in ["bert", "xlnet", "roberta", "distilbert"]:
             if train_mode:
                # return {"input_ids": batch[0], "attention_mask": batch[1], "labels": batch[2]}
@@ -118,8 +134,21 @@ class ExtSumProcessor:
                        "mask": batch[3], "mask_cls": batch[4]}
         else:
             raise ValueError("Model not supported: {}".format(model_name))
-    
+            
     def preprocess(self, sources, targets=None, oracle_mode="greedy", selections=3):
+        """preprocess multiple data points"""
+        
+        is_labeled = False
+        if targets is None:
+            for source in sources:
+                yield list(self._preprocess_single(source, None, oracle_mode, selections))
+        else:
+            for (source, target) in zip(sources, targets):
+                yield list(self._preprocess_single(source, target, oracle_mode, selections))
+            is_labeled = True
+            
+        
+    def preprocess_3(self, sources, targets=None, oracle_mode="greedy", selections=3):
         """preprocess multiple data points"""
         
         is_labeled = False
@@ -253,10 +282,10 @@ class ExtSumProcessor:
         #return {"src": indexed_tokens, "labels": labels, "segs": segments_ids, 'clss': cls_ids,
         #           'src_txt': src_txt, "tgt_txt": tgt_txt}
 
-
+from transformers import PreTrainedModel,  PretrainedConfig, DistilBertModel, BertModel, DistilBertConfig
 
 class ExtractiveSummarizer(Transformer):
-    def __init__(self, model_name="bert-base-cased", cache_dir="."):
+    def __init__(self, model_name="distilbert-base-uncased", model_class=DistilBertModel, cache_dir="."):
         super().__init__(
             model_class=MODEL_CLASS,
             model_name=model_name,
@@ -264,15 +293,16 @@ class ExtractiveSummarizer(Transformer):
             cache_dir=cache_dir,
         )
         args = Bunch(default_parameters)
-        self.model = Summarizer(args, MODEL_CLASS[model_name], model_name, None, cache_dir)
-
+        self.model = Summarizer("transformer", args, model_class, model_name, None, cache_dir)
+        
+        
     @staticmethod
     def list_supported_models():
         return list(MODEL_CLASS)
 
     def fit(
         self,
-        train_dataset,
+        train_data_iterator,
         device="cuda",
         num_epochs=1,
         batch_size=32,
@@ -289,10 +319,15 @@ class ExtractiveSummarizer(Transformer):
         accum_count=2,
         **kwargs
     ):
-        device, num_gpus = get_device(device=device, num_gpus=num_gpus, local_rank=local_rank)
+        #device, num_gpus = get_device(device=device, num_gpus=num_gpus, local_rank=local_rank)
+        device = torch.device("cuda:{}".format(0))
+        torch.backends.cudnn.enabled = True
+        torch.backends.cudnn.deterministic = True
+        
         self.model.to(device)
+        
         super().fine_tune(
-            train_dataset=train_dataset,
+            train_data_iterator,
             get_inputs=ExtSumProcessor.get_inputs,
             device=device,
             per_gpu_train_batch_size=batch_size,
@@ -307,7 +342,7 @@ class ExtractiveSummarizer(Transformer):
             **kwargs,
         )
 
-    def predict(self, eval_dataset, device, batch_size=16, sentence_seperator="<q>", top_n=3, block_trigram=True, num_gpus=1, verbose=True, cal_lead=False):
+    def predict(self, eval_data_iterator, device, batch_size=16, sentence_seperator="<q>", top_n=3, block_trigram=True, num_gpus=1, verbose=True, cal_lead=False):
         def _get_ngrams(n, text):
             ngram_set = set()
             text_length = len(text)
@@ -323,48 +358,57 @@ class ExtractiveSummarizer(Transformer):
                 if len(tri_c.intersection(tri_s))>0:
                     return True
             return False
-
-        sent_scores = list(
-            super().predict(
-                eval_dataset=eval_dataset,
-                get_inputs=ExtSumProcessor.get_inputs,
-                device=device,
-                per_gpu_eval_batch_size=batch_size,
-                n_gpu=num_gpus,
-                verbose=verbose,
-            )
-        )
-        #return sent_scores
-        if cal_lead:
-            selected_ids = list(range(eval_dataset.clss.size(1)))*len(eval_dataset.clss)
-        else:
-            negative_sent_score = [-i for i in sent_scores[0]]
-            selected_ids = np.argsort(negative_sent_score, 1)   
-            # selected_ids = np.sort(selected_ids,1)
-        pred = []
-        for i, idx in enumerate(selected_ids):
-            _pred = []
-            if(len(eval_dataset.src_str[i])==0):
-                pred.append('')
-                continue
-            for j in selected_ids[i][:len(eval_dataset.src_str[i])]:
-                if(j>=len( eval_dataset.src_str[i])):
+        def _get_pred(batch, sent_scores):
+            #return sent_scores
+            if cal_lead:
+                selected_ids = list(range(batch.clss.size(1)))*len(batch.clss)
+            else:
+                #negative_sent_score = [-i for i in sent_scores[0]]
+                selected_ids = np.argsort(-sent_scores, 1)   
+                # selected_ids = np.sort(selected_ids,1)
+            pred = []
+            for i, idx in enumerate(selected_ids):
+                _pred = []
+                if(len(batch.src_str[i])==0):
+                    pred.append('')
                     continue
-                candidate = eval_dataset.src_str[i][j].strip()
-                if(block_trigram):
-                    if(not _block_tri(candidate,_pred)):
+                for j in selected_ids[i][:len(batch.src_str[i])]:
+                    if(j>=len( batch.src_str[i])):
+                        continue
+                    candidate = batch.src_str[i][j].strip()
+                    if(block_trigram):
+                        if(not _block_tri(candidate,_pred)):
+                            _pred.append(candidate)
+                    else:
                         _pred.append(candidate)
-                else:
-                    _pred.append(candidate)
 
-                # only select the top 3
-                if len(_pred) == top_n:
-                    break
+                    # only select the top 3
+                    if len(_pred) == top_n:
+                        break
 
-            #_pred = '<q>'.join(_pred)
-            _pred = sentence_seperator.join(_pred)  
-            pred.append(_pred.strip())
+                #_pred = '<q>'.join(_pred)
+                _pred = sentence_seperator.join(_pred)  
+                pred.append(_pred.strip())
+            return pred
+        
+         #for batch in tqdm(eval_data_iterator, desc="Evaluating", disable=not verbose):
+        self.model.eval()
+        pred = []
+        for batch in eval_data_iterator:
+            batch = batch.to(device)
+            #batch = tuple(t.to(device) for t in batch)
+            #batch = tuple(t.to(device) for t in batch if type(t)==torch.Tensor)
+            with torch.no_grad():
+                inputs = ExtSumProcessor.get_inputs(batch, self.model_name, train_mode=False)
+                outputs = self.model(**inputs)
+                sent_scores = outputs[0]
+                sent_scores = sent_scores.detach().cpu().numpy()
+                #return sent_scores
+                pred.extend(_get_pred(batch, sent_scores))
+            #yield logits.detach().cpu().numpy()
         return pred
+
+
                     
         """preds = list(
             super().predict(
