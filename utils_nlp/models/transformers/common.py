@@ -32,28 +32,7 @@ MAX_SEQ_LEN = 512
 logger = logging.getLogger(__name__)
 
 
-<<<<<<< HEAD
 class Transformer:
-=======
-def get_device(device, num_gpus, local_rank):
-    if local_rank == -1:
-        device = torch.device("cuda" if torch.cuda.is_available() and device == "cuda" else "cpu")
-        num_gpus = (
-            min(num_gpus, torch.cuda.device_count()) if num_gpus else torch.cuda.device_count()
-        )
-    else:
-        torch.cuda.set_device(local_rank)
-        device = torch.device("cuda", local_rank)
-        torch.distributed.init_process_group(backend="nccl")
-        num_gpus = 1
-
-    return device, num_gpus
-
-from abc import ABC, abstractmethod
-from tensorboardX import SummaryWriter
-
-class Transformer(ABC):
->>>>>>> 14465fb... change prediction
     def __init__(
         self,
         model_class,
@@ -73,7 +52,7 @@ class Transformer(ABC):
         self._model_type = model_name.split("-")[0]
         self.cache_dir = cache_dir
         self.load_model_from_dir = load_model_from_dir
-        """if load_model_from_dir is None:
+        if load_model_from_dir is None:
             self.model = model_class[model_name].from_pretrained(
                 model_name, cache_dir=cache_dir, num_labels=num_labels, output_loading_info=False
             )
@@ -82,8 +61,7 @@ class Transformer(ABC):
             self.model = model_class[model_name].from_pretrained(
                 load_model_from_dir, num_labels=num_labels, output_loading_info=False
             )
-        """
-        writer = SummaryWriter()
+
     @property
     def model_name(self):
         return self._model_name
@@ -102,12 +80,7 @@ class Transformer(ABC):
 
     def fine_tune(
         self,
-<<<<<<< HEAD
         train_dataloader,
-=======
-        #train_dataset,
-        train_data_iterator_function,
->>>>>>> 14465fb... change prediction
         get_inputs,
         device,
         max_steps=-1,
@@ -126,7 +99,6 @@ class Transformer(ABC):
         local_rank=-1,
         verbose=True,
         seed=None,
-<<<<<<< HEAD
     ):
         if seed is not None:
             Transformer.set_seed(seed, n_gpu > 0)
@@ -136,19 +108,6 @@ class Transformer(ABC):
             num_train_epochs = (
                 max_steps // (len(train_dataloader) // gradient_accumulation_steps) + 1
             )
-=======
-        report_every=50,
-        **kwargs
-    ):
-        if seed is not None:
-            Transformer.set_seed(seed, n_gpu > 0)
-        
-        train_batch_size = 1,
-        
-        if max_steps > 0:
-            t_total = max_steps
-   
->>>>>>> 14465fb... change prediction
         else:
             t_total = len(train_dataloader) // gradient_accumulation_steps * num_train_epochs
 
@@ -200,7 +159,6 @@ class Transformer(ABC):
         global_step = 0
         tr_loss = 0.0
         self.model.zero_grad()
-<<<<<<< HEAD
         train_iterator = trange(
             int(num_train_epochs), desc="Epoch", disable=local_rank not in [-1, 0] or not verbose
         )
@@ -212,53 +170,25 @@ class Transformer(ABC):
             for step, batch in enumerate(epoch_iterator):
                 self.model.train()
                 batch = tuple(t.to(device) for t in batch)
-=======
-      
-        self.model.train()
-        import time
-        start = time.time()
-        
-        
-
-        train_data_iterator = train_data_iterator_function()
-        accum_loss = 0
-        while 1:  
-            for step, batch in enumerate(train_data_iterator):
-                batch = batch.to(device)
-
-                #batch = tuple(t.to(device) for t in batch if type(t)==torch.Tensor)
->>>>>>> 14465fb... change prediction
                 inputs = get_inputs(batch, self.model_name)
-                outputs = self.model(**inputs) 
+                outputs = self.model(**inputs)
                 loss = outputs[0]
+
                 if n_gpu > 1:
                     loss = loss.mean()
                 if gradient_accumulation_steps > 1:
                     loss = loss / gradient_accumulation_steps
-<<<<<<< HEAD
 
                 if step % 10 == 0 and verbose:
                     tqdm.write("Loss:{:.6f}".format(loss))
-=======
-                
-                accum_loss += loss.item()
-                if step % report_every == 0 and verbose:
-                    #tqdm.write(loss)
-                    end = time.time()
-                    print("loss: {0:.6f}, time: {1:.2f}, step {2:f} out of total {3:f}".format(
-                        accum_loss/report_every, end-start, global_step, max_steps))
-                    accum_loss = 0
-                    start = end
->>>>>>> 14465fb... change prediction
 
                 if fp16:
                     with amp.scale_loss(loss, optimizer) as scaled_loss:
                         scaled_loss.backward()
-                    torch.nn.utils.clip_grad_norm_(amp.master_params(optimizer), 0)
+                    torch.nn.utils.clip_grad_norm_(amp.master_params(optimizer), max_grad_norm)
                 else:
-                    #loss.backward()
-                    (loss/loss.numel()).backward()
-                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), 0)
+                    loss.backward()
+                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_grad_norm)
 
                 tr_loss += loss.item()
                 if (step + 1) % gradient_accumulation_steps == 0:
@@ -268,40 +198,21 @@ class Transformer(ABC):
                     global_step += 1
 
                 if max_steps > 0 and global_step > max_steps:
+                    epoch_iterator.close()
                     break
             if max_steps > 0 and global_step > max_steps:
+                train_iterator.close()
                 break
 
             # empty cache
-            #del [batch]
+            del [batch]
             torch.cuda.empty_cache()
         return global_step, tr_loss / global_step
 
-<<<<<<< HEAD
     def predict(self, eval_dataloader, get_inputs, device, verbose=True):
         for batch in tqdm(eval_dataloader, desc="Evaluating", disable=not verbose):
             self.model.eval()
             batch = tuple(t.to(device) for t in batch)
-=======
-    def predict(
-        self,
-        eval_data_iterator,
-        get_inputs,
-        device,
-        per_gpu_eval_batch_size=16,
-        n_gpu=1,
-        local_rank=-1,
-        verbose=True,
-    ):
-       
-
-        #for batch in tqdm(eval_data_iterator, desc="Evaluating", disable=not verbose):
-        self.model.eval()
-        for batch in eval_data_iterator():
-            batch = batch.to(device)
-            #batch = tuple(t.to(device) for t in batch)
-            #batch = tuple(t.to(device) for t in batch if type(t)==torch.Tensor)
->>>>>>> 14465fb... change prediction
             with torch.no_grad():
                 inputs = get_inputs(batch, self.model_name, train_mode=False)
                 outputs = self.model(**inputs)
