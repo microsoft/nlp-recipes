@@ -87,7 +87,7 @@ def load_dataset(
     model_name="bert-base-uncased",
     to_lower=False,
     cache_dir='./temp',
-    maxLen=MAX_SEQ_LEN,
+    max_len=MAX_SEQ_LEN,
     trailing_piece_tag="X"
 ):
     """
@@ -112,7 +112,7 @@ def load_dataset(
             Defaults to False.
         cache_dir (str, optional): The default folder for saving cache files.
             Defaults to './temp'.
-        maxLen (int, optional): Maximum length of the list of tokens. Lists longer
+        max_len (int, optional): Maximum length of the list of tokens. Lists longer
             than this are truncated and shorter ones are padded with "O"s. 
             Default value is BERT_MAX_LEN=512.
         trailing_piece_tag (str, optional): Tag used to label trailing word pieces.
@@ -199,7 +199,7 @@ def load_dataset(
 
     train_dataset = processor.preprocess_for_bert(
         text=train_df['sentence'],
-        max_len=maxLen,
+        max_len=max_len,
         labels=train_df['labels'],
         label_map=label_map,
         trailing_piece_tag=trailing_piece_tag
@@ -207,7 +207,7 @@ def load_dataset(
 
     test_dataset = processor.preprocess_for_bert(
         text=test_df['sentence'],
-        max_len=maxLen,
+        max_len=max_len,
         labels=test_df['labels'],
         label_map=label_map,
         trailing_piece_tag=trailing_piece_tag

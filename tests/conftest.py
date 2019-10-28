@@ -80,8 +80,8 @@ def notebooks():
         "tc_bbc_bert_hi": os.path.join(
             folder_notebooks, "text_classification", "tc_bbc_bert_hi.ipynb"
         ),
-        "ner_wikigold_bert": os.path.join(
-            folder_notebooks, "named_entity_recognition", "ner_wikigold_bert.ipynb"
+        "ner_wikigold_transform": os.path.join(
+            folder_notebooks, "named_entity_recognition", "ner_wikigold_transformer.ipynb"
         ),
         "deep_and_unified_understanding": os.path.join(
             folder_notebooks, "model_explainability", "interpret_dnn_layers.ipynb"
