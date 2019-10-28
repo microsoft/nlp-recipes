@@ -12,6 +12,7 @@ import os
 import pandas as pd
 import logging
 
+from tempfile import TemporaryDirectory
 from utils_nlp.dataset.url_utils import maybe_download
 from utils_nlp.dataset.ner_utils import preprocess_conll
 from utils_nlp.models.transformers.common import MAX_SEQ_LEN
@@ -79,14 +80,14 @@ def get_unique_labels():
 
 
 def load_dataset(
-    local_path="~/.nlp_utils/datasets/",
+    local_path=TemporaryDirectory().name,
     test_fraction=0.3,
     random_seed=None,
     train_sample_ratio=1.0,
     test_sample_ratio=1.0,
     model_name="bert-base-uncased",
-    to_lower=False,
-    cache_dir='./temp',
+    to_lower=True,
+    cache_dir=TemporaryDirectory().name,
     max_len=MAX_SEQ_LEN,
     trailing_piece_tag="X"
 ):
@@ -109,7 +110,7 @@ def load_dataset(
         model_name (str, optional): The pretained model name.
             Defaults to "bert-base-uncased".
         to_lower (bool, optional): Lower case text input.
-            Defaults to False.
+            Defaults to True.
         cache_dir (str, optional): The default folder for saving cache files.
             Defaults to './temp'.
         max_len (int, optional): Maximum length of the list of tokens. Lists longer
