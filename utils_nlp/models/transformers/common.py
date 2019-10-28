@@ -32,7 +32,7 @@ TOKENIZER_CLASS.update({k: DistilBertTokenizer for k in DISTILBERT_PRETRAINED_MO
 MAX_SEQ_LEN = 512
 
 logger = logging.getLogger(__name__)
-
+import bertsum.distributed as distributed
 
 def get_device(device, num_gpus, local_rank):
     if local_rank == -1:
@@ -108,6 +108,7 @@ class Transformer(ABC):
         train_data_iterator_function,
         get_inputs,
         device,
+        optimizer,
         max_steps=-1,
         num_train_epochs=1,
         max_grad_norm=1.0,
@@ -153,8 +154,8 @@ class Transformer(ABC):
                 "weight_decay": 0.0,
             },
         ]
-        optimizer = AdamW(optimizer_grouped_parameters, lr=learning_rate, eps=adam_epsilon)
-        scheduler = WarmupLinearSchedule(optimizer, warmup_steps=warmup_steps, t_total=t_total)
+        #optimizer = AdamW(optimizer_grouped_parameters, lr=learning_rate, eps=adam_epsilon)
+        #scheduler = WarmupLinearSchedule(optimizer, warmup_steps=warmup_steps, t_total=t_total)
 
         if fp16:
             try:
@@ -217,13 +218,20 @@ class Transformer(ABC):
                 else:
                     #loss.backward()
                     (loss/loss.numel()).backward()
-                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), 0)
+                    #torch.nn.utils.clip_grad_norm_(self.model.parameters(), 0)
 
                 tr_loss += loss.item()
                 if (step + 1) % gradient_accumulation_steps == 0:
                     optimizer.step()
-                    scheduler.step()
+                    #scheduler.step()
                     self.model.zero_grad()
+                    if n_gpu > 1:
+                        grads = [p.grad.data for p in self.model.parameters()
+                                 if p.requires_grad
+                                 and p.grad is not None]
+                        distributed.all_reduce_and_rescale_tensors(
+                            grads, float(1))
+                    
                     global_step += 1
 
                 if max_steps > 0 and global_step > max_steps:

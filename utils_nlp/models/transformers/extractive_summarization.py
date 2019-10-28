@@ -42,6 +42,7 @@ from bertsum.prepro.data_builder import greedy_selection, combination_selection
 from bertsum.prepro.data_builder import TransformerData
 from utils_nlp.models.bert.extractive_text_summarization import Bunch, modified_format_to_bert, default_parameters
 from bertsum.models.model_builder import Summarizer
+from bertsum.models import  model_builder
 
 class ExtSumData():
     def __init__(self, src, segs, clss, mask, mask_cls, labels=None, src_str=None, tgt_str=None):
@@ -283,6 +284,7 @@ class ExtSumProcessor:
         #           'src_txt': src_txt, "tgt_txt": tgt_txt}
 
 from transformers import PreTrainedModel,  PretrainedConfig, DistilBertModel, BertModel, DistilBertConfig
+import bertsum.distributed as distributed
 
 class ExtractiveSummarizer(Transformer):
     def __init__(self, model_name="distilbert-base-uncased", model_class=DistilBertModel, cache_dir="."):
@@ -309,7 +311,7 @@ class ExtractiveSummarizer(Transformer):
         num_gpus=None,
         local_rank=-1,
         weight_decay=0.0,
-        learning_rate=2e-3,
+        learning_rate=1e-4,
         adam_epsilon=1e-8,
         warmup_steps=10000,
         verbose=True,
@@ -321,15 +323,20 @@ class ExtractiveSummarizer(Transformer):
     ):
         #device, num_gpus = get_device(device=device, num_gpus=num_gpus, local_rank=local_rank)
         device = torch.device("cuda:{}".format(0))
+        gpu_rank = distributed.multi_init(0, 1, "0")
         torch.backends.cudnn.enabled = True
         torch.backends.cudnn.deterministic = True
         
         self.model.to(device)
         
+        args = Bunch(default_parameters)
+        optim = model_builder.build_optim(args, self.model, None)
+        
         super().fine_tune(
             train_data_iterator,
             get_inputs=ExtSumProcessor.get_inputs,
             device=device,
+            optimizer=optim,
             per_gpu_train_batch_size=batch_size,
             n_gpu=num_gpus,
             num_train_epochs=num_epochs,
