@@ -345,7 +345,7 @@ class TokenClassifier(Transformer):
         eval_dataset,
         device="cuda",
         batch_size=32,
-        num_gpus=None,
+        num_gpus=1,
         local_rank=-1,
         verbose=False,
     ):
