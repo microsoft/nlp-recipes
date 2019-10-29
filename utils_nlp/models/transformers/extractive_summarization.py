@@ -40,53 +40,49 @@ MODEL_CLASS.update(
 
 from bertsum.prepro.data_builder import greedy_selection, combination_selection
 from bertsum.prepro.data_builder import TransformerData
-from utils_nlp.models.bert.extractive_text_summarization import Bunch, modified_format_to_bert, default_parameters
+from utils_nlp.models.bert.extractive_text_summarization import Bunch, default_parameters
 from bertsum.models.model_builder import Summarizer
 from bertsum.models import  model_builder
+from transformers import PreTrainedModel,  PretrainedConfig, DistilBertModel, BertModel, DistilBertConfig
+import bertsum.distributed as distributed
+import time
 
-class ExtSumData():
-    def __init__(self, src, segs, clss, mask, mask_cls, labels=None, src_str=None, tgt_str=None):
-        self.src = src
-        self.segs = segs
-        self.clss = clss
-        self.mask = mask
-        self.mask_cls = mask_cls
-        self.labels = labels
-        self.src_str = src_str
-        self.tgt_str = tgt_str
+import itertools
+
+from bertsum.models.data_loader  import DataIterator
+from bertsum.models import  model_builder, data_loader
+class Bunch(object):
+    """ Class which convert a dictionary to an object """
+
+    def __init__(self, adict):
+        self.__dict__.update(adict)
+
+def get_dataset(file_list, is_train=False):
+        if is_train:
+            random.shuffle(file_list)
+        for file in file_list:
+            yield torch.load(file)
+            
+def get_data_loader(file_list, device, is_labeled=False, batch_size=3000):
+    """
+    Function to get data iterator over a list of data objects.
+
+    Args:
+        dataset (list of objects): a list of data objects.
+        is_test (bool): it specifies whether the data objects are labeled data.
+        batch_size (int): number of tokens per batch.
         
-class ExtSumIterableDataset(torch.utils.data.IterableDataset):
-    def __init__(self, src, segs, clss, mask, mask_cls, labels=None, src_str=None, tgt_str=None):
-        self.src = src
-        self.segs = segs
-        self.clss = clss
-        self.mask = mask
-        self.mask_cls = mask_cls
-        self.labels = labels
-        self.src_str = src_str
-        self.tgt_str = tgt_str
-    
-    def __iter__(self):
-        if self.labels is not None:
-            return iter(zip(self.src, self.segs, self.clss, \
-                self.mask, self.mask_cls,  self.src_str, self.labels, self.tgt_str))
-        else:
-            return  iter(zip(self.src, self.segs, self.clss, \
-                self.mask, self.mask_cls, self.src_str))
-        
+    Returns:
+        DataIterator
 
-    def __getitem__(self, index):
-        if self.labels is not None:
-            return ExtSumData(self.src[index], self.segs[index], self.clss[index], \
-                self.mask[index], self.mask_cls[index],   self.labels[index], self.src_str[index], self.tgt_str[index])
-        else:
-            return ExtSumData(self.src[index], self.segs[index], self.clss[index], \
-                self.mask[index], self.mask_cls[index], None, self.src_str[index], None)
-
-    def __len__(self):
-        return len(self.src)
-
-    
+    """
+    args = Bunch({})
+    args.use_interval = True
+    args.batch_size = batch_size
+    data_iter = None
+    data_iter  = data_loader.Dataloader(args, get_dataset(file_list), args.batch_size, device, shuffle=False, is_test=is_labeled)
+    return data_iter
+            
 
 class ExtSumProcessor:    
     def __init__(self, model_name="bert-base-cased", to_lower=False, cache_dir="."):
@@ -108,10 +104,8 @@ class ExtSumProcessor:
         
     @staticmethod
     def get_inputs(batch, model_name, train_mode=True):
-        if model_name.split("-")[0] in ["bert", "xlnet", "roberta", "distilbert"]:
+        if model_name.split("-")[0] in ["bert", "distilbert"]:
             if train_mode:
-               # return {"input_ids": batch[0], "attention_mask": batch[1], "labels": batch[2]}
-            #src, segs, clss, mask, mask_cls, src_str
             # labels must be the last
                 return {"x": batch.src, "segs": batch.segs, "clss": batch.clss,
                         "mask": batch.mask, "mask_cls": batch.mask_cls, "labels": batch.labels}
@@ -121,20 +115,6 @@ class ExtSumProcessor:
         else:
             raise ValueError("Model not supported: {}".format(model_name))
 
-    @staticmethod
-    def get_inputs_2(batch, model_name, train_mode=True):
-        if model_name.split("-")[0] in ["bert", "xlnet", "roberta", "distilbert"]:
-            if train_mode:
-               # return {"input_ids": batch[0], "attention_mask": batch[1], "labels": batch[2]}
-            #src, segs, clss, mask, mask_cls, src_str
-            # labels must be the last
-                return {"x": batch[0], "segs": batch[1], "clss": batch[2],
-                        "mask": batch[3], "mask_cls": batch[4], "labels": batch[5]}
-            else:
-                return {"x": batch[0], "segs": batch[1], "clss": batch[2],
-                       "mask": batch[3], "mask_cls": batch[4]}
-        else:
-            raise ValueError("Model not supported: {}".format(model_name))
             
     def preprocess(self, sources, targets=None, oracle_mode="greedy", selections=3):
         """preprocess multiple data points"""
@@ -142,127 +122,12 @@ class ExtSumProcessor:
         is_labeled = False
         if targets is None:
             for source in sources:
-                yield list(self._preprocess_single(source, None, oracle_mode, selections))
+                yield self._preprocess_single(source, None, oracle_mode, selections)
         else:
             for (source, target) in zip(sources, targets):
-                yield list(self._preprocess_single(source, target, oracle_mode, selections))
+                yield self._preprocess_single(source, target, oracle_mode, selections)
             is_labeled = True
             
-        
-    def preprocess_3(self, sources, targets=None, oracle_mode="greedy", selections=3):
-        """preprocess multiple data points"""
-        
-        is_labeled = False
-        if targets is None:
-            data = [self._preprocess_single(source, None, oracle_mode, selections) for source in sources]     
-        else:
-            data = [self._preprocess_single(source, target, oracle_mode, selections) for (source, target) in zip(sources, targets)]
-            is_labeled = True
-            
-        def _pad(data, pad_id, width=-1):
-            if (width == -1):
-                width = max(len(d) for d in data)
-            rtn_data = [d + [pad_id] * (width - len(d)) for d in data]
-            return rtn_data
-
-    
-        if data is not None:
-            pre_src = [x[0] for x in data]
-            pre_segs = [x[2] for x in data]
-            pre_clss = [x[3] for x in data]
-
-            src = torch.tensor(_pad(pre_src, 0))
-        
-            pre_labels = None
-            labels = None
-            if is_labeled:
-                pre_labels = [x[1] for x in data]
-                labels = torch.tensor(_pad(pre_labels, 0))
-            segs = torch.tensor(_pad(pre_segs, 0))
-            #mask = 1 - (src == 0)
-            mask = ~(src == 0)
-
-            clss = torch.tensor(_pad(pre_clss, -1))
-            #mask_cls = 1 - (clss == -1)
-            mask_cls = ~(clss == -1)
-            clss[clss == -1] = 0
-
-            #setattr(self, 'clss', clss.to(device))
-            #setattr(self, 'mask_cls', mask_cls.to(device))
-            #setattr(self, 'src', src.to(device))
-            #setattr(self, 'segs', segs.to(device))
-            #setattr(self, 'mask', mask.to(device))
-            src_str = [x[-2] for x in data]
-            #setattr(self, 'src_str', src_str)
-            #x, segs, clss, mask, mask_cls, 
-            #td = TensorDataset(src, segs, clss, mask, mask_cls)
-            #td = src, segs, clss, mask, mask_cls, None, src_str, None
-            td = ExtSumIterableDataset(src, segs, clss, mask, mask_cls, None, src_str, None)
-            if is_labeled:
-                #setattr(self, 'labels', labels.to(device))
-                tgt_str = [x[-1] for x in data]
-                #setattr(self, 'tgt_str', tgt_str)
-                #td = TensorDataset(src, segs, clss, mask, mask_cls, labels)
-                td = ExtSumIterableDataset(src, segs, clss, mask, mask_cls, labels, src_str, tgt_str)
-            return td
-        
-
-    def preprocess_2(self, sources, targets=None, oracle_mode="greedy", selections=3):
-        """preprocess multiple data points"""
-        
-        is_labeled = False
-        if targets is None:
-            data = [self._preprocess_single(source, None, oracle_mode, selections) for source in sources]     
-        else:
-            data = [self._preprocess_single(source, target, oracle_mode, selections) for (source, target) in zip(sources, targets)]
-            is_labeled = True
-            
-        def _pad(data, pad_id, width=-1):
-            if (width == -1):
-                width = max(len(d) for d in data)
-            rtn_data = [d + [pad_id] * (width - len(d)) for d in data]
-            return rtn_data
-
-    
-        if data is not None:
-            pre_src = [x[0] for x in data]
-            pre_segs = [x[2] for x in data]
-            pre_clss = [x[3] for x in data]
-
-            src = torch.tensor(_pad(pre_src, 0))
-        
-            pre_labels = None
-            labels = None
-            if is_labeled:
-                pre_labels = [x[1] for x in data]
-                labels = torch.tensor(_pad(pre_labels, 0))
-            segs = torch.tensor(_pad(pre_segs, 0))
-            #mask = 1 - (src == 0)
-            mask = ~(src == 0)
-
-            clss = torch.tensor(_pad(pre_clss, -1))
-            #mask_cls = 1 - (clss == -1)
-            mask_cls = ~(clss == -1)
-            clss[clss == -1] = 0
-
-            #setattr(self, 'clss', clss.to(device))
-            #setattr(self, 'mask_cls', mask_cls.to(device))
-            #setattr(self, 'src', src.to(device))
-            #setattr(self, 'segs', segs.to(device))
-            #setattr(self, 'mask', mask.to(device))
-            src_str = [x[-2] for x in data]
-            #setattr(self, 'src_str', src_str)
-            #x, segs, clss, mask, mask_cls, 
-            td = TensorDataset(src, segs, clss, mask, mask_cls)
-            if (is_labeled):
-                #setattr(self, 'labels', labels.to(device))
-                tgt_str = [x[-1] for x in data]
-                #setattr(self, 'tgt_str', tgt_str)
-                td = TensorDataset(src, segs, clss, mask, mask_cls, labels)
-            return td
-                
-        
-    
     def _preprocess_single(self, source, target=None, oracle_mode="greedy", selections=3):
         """preprocess single data point"""
         oracle_ids = None
@@ -271,20 +136,13 @@ class ExtSumProcessor:
                 oracle_ids = greedy_selection(source, target, selections)
             elif (oracle_mode == 'combination'):
                 oracle_ids = combination_selection(source, target, selections)
-                print(oracle_ids)
-            
-         
+                
         b_data  = self.preprossor.preprocess(source, target, oracle_ids)
-        
         if (b_data is None):
             return None
         indexed_tokens, labels, segments_ids, cls_ids, src_txt, tgt_txt = b_data
-        return (indexed_tokens, labels, segments_ids, cls_ids, src_txt, tgt_txt)
-        #return {"src": indexed_tokens, "labels": labels, "segs": segments_ids, 'clss': cls_ids,
-        #           'src_txt': src_txt, "tgt_txt": tgt_txt}
-
-from transformers import PreTrainedModel,  PretrainedConfig, DistilBertModel, BertModel, DistilBertConfig
-import bertsum.distributed as distributed
+        return {"src": indexed_tokens, "labels": labels, "segs": segments_ids, 'clss': cls_ids,
+                   'src_txt': src_txt, "tgt_txt": tgt_txt}
 
 class ExtractiveSummarizer(Transformer):
     def __init__(self, model_name="distilbert-base-uncased", model_class=DistilBertModel, cache_dir="."):
@@ -304,50 +162,104 @@ class ExtractiveSummarizer(Transformer):
 
     def fit(
         self,
-        train_data_iterator,
+        train_data_iterator_function,
         device="cuda",
-        num_epochs=1,
-        batch_size=32,
         num_gpus=None,
         local_rank=-1,
-        weight_decay=0.0,
-        learning_rate=1e-4,
-        adam_epsilon=1e-8,
-        warmup_steps=10000,
+        max_steps=1e5,
         verbose=True,
         seed=None,
-        decay_method='noam', 
-        lr=0.002,
-        accum_count=2,
+        gradient_accumulation_steps=2,
+        report_every=50,
         **kwargs
     ):
         #device, num_gpus = get_device(device=device, num_gpus=num_gpus, local_rank=local_rank)
         device = torch.device("cuda:{}".format(0))
-        gpu_rank = distributed.multi_init(0, 1, "0")
+        #gpu_rank = distributed.multi_init(0, 1, "0")
         torch.backends.cudnn.enabled = True
         torch.backends.cudnn.deterministic = True
         
         self.model.to(device)
         
-        args = Bunch(default_parameters)
-        optim = model_builder.build_optim(args, self.model, None)
+        get_inputs=ExtSumProcessor.get_inputs     
         
-        super().fine_tune(
-            train_data_iterator,
-            get_inputs=ExtSumProcessor.get_inputs,
-            device=device,
-            optimizer=optim,
-            per_gpu_train_batch_size=batch_size,
-            n_gpu=num_gpus,
-            num_train_epochs=num_epochs,
-            weight_decay=weight_decay,
-            learning_rate=learning_rate,
-            adam_epsilon=adam_epsilon,
-            warmup_steps=warmup_steps,
-            verbose=verbose,
-            seed=seed,
-            **kwargs,
-        )
+        args = Bunch(default_parameters)
+        optimizer = model_builder.build_optim(args, self.model, None)
+        
+        if seed is not None:
+            super(ExtractiveSummarizer).set_seed(seed, n_gpu > 0)
+        
+        train_batch_size = 1,
+        
+        # multi-gpu training (should be after apex fp16 initialization)
+        if num_gpus > 1:
+            self.model = torch.nn.DataParallel(self.model)
+
+        # Distributed training (should be after apex fp16 initialization)
+        if local_rank != -1:
+            self.model = torch.nn.parallel.DistributedDataParallel(
+                self.model,
+                device_ids=[local_rank],
+                output_device=local_rank,
+                find_unused_parameters=True,
+            )
+
+        global_step = 0
+        tr_loss = 0.0
+        self.model.zero_grad()
+      
+        self.model.train()
+        start = time.time()
+        
+        train_data_iterator = train_data_iterator_function()
+        accum_loss = 0
+        while 1:  
+            for step, batch in enumerate(train_data_iterator):
+                batch = batch.to(device)
+
+                #batch = tuple(t.to(device) for t in batch if type(t)==torch.Tensor)
+                inputs = get_inputs(batch, self.model_name)
+                outputs = self.model(**inputs) 
+                loss = outputs[0]
+                if num_gpus > 1:
+                    loss = loss.mean()
+                if gradient_accumulation_steps > 1:
+                    loss = loss / gradient_accumulation_steps
+                
+                accum_loss += loss.item()
+                if step % report_every == 0 and verbose:
+                    #tqdm.write(loss)
+                    end = time.time()
+                    print("loss: {0:.6f}, time: {1:.2f}, step {2:f} out of total {3:f}".format(
+                        accum_loss/report_every, end-start, global_step, max_steps))
+                    accum_loss = 0
+                    start = end
+                    
+                (loss/loss.numel()).backward()
+                
+                tr_loss += loss.item()
+                if (step + 1) % gradient_accumulation_steps == 0:
+                    optimizer.step()
+                    #scheduler.step()
+                    self.model.zero_grad()
+                    if num_gpus > 1:
+                        grads = [p.grad.data for p in self.model.parameters()
+                                 if p.requires_grad
+                                 and p.grad is not None]
+                        distributed.all_reduce_and_rescale_tensors(
+                            grads, float(1))
+                    
+                    global_step += 1
+
+                if max_steps > 0 and global_step > max_steps:
+                    break
+            if max_steps > 0 and global_step > max_steps:
+                break
+
+            # empty cache
+            #del [batch]
+            torch.cuda.empty_cache()
+        return global_step, tr_loss / global_step        
 
     def predict(self, eval_data_iterator, device, batch_size=16, sentence_seperator="<q>", top_n=3, block_trigram=True, num_gpus=1, verbose=True, cal_lead=False):
         def _get_ngrams(n, text):
