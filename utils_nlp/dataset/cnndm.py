@@ -15,7 +15,10 @@ from bertsum.others.utils import clean
 from multiprocess import Pool
 from tqdm import tqdm
 import itertools
-
+from torchtext.utils import download_from_url, extract_archive
+import zipfile
+import glob
+import path
 
 def _line_iter(file_path):
     with open(file_path, "r", encoding="utf8") as fd:
@@ -23,11 +26,10 @@ def _line_iter(file_path):
             yield line
 
 
-def _create__data_from_iterator(iterator, preprocessing, word_tokenizer):
+def _create_data_from_iterator(iterator, preprocessing, word_tokenizer):
     data = []
-    with tqdm(unit_scale=0, unit="lines") as t:
-        for line in iterator:
-            data.append(preprocess((line, preprocessing, word_tokenizer)))
+    for line in iterator:
+        data.append(preprocess((line, preprocessing, word_tokenizer)))
     return data
 
 
@@ -75,7 +77,7 @@ class Summarization(torch.utils.data.Dataset):
         top_n=-1,
         **kwargs
     ):
-        """ create an CNN/CM dataset instance given the paths of source file and targetfile"""
+        """ create an CNN/CM dataset instance given the paths of source file and target file"""
 
         super(Summarization, self).__init__()
         source_iter = _line_iter(source_file)
@@ -85,11 +87,11 @@ class Summarization(torch.utils.data.Dataset):
             source_iter = itertools.islice(source_iter, top_n)
             target_iter = itertools.islice(target_iter, top_n)
 
-        self._source = _create__data_from_iterator(
+        self._source = _create_data_from_iterator(
             source_iter, source_preprocessing, word_tokenization
         )
 
-        self._target = _create__data_from_iterator(
+        self._target = _create_data_from_iterator(
             target_iter, target_preprocessing, word_tokenization
         )
 
@@ -147,3 +149,50 @@ def CNNDMSummarization(*args, **kwargs):
         )
 
     return _setup_datasets(*((urls[0],) + args), **kwargs)
+
+
+class CNNDMBertSumProcessedData():
+        
+    @staticmethod
+    def save_data(data_iter, is_test=False, path_and_prefix="./", chunk_size=None):
+        def chunks(iterable, chunk_size):
+            iterator = iter(iterable)
+            for first in iterator:
+                if chunk_size:
+                    yield itertools.chain([first], itertools.islice(iterator, chunk_size - 1))
+                else:
+                    yield itertools.chain([first], itertools.islice(iterator, None))
+        chunks = chunks(data_iter, chunk_size)
+        filename_list = []
+        for i,chunked_data in enumerate(chunks):
+            filename = f"{path_and_prefix}_{i}_test" if is_test else f"{path_and_prefix}_{i}_train"
+            torch.save(list(chunked_data), filename)
+            filename_list.append(filename)
+        return filename_list
+
+
+    @staticmethod
+    def create(local_processed_path=None, local_cache_path=".data"):
+        train_files = []
+        test_files = []
+        if local_processed_path:
+            files = sorted(glob.glob(local_processed_path + '*'))
+            
+        else:    
+            file_name = "bertsum_data.zip"
+            url = "https://drive.google.com/uc?export=download&id=1x0d61LP9UAN389YN00z0Pv-7jQgirVg6"
+            #url = "https://drive.google.com/uc?export=download&id=0Bz8a_Dbh9QhbaW12WVVZS2drcnM"
+            #dataset_zip = download_from_url(url, root=local_cache_path)
+            #zip=zipfile.ZipFile(dataset_zip)
+            zip=zipfile.ZipFile("./temp_data3/"+file_name)
+            #zip.extractall(local_cache_path)
+            files = zip.namelist()
+
+        for fname in files:
+                if fname.find('train') != -1:
+                    train_files.append(path.join(local_cache_path, fname))
+                elif fname.find('test') != -1:
+                    test_files.append(path.join(local_cache_path, fname))
+
+        return (train_files, test_files)
+
