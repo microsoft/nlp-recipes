@@ -1,5 +1,6 @@
 import torch
 from torchtext.utils import extract_archive
+import torchtext
 from utils_nlp.dataset.url_utils import maybe_download
 import regex as re
 
@@ -18,8 +19,10 @@ import itertools
 from torchtext.utils import download_from_url, extract_archive
 import zipfile
 import glob
-import path
+from os.path import isfile, join
 
+from utils_nlp.models.transformers.extractive_summarization import get_dataset, get_dataloader
+#https://torchtext.readthedocs.io/en/latest/datasets.html#sentiment-analysis
 def _line_iter(file_path):
     with open(file_path, "r", encoding="utf8") as fd:
         for line in fd:
@@ -151,8 +154,7 @@ def CNNDMSummarization(*args, **kwargs):
     return _setup_datasets(*((urls[0],) + args), **kwargs)
 
 
-class CNNDMBertSumProcessedData():
-        
+class CNNDMBertSumProcessedData():      
     @staticmethod
     def save_data(data_iter, is_test=False, path_and_prefix="./", chunk_size=None):
         def chunks(iterable, chunk_size):
@@ -172,27 +174,24 @@ class CNNDMBertSumProcessedData():
 
 
     @staticmethod
-    def create(local_processed_path=None, local_cache_path=".data"):
+    def download(local_path=".data"):
+
+        file_name = "bertsum_data.zip"
+        url = "https://drive.google.com/uc?export=download&id=1x0d61LP9UAN389YN00z0Pv-7jQgirVg6"
+        dataset_zip = download_from_url(url, root=local_path)
+        zip=zipfile.ZipFile(dataset_zip)
+        #zip=zipfile.ZipFile("./temp_data3/"+file_name)
+        zip.extractall(local_path)
+        return local_path
+    
+    @classmethod
+    def splits(cls, root):
         train_files = []
         test_files = []
-        if local_processed_path:
-            files = sorted(glob.glob(local_processed_path + '*'))
-            
-        else:    
-            file_name = "bertsum_data.zip"
-            url = "https://drive.google.com/uc?export=download&id=1x0d61LP9UAN389YN00z0Pv-7jQgirVg6"
-            #url = "https://drive.google.com/uc?export=download&id=0Bz8a_Dbh9QhbaW12WVVZS2drcnM"
-            #dataset_zip = download_from_url(url, root=local_cache_path)
-            #zip=zipfile.ZipFile(dataset_zip)
-            zip=zipfile.ZipFile("./temp_data3/"+file_name)
-            #zip.extractall(local_cache_path)
-            files = zip.namelist()
-
+        files = [join(root, f) for f in os.listdir(root) if isfile(join(root, f))]        
         for fname in files:
-                if fname.find('train') != -1:
-                    train_files.append(path.join(local_cache_path, fname))
-                elif fname.find('test') != -1:
-                    test_files.append(path.join(local_cache_path, fname))
-
-        return (train_files, test_files)
-
+            if fname.find('train') != -1:
+                train_files.append(fname)
+            elif fname.find('test') != -1:
+                test_files.append(fname)
+        return get_dataset(train_files),  get_dataset(test_files)

@@ -28,22 +28,21 @@ from utils_nlp.models.transformers.common import (
     get_device,
 )
 
-MODEL_CLASS = {}
-MODEL_CLASS.update({k: BertForSequenceClassification for k in BERT_PRETRAINED_MODEL_ARCHIVE_MAP})
-MODEL_CLASS.update(
-    {k: RobertaForSequenceClassification for k in ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP}
-)
-MODEL_CLASS.update({k: XLNetForSequenceClassification for k in XLNET_PRETRAINED_MODEL_ARCHIVE_MAP})
-MODEL_CLASS.update(
-    {k: DistilBertForSequenceClassification for k in DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP}
-)
+from transformers import PreTrainedModel,  PretrainedConfig, DistilBertModel, BertModel, DistilBertConfig
 
+import torch
+from transformers import *
+
+# Transformers has a unified API
+# for 8 transformer architectures and 30 pretrained weights.
+#          Model          | Tokenizer          | Pretrained weights shortcut
+MODEL_CLASS= {"bert-base-uncased": BertModel, 
+              'distilbert-base-uncased': DistilBertModel}
 from bertsum.prepro.data_builder import greedy_selection, combination_selection
 from bertsum.prepro.data_builder import TransformerData
-from utils_nlp.models.bert.extractive_text_summarization import Bunch, default_parameters
 from bertsum.models.model_builder import Summarizer
 from bertsum.models import  model_builder
-from transformers import PreTrainedModel,  PretrainedConfig, DistilBertModel, BertModel, DistilBertConfig
+
 import bertsum.distributed as distributed
 import time
 
@@ -51,6 +50,9 @@ import itertools
 
 from bertsum.models.data_loader  import DataIterator
 from bertsum.models import  model_builder, data_loader
+
+from torch.utils.data import DataLoader
+
 class Bunch(object):
     """ Class which convert a dictionary to an object """
 
@@ -63,7 +65,7 @@ def get_dataset(file_list, is_train=False):
         for file in file_list:
             yield torch.load(file)
             
-def get_data_loader(file_list, device, is_labeled=False, batch_size=3000):
+def get_dataloader(data_iter, is_labeled=False, batch_size=3000):
     """
     Function to get data iterator over a list of data objects.
 
@@ -76,12 +78,7 @@ def get_data_loader(file_list, device, is_labeled=False, batch_size=3000):
         DataIterator
 
     """
-    args = Bunch({})
-    args.use_interval = True
-    args.batch_size = batch_size
-    data_iter = None
-    data_iter  = data_loader.Dataloader(args, get_dataset(file_list), args.batch_size, device, shuffle=False, is_test=is_labeled)
-    return data_iter
+    return data_loader.Dataloader(data_iter, batch_size, shuffle=False, is_labeled=is_labeled)
             
 
 class ExtSumProcessor:    
@@ -145,14 +142,25 @@ class ExtSumProcessor:
                    'src_txt': src_txt, "tgt_txt": tgt_txt}
 
 class ExtractiveSummarizer(Transformer):
-    def __init__(self, model_name="distilbert-base-uncased", model_class=DistilBertModel, cache_dir="."):
+    def __init__(self, model_name="distilbert-base-uncased",  encoder="transformer",  cache_dir="."):
         super().__init__(
             model_class=MODEL_CLASS,
             model_name=model_name,
             num_labels=0,
             cache_dir=cache_dir,
         )
-        args = Bunch(default_parameters)
+        model_class  =MODEL_CLASS[model_name]
+        default_summarizer_layer_parameters = {
+        "ff_size": 512, 
+        "heads": 4, 
+        "dropout": 0.1,
+        "inter_layers": 2, 
+        "hidden_size": 128, 
+        "rnn_size": 512,
+        "param_init": 0.0, 
+        "param_init_glorot": True}
+        
+        args = Bunch(default_summarizer_layer_parameters)
         self.model = Summarizer("transformer", args, model_class, model_name, None, cache_dir)
         
         
@@ -162,18 +170,30 @@ class ExtractiveSummarizer(Transformer):
 
     def fit(
         self,
-        train_data_iterator_function,
+        train_iter,
+        batch_size=3000,
         device="cuda",
         num_gpus=None,
         local_rank=-1,
-        max_steps=1e5,
+        max_steps=5e5,
+        optimization_method='adam', 
+        lr=2e-3, 
+        max_grad_norm=0, 
+        beta1=0.9, 
+        beta2=0.999, 
+        decay_method='noam', 
+        warmup_steps=1e5,
         verbose=True,
         seed=None,
         gradient_accumulation_steps=2,
-        report_every=50,
+        report_every=50,    
         **kwargs
     ):
-        #device, num_gpus = get_device(device=device, num_gpus=num_gpus, local_rank=local_rank)
+        """
+        train_dataset is actually a list of files in local disk
+        """
+        device, num_gpus = get_device(device=device, num_gpus=num_gpus, local_rank=local_rank)
+        print(device)
         device = torch.device("cuda:{}".format(0))
         #gpu_rank = distributed.multi_init(0, 1, "0")
         torch.backends.cudnn.enabled = True
@@ -183,13 +203,12 @@ class ExtractiveSummarizer(Transformer):
         
         get_inputs=ExtSumProcessor.get_inputs     
         
-        args = Bunch(default_parameters)
-        optimizer = model_builder.build_optim(args, self.model, None)
+        #args = Bunch(default_parameters)
+        optimizer = model_builder.build_optim(optimization_method, lr, max_grad_norm, beta1, 
+                                              beta2, decay_method, warmup_steps, self.model, None)
         
         if seed is not None:
             super(ExtractiveSummarizer).set_seed(seed, n_gpu > 0)
-        
-        train_batch_size = 1,
         
         # multi-gpu training (should be after apex fp16 initialization)
         if num_gpus > 1:
@@ -211,12 +230,16 @@ class ExtractiveSummarizer(Transformer):
         self.model.train()
         start = time.time()
         
-        train_data_iterator = train_data_iterator_function()
+   
+        def train_iter_func():
+            return get_dataloader(train_iter, is_labeled=True, batch_size=batch_size)
+
+        
         accum_loss = 0
         while 1:  
+            train_data_iterator = train_iter_func()
             for step, batch in enumerate(train_data_iterator):
                 batch = batch.to(device)
-
                 #batch = tuple(t.to(device) for t in batch if type(t)==torch.Tensor)
                 inputs = get_inputs(batch, self.model_name)
                 outputs = self.model(**inputs) 
@@ -227,13 +250,7 @@ class ExtractiveSummarizer(Transformer):
                     loss = loss / gradient_accumulation_steps
                 
                 accum_loss += loss.item()
-                if step % report_every == 0 and verbose:
-                    #tqdm.write(loss)
-                    end = time.time()
-                    print("loss: {0:.6f}, time: {1:.2f}, step {2:f} out of total {3:f}".format(
-                        accum_loss/report_every, end-start, global_step, max_steps))
-                    accum_loss = 0
-                    start = end
+                
                     
                 (loss/loss.numel()).backward()
                 
@@ -250,6 +267,14 @@ class ExtractiveSummarizer(Transformer):
                             grads, float(1))
                     
                     global_step += 1
+                    
+                if (global_step + 1) % report_every == 0 and verbose:
+                    #tqdm.write(loss)
+                    end = time.time()
+                    print("loss: {0:.6f}, time: {1:f}, examples number: {2:f}, step {3:f} out of total {4:f}".format(
+                        accum_loss/report_every, end-start, len(batch), global_step+1, max_steps))
+                    accum_loss = 0
+                    start = end
 
                 if max_steps > 0 and global_step > max_steps:
                     break
