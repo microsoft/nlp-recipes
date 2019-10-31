@@ -127,13 +127,16 @@ nlp_*.yaml
 nohup.out
 temp/
 tmp/
+logs/
+score.py
 
 # Data
 data/
+squad/
+bidaf-question-answering/
 */question_answering/bidaf.tar.gz
 */question_answering/bidafenv.yml
 */question_answering/config.json
-*/question_answering/score.py
 */question_answering/vocabulary/
 */question_answering/weights.th
 

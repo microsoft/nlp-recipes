@@ -20,16 +20,16 @@ URL = (
 )
 
 
-def load_train_test_dfs(local_cache_path="./", test_percentage=0.5, random_seed=None):
+def load_train_test_dfs(local_cache_path="./", test_fraction=0.5, random_seed=None):
     """
-    Get the training and testing data frames based on test_percentage.
+    Get the training and testing data frames based on test_fraction.
 
     Args:
         local_cache_path (str): Path to store the data. If the data file
             doesn't exist in this path, it's downloaded.
-        test_percentage (float, optional): Percentage of data ot use for
+        test_fraction (float, optional): Fraction of data ot use for
             testing. Since this is a small dataset, the default testing
-            percentage is set to 0.5
+            fraction is set to 0.5
         random_seed (float, optional): Random seed used to shuffle the data.
 
     Returns:
@@ -56,7 +56,7 @@ def load_train_test_dfs(local_cache_path="./", test_percentage=0.5, random_seed=
     sentence_list[:], labels_list[:] = zip(*sentence_and_labels)
 
     sentence_count = len(sentence_list)
-    test_sentence_count = round(sentence_count * test_percentage)
+    test_sentence_count = round(sentence_count * test_fraction)
     test_sentence_list = sentence_list[:test_sentence_count]
     test_labels_list = labels_list[:test_sentence_count]
     train_sentence_list = sentence_list[test_sentence_count:]

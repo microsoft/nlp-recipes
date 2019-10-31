@@ -52,15 +52,15 @@ CONDA_GPU = {
     "numba": "numba>=0.38.1",
     "pytorch": "pytorch>=1.0.0",
     "tensorflow": "tensorflow-gpu==1.12.0",
-    "cudatoolkit": "cudatoolkit==9.2"
+    "cudatoolkit": "cudatoolkit==9.2",
 }
 
 PIP_BASE = {
     "allennlp": "allennlp==0.8.4",
-    "azureml-sdk[automl]": "azureml-sdk[automl]==1.0.48",
-    "azureml-train-automl": "azureml-train-automl==1.0.48",
+    "azureml-sdk": "azureml-sdk[automl,notebooks,contrib]==1.0.57",
+    "azureml-train-automl": "azureml-train-automl==1.0.57",
     "azureml-dataprep": "azureml-dataprep==1.1.8",
-    "azureml-widgets": "azureml-widgets==1.0.48",
+    "azureml-widgets": "azureml-widgets==1.0.57",
     "azureml-mlflow": "azureml-mlflow>=1.0.43.1",
     "black": "black>=18.6b4",
     "cached-property": "cached-property==1.5.1",
@@ -68,12 +68,13 @@ PIP_BASE = {
     "nteract-scrapbook": "nteract-scrapbook>=0.2.1",
     "pydocumentdb": "pydocumentdb>=2.3.3",
     "pytorch-pretrained-bert": "pytorch-pretrained-bert>=0.6",
+    "pytorch-transformers": "pytorch-transformers>=1.2.0",
     "tqdm": "tqdm==4.31.1",
     "pyemd": "pyemd==0.5.1",
     "ipywebrtc": "ipywebrtc==0.4.3",
     "pre-commit": "pre-commit>=1.14.4",
     "scikit-learn": "scikit-learn>=0.19.0,<=0.20.3",
-    "setuptools_scm": "setuptools_scm==3.2.0",
+    "seaborn": "seaborn>=0.9.0",
     "sklearn-crfsuite": "sklearn-crfsuite>=0.3.6",
     "spacy": "spacy>=2.1.4",
     "spacy-models": (
@@ -83,6 +84,7 @@ PIP_BASE = {
     "gensim": "gensim>=3.7.0",
     "nltk": "nltk>=3.4",
     "seqeval": "seqeval>=0.0.12",
+    "allennlp": "allennlp>=0.8.4",
 }
 PIP_GPU = {}
 
@@ -128,7 +130,7 @@ if __name__ == "__main__":
     if args.name is not None:
         conda_env = args.name
 
-    # add conda and pip base packages 
+    # add conda and pip base packages
     conda_packages = CONDA_BASE
     pip_packages = PIP_BASE
 
