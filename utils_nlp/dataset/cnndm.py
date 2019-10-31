@@ -183,6 +183,7 @@ class CNNDMBertSumProcessedData():
         #zip=zipfile.ZipFile("./temp_data3/"+file_name)
         zip.extractall(local_path)
         return local_path
+            
     
     @classmethod
     def splits(cls, root):
@@ -194,4 +195,8 @@ class CNNDMBertSumProcessedData():
                 train_files.append(fname)
             elif fname.find('test') != -1:
                 test_files.append(fname)
-        return get_dataset(train_files),  get_dataset(test_files)
+        def get_train_dataset():
+            return get_dataset(train_files)
+        def get_test_dataset():
+            return get_dataset(test_files)
+        return get_train_dataset, get_test_dataset

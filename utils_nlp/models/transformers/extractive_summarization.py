@@ -58,6 +58,23 @@ class Bunch(object):
 
     def __init__(self, adict):
         self.__dict__.update(adict)
+        
+def get_data_iter(dataset,is_labeled=False, batch_size=3000):
+    """
+    Function to get data iterator over a list of data objects.
+
+    Args:
+        dataset (list of objects): a list of data objects.
+        is_test (bool): it specifies whether the data objects are labeled data.
+        batch_size (int): number of tokens per batch.
+        
+    Returns:
+        DataIterator
+
+    """
+
+    return DataIterator(dataset, batch_size, is_labeled=is_labeled, shuffle=False, sort=False)
+
 
 def get_dataset(file_list, is_train=False):
         if is_train:
@@ -190,7 +207,7 @@ class ExtractiveSummarizer(Transformer):
         **kwargs
     ):
         """
-        train_dataset is actually a list of files in local disk
+        train_dataset is data iterator
         """
         device, num_gpus = get_device(device=device, num_gpus=num_gpus, local_rank=local_rank)
         print(device)
@@ -231,13 +248,13 @@ class ExtractiveSummarizer(Transformer):
         start = time.time()
         
    
-        def train_iter_func():
-            return get_dataloader(train_iter, is_labeled=True, batch_size=batch_size)
+        #def train_iter_func():
+        #    return get_dataloader(train_iter(), is_labeled=True, batch_size=batch_size)
 
         
         accum_loss = 0
         while 1:  
-            train_data_iterator = train_iter_func()
+            train_data_iterator = get_dataloader(train_iter(), is_labeled=True, batch_size=batch_size)
             for step, batch in enumerate(train_data_iterator):
                 batch = batch.to(device)
                 #batch = tuple(t.to(device) for t in batch if type(t)==torch.Tensor)
@@ -266,12 +283,12 @@ class ExtractiveSummarizer(Transformer):
                         distributed.all_reduce_and_rescale_tensors(
                             grads, float(1))
                     
-                    global_step += 1
+                global_step += 1
                     
                 if (global_step + 1) % report_every == 0 and verbose:
                     #tqdm.write(loss)
                     end = time.time()
-                    print("loss: {0:.6f}, time: {1:f}, examples number: {2:f}, step {3:f} out of total {4:f}".format(
+                    print("loss: {0:.6f}, time: {1:f}, number of examples: {2:.0f}, step {3:.0f} out of total {4:.0f}".format(
                         accum_loss/report_every, end-start, len(batch), global_step+1, max_steps))
                     accum_loss = 0
                     start = end
@@ -335,36 +352,14 @@ class ExtractiveSummarizer(Transformer):
                 pred.append(_pred.strip())
             return pred
         
-         #for batch in tqdm(eval_data_iterator, desc="Evaluating", disable=not verbose):
         self.model.eval()
         pred = []
         for batch in eval_data_iterator:
             batch = batch.to(device)
-            #batch = tuple(t.to(device) for t in batch)
-            #batch = tuple(t.to(device) for t in batch if type(t)==torch.Tensor)
             with torch.no_grad():
                 inputs = ExtSumProcessor.get_inputs(batch, self.model_name, train_mode=False)
                 outputs = self.model(**inputs)
                 sent_scores = outputs[0]
                 sent_scores = sent_scores.detach().cpu().numpy()
-                #return sent_scores
                 pred.extend(_get_pred(batch, sent_scores))
-            #yield logits.detach().cpu().numpy()
         return pred
-
-
-                    
-        """preds = list(
-            super().predict(
-                eval_dataset=eval_dataset,
-                get_inputs=ExtSumProcessor.get_inputs,
-                device=device,
-                per_gpu_eval_batch_size=batch_size,
-                n_gpu=num_gpus,
-                verbose=True,
-            )
-        )
-        preds = np.concatenate(preds)
-        # todo generator & probs
-        return np.argmax(preds, axis=1)
-        """
