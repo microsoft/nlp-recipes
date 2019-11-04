@@ -18,6 +18,7 @@ from utils_nlp.dataset.url_utils import extract_zip, maybe_download
 from utils_nlp.models.transformers.common import MAX_SEQ_LEN
 from utils_nlp.models.transformers.sequence_classification import Processor
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
 
 
 URL = (
@@ -106,6 +107,9 @@ def load_dataset(
             4. label_ids_all: Tensor, each sublist contains token labels of
                 a input sentence/paragraph, if labels is provided. If the
                 `labels` argument is not provided, it will not return this tensor.
+        
+        label_encoder (LabelEncoder): a sklearn LabelEncoder instance. The label values
+            can be retrieved by calling the `inverse_transform` function.
     """
 
      # download and load the original dataset
@@ -117,6 +121,9 @@ def load_dataset(
     # set the text and label columns
     text_col = all_df.columns[0]
     label_col = all_df.columns[1]
+
+    label_encoder = LabelEncoder()
+    label_encoder.fit(["culture", "diverse", "economy", "politics", "sports"])
 
     # remove empty documents
     all_df = all_df[all_df[text_col].isna() == False]
@@ -164,24 +171,19 @@ def load_dataset(
         max_len=max_len
     )
 
-    return (train_dataset, test_dataset)
+    return (train_dataset, test_dataset, label_encoder)
 
 
-def label_ids_to_names(label_ids):
+def get_label_values(label_encoder, label_ids):
     """
-    Get the label names from label IDs. 
+    Get the label values from label IDs. 
 
     Args:
+        label_encoder (LabelEncoder): a fitted sklearn LabelEncoder instance
         label_ids (Numpy array): a Numpy array of label IDs.
 
     Returns:
         Numpy array. A Numpy array of label values.
     """
 
-    # label ID to label value mapping
-    id2str = {0: "culture", 1: "diverse", 2: "economy", 3: "politics", 4: "sports"}
-    return np.vectorize(id2str.get)(label_ids)
-
-
-def get_label_names():
-    return ["culture", "diverse", "economy", "politics", "sports"]
+    return label_encoder.inverse_transform(label_ids)
