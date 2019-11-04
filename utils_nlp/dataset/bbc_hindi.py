@@ -67,6 +67,7 @@ def load_pandas_df(local_cache_path='.'):
 
 def load_dataset(
     local_path=TemporaryDirectory().name,
+    test_fraction=1.0,
     random_seed=None,
     train_sample_ratio=1.0,
     test_sample_ratio=1.0,
@@ -83,6 +84,10 @@ def load_dataset(
     Args:
         local_path (str, optional): The local file path to save the raw wikigold file.
             Defautls to TemporaryDirectory().name.
+        test_fraction (float, optional): The fraction of testing dataset when splitting.
+            This variable is just a placeholder for a unified interface since the BBC Hindi 
+            dataset already split training and testing for us. 
+            Defaults to 1.0.
         random_seed (float, optional): Random seed used to shuffle the data.
             Defaults to None.
         train_sample_ratio (float, optional): The ratio that used to sub-sampling for training.
