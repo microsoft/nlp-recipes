@@ -4,20 +4,20 @@ This folder contains examples and best practices, written in Jupyter notebooks, 
 
 |Category|Applications|Methods|Languages|
 |---| ------------------------ | ------------------- |---|
-|[Text Classification](text_classification)|Topic Classification|BERT, XLNet|en, hi, ar|
+|[Text Classification](text_classification)|Topic Classification|BERT, XLNet, RoBERTa, DistilBERT|en, hi, ar|
 |[Named Entity Recognition](named_entity_recognition) |Wikipedia NER|BERT|en|
 |[Entailment](entailment)|MultiNLI Natural Language Inference|BERT|en|
-|[Question Answering](question_answering) |SQuAD|BiDAF, BERT|en|
-|[Sentence Similarity](sentence_similarity)|STS Benchmark|Representation: TF-IDF, Word Embeddings, Doc Embeddings<br>Metrics: Cosine Similarity, Word Mover's Distance<br> Models: BERT, GenSen||
-|[Embeddings](embeddings)|Custom Embeddings Training|Word2Vec, fastText, GloVe||
-|[Annotation](annotation)|Text Annotation|Doccano||
-|[Model Explainability](model_explainability)|DNN Layer Explanation|DUUDNM (Guan et al.)|
+|[Question Answering](question_answering) |SQuAD|BiDAF, BERT, XLNet, DistilBERT|en|
+|[Sentence Similarity](sentence_similarity)|STS Benchmark|BERT, GenSen|en|
+|[Embeddings](embeddings)|Custom Embeddings Training|Word2Vec, fastText, GloVe|en|
+|[Annotation](annotation)|Text Annotation|Doccano|en|
+|[Model Explainability](model_explainability)|DNN Layer Explanation|DUUDNM (Guan et al.)|en|
 
 ## Data/Telemetry
 The Azure Machine Learning notebooks collect browser usage data and send it to Microsoft to help improve our products and services. Read Microsoft's [privacy statement to learn more](https://privacy.microsoft.com/en-US/privacystatement).
 
-To opt out of tracking, please go to the raw `.ipynb` files and remove the following line of code (the URL will be slightly different depending on the file):
+To opt out of tracking, a Python [script](../tools/remove_pixelserver.py) under the `tools` folder is also provided. Executing the script will check all notebooks under the `examples` folder, and automatically remove the telemetry cell:
 
 ```sh
-    "![Impressions](https://PixelServer20190423114238.azurewebsites.net/api/impressions/nlp/examples/text_classification/tc_bert_azureml.png)"
+python ../tools/remove_pixelserver.py
 ```
