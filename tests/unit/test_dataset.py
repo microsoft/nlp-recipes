@@ -10,6 +10,7 @@ from utils_nlp.dataset import wikigold
 from utils_nlp.dataset import xnli
 from utils_nlp.dataset import snli
 from utils_nlp.dataset import Split
+from utils_nlp.dataset import squad
 from utils_nlp.dataset.ner_utils import preprocess_conll
 
 
@@ -41,16 +42,7 @@ def ner_utils_test_data(scope="module"):
                     "1862",
                     ".",
                 ],
-                [
-                    "Frederick",
-                    "H.",
-                    "Collier",
-                    "was",
-                    "the",
-                    "first",
-                    "colonel",
-                    ".",
-                ],
+                ["Frederick", "H.", "Collier", "was", "the", "first", "colonel", "."],
             ],
             [
                 [
@@ -80,10 +72,7 @@ def ner_utils_test_data(scope="module"):
 
 def test_maybe_download():
     # ToDo: Change this url when repo goes public.
-    file_url = (
-        "https://raw.githubusercontent.com/Microsoft/Recommenders/"
-        "master/LICENSE"
-    )
+    file_url = "https://raw.githubusercontent.com/Microsoft/Recommenders/master/LICENSE"
     filepath = "license.txt"
     assert not os.path.exists(filepath)
     filepath = maybe_download(file_url, "license.txt", expected_bytes=1162)
@@ -107,9 +96,7 @@ def test_wikigold(tmp_path):
     downloaded_file = os.path.join(tmp_path, "wikigold.conll.txt")
     assert not os.path.exists(downloaded_file)
 
-    train_df, test_df = wikigold.load_train_test_dfs(
-        tmp_path, test_fraction=wg_test_fraction
-    )
+    train_df, test_df = wikigold.load_train_test_dfs(tmp_path, test_fraction=wg_test_fraction)
 
     assert os.path.exists(downloaded_file)
 
@@ -123,23 +110,38 @@ def test_ner_utils(ner_utils_test_data):
 
 
 def test_xnli(tmp_path):
-    # only test for the dev df as the train dataset takes several
+    # Only test for the dev df as the train dataset takes several
     # minutes to download
     dev_df = xnli.load_pandas_df(local_cache_path=tmp_path, file_split="dev")
     assert dev_df.shape == (2490, 2)
 
 
 def test_snli(tmp_path):
-    df_train = snli.load_pandas_df(
-        local_cache_path=tmp_path, file_split=Split.TRAIN
-    )
+    df_train = snli.load_pandas_df(local_cache_path=tmp_path, file_split=Split.TRAIN)
     assert df_train.shape == (550152, 14)
-    df_test = snli.load_pandas_df(
-        local_cache_path=tmp_path, file_split=Split.TEST
-    )
+    df_test = snli.load_pandas_df(local_cache_path=tmp_path, file_split=Split.TEST)
     assert df_test.shape == (10000, 14)
-    df_dev = snli.load_pandas_df(
-        local_cache_path=tmp_path, file_split=Split.DEV
-    )
+    df_dev = snli.load_pandas_df(local_cache_path=tmp_path, file_split=Split.DEV)
     assert df_dev.shape == (10000, 14)
 
+
+def test_squad(tmp_path):
+    v1_train_df = squad.load_pandas_df(
+        local_cache_path=tmp_path, squad_version="v1.1", file_split="train"
+    )
+    assert v1_train_df.shape == (87599, 6)
+
+    v1_dev_df = squad.load_pandas_df(
+        local_cache_path=tmp_path, squad_version="v1.1", file_split="dev"
+    )
+    assert v1_dev_df.shape == (10570, 6)
+
+    v2_train_df = squad.load_pandas_df(
+        local_cache_path=tmp_path, squad_version="v2.0", file_split="train"
+    )
+    assert v2_train_df.shape == (130319, 6)
+
+    v2_dev_df = squad.load_pandas_df(
+        local_cache_path=tmp_path, squad_version="v2.0", file_split="dev"
+    )
+    assert v2_dev_df.shape == (11873, 6)
