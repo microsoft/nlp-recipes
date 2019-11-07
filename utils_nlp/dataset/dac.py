@@ -161,13 +161,13 @@ def load_dataset(
 
     train_dataset = processor.preprocess(
         text=train_df[text_col],
-        labels=train_df[label_col],
+        labels=train_df[label_col].values,
         max_len=max_len
     )
 
     test_dataset = processor.preprocess(
         text=test_df[text_col],
-        labels=test_df[label_col],
+        labels=test_df[label_col].values,
         max_len=max_len
     )
 

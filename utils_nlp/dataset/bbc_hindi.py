@@ -62,6 +62,9 @@ def load_pandas_df(local_cache_path='.'):
         header=None
     )
 
+    train_df = train_df.fillna("")
+    test_df = test_df.fillna("")
+
     return (train_df, test_df)
 
 
