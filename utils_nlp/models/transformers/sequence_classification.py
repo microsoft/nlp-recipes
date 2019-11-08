@@ -4,6 +4,7 @@
 import numpy as np
 import torch
 from torch.utils.data import TensorDataset
+
 from transformers.modeling_bert import (
     BERT_PRETRAINED_MODEL_ARCHIVE_MAP,
     BertForSequenceClassification,
@@ -21,12 +22,9 @@ from transformers.modeling_xlnet import (
     XLNetForSequenceClassification,
 )
 
-from utils_nlp.models.transformers.common import (
-    MAX_SEQ_LEN,
-    TOKENIZER_CLASS,
-    Transformer,
-    get_device,
-)
+from utils_nlp.common.pytorch_utils import get_device
+from utils_nlp.models.transformers.common import MAX_SEQ_LEN, TOKENIZER_CLASS, Transformer
+
 
 MODEL_CLASS = {}
 MODEL_CLASS.update({k: BertForSequenceClassification for k in BERT_PRETRAINED_MODEL_ARCHIVE_MAP})
