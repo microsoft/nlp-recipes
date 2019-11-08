@@ -18,6 +18,7 @@ from utils_nlp.dataset.url_utils import maybe_download
 from utils_nlp.models.transformers.common import MAX_SEQ_LEN
 from utils_nlp.models.transformers.sequence_classification import Processor
 from sklearn.preprocessing import LabelEncoder
+from sklearn.model_selection import train_test_split
 
 
 URL = (
@@ -70,7 +71,7 @@ def load_pandas_df(local_cache_path='.'):
 
 def load_dataset(
     local_path=TemporaryDirectory().name,
-    test_fraction=1.0,
+    test_fraction=0.25,
     random_seed=None,
     train_sample_ratio=1.0,
     test_sample_ratio=1.0,
@@ -88,9 +89,7 @@ def load_dataset(
         local_path (str, optional): The local file path to save the raw wikigold file.
             Defautls to TemporaryDirectory().name.
         test_fraction (float, optional): The fraction of testing dataset when splitting.
-            This variable is just a placeholder for a unified interface since the BBC Hindi 
-            dataset already split training and testing for us. 
-            Defaults to 1.0.
+            Defaults to 0.25.
         random_seed (float, optional): Random seed used to shuffle the data.
             Defaults to None.
         train_sample_ratio (float, optional): The ratio that used to sub-sampling for training.
@@ -136,11 +135,22 @@ def load_dataset(
     """
 
     # download and load the original dataset
-    train_df, test_df = load_pandas_df(local_cache_path=local_path)
+    train, test = load_pandas_df(local_cache_path=local_path)
+    all_df = pd.concat([train, test], ignore_index=True)
 
     # encode labels, use the "genre" column as the label column
     label_encoder = LabelEncoder()
-    label_encoder.fit(train_df[0])
+    label_encoder.fit(all_df[0])
+
+    if test_fraction < 0 or test_fraction >= 1.0:
+        logging.warning("Invalid test fraction value: {}, changed to 0.25".format(test_fraction))
+        test_fraction = 0.25
+    
+    train_df, test_df = train_test_split(
+        all_df,
+        train_size=(1.0 - test_fraction),
+        random_state=random_seed
+    )
 
     if train_sample_ratio > 1.0:
         train_sample_ratio = 1.0
