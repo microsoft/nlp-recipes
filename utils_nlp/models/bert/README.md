@@ -1,6 +1,6 @@
 # BERT-based Classes
 
-This folder contains utility functions and classes based on the implementation of [PyTorch-Transformers](https://github.com/huggingface/pytorch-transformers). 
+This folder contains utility functions and classes based on the implementation of [Transformers](https://github.com/huggingface/transformers). 
 
 ## Summary
 

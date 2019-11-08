@@ -3,9 +3,9 @@
 
 
 # This script reuses some code from
-# https://github.com/huggingface/pytorch-transformers/blob/master/examples/utils_glue.py
+# https://github.com/huggingface/transformers/blob/master/examples/utils_glue.py
 from enum import Enum
-from pytorch_transformers import XLNetTokenizer
+from transformers import XLNetTokenizer
 from mlflow import log_metric, log_param, log_artifact
 
 
