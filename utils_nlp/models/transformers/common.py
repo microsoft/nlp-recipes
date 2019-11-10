@@ -9,6 +9,7 @@ import os
 import random
 
 import numpy as np
+import horovod.torch as hvd
 import torch
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
 from torch.utils.data.distributed import DistributedSampler
@@ -100,15 +101,23 @@ class Transformer:
         fp16=False,
         fp16_opt_level="O1",
         local_rank=-1,
+        hvd_dist=False,
+        world_size=-1,
+        rank=-1,
         verbose=True,
         seed=None,
     ):
         if seed is not None:
             Transformer.set_seed(seed, n_gpu > 0)
 
+        if rank == -1:
+            rank = local_rank
+
         train_batch_size = per_gpu_train_batch_size * max(1, n_gpu)
         train_sampler = (
-            RandomSampler(train_dataset) if local_rank == -1 else DistributedSampler(train_dataset)
+            RandomSampler(train_dataset)
+            if local_rank == -1
+            else DistributedSampler(train_dataset, num_replicas=world_size, rank=rank)
         )
         train_dataloader = DataLoader(
             train_dataset, sampler=train_sampler, batch_size=train_batch_size
@@ -144,6 +153,16 @@ class Transformer:
             ]
             optimizer = AdamW(optimizer_grouped_parameters, lr=learning_rate, eps=adam_epsilon)
 
+        if hvd_dist:
+            optimizer = hvd.DistributedOptimizer(
+                optimizer,
+                named_parameters=self.model.named_parameters(),
+                backward_passes_per_step=gradient_accumulation_steps,
+            )
+
+            hvd.broadcast_parameters(self.model.state_dict(), root_rank=0)
+            hvd.broadcast_optimizer_state(optimizer, root_rank=0)
+
         if scheduler is None:
             scheduler = WarmupLinearSchedule(optimizer, warmup_steps=warmup_steps, t_total=t_total)
 
@@ -159,24 +178,22 @@ class Transformer:
             self.model = torch.nn.DataParallel(self.model)
 
         # Distributed training (should be after apex fp16 initialization)
-        if local_rank != -1:
+        if local_rank != -1 and not hvd_dist:
             self.model = torch.nn.parallel.DistributedDataParallel(
-                self.model,
-                device_ids=[local_rank],
-                output_device=local_rank,
-                find_unused_parameters=True,
+                self.model, device_ids=[local_rank], find_unused_parameters=True
             )
 
         global_step = 0
+        accumulation_step = 0
         tr_loss = 0.0
         self.model.zero_grad()
         train_iterator = trange(
-            int(num_train_epochs), desc="Epoch", disable=local_rank not in [-1, 0] or not verbose
+            int(num_train_epochs), desc="Epoch", disable=rank not in [-1, 0] or not verbose
         )
 
         for _ in train_iterator:
             epoch_iterator = tqdm(
-                train_dataloader, desc="Iteration", disable=local_rank not in [-1, 0] or not verbose
+                train_dataloader, desc="Iteration", disable=rank not in [-1, 0] or not verbose
             )
             for step, batch in enumerate(epoch_iterator):
                 self.model.train()
@@ -199,11 +216,20 @@ class Transformer:
                     torch.nn.utils.clip_grad_norm_(amp.master_params(optimizer), max_grad_norm)
                 else:
                     loss.backward()
-                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_grad_norm)
+                    if not hvd_dist:
+                        torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_grad_norm)
 
                 tr_loss += loss.item()
-                if (step + 1) % gradient_accumulation_steps == 0:
-                    optimizer.step()
+                accumulation_step += 1
+                if accumulation_step == gradient_accumulation_steps:
+                    accumulation_step = 0
+                    if hvd_dist:
+                        optimizer.synchronize()
+                        torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_grad_norm)
+                        with optimizer.skip_synchronize():
+                            optimizer.step()
+                    else:
+                        optimizer.step()
                     scheduler.step()
                     self.model.zero_grad()
                     global_step += 1

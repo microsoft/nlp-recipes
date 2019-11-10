@@ -8,14 +8,7 @@ import torch.nn as nn
 import warnings
 
 
-def get_device(
-    num_gpus=None,
-    local_rank=-1,
-    #    backend="nccl",
-    #    rank=0,
-    #    world_size=1,
-    #    init_method="file:///distributed",
-):
+def get_device(num_gpus=None, local_rank=-1):
     if local_rank == -1:
         num_gpus = (
             min(num_gpus, torch.cuda.device_count())
@@ -26,8 +19,6 @@ def get_device(
     else:
         torch.cuda.set_device(local_rank)
         device = torch.device("cuda", local_rank)
-        # torch.distributed.init_process_group(backend="nccl")
-        # torch.distributed.init_process_group(backend=backend, rank=rank, world_size=world_size, init_method=init_method)
         num_gpus = 1
     return device, num_gpus
 

@@ -17,7 +17,6 @@
 # Modifications copyright © Microsoft Corporation
 
 
-import os
 import logging
 from tqdm import tqdm
 import collections
@@ -42,12 +41,9 @@ from transformers.modeling_distilbert import (
     DistilBertForQuestionAnswering,
 )
 
-from utils_nlp.models.transformers.common import (
-    MAX_SEQ_LEN,
-    TOKENIZER_CLASS,
-    Transformer,
-    get_device,
-)
+from utils_nlp.models.transformers.common import MAX_SEQ_LEN, TOKENIZER_CLASS, Transformer
+
+from utils_nlp.common.pytorch_utils import get_device
 
 MODEL_CLASS = {}
 MODEL_CLASS.update({k: BertForQuestionAnswering for k in BERT_PRETRAINED_MODEL_ARCHIVE_MAP})
@@ -55,14 +51,6 @@ MODEL_CLASS.update({k: XLNetForQuestionAnswering for k in XLNET_PRETRAINED_MODEL
 MODEL_CLASS.update(
     {k: DistilBertForQuestionAnswering for k in DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP}
 )
-
-# cached files during preprocessing
-# these are used in postprocessing to generate the final answer texts
-CACHED_EXAMPLES_TRAIN_FILE = "cached_examples_train.jsonl"
-CACHED_FEATURES_TRAIN_FILE = "cached_features_train.jsonl"
-
-CACHED_EXAMPLES_TEST_FILE = "cached_examples_test.jsonl"
-CACHED_FEATURES_TEST_FILE = "cached_features_test.jsonl"
 
 logger = logging.getLogger(__name__)
 
@@ -182,101 +170,79 @@ class QAProcessor:
                 "./cached_qa_features".
         """
 
-        if not os.path.exists(feature_cache_dir):
-            os.makedirs(feature_cache_dir)
-
         if is_training and not qa_dataset.actual_answer_available:
             raise Exception("answer_start and answer_text must be provided for training data.")
 
+        unique_id_all = []
+        unique_id_cur = 1000000000
+
+        features = []
+        qa_examples = []
+        qa_examples_json = []
+        features_json = []
+
+        for qa_input in qa_dataset:
+            qa_example_cur = _create_qa_example(qa_input, is_training=is_training)
+
+            qa_examples.append(qa_example_cur)
+
+            qa_examples_json.append(
+                {"qa_id": qa_example_cur.qa_id, "doc_tokens": qa_example_cur.doc_tokens}
+            )
+
+            features_cur = _create_qa_features(
+                qa_example_cur,
+                model_type=self.model_type,
+                tokenizer=self.tokenizer,
+                unique_id=unique_id_cur,
+                is_training=is_training,
+                max_question_length=max_question_length,
+                max_seq_length=max_seq_length,
+                doc_stride=doc_stride,
+                custom_tokenize=self.custom_tokenize,
+            )
+            features += features_cur
+
+            for f in features_cur:
+                features_json.append(
+                    {
+                        "qa_id": f.qa_id,
+                        "unique_id": f.unique_id,
+                        "tokens": f.tokens,
+                        "token_to_orig_map": f.token_to_orig_map,
+                        "token_is_max_context": f.token_is_max_context,
+                        "paragraph_len": f.paragraph_len,
+                    }
+                )
+                unique_id_cur = f.unique_id
+                unique_id_all.append(unique_id_cur)
+
+        # TODO: maybe generalize the following code
+        input_ids = torch.tensor([f.input_ids for f in features], dtype=torch.long)
+        input_mask = torch.tensor([f.input_mask for f in features], dtype=torch.long)
+        segment_ids = torch.tensor([f.segment_ids for f in features], dtype=torch.long)
+        cls_index = torch.tensor([f.cls_index for f in features], dtype=torch.long)
+        p_mask = torch.tensor([f.p_mask for f in features], dtype=torch.float)
+
         if is_training:
-            examples_file = os.path.join(feature_cache_dir, CACHED_EXAMPLES_TRAIN_FILE)
-            features_file = os.path.join(feature_cache_dir, CACHED_FEATURES_TRAIN_FILE)
+            start_positions = torch.tensor([f.start_position for f in features], dtype=torch.long)
+            end_positions = torch.tensor([f.end_position for f in features], dtype=torch.long)
+            qa_dataset = TensorDataset(
+                input_ids,
+                input_mask,
+                segment_ids,
+                start_positions,
+                end_positions,
+                cls_index,
+                p_mask,
+            )
         else:
-            examples_file = os.path.join(feature_cache_dir, CACHED_EXAMPLES_TEST_FILE)
-            features_file = os.path.join(feature_cache_dir, CACHED_FEATURES_TEST_FILE)
+            unique_id_all = torch.tensor(unique_id_all, dtype=torch.long)
+            qa_dataset = TensorDataset(
+                input_ids, input_mask, segment_ids, cls_index, p_mask, unique_id_all
+            )
 
-        with jsonlines.open(examples_file, "w") as examples_writer, jsonlines.open(
-            features_file, "w"
-        ) as features_writer:
-
-            unique_id_all = []
-            unique_id_cur = 1000000000
-
-            features = []
-            qa_examples = []
-            qa_examples_json = []
-            features_json = []
-
-            for qa_input in qa_dataset:
-                qa_example_cur = _create_qa_example(qa_input, is_training=is_training)
-
-                qa_examples.append(qa_example_cur)
-
-                qa_examples_json.append(
-                    {"qa_id": qa_example_cur.qa_id, "doc_tokens": qa_example_cur.doc_tokens}
-                )
-
-                features_cur = _create_qa_features(
-                    qa_example_cur,
-                    model_type=self.model_type,
-                    tokenizer=self.tokenizer,
-                    unique_id=unique_id_cur,
-                    is_training=is_training,
-                    max_question_length=max_question_length,
-                    max_seq_length=max_seq_length,
-                    doc_stride=doc_stride,
-                    custom_tokenize=self.custom_tokenize,
-                )
-                features += features_cur
-
-                for f in features_cur:
-                    features_json.append(
-                        {
-                            "qa_id": f.qa_id,
-                            "unique_id": f.unique_id,
-                            "tokens": f.tokens,
-                            "token_to_orig_map": f.token_to_orig_map,
-                            "token_is_max_context": f.token_is_max_context,
-                            "paragraph_len": f.paragraph_len,
-                        }
-                    )
-                    unique_id_cur = f.unique_id
-                    unique_id_all.append(unique_id_cur)
-
-            examples_writer.write_all(qa_examples_json)
-            features_writer.write_all(features_json)
-
-            # TODO: maybe generalize the following code
-            input_ids = torch.tensor([f.input_ids for f in features], dtype=torch.long)
-            input_mask = torch.tensor([f.input_mask for f in features], dtype=torch.long)
-            segment_ids = torch.tensor([f.segment_ids for f in features], dtype=torch.long)
-            cls_index = torch.tensor([f.cls_index for f in features], dtype=torch.long)
-            p_mask = torch.tensor([f.p_mask for f in features], dtype=torch.float)
-
-            if is_training:
-                start_positions = torch.tensor(
-                    [f.start_position for f in features], dtype=torch.long
-                )
-                end_positions = torch.tensor([f.end_position for f in features], dtype=torch.long)
-                qa_dataset = TensorDataset(
-                    input_ids,
-                    input_mask,
-                    segment_ids,
-                    start_positions,
-                    end_positions,
-                    cls_index,
-                    p_mask,
-                )
-            else:
-                unique_id_all = torch.tensor(unique_id_all, dtype=torch.long)
-                qa_dataset = TensorDataset(
-                    input_ids, input_mask, segment_ids, cls_index, p_mask, unique_id_all
-                )
-
-            logger.info("QA examples are saved to {}".format(examples_file))
-            logger.info("QA features are saved to {}".format(features_file))
-
-        return qa_dataset
+        return qa_dataset, qa_examples_json, features_json
 
     def postprocess(
         self,
@@ -486,6 +452,9 @@ class AnswerExtractor(Transformer):
         fp16=False,
         fp16_opt_level="O1",
         local_rank=-1,
+        hvd_dist=False,
+        world_size=-1,
+        rank=-1,
         verbose=True,
         seed=None,
         cache_model=True,
@@ -549,19 +518,17 @@ class AnswerExtractor(Transformer):
             fp16=fp16,
             fp16_opt_level=fp16_opt_level,
             local_rank=local_rank,
+            hvd_dist=hvd_dist,
+            world_size=world_size,
+            rank=rank,
             verbose=verbose,
             seed=seed,
         )
-        if cache_model:
+        if cache_model and rank in [0, -1]:
             self.save_model()
 
     def predict(
-        self,
-        test_dataset,
-        per_gpu_batch_size=16,
-        num_gpus=None,
-        local_rank=-1,
-        verbose=True,
+        self, test_dataset, per_gpu_batch_size=16, num_gpus=None, local_rank=-1, verbose=True
     ):
 
         """
