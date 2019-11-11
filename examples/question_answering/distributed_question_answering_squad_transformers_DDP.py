@@ -18,8 +18,8 @@ from utils_nlp.common.timer import Timer
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--local_rank", type=int, default=-1)
-parser.add_argument("--rank", type=int, default=-1)
-parser.add_argument("--dist_url", type=str, default="env://")
+parser.add_argument("--rank", type=int, default=0)
+parser.add_argument("--dist_url", type=str, default="tcp://127.0.0.1:29500")
 parser.add_argument("--node_count", type=int, default=1)
 parser.add_argument("--cache_dir", type=str, default="./")
 parser.add_argument("--model_name", type=str, default="distilbert-base-uncased")

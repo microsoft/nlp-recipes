@@ -16,10 +16,6 @@ from utils_nlp.eval.question_answering import evaluate_qa
 from utils_nlp.common.timer import Timer
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--local_rank", type=int, default=-1)
-parser.add_argument("--rank", type=int, default=-1)
-parser.add_argument("--dist_url", type=str, default="env://")
-parser.add_argument("--node_count", type=int, default=1)
 parser.add_argument("--cache_dir", type=str, default="./")
 parser.add_argument("--model_name", type=str, default="distilbert-base-uncased")
 parser.add_argument("--do_lower_case", type=bool, default=True)
