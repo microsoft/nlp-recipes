@@ -27,13 +27,13 @@ URL = (
 )
 
 
-def load_pandas_df(local_cache_path='.'):
+def load_pandas_df(local_cache_path=TemporaryDirectory().name):
     """
     Downloads and extracts the dataset files
 
     Args:
-        local_cache_path ([type], optional): [description]. Defaults to None.
-        num_rows (int): Number of rows to load. If None, all data is loaded.
+        local_cache_path (str, optional): The local file path to save the raw file.
+        Defaults to TemporaryDirectory().name.
     Returns:
         pd.DataFrame: pandas DataFrame containing the loaded dataset.
     """
