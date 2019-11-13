@@ -18,6 +18,7 @@ from torch.utils.data import DataLoader, RandomSampler, SequentialSampler, Tenso
 from utils_nlp.models.bert.common import Language, Tokenizer
 from cached_property import cached_property
 
+
 class PoolingStrategy(str, Enum):
     """Enumerate pooling strategies"""
 
@@ -79,12 +80,11 @@ class BERTSentenceEncoder:
             self._layer_index = [layer_index]
         else:
             self.layer_index = layer_index
-        
 
     @cached_property
     def cuda(self):
         """ cache the output of torch.cuda.is_available() """
-        
+
         self.has_cuda = torch.cuda.is_available()
         return self.has_cuda
 
@@ -106,7 +106,7 @@ class BERTSentenceEncoder:
         Returns:
             pd.DataFrame with columns text_index (int), token (str), layer_index (int), values (list[float]). 
         """
-        device = get_device("cpu" if self.num_gpus == 0 or self.cuda else "gpu")
+        device, num_gpus = get_device(self.num_gpus)
         self.model = move_to_device(self.model, device, self.num_gpus)
 
         self.model.eval()
