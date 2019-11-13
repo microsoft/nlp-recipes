@@ -56,7 +56,9 @@ def load_dataset(
     model_name="bert-base-uncased",
     to_lower=True,
     cache_dir=TemporaryDirectory().name,
-    max_len=MAX_SEQ_LEN
+    max_len=MAX_SEQ_LEN,
+    batch_size=32,
+    num_gpus=None
 ):
     """
     Load the multinli dataset and split into training and testing datasets.
@@ -83,33 +85,23 @@ def load_dataset(
         max_len (int, optional): Maximum length of the list of tokens. Lists longer
             than this are truncated and shorter ones are padded with "O"s. 
             Default value is BERT_MAX_LEN=512.
+        batch_size (int, optional): The batch size for training and testing.
+            Defaults to 32.
+        num_gpus (int, optional): The number of GPUs.
+            Defaults to None.
 
     Returns:
-        tuple. The tuple contains two elements:
-        train_dataset (TensorDataset): A TensorDataset containing the following four tensors.
-            1. input_ids_all: Tensor. Each sublist contains numerical values,
-                i.e. token ids, corresponding to the tokens in the input 
-                text data.
-            2. input_mask_all: Tensor. Each sublist contains the attention
-                mask of the input token id list, 1 for input tokens and 0 for
-                padded tokens, so that padded tokens are not attended to.
-            4. label_ids_all: Tensor, each sublist contains token labels of
-                a input sentence/paragraph, if labels is provided. If the
-                `labels` argument is not provided, it will not return this tensor.
+        tuple. The tuple contains four elements:
+        train_dataload (DataLoader): a PyTorch DataLoader instance for training.
 
-        test_dataset (TensorDataset): A TensorDataset containing the following four tensors.
-            1. input_ids_all: Tensor. Each sublist contains numerical values,
-                i.e. token ids, corresponding to the tokens in the input 
-                text data.
-            2. input_mask_all: Tensor. Each sublist contains the attention
-                mask of the input token id list, 1 for input tokens and 0 for
-                padded tokens, so that padded tokens are not attended to.
-            4. label_ids_all: Tensor, each sublist contains token labels of
-                a input sentence/paragraph, if labels is provided. If the
-                `labels` argument is not provided, it will not return this tensor.
+        test_dataload (DataLoader): a PyTorch DataLoader instance for testing.
         
         label_encoder (LabelEncoder): a sklearn LabelEncoder instance. The label values
             can be retrieved by calling the `inverse_transform` function.
+        
+        test_labels (Series): a Pandas Series of testing label (in label ID format). If
+            the labels are in raw label values format, we will need to transform it to 
+            label IDs by using the label_encoder.transform function.
     """
 
      # download and load the original dataset
@@ -157,21 +149,39 @@ def load_dataset(
     if test_sample_ratio < 1.0:
         test_df = test_df.sample(frac=test_sample_ratio).reset_index(drop=True)
 
-    processor = Processor(model_name=model_name, to_lower=to_lower, cache_dir=cache_dir)
-
-    train_dataset = processor.preprocess(
-        text=train_df[text_col],
-        labels=train_df[label_col].values,
-        max_len=max_len
+    processor = Processor(
+        model_name=model_name,
+        to_lower=to_lower,
+        cache_dir=cache_dir
     )
 
-    test_dataset = processor.preprocess(
-        text=test_df[text_col],
-        labels=test_df[label_col].values,
-        max_len=max_len
+    train_dataloader = processor.create_dataloader_from_df(
+        df=train_df,
+        text_col=text_col,
+        label_col=label_col,
+        max_len=max_len,
+        text2_col=None,
+        batch_size=batch_size,
+        num_gpus=num_gpus,
+        shuffle=True,
+        distributed=False
     )
 
-    return (train_dataset, test_dataset, label_encoder)
+    test_dataloader = processor.create_dataloader_from_df(
+        df=test_df,
+        text_col=text_col,
+        label_col=label_col,
+        max_len=max_len,
+        text2_col=None,
+        batch_size=batch_size,
+        num_gpus=num_gpus,
+        shuffle=False,
+        distributed=False
+    )
+
+    # the DAC dataset already converted the labels to label ID format
+    test_labels = test_df[label_col]
+    return (train_dataloader, test_dataloader, label_encoder, test_labels)
 
 
 def get_label_values(label_encoder, label_ids):
