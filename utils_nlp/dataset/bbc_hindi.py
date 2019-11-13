@@ -201,8 +201,6 @@ def load_dataset(
         distributed=False
     )
 
-    # the DAC dataset already converted the labels to label ID format
-    test_labels = test_df[label_col]
     return (train_dataloader, test_dataloader, label_encoder, test_labels)
 
 
