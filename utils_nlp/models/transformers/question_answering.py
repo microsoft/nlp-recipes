@@ -29,24 +29,21 @@ import torch
 from torch.utils.data import TensorDataset, SequentialSampler, DataLoader
 
 from transformers.tokenization_bert import BasicTokenizer, whitespace_tokenize
-
 from transformers.modeling_bert import BERT_PRETRAINED_MODEL_ARCHIVE_MAP, BertForQuestionAnswering
-
 from transformers.modeling_xlnet import (
     XLNET_PRETRAINED_MODEL_ARCHIVE_MAP,
     XLNetForQuestionAnswering,
 )
-
 from transformers.modeling_distilbert import (
     DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP,
     DistilBertForQuestionAnswering,
 )
 
+from utils_nlp.common.pytorch_utils import get_device
 from utils_nlp.models.transformers.common import (
     MAX_SEQ_LEN,
     TOKENIZER_CLASS,
     Transformer,
-    get_device,
 )
 
 MODEL_CLASS = {}
