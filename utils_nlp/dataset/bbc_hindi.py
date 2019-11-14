@@ -69,7 +69,7 @@ def load_pandas_df(local_cache_path=TemporaryDirectory().name):
     return (train_df, test_df)
 
 
-def load_dataset(
+def load_tc_dataset(
     local_path=TemporaryDirectory().name,
     test_fraction=0.25,
     random_seed=None,

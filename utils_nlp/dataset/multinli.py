@@ -92,7 +92,7 @@ def get_generator(
     return loader.get_sequential_batches(batch_size=int(batch_size), num_batches=num_batches)
 
 
-def load_dataset(
+def load_tc_dataset(
     local_path=TemporaryDirectory().name,
     test_fraction=0.25,
     random_seed=None,

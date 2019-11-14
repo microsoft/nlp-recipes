@@ -47,7 +47,7 @@ def load_pandas_df(local_cache_path=None, num_rows=None):
     return pd.read_csv(csv_file_path, nrows=num_rows)
 
 
-def load_dataset(
+def load_tc_dataset(
     local_path=TemporaryDirectory().name,
     test_fraction=0.25,
     random_seed=None,
