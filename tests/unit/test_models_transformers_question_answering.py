@@ -3,7 +3,7 @@
 
 import pytest
 import os
-from utils_nlp.dataset.pytorch import QADataset
+from utils_nlp.models.transformers.datasets import QADataset
 from utils_nlp.models.transformers.question_answering import (
     QAProcessor,
     AnswerExtractor,
