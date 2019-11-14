@@ -48,9 +48,15 @@ class Processor:
     def get_inputs(batch, model_name, train_mode=True):
         if model_name.split("-")[0] in ["bert", "xlnet", "roberta", "distilbert"]:
             if train_mode:
-                return {"input_ids": batch[0], "attention_mask": batch[1], "token_type_ids": batch[2], "labels": batch[3]}
+                inputs = {"input_ids": batch[0], "attention_mask": batch[1], "labels": batch[3]}
             else:
-                return {"input_ids": batch[0], "attention_mask": batch[1], "token_type_ids": batch[2]}
+                inputs = {"input_ids": batch[0], "attention_mask": batch[1]}
+
+            # distilbert doesn't support segment ids
+            if model_name.split("-")[0] not in ["distilbert"]:
+                inputs["token_type_ids"] = batch[2]
+
+            return inputs
         else:
             raise ValueError("Model not supported: {}".format(model_name))
 
@@ -72,26 +78,13 @@ class Processor:
         input_ids = input_ids + [0] * (max_len - len(input_ids))
         # create input mask
         attention_mask = [min(1, x) for x in input_ids]
-        return input_ids, attention_mask
-#        input_mask = [[min(1, x) for x in y] for y in input_ids]
-#        # create segment ids
-#        token_type_ids = [0] * len(input_ids)
-#        if labels is None:
-#            td = TensorDataset(
-#                torch.tensor(input_ids, dtype=torch.long),
-#                torch.tensor(input_mask, dtype=torch.long),
-#                torch.tensor(token_type_ids, dtype=torch.long),
-#            )
-#        else:
-#            td = TensorDataset(
-#                torch.tensor(input_ids, dtype=torch.long),
-#                torch.tensor(input_mask, dtype=torch.long),
-#                torch.tensor(token_type_ids, dtype=torch.long),
-#                torch.tensor(labels, dtype=torch.long),
-#            )
-#        return td
+        # create segment ids
+        token_type_ids = [0] * len(input_ids)
 
-    def preprocess_sentence_pair(self, text, labels=None, max_len=MAX_SEQ_LEN):
+        return input_ids, attention_mask, token_type_ids
+
+    @staticmethod
+    def text_pair_transform(text_1, text_2, tokenizer, max_len=MAX_SEQ_LEN):
         """preprocess data or batches"""
 
         def _truncate_seq_pair(tokens_a, tokens_b, max_length):
@@ -114,70 +107,49 @@ class Processor:
                 else:
                     tokens_b.pop()
 
-            tokens_a.append("[SEP]")
+            tokens_a.append(tokenizer.sep_token)
 
             if tokens_b:
-                tokens_b.append("[SEP]")
+                tokens_b.append(tokenizer.sep_token)
 
-            return [tokens_a, tokens_b]
+            return tokens_a, tokens_b
 
         if max_len > MAX_SEQ_LEN:
             print("setting max_len to max allowed tokens: {}".format(MAX_SEQ_LEN))
             max_len = MAX_SEQ_LEN
 
-        tokens = [[self.tokenizer.tokenize(x) for x in sentences] for sentences in tqdm(text)]
-        # get tokens for each sentence [[t00, t01, ...] [t10, t11,... ]]
-        tokens = [
-            _truncate_seq_pair(sentence[0], sentence[1], max_len - 3)
-            for sentence in tokens
-        ]
+        tokens_1 = tokenizer.tokenize(text_1)
 
-        # construct token_type_ids
-        # [[0, 0, 0, 0, ... 0, 1, 1, 1, ... 1], [0, 0, 0, ..., 1, 1, ]
-        token_type_ids = [
-            [[i] * len(sentence) for i, sentence in enumerate(example)] for example in tokens
-        ]
+        tokens_2 = tokenizer.tokenize(text_2)
+
+        tokens_1, tokens_2 = _truncate_seq_pair(tokens_1, tokens_2, max_len - 3)
+
+        # construct token_type_ids, prefix with [0] for [CLS]
+        # [0, 0, 0, 0, ... 0, 1, 1, 1, ... 1]
+        token_type_ids = [0] + [0] * len(tokens_1) + [1] * len(tokens_2)
+        # pad sequence
+        token_type_ids = token_type_ids + [0] * (max_len - len(token_type_ids))
         # merge sentences
-        tokens = [[token for sentence in example for token in sentence] for example in tokens]
-        # prefix with [0] for [CLS]
-        token_type_ids = [
-            [0] + [i for sentence in example for i in sentence] for example in token_type_ids
-        ]
-        # pad sequence
-        token_type_ids = [x + [0] * (max_len - len(x)) for x in token_type_ids]
-
-        tokens = [["[CLS]"] + x for x in tokens]
+        tokens = [tokenizer.cls_token] + tokens_1 + tokens_2
         # convert tokens to indices
-        input_ids = [self.tokenizer.convert_tokens_to_ids(x) for x in tokens]
+        input_ids = tokenizer.convert_tokens_to_ids(tokens)
         # pad sequence
-        input_ids = [x + [0] * (max_len - len(x)) for x in input_ids]
+        input_ids = input_ids + [0] * (max_len - len(input_ids))
         # create input mask
-        input_mask = [[min(1, x) for x in y] for y in input_ids]
+        attention_mask = [min(1, x) for x in input_ids]
 
-        if labels is None:
-            td = TensorDataset(
-                torch.tensor(input_ids, dtype=torch.long),
-                torch.tensor(input_mask, dtype=torch.long),
-                torch.tensor(token_type_ids, dtype=torch.long)
-            )
-        else:
-            td = TensorDataset(
-                torch.tensor(input_ids, dtype=torch.long),
-                torch.tensor(input_mask, dtype=torch.long),
-                torch.tensor(token_type_ids, dtype=torch.long),
-                torch.tensor(labels, dtype=torch.long),
-        return td
+        return input_ids, attention_mask, token_type_ids
 
     def create_dataloader_from_df(
         self,
         df,
         text_col,
-        label_col,
-        max_len=MAX_SEQ_LEN,
+        shuffle,
+        label_col=None,
         text2_col=None,
+        max_len=MAX_SEQ_LEN,
         batch_size=32,
         num_gpus=None,
-        shuffle=True,
         distributed=False,
     ):
         if text2_col is None:
@@ -195,7 +167,7 @@ class Processor:
                 text_col,
                 text2_col,
                 label_col,
-                transform=text_transform,
+                transform=Processor.text_pair_transform,
                 tokenizer=self.tokenizer,
                 max_len=max_len,
             )
