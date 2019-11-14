@@ -117,3 +117,21 @@ def test_tc_bert_azureml(
 
     if os.path.exists("outputs"):
         shutil.rmtree("outputs")
+
+@pytest.mark.gpu
+@pytest.mark.integration
+def test_multi_languages_transformer(notebooks, tmp):
+    notebook_path = notebooks["tc_multi_languages_transformers"]
+    pm.execute_notebook(
+        notebook_path,
+        OUTPUT_NOTEBOOK,
+        kernel_name=KERNEL_NAME,
+        parameters={
+            "QUICK_RUN": True,
+            "USE_DATASET": "dac"
+        },
+    )
+    result = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict
+    assert pytest.approx(result["precision"], 0.94, abs=ABS_TOL)
+    assert pytest.approx(result["recall"], 0.94, abs=ABS_TOL)
+    assert pytest.approx(result["f1"], 0.94, abs=ABS_TOL)
