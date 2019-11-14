@@ -9,11 +9,11 @@ from torch.utils.data import Dataset
 class SCDataSet(Dataset):
     """Dataset for single sequence classification tasks"""
 
-    def __init__(self, df, text_col, label_col, max_len, transform):
+    def __init__(self, df, text_col, label_col, transform, **transform_args):
         self.df = df
         cols = list(df.columns)
         self.transform = transform
-        self.max_len = max_len
+        self.transform_args = transform_args
 
         if isinstance(text_col, int):
             self.text_col = text_col
@@ -33,7 +33,7 @@ class SCDataSet(Dataset):
 
     def __getitem__(self, idx):
         input_ids, attention_mask = self.transform(
-            self.df.iloc[idx, self.text_col], max_len=self.max_len
+            self.df.iloc[idx, self.text_col], **self.transform_args
         )
         if self.label_col is None:
             return tuple(
@@ -58,11 +58,11 @@ class SCDataSet(Dataset):
 class SPCDataSet(Dataset):
     """Dataset for sequence pair classification tasks"""
 
-    def __init__(self, df, text1_col, text2_col, label_col, max_len, transform):
+    def __init__(self, df, text1_col, text2_col, label_col, transform, **transform_args):
         self.df = df
         cols = list(df.columns)
         self.transform = transform
-        self.max_len = max_len
+        self.transform_args = transform_args
 
         if isinstance(text1_col, int):
             self.text1_col = text1_col
@@ -89,10 +89,10 @@ class SPCDataSet(Dataset):
 
     def __getitem__(self, idx):
         input1_ids, attention1_mask = self.transform(
-            self.df.iloc[idx, self.text1_col], max_len=self.max_len
+            self.df.iloc[idx, self.text1_col], **self.transform_args
         )
         input2_ids, attention2_mask = transform(
-            self.df.iloc[idx, self.text2_col], max_len=self.max_len
+            self.df.iloc[idx, self.text2_col], **self.transform_args
         )
 
         if self.label_col is None:
