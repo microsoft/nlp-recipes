@@ -82,6 +82,9 @@ def notebooks():
         "tc_bbc_bert_hi": os.path.join(
             folder_notebooks, "text_classification", "tc_bbc_bert_hi.ipynb"
         ),
+        "tc_multi_languages_transformers": os.path.join(
+            folder_notebooks, "text_classification", "tc_multi_languages_transformers.ipynb"
+        ),
         "ner_wikigold_transformer": os.path.join(
             folder_notebooks, "named_entity_recognition", "ner_wikigold_transformer.ipynb"
         ),
