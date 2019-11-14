@@ -84,11 +84,12 @@ class Processor:
         distributed=False,
     ):
         if text2_col is None:
-            ds = SCDataSet(df, text_col, label_col, max_len=max_len, transform=self.text_transform)
+            ds = SCDataSet(df, text_col, label_col, transform=self.text_transform, max_len=max_len)
         else:
             ds = SPCDataSet(
-                df, text_col, text2_col, label_col, max_len=max_len, transform=self.text_transform
+                df, text_col, text2_col, label_col, transform=self.text_transform, max_len=max_len
             )
+
         if num_gpus is not None:
             batch_size = batch_size * max(1, num_gpus)
         if distributed:
@@ -97,12 +98,6 @@ class Processor:
             sampler = RandomSampler(ds) if shuffle else SequentialSampler(ds)
 
         return DataLoader(ds, sampler=sampler, batch_size=batch_size)
-
-    # def get_eval_dataloader(dataset, batch_size, num_gpus):
-    #     if num_gpus is not None:
-    #         batch_size = batch_size * max(1, num_gpus)
-    #     sampler = SequentialSampler(dataset)
-    #     return DataLoader(dataset, sampler=sampler, batch_size=batch_size)
 
 
 class SequenceClassifier(Transformer):
