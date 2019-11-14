@@ -7,6 +7,6 @@ models and detecting biases caused by the training data.
 
 ## Summary
 
-|Notebook|Environment|Description|Dataset|
-|---|:---:|---|---|
-|[DUUDNM](interpret_dnn_layers.ipynb)|Local| Interpreting DNN Layers using Mutual Information.||
+|Notebook|Environment|Description|Dataset| Language |
+|---|:---:|---|---|---|
+|[DUUDNM](interpret_dnn_layers.ipynb)|Local| Interpreting DNN Layers using Mutual Information.||en|

@@ -1,4 +1,4 @@
-from utils_nlp.dataset.pytorch import QADataset
+from utils_nlp.models.transformers.datasets import QADataset
 
 
 def test_QADataset(qa_test_df):

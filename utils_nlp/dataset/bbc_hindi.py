@@ -3,93 +3,70 @@
 
 """
     Utility functions for downloading, extracting, and reading the
-    Multi-Genre NLI (MultiNLI) Corpus.
-    https://www.nyu.edu/projects/bowman/multinli/
+    BBC Hindi News Corpus.
+    https://github.com/NirantK/hindi2vec/releases/tag/bbc-hindi-v0.1
 """
 
 import os
-
 import pandas as pd
 import logging
+import numpy as np
+import tarfile
 
 from tempfile import TemporaryDirectory
-from utils_nlp.dataset.data_loaders import DaskJSONLoader
-from utils_nlp.dataset.url_utils import extract_zip, maybe_download
+from utils_nlp.dataset.url_utils import maybe_download
 from utils_nlp.models.transformers.common import MAX_SEQ_LEN
 from utils_nlp.models.transformers.sequence_classification import Processor
-from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
-
-URL = "http://www.nyu.edu/projects/bowman/multinli/multinli_1.0.zip"
-DATA_FILES = {
-    "train": "multinli_1.0/multinli_1.0_train.jsonl",
-    "dev_matched": "multinli_1.0/multinli_1.0_dev_matched.jsonl",
-    "dev_mismatched": "multinli_1.0/multinli_1.0_dev_mismatched.jsonl",
-}
+from sklearn.model_selection import train_test_split
 
 
-def download_file_and_extract(local_cache_path: str = ".", file_split: str = "train") -> None:
-    """Download and extract the dataset files
+URL = (
+    "https://github.com/NirantK/hindi2vec/releases/"
+    "download/bbc-hindi-v0.1/bbc-hindiv01.tar.gz"
+)
+
+
+def load_pandas_df(local_cache_path=TemporaryDirectory().name):
+    """
+    Downloads and extracts the dataset files
 
     Args:
-        local_cache_path (str [optional]) -- Directory to cache files to. Defaults to current working directory (default: {"."})
-        file_split {str} -- [description] (default: {"train"})
-    
+        local_cache_path (str, optional): The local file path to save the raw file.
+        Defaults to TemporaryDirectory().name.
     Returns:
-        None -- Nothing is returned
-    """
-    file_name = URL.split("/")[-1]
-    maybe_download(URL, file_name, local_cache_path)
-
-    if not os.path.exists(os.path.join(local_cache_path, DATA_FILES[file_split])):
-        extract_zip(os.path.join(local_cache_path, file_name), local_cache_path)
-
-
-def load_pandas_df(local_cache_path=".", file_split="train"):
-    """Loads extracted dataset into pandas
-    Args:
-        local_cache_path ([type], optional): [description]. Defaults to current working directory.
-        file_split (str, optional): The subset to load.
-            One of: {"train", "dev_matched", "dev_mismatched"}
-            Defaults to "train".
-    Returns:
-        pd.DataFrame: pandas DataFrame containing the specified
-            MultiNLI subset.
-    """
-    try:
-        download_file_and_extract(local_cache_path, file_split)
-    except Exception as e:
-        raise e
-    return pd.read_json(os.path.join(local_cache_path, DATA_FILES[file_split]), lines=True)
-
-
-def get_generator(
-    local_cache_path=".", file_split="train", block_size=10e6, batch_size=10e6, num_batches=None
-):
-    """ Returns an extracted dataset as a random batch generator that
-    yields pandas dataframes.
-    Args:
-        local_cache_path ([type], optional): [description]. Defaults to None.
-        file_split (str, optional): The subset to load.
-            One of: {"train", "dev_matched", "dev_mismatched"}
-            Defaults to "train".
-        block_size (int, optional): Size of partition in bytes.
-        num_batches (int): Number of batches to generate.
-        batch_size (int]): Batch size.
-    Returns:
-        Generator[pd.Dataframe, None, None] : Random batch generator that yields pandas dataframes.
+        pd.DataFrame: pandas DataFrame containing the loaded dataset.
     """
 
-    try:
-        download_file_and_extract(local_cache_path, file_split)
-    except Exception as e:
-        raise e
+    zipped_file = URL.split("/")[-1]
+    maybe_download(URL, zipped_file, local_cache_path)
 
-    loader = DaskJSONLoader(
-        os.path.join(local_cache_path, DATA_FILES[file_split]), block_size=block_size
+    zipped_file_path = os.path.join(local_cache_path, zipped_file)
+    tar = tarfile.open(zipped_file_path, "r:gz")
+    tar.extractall(path=local_cache_path)
+    tar.close()
+
+    train_csv_file_path = os.path.join(local_cache_path, "hindi-train.csv")
+    test_csv_file_path = os.path.join(local_cache_path, "hindi-test.csv")
+
+    train_df = pd.read_csv(
+        train_csv_file_path,
+        sep="\t",
+        encoding='utf-8',
+        header=None
     )
 
-    return loader.get_sequential_batches(batch_size=int(batch_size), num_batches=num_batches)
+    test_df = pd.read_csv(
+        test_csv_file_path,
+        sep="\t",
+        encoding='utf-8',
+        header=None
+    )
+
+    train_df = train_df.fillna("")
+    test_df = test_df.fillna("")
+
+    return (train_df, test_df)
 
 
 def load_tc_dataset(
@@ -150,17 +127,11 @@ def load_tc_dataset(
     """
 
     # download and load the original dataset
-    all_df = load_pandas_df(
-        local_cache_path=local_path,
-        file_split="train"
-    )
-
-    # select the examples corresponding to one of the entailment labels (neutral
-    # in this case) to avoid duplicate rows, as the sentences are not unique,
-    # whereas the sentence pairs are.
-    all_df = all_df[all_df["gold_label"] == "neutral"]
-    text_col = "sentence1"
-    label_col = "genre"
+    train, test = load_pandas_df(local_cache_path=local_path)
+    all_df = pd.concat([train, test], ignore_index=True)
+    all_df.columns = ["label", "text"]
+    text_col = "text"
+    label_col = "label"
 
     # encode labels, use the "genre" column as the label column
     label_encoder = LabelEncoder()

@@ -4,7 +4,9 @@
 import numpy as np
 from tqdm import tqdm
 import torch
-from torch.utils.data import TensorDataset
+from torch.utils.data import TensorDataset, DataLoader, SequentialSampler, RandomSampler
+from torch.utils.data.distributed import DistributedSampler
+
 from transformers.modeling_bert import (
     BERT_PRETRAINED_MODEL_ARCHIVE_MAP,
     BertForSequenceClassification,
@@ -21,14 +23,9 @@ from transformers.modeling_xlnet import (
     XLNET_PRETRAINED_MODEL_ARCHIVE_MAP,
     XLNetForSequenceClassification,
 )
-
-from utils_nlp.models.transformers.common import (
-    MAX_SEQ_LEN,
-    TOKENIZER_CLASS,
-    Transformer,
-)
-
 from utils_nlp.common.pytorch_utils import get_device
+from utils_nlp.models.transformers.datasets import SCDataSet, SPCDataSet
+from utils_nlp.models.transformers.common import MAX_SEQ_LEN, TOKENIZER_CLASS, Transformer
 
 MODEL_CLASS = {}
 MODEL_CLASS.update({k: BertForSequenceClassification for k in BERT_PRETRAINED_MODEL_ARCHIVE_MAP})
@@ -57,41 +54,42 @@ class Processor:
         else:
             raise ValueError("Model not supported: {}".format(model_name))
 
-    def preprocess(self, text, labels=None, max_len=MAX_SEQ_LEN):
-        """preprocess data or batches"""
+    @staticmethod
+    def text_transform(text, tokenizer, max_len=MAX_SEQ_LEN):
+        """preprocess text"""
         if max_len > MAX_SEQ_LEN:
             print("setting max_len to max allowed sequence length: {}".format(MAX_SEQ_LEN))
             max_len = MAX_SEQ_LEN
-
-        tokens = [self.tokenizer.tokenize(x) for x in text]
-
         # truncate and add CLS & SEP markers
-        tokens = [
-            [self.tokenizer.cls_token] + x[0 : max_len - 2] + [self.tokenizer.sep_token]
-            for x in tokens
-        ]
+        tokens = (
+            [tokenizer.cls_token]
+            + tokenizer.tokenize(text)[0 : max_len - 2]
+            + [tokenizer.sep_token]
+        )
         # get input ids
-        input_ids = [self.tokenizer.convert_tokens_to_ids(x) for x in tokens]
+        input_ids = tokenizer.convert_tokens_to_ids(tokens)
         # pad sequence
-        input_ids = [x + [0] * (max_len - len(x)) for x in input_ids]
+        input_ids = input_ids + [0] * (max_len - len(input_ids))
         # create input mask
-        input_mask = [[min(1, x) for x in y] for y in input_ids]
-        # create segment ids
-        token_type_ids = [0] * len(input_ids)
-        if labels is None:
-            td = TensorDataset(
-                torch.tensor(input_ids, dtype=torch.long),
-                torch.tensor(input_mask, dtype=torch.long),
-                torch.tensor(token_type_ids, dtype=torch.long),
-            )
-        else:
-            td = TensorDataset(
-                torch.tensor(input_ids, dtype=torch.long),
-                torch.tensor(input_mask, dtype=torch.long),
-                torch.tensor(token_type_ids, dtype=torch.long),
-                torch.tensor(labels, dtype=torch.long),
-            )
-        return td
+        attention_mask = [min(1, x) for x in input_ids]
+        return input_ids, attention_mask
+#        input_mask = [[min(1, x) for x in y] for y in input_ids]
+#        # create segment ids
+#        token_type_ids = [0] * len(input_ids)
+#        if labels is None:
+#            td = TensorDataset(
+#                torch.tensor(input_ids, dtype=torch.long),
+#                torch.tensor(input_mask, dtype=torch.long),
+#                torch.tensor(token_type_ids, dtype=torch.long),
+#            )
+#        else:
+#            td = TensorDataset(
+#                torch.tensor(input_ids, dtype=torch.long),
+#                torch.tensor(input_mask, dtype=torch.long),
+#                torch.tensor(token_type_ids, dtype=torch.long),
+#                torch.tensor(labels, dtype=torch.long),
+#            )
+#        return td
 
     def preprocess_sentence_pair(self, text, labels=None, max_len=MAX_SEQ_LEN):
         """preprocess data or batches"""
@@ -168,8 +166,48 @@ class Processor:
                 torch.tensor(input_mask, dtype=torch.long),
                 torch.tensor(token_type_ids, dtype=torch.long),
                 torch.tensor(labels, dtype=torch.long),
-            )
         return td
+
+    def create_dataloader_from_df(
+        self,
+        df,
+        text_col,
+        label_col,
+        max_len=MAX_SEQ_LEN,
+        text2_col=None,
+        batch_size=32,
+        num_gpus=None,
+        shuffle=True,
+        distributed=False,
+    ):
+        if text2_col is None:
+            ds = SCDataSet(
+                df,
+                text_col,
+                label_col,
+                transform=Processor.text_transform,
+                tokenizer=self.tokenizer,
+                max_len=max_len,
+            )
+        else:
+            ds = SPCDataSet(
+                df,
+                text_col,
+                text2_col,
+                label_col,
+                transform=text_transform,
+                tokenizer=self.tokenizer,
+                max_len=max_len,
+            )
+
+        if num_gpus is not None:
+            batch_size = batch_size * max(1, num_gpus)
+        if distributed:
+            sampler = DistributedSampler(dataset)
+        else:
+            sampler = RandomSampler(ds) if shuffle else SequentialSampler(ds)
+
+        return DataLoader(ds, sampler=sampler, batch_size=batch_size)
 
 
 class SequenceClassifier(Transformer):
@@ -187,9 +225,8 @@ class SequenceClassifier(Transformer):
 
     def fit(
         self,
-        train_dataset,
+        train_dataloader,
         num_epochs=1,
-        batch_size=32,
         num_gpus=None,
         local_rank=-1,
         weight_decay=0.0,
@@ -206,10 +243,9 @@ class SequenceClassifier(Transformer):
         device, num_gpus = get_device(num_gpus=num_gpus, local_rank=local_rank)
         self.model.to(device)
         super().fine_tune(
-            train_dataset=train_dataset,
+            train_dataloader=train_dataloader,
             get_inputs=Processor.get_inputs,
             device=device,
-            per_gpu_train_batch_size=batch_size,
             n_gpu=num_gpus,
             num_train_epochs=num_epochs,
             weight_decay=weight_decay,
@@ -220,15 +256,13 @@ class SequenceClassifier(Transformer):
             seed=seed,
         )
 
-    def predict(self, eval_dataset, batch_size=16, num_gpus=1, verbose=True):
+    def predict(self, eval_dataloader, num_gpus=1, verbose=True):
         device, num_gpus = get_device(num_gpus=num_gpus, local_rank=-1)
         preds = list(
             super().predict(
-                eval_dataset=eval_dataset,
+                eval_dataloader=eval_dataloader,
                 get_inputs=Processor.get_inputs,
                 device=device,
-                per_gpu_eval_batch_size=batch_size,
-                n_gpu=num_gpus,
                 verbose=verbose,
             )
         )

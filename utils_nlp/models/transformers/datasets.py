@@ -2,29 +2,117 @@
 # Licensed under the MIT License.
 
 import collections
+import torch
 from torch.utils.data import Dataset
 
 
 class SCDataSet(Dataset):
-    def __init__(self, df, text_col, label_col):
+    """Dataset for single sequence classification tasks"""
+
+    def __init__(self, df, text_col, label_col, transform, **transform_args):
         self.df = df
+        cols = list(df.columns)
+        self.transform = transform
+        self.transform_args = transform_args
 
         if isinstance(text_col, int):
             self.text_col = text_col
         elif isinstance(text_col, str):
-            self.text_col = df.columns.index(text_col)
+            self.text_col = cols.index(text_col)
         else:
             raise TypeError("text_col must be of type int or str")
 
-        if isinstance(label_col, int):
+        if label_col is None:
+            self.label_col = None
+        elif isinstance(label_col, int):
             self.label_col = label_col
         elif isinstance(label_col, str):
-            self.label_col = df.columns.index(label_col)
+            self.label_col = cols.index(label_col)
         else:
             raise TypeError("label_col must be of type int or str")
 
     def __getitem__(self, idx):
-        return (self.df.iloc[idx, self.text_col], self.df.iloc[idx, self.label_col])
+        input_ids, attention_mask = self.transform(
+            self.df.iloc[idx, self.text_col], **self.transform_args
+        )
+        if self.label_col is None:
+            return tuple(
+                [
+                    torch.tensor(input_ids, dtype=torch.long),
+                    torch.tensor(attention_mask, dtype=torch.long),
+                ]
+            )
+        labels = self.df.iloc[idx, self.label_col]
+        return tuple(
+            [
+                torch.tensor(input_ids, dtype=torch.long),  # input_ids
+                torch.tensor(attention_mask, dtype=torch.long),  # attention_mask
+                torch.tensor(labels, dtype=torch.long),  # labels
+            ]
+        )
+
+    def __len__(self):
+        return self.df.shape[0]
+
+
+class SPCDataSet(Dataset):
+    """Dataset for sequence pair classification tasks"""
+
+    def __init__(self, df, text1_col, text2_col, label_col, transform, **transform_args):
+        self.df = df
+        cols = list(df.columns)
+        self.transform = transform
+        self.transform_args = transform_args
+
+        if isinstance(text1_col, int):
+            self.text1_col = text1_col
+        elif isinstance(text1_col, str):
+            self.text1_col = cols.index(text1_col)
+        else:
+            raise TypeError("text1_col must be of type int or str")
+
+        if isinstance(text2_col, int):
+            self.text2_col = text2_col
+        elif isinstance(text2_col, str):
+            self.text2_col = cols.index(text2_col)
+        else:
+            raise TypeError("text2_col must be of type int or str")
+
+        if label_col is None:
+            self.label_col = None
+        elif isinstance(label_col, int):
+            self.label_col = label_col
+        elif isinstance(label_col, str):
+            self.label_col = cols.index(label_col)
+        else:
+            raise TypeError("label_col must be of type int or str")
+
+    def __getitem__(self, idx):
+        input1_ids, attention1_mask = self.transform(
+            self.df.iloc[idx, self.text1_col], **self.transform_args
+        )
+        input2_ids, attention2_mask = transform(
+            self.df.iloc[idx, self.text2_col], **self.transform_args
+        )
+
+        if self.label_col is None:
+            return tuple(
+                [
+                    torch.tensor(input1_ids + input2_ids, dtype=torch.long),
+                    torch.tensor(attention1_mask + attention2_mask, dtype=torch.long),
+                    torch.tensor([0] * len(input1_ids) + [1] * len(input2_ids), dtype=torch.long),
+                ]
+            )
+
+        labels = self.df.iloc[idx, self.label_col]
+        return tuple(
+            [
+                torch.tensor(input1_ids + input2_ids, dtype=torch.long),
+                torch.tensor(attention1_mask + attention2_mask, dtype=torch.long),
+                torch.tensor([0] * len(input1_ids) + [1] * len(input2_ids), dtype=torch.long),
+                torch.tensor(labels, dtype=torch.long),
+            ]
+        )
 
     def __len__(self):
         return self.df.shape[0]

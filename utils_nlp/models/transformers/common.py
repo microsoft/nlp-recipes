@@ -10,8 +10,6 @@ import random
 
 import numpy as np
 import torch
-from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
-from torch.utils.data.distributed import DistributedSampler
 from tqdm import tqdm, trange
 from transformers import AdamW, WarmupLinearSchedule
 from transformers.modeling_bert import BERT_PRETRAINED_MODEL_ARCHIVE_MAP
@@ -47,8 +45,8 @@ class Transformer:
         if model_name not in self.list_supported_models():
             raise ValueError(
                 "Model name {0} is not supported by {1}. "
-                "Call '{2}.list_supported_models()' to get all supported model "
-                "names.".format(value, self.__class__.__name__, self.__class__.__name__)
+                "Call '{1}.list_supported_models()' to get all supported model "
+                "names.".format(value, self.__class__.__name__)
             )
         self._model_name = model_name
         self._model_type = model_name.split("-")[0]
@@ -82,14 +80,13 @@ class Transformer:
 
     def fine_tune(
         self,
-        train_dataset,
+        train_dataloader,
         get_inputs,
         device,
         max_steps=-1,
         num_train_epochs=1,
         max_grad_norm=1.0,
         gradient_accumulation_steps=1,
-        per_gpu_train_batch_size=8,
         n_gpu=1,
         optimizer=None,
         scheduler=None,
@@ -105,14 +102,6 @@ class Transformer:
     ):
         if seed is not None:
             Transformer.set_seed(seed, n_gpu > 0)
-
-        train_batch_size = per_gpu_train_batch_size * max(1, n_gpu)
-        train_sampler = (
-            RandomSampler(train_dataset) if local_rank == -1 else DistributedSampler(train_dataset)
-        )
-        train_dataloader = DataLoader(
-            train_dataset, sampler=train_sampler, batch_size=train_batch_size
-        )
 
         if max_steps > 0:
             t_total = max_steps
@@ -191,7 +180,7 @@ class Transformer:
                     loss = loss / gradient_accumulation_steps
 
                 if step % 10 == 0 and verbose:
-                    tqdm.write("Loss:{:.6f}".format(loss / train_batch_size))
+                    tqdm.write("Loss:{:.6f}".format(loss))
 
                 if fp16:
                     with amp.scale_loss(loss, optimizer) as scaled_loss:
@@ -220,24 +209,7 @@ class Transformer:
             torch.cuda.empty_cache()
         return global_step, tr_loss / global_step
 
-    def predict(
-        self,
-        eval_dataset,
-        get_inputs,
-        device,
-        per_gpu_eval_batch_size=16,
-        n_gpu=1,
-        local_rank=-1,
-        verbose=True,
-    ):
-        eval_batch_size = per_gpu_eval_batch_size * max(1, n_gpu)
-        eval_sampler = (
-            SequentialSampler(eval_dataset)
-            if local_rank == -1
-            else DistributedSampler(eval_dataset)
-        )
-        eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=eval_batch_size)
-
+    def predict(self, eval_dataloader, get_inputs, device, verbose=True):
         for batch in tqdm(eval_dataloader, desc="Evaluating", disable=not verbose):
             self.model.eval()
             batch = tuple(t.to(device) for t in batch)
@@ -245,7 +217,6 @@ class Transformer:
                 inputs = get_inputs(batch, self.model_name, train_mode=False)
                 outputs = self.model(**inputs)
                 logits = outputs[0]
-
             yield logits.detach().cpu().numpy()
 
     def save_model(self):
