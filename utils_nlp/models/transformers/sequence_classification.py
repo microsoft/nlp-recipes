@@ -52,19 +52,20 @@ class Processor:
         else:
             raise ValueError("Model not supported: {}".format(model_name))
 
-    def text_transform(self, text, max_len=MAX_SEQ_LEN):
+    @staticmethod
+    def text_transform(text, tokenizer, max_len=MAX_SEQ_LEN):
         """preprocess text"""
         if max_len > MAX_SEQ_LEN:
             print("setting max_len to max allowed sequence length: {}".format(MAX_SEQ_LEN))
             max_len = MAX_SEQ_LEN
         # truncate and add CLS & SEP markers
         tokens = (
-            [self.tokenizer.cls_token]
-            + self.tokenizer.tokenize(text)[0 : max_len - 2]
-            + [self.tokenizer.sep_token]
+            [tokenizer.cls_token]
+            + tokenizer.tokenize(text)[0 : max_len - 2]
+            + [tokenizer.sep_token]
         )
         # get input ids
-        input_ids = self.tokenizer.convert_tokens_to_ids(tokens)
+        input_ids = tokenizer.convert_tokens_to_ids(tokens)
         # pad sequence
         input_ids = input_ids + [0] * (max_len - len(input_ids))
         # create input mask
@@ -84,10 +85,23 @@ class Processor:
         distributed=False,
     ):
         if text2_col is None:
-            ds = SCDataSet(df, text_col, label_col, transform=self.text_transform, max_len=max_len)
+            ds = SCDataSet(
+                df,
+                text_col,
+                label_col,
+                transform=Processor.text_transform,
+                tokenizer=self.tokenizer,
+                max_len=max_len,
+            )
         else:
             ds = SPCDataSet(
-                df, text_col, text2_col, label_col, transform=self.text_transform, max_len=max_len
+                df,
+                text_col,
+                text2_col,
+                label_col,
+                transform=text_transform,
+                tokenizer=self.tokenizer,
+                max_len=max_len,
             )
 
         if num_gpus is not None:
