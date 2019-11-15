@@ -16,6 +16,7 @@ def test_ner_wikigold_bert(notebooks, tmp):
         notebook_path,
         OUTPUT_NOTEBOOK,
         parameters={
+            "DATA_PATH": tmp,
             "CACHE_DIR": tmp
         },
         kernel_name=KERNEL_NAME,
