@@ -37,29 +37,29 @@ def test_entailment_multinli_bert(notebooks, tmp):
     assert pytest.approx(result["mismatched_recall"], 0.76, abs=ABS_TOL)
     assert pytest.approx(result["mismatched_f1"], 0.76, abs=ABS_TOL)
 
-# @pytest.mark.integration
-# @pytest.mark.azureml
-# def test_entailment_xnli_bert_azureml(
-#     notebooks, subscription_id, resource_group, workspace_name, workspace_region, cluster_name
-# ):
-#     notebook_path = notebooks["entailment_xnli_bert_azureml"]
-#     pm.execute_notebook(
-#         notebook_path,
-#         OUTPUT_NOTEBOOK,
-#         parameters={
-#             "DATA_PERCENT_USED": 0.0025,
-#             "subscription_id": subscription_id,
-#             "resource_group": resource_group,
-#             "workspace_name": workspace_name,
-#             "workspace_region": workspace_region,
-#             "cluster_name": cluster_name,
-#         },
-#         kernel_name=KERNEL_NAME,
-#     )
+@pytest.mark.integration
+@pytest.mark.azureml
+def test_entailment_xnli_bert_azureml(
+    notebooks, subscription_id, resource_group, workspace_name, workspace_region, cluster_name
+):
+    notebook_path = notebooks["entailment_xnli_bert_azureml"]
+    pm.execute_notebook(
+        notebook_path,
+        OUTPUT_NOTEBOOK,
+        parameters={
+            "DATA_PERCENT_USED": 0.0025,
+            "subscription_id": subscription_id,
+            "resource_group": resource_group,
+            "workspace_name": workspace_name,
+            "workspace_region": workspace_region,
+            "cluster_name": cluster_name,
+        },
+        kernel_name=KERNEL_NAME,
+    )
 
-#     with open("outputs/results.json", "r") as handle:
-#         result_dict = json.load(handle)
-#         assert result_dict["weighted avg"]["f1-score"] == pytest.approx(0.2, abs=ABS_TOL)
+    with open("outputs/results.json", "r") as handle:
+        result_dict = json.load(handle)
+        assert result_dict["weighted avg"]["f1-score"] == pytest.approx(0.2, abs=ABS_TOL)
 
-#     if os.path.exists("outputs"):
-#         shutil.rmtree("outputs")
+    if os.path.exists("outputs"):
+        shutil.rmtree("outputs")
