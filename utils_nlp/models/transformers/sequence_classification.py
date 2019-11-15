@@ -2,8 +2,8 @@
 # Licensed under the MIT License.
 
 import numpy as np
-
-from torch.utils.data import DataLoader, SequentialSampler, RandomSampler
+import torch.nn as nn
+from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
 from torch.utils.data.distributed import DistributedSampler
 from transformers.modeling_bert import (
     BERT_PRETRAINED_MODEL_ARCHIVE_MAP,
@@ -22,8 +22,9 @@ from transformers.modeling_xlnet import (
     XLNetForSequenceClassification,
 )
 from utils_nlp.common.pytorch_utils import get_device
-from utils_nlp.models.transformers.datasets import SCDataSet, SPCDataSet
 from utils_nlp.models.transformers.common import MAX_SEQ_LEN, TOKENIZER_CLASS, Transformer
+from utils_nlp.models.transformers.datasets import SCDataSet, SPCDataSet
+
 
 MODEL_CLASS = {}
 MODEL_CLASS.update({k: BertForSequenceClassification for k in BERT_PRETRAINED_MODEL_ARCHIVE_MAP})
@@ -145,7 +146,11 @@ class SequenceClassifier(Transformer):
         """
 
         device, num_gpus = get_device(num_gpus=num_gpus, local_rank=local_rank)
-        self.model.to(device)
+        if isinstance(self.model, nn.DataParallel):
+            self.model.module.to(device)
+        else:
+            self.model.to(device)
+
         super().fine_tune(
             train_dataloader=train_dataloader,
             get_inputs=Processor.get_inputs,
@@ -162,6 +167,11 @@ class SequenceClassifier(Transformer):
 
     def predict(self, eval_dataloader, num_gpus=1, verbose=True):
         device, num_gpus = get_device(num_gpus=num_gpus, local_rank=-1)
+        if isinstance(self.model, nn.DataParallel):
+            self.model.module.to(device)
+        else:
+            self.model.to(device)
+
         preds = list(
             super().predict(
                 eval_dataloader=eval_dataloader,
