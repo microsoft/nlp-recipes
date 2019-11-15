@@ -15,13 +15,15 @@ ABS_TOL = 0.1
 @pytest.mark.gpu
 @pytest.mark.integration
 def test_entailment_multinli_bert(notebooks, tmp):
-    notebook_path = notebooks["entailment_multinli_bert"]
+    notebook_path = notebooks["entailment_multinli_transformers"]
     pm.execute_notebook(
         notebook_path,
         OUTPUT_NOTEBOOK,
         parameters={
-            "TRAIN_DATA_USED_PERCENT": 0.05,
-            "DEV_DATA_USED_PERCENT": 0.05,
+            "MODEL_NAME": "bert-base-uncased",
+            "TO_LOWER": True,
+            "TRAIN_DATA_USED_FRACTION": 0.05,
+            "DEV_DATA_USED_FRACTION": 0.05,
             "NUM_EPOCHS": 1,
             "CACHE_DIR": tmp
         },

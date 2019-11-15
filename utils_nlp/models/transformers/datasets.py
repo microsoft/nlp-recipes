@@ -32,7 +32,7 @@ class SCDataSet(Dataset):
             raise TypeError("label_col must be of type int or str")
 
     def __getitem__(self, idx):
-        input_ids, attention_mask = self.transform(
+        input_ids, attention_mask, token_type_ids = self.transform(
             self.df.iloc[idx, self.text_col], **self.transform_args
         )
         if self.label_col is None:
@@ -40,6 +40,8 @@ class SCDataSet(Dataset):
                 [
                     torch.tensor(input_ids, dtype=torch.long),
                     torch.tensor(attention_mask, dtype=torch.long),
+                    torch.tensor(token_type_ids, dtype=torch.long),
+
                 ]
             )
         labels = self.df.iloc[idx, self.label_col]
@@ -47,6 +49,7 @@ class SCDataSet(Dataset):
             [
                 torch.tensor(input_ids, dtype=torch.long),  # input_ids
                 torch.tensor(attention_mask, dtype=torch.long),  # attention_mask
+                torch.tensor(token_type_ids, dtype=torch.long),  # segment ids
                 torch.tensor(labels, dtype=torch.long),  # labels
             ]
         )
@@ -88,29 +91,27 @@ class SPCDataSet(Dataset):
             raise TypeError("label_col must be of type int or str")
 
     def __getitem__(self, idx):
-        input1_ids, attention1_mask = self.transform(
-            self.df.iloc[idx, self.text1_col], **self.transform_args
-        )
-        input2_ids, attention2_mask = transform(
-            self.df.iloc[idx, self.text2_col], **self.transform_args
+        input_ids, attention_mask, token_type_ids = self.transform(
+            self.df.iloc[idx, self.text1_col], self.df.iloc[idx, self.text2_col], **self.transform_args
         )
 
         if self.label_col is None:
             return tuple(
                 [
-                    torch.tensor(input1_ids + input2_ids, dtype=torch.long),
-                    torch.tensor(attention1_mask + attention2_mask, dtype=torch.long),
-                    torch.tensor([0] * len(input1_ids) + [1] * len(input2_ids), dtype=torch.long),
+                    torch.tensor(input_ids, dtype=torch.long),
+                    torch.tensor(attention_mask, dtype=torch.long),
+                    torch.tensor(token_type_ids, dtype=torch.long),
                 ]
             )
 
         labels = self.df.iloc[idx, self.label_col]
         return tuple(
             [
-                torch.tensor(input1_ids + input2_ids, dtype=torch.long),
-                torch.tensor(attention1_mask + attention2_mask, dtype=torch.long),
-                torch.tensor([0] * len(input1_ids) + [1] * len(input2_ids), dtype=torch.long),
+                torch.tensor(input_ids, dtype=torch.long),
+                torch.tensor(attention_mask, dtype=torch.long),
+                torch.tensor(token_type_ids, dtype=torch.long),
                 torch.tensor(labels, dtype=torch.long),
+
             ]
         )
 

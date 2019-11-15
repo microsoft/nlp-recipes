@@ -64,8 +64,8 @@ def notebooks():
             "question_answering",
             "question_answering_system_bidaf_quickstart.ipynb",
         ),
-        "entailment_multinli_bert": os.path.join(
-            folder_notebooks, "entailment", "entailment_multinli_bert.ipynb"
+        "entailment_multinli_transformers": os.path.join(
+            folder_notebooks, "entailment", "entailment_multinli_transformers.ipynb"
         ),
         "entailment_xnli_bert_azureml": os.path.join(
             folder_notebooks, "entailment", "entailment_xnli_bert_azureml.ipynb"

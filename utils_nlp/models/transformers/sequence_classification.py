@@ -2,9 +2,11 @@
 # Licensed under the MIT License.
 
 import numpy as np
+import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
 from torch.utils.data.distributed import DistributedSampler
+
 from transformers.modeling_bert import (
     BERT_PRETRAINED_MODEL_ARCHIVE_MAP,
     BertForSequenceClassification,
@@ -47,9 +49,15 @@ class Processor:
     def get_inputs(batch, model_name, train_mode=True):
         if model_name.split("-")[0] in ["bert", "xlnet", "roberta", "distilbert"]:
             if train_mode:
-                return {"input_ids": batch[0], "attention_mask": batch[1], "labels": batch[2]}
+                inputs = {"input_ids": batch[0], "attention_mask": batch[1], "labels": batch[3]}
             else:
-                return {"input_ids": batch[0], "attention_mask": batch[1]}
+                inputs = {"input_ids": batch[0], "attention_mask": batch[1]}
+
+            # distilbert doesn't support segment ids
+            if model_name.split("-")[0] not in ["distilbert"]:
+                inputs["token_type_ids"] = batch[2]
+
+            return inputs
         else:
             raise ValueError("Model not supported: {}".format(model_name))
 
@@ -71,18 +79,78 @@ class Processor:
         input_ids = input_ids + [0] * (max_len - len(input_ids))
         # create input mask
         attention_mask = [min(1, x) for x in input_ids]
-        return input_ids, attention_mask
+        # create segment ids
+        token_type_ids = [0] * len(input_ids)
+
+        return input_ids, attention_mask, token_type_ids
+
+    @staticmethod
+    def text_pair_transform(text_1, text_2, tokenizer, max_len=MAX_SEQ_LEN):
+        """preprocess data or batches"""
+
+        def _truncate_seq_pair(tokens_a, tokens_b, max_length):
+            """Truncates a sequence pair in place to the maximum length."""
+            # This is a simple heuristic which will always truncate the longer
+            # sequence one token at a time. This makes more sense than
+            # truncating an equal percent of tokens from each, since if one
+            # sequence is very short then each token that's truncated likely
+            # contains more information than a longer sequence.
+
+            if not tokens_b:
+                max_length += 1
+
+            while True:
+                total_length = len(tokens_a) + len(tokens_b)
+                if total_length <= max_length:
+                    break
+                if len(tokens_a) > len(tokens_b):
+                    tokens_a.pop()
+                else:
+                    tokens_b.pop()
+
+            tokens_a.append(tokenizer.sep_token)
+
+            if tokens_b:
+                tokens_b.append(tokenizer.sep_token)
+
+            return tokens_a, tokens_b
+
+        if max_len > MAX_SEQ_LEN:
+            print("setting max_len to max allowed tokens: {}".format(MAX_SEQ_LEN))
+            max_len = MAX_SEQ_LEN
+
+        tokens_1 = tokenizer.tokenize(text_1)
+
+        tokens_2 = tokenizer.tokenize(text_2)
+
+        tokens_1, tokens_2 = _truncate_seq_pair(tokens_1, tokens_2, max_len - 3)
+
+        # construct token_type_ids, prefix with [0] for [CLS]
+        # [0, 0, 0, 0, ... 0, 1, 1, 1, ... 1]
+        token_type_ids = [0] + [0] * len(tokens_1) + [1] * len(tokens_2)
+        # pad sequence
+        token_type_ids = token_type_ids + [0] * (max_len - len(token_type_ids))
+        # merge sentences
+        tokens = [tokenizer.cls_token] + tokens_1 + tokens_2
+        # convert tokens to indices
+        input_ids = tokenizer.convert_tokens_to_ids(tokens)
+        # pad sequence
+        input_ids = input_ids + [0] * (max_len - len(input_ids))
+        # create input mask
+        attention_mask = [min(1, x) for x in input_ids]
+
+        return input_ids, attention_mask, token_type_ids
 
     def create_dataloader_from_df(
         self,
         df,
         text_col,
-        label_col,
-        max_len=MAX_SEQ_LEN,
+        label_col=None,
         text2_col=None,
+        shuffle=False,
+        max_len=MAX_SEQ_LEN,
         batch_size=32,
         num_gpus=None,
-        shuffle=True,
         distributed=False,
     ):
         if text2_col is None:
@@ -100,15 +168,18 @@ class Processor:
                 text_col,
                 text2_col,
                 label_col,
-                transform=text_transform,
+                transform=Processor.text_pair_transform,
                 tokenizer=self.tokenizer,
                 max_len=max_len,
             )
 
-        if num_gpus is not None:
-            batch_size = batch_size * max(1, num_gpus)
+        if num_gpus is None:
+            num_gpus = torch.cuda.device_count()
+
+        batch_size = batch_size * max(1, num_gpus)
+
         if distributed:
-            sampler = DistributedSampler(dataset)
+            sampler = DistributedSampler(ds)
         else:
             sampler = RandomSampler(ds) if shuffle else SequentialSampler(ds)
 

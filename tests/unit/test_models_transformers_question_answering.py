@@ -11,6 +11,11 @@ from utils_nlp.models.transformers.question_answering import (
     CACHED_FEATURES_TEST_FILE,
 )
 
+import torch
+
+NUM_GPUS = max(1, torch.cuda.device_count())
+BATCH_SIZE = 8
+
 
 @pytest.fixture()
 def qa_test_data(qa_test_df, tmp):
@@ -61,6 +66,8 @@ def qa_test_data(qa_test_df, tmp):
     qa_processor_bert = QAProcessor()
     train_features_bert = qa_processor_bert.preprocess(
         train_dataset,
+        batch_size=BATCH_SIZE,
+        num_gpus=NUM_GPUS,
         is_training=True,
         max_question_length=16,
         max_seq_length=64,
@@ -70,6 +77,8 @@ def qa_test_data(qa_test_df, tmp):
 
     test_features_bert = qa_processor_bert.preprocess(
         test_dataset,
+        batch_size=BATCH_SIZE,
+        num_gpus=NUM_GPUS,
         is_training=False,
         max_question_length=16,
         max_seq_length=64,
@@ -80,6 +89,8 @@ def qa_test_data(qa_test_df, tmp):
     qa_processor_xlnet = QAProcessor(model_name="xlnet-base-cased")
     train_features_xlnet = qa_processor_xlnet.preprocess(
         train_dataset,
+        batch_size=BATCH_SIZE,
+        num_gpus=NUM_GPUS,
         is_training=True,
         max_question_length=16,
         max_seq_length=64,
@@ -89,6 +100,8 @@ def qa_test_data(qa_test_df, tmp):
 
     test_features_xlnet = qa_processor_xlnet.preprocess(
         test_dataset,
+        batch_size=BATCH_SIZE,
+        num_gpus=NUM_GPUS,
         is_training=False,
         max_question_length=16,
         max_seq_length=64,
@@ -99,6 +112,8 @@ def qa_test_data(qa_test_df, tmp):
     qa_processor_distilbert = QAProcessor(model_name="distilbert-base-uncased")
     train_features_distilbert = qa_processor_distilbert.preprocess(
         train_dataset,
+        batch_size=BATCH_SIZE,
+        num_gpus=NUM_GPUS,
         is_training=True,
         max_question_length=16,
         max_seq_length=64,
@@ -108,6 +123,8 @@ def qa_test_data(qa_test_df, tmp):
 
     test_features_distilbert = qa_processor_distilbert.preprocess(
         test_dataset,
+        batch_size=BATCH_SIZE,
+        num_gpus=NUM_GPUS,
         is_training=False,
         max_question_length=16,
         max_seq_length=64,
@@ -157,9 +174,7 @@ def test_QAProcessor(qa_test_data, tmp):
 def test_AnswerExtractor(qa_test_data, tmp):
     # test bert
     qa_extractor_bert = AnswerExtractor(cache_dir=tmp)
-    qa_extractor_bert.fit(
-        qa_test_data["train_features_bert"], cache_model=True, per_gpu_batch_size=8
-    )
+    qa_extractor_bert.fit(qa_test_data["train_features_bert"], cache_model=True)
 
     # test saving fine-tuned model
     model_output_dir = os.path.join(tmp, "fine_tuned")
@@ -170,15 +185,11 @@ def test_AnswerExtractor(qa_test_data, tmp):
     qa_extractor_from_cache.predict(qa_test_data["test_features_bert"])
 
     qa_extractor_xlnet = AnswerExtractor(model_name="xlnet-base-cased", cache_dir=tmp)
-    qa_extractor_xlnet.fit(
-        qa_test_data["train_features_xlnet"], cache_model=False, per_gpu_batch_size=8
-    )
+    qa_extractor_xlnet.fit(qa_test_data["train_features_xlnet"], cache_model=False)
     qa_extractor_xlnet.predict(qa_test_data["test_features_xlnet"])
 
     qa_extractor_distilbert = AnswerExtractor(model_name="distilbert-base-uncased", cache_dir=tmp)
-    qa_extractor_distilbert.fit(
-        qa_test_data["train_features_distilbert"], cache_model=False, per_gpu_batch_size=8
-    )
+    qa_extractor_distilbert.fit(qa_test_data["train_features_distilbert"], cache_model=False)
     qa_extractor_distilbert.predict(qa_test_data["test_features_distilbert"])
 
 
