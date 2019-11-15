@@ -1,30 +1,21 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
-import torch
 import logging
-import numpy as np
-
-from torch.utils.data import TensorDataset
-from cached_property import cached_property
 from collections import Iterable
 
-from transformers.modeling_bert import (
-    BERT_PRETRAINED_MODEL_ARCHIVE_MAP,
-    BertForTokenClassification
-)
+import numpy as np
+import torch
+from torch.utils.data import TensorDataset
+from transformers.modeling_bert import BERT_PRETRAINED_MODEL_ARCHIVE_MAP, BertForTokenClassification
+from utils_nlp.common.pytorch_utils import get_device
+from utils_nlp.models.transformers.common import MAX_SEQ_LEN, TOKENIZER_CLASS, Transformer
 
-from utils_nlp.models.transformers.common import (
-    MAX_SEQ_LEN,
-    TOKENIZER_CLASS,
-    Transformer,
-    get_device,
-)
 
 TC_MODEL_CLASS = {k: BertForTokenClassification for k in BERT_PRETRAINED_MODEL_ARCHIVE_MAP}
 
 
-class TokenClassificationProcessor():
+class TokenClassificationProcessor:
     """
     Process raw dataset for training and testing.
 
@@ -42,7 +33,7 @@ class TokenClassificationProcessor():
         self.to_lower = to_lower
         self.cache_dir = cache_dir
         self.tokenizer = TOKENIZER_CLASS[model_name].from_pretrained(
-            model_name, do_lower_case=to_lower, cache_dir=cache_dir
+            model_name, do_lower_case=to_lower, cache_dir=cache_dir, output_loading_info=False
         )
 
     @staticmethod
@@ -55,19 +46,18 @@ class TokenClassificationProcessor():
             train_mode (bool, optional): Whether it's for model training. Set it to False if
                 it's for testing and it won't have the 'labels' data field.
                 Defaults to True, for model training.
-        
+
         Returns:
             dict: A dictionary object contains all needed information for training or testing.
         """
 
         if model_name.split("-")[0] not in ["bert"]:
             raise ValueError("Model not supported: {}".format(model_name))
-    
+
         if train_mode:
             return {"input_ids": batch[0], "attention_mask": batch[1], "labels": batch[3]}
         else:
             return {"input_ids": batch[0], "attention_mask": batch[1]}
-
 
     @staticmethod
     def create_label_map(label_lists, trailing_piece_tag="X"):
@@ -79,9 +69,9 @@ class TokenClassificationProcessor():
                 which presents class of each token.
             trailing_piece_tag (str, optional): Tag used to label trailing word pieces.
                 Defaults to "X".
-            
+
         Returns:
-            dict: A dictionary object to map a label (str) to an ID (int). 
+            dict: A dictionary object to map a label (str) to an ID (int).
         """
 
         label_set = set()
@@ -94,14 +84,8 @@ class TokenClassificationProcessor():
             label_map[trailing_piece_tag] = len(label_set)
         return label_map
 
-
     def preprocess_for_bert(
-        self,
-        text,
-        max_len=MAX_SEQ_LEN,
-        labels=None,
-        label_map=None,
-        trailing_piece_tag="X"
+        self, text, max_len=MAX_SEQ_LEN, labels=None, label_map=None, trailing_piece_tag="X"
     ):
         """
         Tokenize and preprocesses input word lists, involving the following steps
@@ -157,7 +141,9 @@ class TokenClassificationProcessor():
             return isinstance(obj, Iterable) and not isinstance(obj, str)
 
         if max_len > MAX_SEQ_LEN:
-            logging.warning("Setting max_len to max allowed sequence length: {}".format(MAX_SEQ_LEN))
+            logging.warning(
+                "Setting max_len to max allowed sequence length: {}".format(MAX_SEQ_LEN)
+            )
             max_len = MAX_SEQ_LEN
 
         if not _is_iterable_but_not_string(text):
@@ -168,7 +154,7 @@ class TokenClassificationProcessor():
             # list of lists for later iteration
             if not _is_iterable_but_not_string(text[0]):
                 text = [text]
-        
+
         if labels is not None:
             if not _is_iterable_but_not_string(labels):
                 raise ValueError("labels must be an iterable and not a string.")
@@ -206,7 +192,11 @@ class TokenClassificationProcessor():
                     new_tokens.append(sub_word)
 
             if len(new_tokens) > max_len:
-                logging.warn("Text after tokenization with length {} has been truncated".format(len(new_tokens)))
+                logging.warn(
+                    "Text after tokenization with length {} has been truncated".format(
+                        len(new_tokens)
+                    )
+                )
                 new_tokens = new_tokens[:max_len]
                 new_labels = new_labels[:max_len]
             input_ids = self.tokenizer.convert_tokens_to_ids(new_tokens)
@@ -241,13 +231,13 @@ class TokenClassificationProcessor():
                 torch.tensor(input_ids_all, dtype=torch.long),
                 torch.tensor(input_mask_all, dtype=torch.long),
                 torch.tensor(trailing_token_mask_all, dtype=torch.bool),
-                torch.tensor(label_ids_all, dtype=torch.long)
+                torch.tensor(label_ids_all, dtype=torch.long),
             )
         else:
             td = TensorDataset(
                 torch.tensor(input_ids_all, dtype=torch.long),
                 torch.tensor(input_mask_all, dtype=torch.long),
-                torch.tensor(trailing_token_mask_all, dtype=torch.bool)
+                torch.tensor(trailing_token_mask_all, dtype=torch.bool),
             )
         return td
 
@@ -280,7 +270,6 @@ class TokenClassifier(Transformer):
     def fit(
         self,
         train_dataset,
-        device="cuda",
         num_epochs=1,
         batch_size=32,
         num_gpus=None,
@@ -297,14 +286,13 @@ class TokenClassifier(Transformer):
 
         Args:
             train_dataset (Dataset): Dataset for training.
-            device (torch.device, optional): A PyTorch device.
-                Defaults to 'cuda'.
             num_epochs (int, optional): Number of training epochs.
                 Defaults to 1.
             batch_size (int, optional): Training batch size.
                 Defaults to 32.
-            num_gpus (int, optional): The number of GPUs to be used.
-                Defaults to None, all gpus are used.
+            num_gpus (int, optional): The number of GPUs to use. If None, all available GPUs will
+                be used. If set to 0 or GPUs are not available, CPU device will
+                be used. Defaults to None.
             local_rank (int, optional): Whether need to do distributed training.
                 Defaults to -1, no distributed training.
             weight_decay (float, optional): Weight decay rate.
@@ -321,7 +309,7 @@ class TokenClassifier(Transformer):
                 Defaults to None, use the default seed.
         """
 
-        device, num_gpus = get_device(device=device, num_gpus=num_gpus, local_rank=local_rank)
+        device, num_gpus = get_device(num_gpus=num_gpus, local_rank=local_rank)
         self.model.to(device)
 
         super().fine_tune(
@@ -339,32 +327,22 @@ class TokenClassifier(Transformer):
             seed=seed,
         )
 
-
-    def predict(
-        self,
-        eval_dataset,
-        device="cuda",
-        batch_size=32,
-        num_gpus=1,
-        local_rank=-1,
-        verbose=False,
-    ):
+    def predict(self, eval_dataset, batch_size=32, num_gpus=None, local_rank=-1, verbose=False):
         """
         Test on an evaluation dataset and get the token label predictions.
 
         Args:
             eval_dataset (TensorDataset): A TensorDataset for evaluation.
-            device (torch.device, optional): A PyTorch device.
-                Defaults to 'cuda'.
             batch_size (int, optional): The batch size for evaluation.
                 Defaults to 32.
-            num_gpus (int, optional): The number of GPUs to be used.
-                Defaults to None, all gpus are used.
+            num_gpus (int, optional): The number of GPUs to use. If None, all available GPUs will
+                be used. If set to 0 or GPUs are not available, CPU device will
+                be used. Defaults to None.
             local_rank (int, optional): Whether need to do distributed training.
                 Defaults to -1, no distributed training.
             verbose (bool, optional): Verbose model.
                 Defaults to False.
-        
+
         Returns:
             ndarray: Numpy ndarray of raw predictions. The shape of the ndarray is
             [number_of_examples, sequence_length, number_of_labels]. Each
@@ -372,6 +350,7 @@ class TokenClassifier(Transformer):
             to get the probability for each class label.
         """
 
+        device, num_gpus = get_device(num_gpus=num_gpus, local_rank=-1)
         preds = list(
             super().predict(
                 eval_dataset=eval_dataset,
@@ -386,13 +365,7 @@ class TokenClassifier(Transformer):
         preds_np = np.concatenate(preds)
         return preds_np
 
-
-    def get_predicted_token_labels(
-        self,
-        predictions,
-        label_map,
-        dataset
-    ):
+    def get_predicted_token_labels(self, predictions, label_map, dataset):
         """
         Post-process the raw prediction values and get the class label for each token.
 
@@ -409,9 +382,9 @@ class TokenClassifier(Transformer):
 
         num_samples = len(dataset.tensors[0])
         if num_samples != predictions.shape[0]:
-            raise ValueError("Predictions have {0} samples, but got {1} samples in dataset".format(
-                    predictions.shape[0],
-                    num_samples
+            raise ValueError(
+                "Predictions have {0} samples, but got {1} samples in dataset".format(
+                    predictions.shape[0], num_samples
                 )
             )
 
@@ -430,7 +403,7 @@ class TokenClassifier(Transformer):
             for sid in range(seq_len):
                 if attention_mask[sid] == 0:
                     break
-        
+
                 if not trailing_mask[sid]:
                     continue
 

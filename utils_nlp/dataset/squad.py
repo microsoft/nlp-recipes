@@ -23,9 +23,7 @@ URL_DICT = {
 }
 
 
-def load_pandas_df(
-    local_cache_path=".", squad_version="v1.1", file_split="train"
-):
+def load_pandas_df(local_cache_path=".", squad_version="v1.1", file_split="train"):
     """Loads the SQuAD dataset in pandas data frame.
 
     Args:
@@ -34,8 +32,12 @@ def load_pandas_df(
         squad_version (str, optional): Version of the SQuAD dataset, accepted values are: 
             "v1.1" and "v2.0". Defaults to "v1.1".
         file_split (str, optional): Dataset split to load, accepted values are: "train" and "dev".
-            Defaults to "train". 
+            Defaults to "train".
     """
+
+    if file_split not in ["train", "dev"]:
+        raise ValueError("file_split should be either train or dev")
+
     URL = URL_DICT[squad_version][file_split]
     file_name = URL.split("/")[-1]
     maybe_download(URL, file_name, local_cache_path)

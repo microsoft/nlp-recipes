@@ -10,8 +10,6 @@ import random
 
 import numpy as np
 import torch
-from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
-from torch.utils.data.distributed import DistributedSampler
 from tqdm import tqdm, trange
 from transformers import AdamW, WarmupLinearSchedule
 from transformers.modeling_bert import BERT_PRETRAINED_MODEL_ARCHIVE_MAP
@@ -34,21 +32,6 @@ MAX_SEQ_LEN = 512
 logger = logging.getLogger(__name__)
 
 
-def get_device(device, num_gpus, local_rank):
-    if local_rank == -1:
-        device = torch.device("cuda" if torch.cuda.is_available() and device == "cuda" else "cpu")
-        num_gpus = (
-            min(num_gpus, torch.cuda.device_count()) if num_gpus else torch.cuda.device_count()
-        )
-    else:
-        torch.cuda.set_device(local_rank)
-        device = torch.device("cuda", local_rank)
-        torch.distributed.init_process_group(backend="nccl")
-        num_gpus = 1
-
-    return device, num_gpus
-
-
 class Transformer:
     def __init__(
         self,
@@ -58,34 +41,30 @@ class Transformer:
         cache_dir=".",
         load_model_from_dir=None,
     ):
-        self.model_name = model_name
+
+        if model_name not in self.list_supported_models():
+            raise ValueError(
+                "Model name {0} is not supported by {1}. "
+                "Call '{1}.list_supported_models()' to get all supported model "
+                "names.".format(value, self.__class__.__name__)
+            )
+        self._model_name = model_name
+        self._model_type = model_name.split("-")[0]
         self.cache_dir = cache_dir
         self.load_model_from_dir = load_model_from_dir
         if load_model_from_dir is None:
             self.model = model_class[model_name].from_pretrained(
-                model_name, cache_dir=cache_dir, num_labels=num_labels
+                model_name, cache_dir=cache_dir, num_labels=num_labels, output_loading_info=False
             )
         else:
             logger.info("Loading cached model from {}".format(load_model_from_dir))
             self.model = model_class[model_name].from_pretrained(
-                load_model_from_dir, num_labels=num_labels
+                load_model_from_dir, num_labels=num_labels, output_loading_info=False
             )
 
     @property
     def model_name(self):
         return self._model_name
-
-    @model_name.setter
-    def model_name(self, value):
-        if value not in self.list_supported_models():
-            raise ValueError(
-                "Model name {0} is not supported by {1}. "
-                "Call '{2}.list_supported_models()' to get all supported model "
-                "names.".format(value, self.__class__.__name__, self.__class__.__name__)
-            )
-
-        self._model_name = value
-        self._model_type = value.split("-")[0]
 
     @property
     def model_type(self):
@@ -101,15 +80,16 @@ class Transformer:
 
     def fine_tune(
         self,
-        train_dataset,
+        train_dataloader,
         get_inputs,
         device,
         max_steps=-1,
         num_train_epochs=1,
         max_grad_norm=1.0,
         gradient_accumulation_steps=1,
-        per_gpu_train_batch_size=8,
         n_gpu=1,
+        optimizer=None,
+        scheduler=None,
         weight_decay=0.0,
         learning_rate=5e-5,
         adam_epsilon=1e-8,
@@ -123,14 +103,6 @@ class Transformer:
         if seed is not None:
             Transformer.set_seed(seed, n_gpu > 0)
 
-        train_batch_size = per_gpu_train_batch_size * max(1, n_gpu)
-        train_sampler = (
-            RandomSampler(train_dataset) if local_rank == -1 else DistributedSampler(train_dataset)
-        )
-        train_dataloader = DataLoader(
-            train_dataset, sampler=train_sampler, batch_size=train_batch_size
-        )
-
         if max_steps > 0:
             t_total = max_steps
             num_train_epochs = (
@@ -139,25 +111,30 @@ class Transformer:
         else:
             t_total = len(train_dataloader) // gradient_accumulation_steps * num_train_epochs
 
-        no_decay = ["bias", "LayerNorm.weight"]
-        optimizer_grouped_parameters = [
-            {
-                "params": [
-                    p
-                    for n, p in self.model.named_parameters()
-                    if not any(nd in n for nd in no_decay)
-                ],
-                "weight_decay": weight_decay,
-            },
-            {
-                "params": [
-                    p for n, p in self.model.named_parameters() if any(nd in n for nd in no_decay)
-                ],
-                "weight_decay": 0.0,
-            },
-        ]
-        optimizer = AdamW(optimizer_grouped_parameters, lr=learning_rate, eps=adam_epsilon)
-        scheduler = WarmupLinearSchedule(optimizer, warmup_steps=warmup_steps, t_total=t_total)
+        if optimizer is None:
+            no_decay = ["bias", "LayerNorm.weight"]
+            optimizer_grouped_parameters = [
+                {
+                    "params": [
+                        p
+                        for n, p in self.model.named_parameters()
+                        if not any(nd in n for nd in no_decay)
+                    ],
+                    "weight_decay": weight_decay,
+                },
+                {
+                    "params": [
+                        p
+                        for n, p in self.model.named_parameters()
+                        if any(nd in n for nd in no_decay)
+                    ],
+                    "weight_decay": 0.0,
+                },
+            ]
+            optimizer = AdamW(optimizer_grouped_parameters, lr=learning_rate, eps=adam_epsilon)
+
+        if scheduler is None:
+            scheduler = WarmupLinearSchedule(optimizer, warmup_steps=warmup_steps, t_total=t_total)
 
         if fp16:
             try:
@@ -203,7 +180,7 @@ class Transformer:
                     loss = loss / gradient_accumulation_steps
 
                 if step % 10 == 0 and verbose:
-                    tqdm.write("Loss:{:.6f}".format(loss / train_batch_size))
+                    tqdm.write("Loss:{:.6f}".format(loss))
 
                 if fp16:
                     with amp.scale_loss(loss, optimizer) as scaled_loss:
@@ -232,24 +209,7 @@ class Transformer:
             torch.cuda.empty_cache()
         return global_step, tr_loss / global_step
 
-    def predict(
-        self,
-        eval_dataset,
-        get_inputs,
-        device,
-        per_gpu_eval_batch_size=16,
-        n_gpu=1,
-        local_rank=-1,
-        verbose=True,
-    ):
-        eval_batch_size = per_gpu_eval_batch_size * max(1, n_gpu)
-        eval_sampler = (
-            SequentialSampler(eval_dataset)
-            if local_rank == -1
-            else DistributedSampler(eval_dataset)
-        )
-        eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=eval_batch_size)
-
+    def predict(self, eval_dataloader, get_inputs, device, verbose=True):
         for batch in tqdm(eval_dataloader, desc="Evaluating", disable=not verbose):
             self.model.eval()
             batch = tuple(t.to(device) for t in batch)
@@ -257,16 +217,13 @@ class Transformer:
                 inputs = get_inputs(batch, self.model_name, train_mode=False)
                 outputs = self.model(**inputs)
                 logits = outputs[0]
-
             yield logits.detach().cpu().numpy()
 
     def save_model(self):
         output_model_dir = os.path.join(self.cache_dir, "fine_tuned")
 
-        if not os.path.exists(self.cache_dir):
-            os.makedirs(self.cache_dir)
-        if not os.path.exists(output_model_dir):
-            os.makedirs(output_model_dir)
+        os.makedirs(self.cache_dir, exist_ok=True)
+        os.makedirs(output_model_dir, exist_ok=True)
 
         logger.info("Saving model checkpoint to %s", output_model_dir)
         # Save a trained model, configuration and tokenizer using `save_pretrained()`.
