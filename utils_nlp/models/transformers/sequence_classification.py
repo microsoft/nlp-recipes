@@ -2,9 +2,8 @@
 # Licensed under the MIT License.
 
 import numpy as np
-from tqdm import tqdm
 import torch
-from torch.utils.data import TensorDataset, DataLoader, SequentialSampler, RandomSampler
+from torch.utils.data import DataLoader, SequentialSampler, RandomSampler
 from torch.utils.data.distributed import DistributedSampler
 
 from transformers.modeling_bert import (
@@ -172,10 +171,13 @@ class Processor:
                 max_len=max_len,
             )
 
-        if num_gpus is not None:
-            batch_size = batch_size * max(1, num_gpus)
+        if num_gpus is None:
+            num_gpus = torch.cuda.device_count()
+
+        batch_size = batch_size * max(1, num_gpus)
+
         if distributed:
-            sampler = DistributedSampler(dataset)
+            sampler = DistributedSampler(ds)
         else:
             sampler = RandomSampler(ds) if shuffle else SequentialSampler(ds)
 
