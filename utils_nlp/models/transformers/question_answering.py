@@ -26,7 +26,8 @@ import math
 import jsonlines
 
 import torch
-from torch.utils.data import TensorDataset, SequentialSampler, DataLoader
+from torch.utils.data import TensorDataset, SequentialSampler, DataLoader, RandomSampler
+from torch.utils.data.distributed import DistributedSampler
 
 from transformers.tokenization_bert import BasicTokenizer, whitespace_tokenize
 from transformers.modeling_bert import BERT_PRETRAINED_MODEL_ARCHIVE_MAP, BertForQuestionAnswering
@@ -40,11 +41,7 @@ from transformers.modeling_distilbert import (
 )
 
 from utils_nlp.common.pytorch_utils import get_device
-from utils_nlp.models.transformers.common import (
-    MAX_SEQ_LEN,
-    TOKENIZER_CLASS,
-    Transformer,
-)
+from utils_nlp.models.transformers.common import MAX_SEQ_LEN, TOKENIZER_CLASS, Transformer
 
 MODEL_CLASS = {}
 MODEL_CLASS.update({k: BertForQuestionAnswering for k in BERT_PRETRAINED_MODEL_ARCHIVE_MAP})
@@ -146,6 +143,9 @@ class QAProcessor:
         self,
         qa_dataset,
         is_training,
+        batch_size=32,
+        num_gpus=None,
+        distributed=False,
         max_question_length=64,
         max_seq_length=MAX_SEQ_LEN,
         doc_stride=128,
@@ -243,37 +243,42 @@ class QAProcessor:
             examples_writer.write_all(qa_examples_json)
             features_writer.write_all(features_json)
 
-            # TODO: maybe generalize the following code
-            input_ids = torch.tensor([f.input_ids for f in features], dtype=torch.long)
-            input_mask = torch.tensor([f.input_mask for f in features], dtype=torch.long)
-            segment_ids = torch.tensor([f.segment_ids for f in features], dtype=torch.long)
-            cls_index = torch.tensor([f.cls_index for f in features], dtype=torch.long)
-            p_mask = torch.tensor([f.p_mask for f in features], dtype=torch.float)
-
-            if is_training:
-                start_positions = torch.tensor(
-                    [f.start_position for f in features], dtype=torch.long
-                )
-                end_positions = torch.tensor([f.end_position for f in features], dtype=torch.long)
-                qa_dataset = TensorDataset(
-                    input_ids,
-                    input_mask,
-                    segment_ids,
-                    start_positions,
-                    end_positions,
-                    cls_index,
-                    p_mask,
-                )
-            else:
-                unique_id_all = torch.tensor(unique_id_all, dtype=torch.long)
-                qa_dataset = TensorDataset(
-                    input_ids, input_mask, segment_ids, cls_index, p_mask, unique_id_all
-                )
-
             logger.info("QA examples are saved to {}".format(examples_file))
             logger.info("QA features are saved to {}".format(features_file))
 
-        return qa_dataset
+        # TODO: maybe generalize the following code
+        input_ids = torch.tensor([f.input_ids for f in features], dtype=torch.long)
+        input_mask = torch.tensor([f.input_mask for f in features], dtype=torch.long)
+        segment_ids = torch.tensor([f.segment_ids for f in features], dtype=torch.long)
+        cls_index = torch.tensor([f.cls_index for f in features], dtype=torch.long)
+        p_mask = torch.tensor([f.p_mask for f in features], dtype=torch.float)
+
+        if is_training:
+            start_positions = torch.tensor([f.start_position for f in features], dtype=torch.long)
+            end_positions = torch.tensor([f.end_position for f in features], dtype=torch.long)
+            qa_dataset = TensorDataset(
+                input_ids,
+                input_mask,
+                segment_ids,
+                start_positions,
+                end_positions,
+                cls_index,
+                p_mask,
+            )
+        else:
+            unique_id_all = torch.tensor(unique_id_all, dtype=torch.long)
+            qa_dataset = TensorDataset(
+                input_ids, input_mask, segment_ids, cls_index, p_mask, unique_id_all
+            )
+
+        if num_gpus is not None:
+            batch_size = batch_size * max(1, num_gpus)
+        if distributed:
+            sampler = DistributedSampler(qa_dataset)
+        else:
+            sampler = RandomSampler(qa_dataset) if is_training else SequentialSampler(qa_dataset)
+
+        return DataLoader(qa_dataset, sampler=sampler, batch_size=batch_size)
 
     def postprocess(
         self,
@@ -469,9 +474,8 @@ class AnswerExtractor(Transformer):
 
     def fit(
         self,
-        train_dataset,
+        train_dataloader,
         num_gpus=None,
-        per_gpu_batch_size=8,
         num_epochs=1,
         learning_rate=5e-5,
         max_grad_norm=1.0,
@@ -491,12 +495,10 @@ class AnswerExtractor(Transformer):
         Fine-tune pre-trained transofmer models for question answering.
 
         Args:
-            train_dataset (QADataset): Training dataset of type
-                :class:`utils_nlp.dataset.pytorch.QADataset`.
+            train_dataloader (Dataloader): Dataloader for the training data.
             num_gpus (int, optional): The number of GPUs to use. If None, all available GPUs will
                 be used. If set to 0 or GPUs are not available, CPU device will
                 be used. Defaults to None.
-            per_gpu_batch_size (int, optional): Training batch size on each GPU. Defaults to 8.
             num_epochs (int, optional): Number of training epochs. Defaults to 1.
             learning_rate (float, optional):  Learning rate of the AdamW optimizer. Defaults to
                 5e-5.
@@ -530,14 +532,13 @@ class AnswerExtractor(Transformer):
 
         self.model.to(device)
         super().fine_tune(
-            train_dataset=train_dataset,
+            train_dataloader=train_dataloader,
             get_inputs=QAProcessor.get_inputs,
             device=device,
             max_steps=max_steps,
             num_train_epochs=num_epochs,
             max_grad_norm=max_grad_norm,
             gradient_accumulation_steps=gradient_accumulation_steps,
-            per_gpu_train_batch_size=per_gpu_batch_size,
             n_gpu=num_gpus,
             weight_decay=weight_decay,
             learning_rate=learning_rate,
@@ -552,22 +553,13 @@ class AnswerExtractor(Transformer):
         if cache_model:
             self.save_model()
 
-    def predict(
-        self,
-        test_dataset,
-        per_gpu_batch_size=16,
-        num_gpus=None,
-        local_rank=-1,
-        verbose=True,
-    ):
+    def predict(self, test_dataloader, num_gpus=None, local_rank=-1, verbose=True):
 
         """
         Predicts answer start and end logits.
 
         Args:
-            test_dataset (QADataset): Testing dataset of type
-            :class:`utils_nlp.dataset.pytorch.QADataset`.
-            per_gpu_batch_size (int, optional): Testing batch size on each GPU. Defaults to 16.
+            test_dataloader (QADataset): Dataloader for the testing data.
             num_gpus (int, optional): The number of GPUs to use. If None, all available GPUs will
                 be used. If set to 0 or GPUs are not available, CPU device will
                 be used. Defaults to None.
@@ -583,15 +575,11 @@ class AnswerExtractor(Transformer):
             return tensor.detach().cpu().tolist()
 
         device, num_gpus = get_device(num_gpus=num_gpus, local_rank=local_rank)
-        batch_size = per_gpu_batch_size * max(1, num_gpus)
 
         self.model.to(device)
 
         # score
         self.model.eval()
-
-        sampler = SequentialSampler(test_dataset)
-        test_dataloader = DataLoader(test_dataset, sampler=sampler, batch_size=batch_size)
 
         all_results = []
         for batch in tqdm(test_dataloader, desc="Evaluating", disable=not verbose):
