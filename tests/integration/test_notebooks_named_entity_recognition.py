@@ -11,20 +11,17 @@ ABS_TOL = 0.05
 @pytest.mark.gpu
 @pytest.mark.integration
 def test_ner_wikigold_bert(notebooks, tmp):
-    notebook_path = notebooks["ner_wikigold_bert"]
+    notebook_path = notebooks["ner_wikigold_transformer"]
     pm.execute_notebook(
         notebook_path,
         OUTPUT_NOTEBOOK,
         parameters={
+            "DATA_PATH": tmp,
             "CACHE_DIR": tmp
         },
         kernel_name=KERNEL_NAME,
     )
     result = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict
-    assert pytest.approx(result["precision_1"], 0.90, abs=ABS_TOL)
-    assert pytest.approx(result["recall_1"], 0.90, abs=ABS_TOL)
-    assert pytest.approx(result["f1_1"], 0.90, abs=ABS_TOL)
-
-    assert pytest.approx(result["precision_2"], 0.80, abs=ABS_TOL)
-    assert pytest.approx(result["recall_2"], 0.85, abs=ABS_TOL)
-    assert pytest.approx(result["f1_2"], 0.85, abs=ABS_TOL)
+    assert pytest.approx(result["precision"], 0.80, abs=ABS_TOL)
+    assert pytest.approx(result["recall"], 0.83, abs=ABS_TOL)
+    assert pytest.approx(result["f1"], 0.83, abs=ABS_TOL)

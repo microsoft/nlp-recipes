@@ -167,7 +167,7 @@ class BERTSequenceClassifier:
         epoch,
         bert_optimizer=None,
         num_epochs=1,
-        num_gpus=0,
+        num_gpus=None,
         lr=2e-5,
         warmup_proportion=None,
         fp16_allreduce=False,
@@ -181,7 +181,7 @@ class BERTSequenceClassifier:
             epoch(int): Current epoch number of training.
             bert_optimizer(optimizer): optimizer can be BERTAdam for local and Dsitributed if Horovod
             num_epochs(int): the number of epochs to run
-            num_gpus(int): the number of gpus
+            num_gpus(int): the number of gpus. If None is specified, all available GPUs will be used.
             lr (float): learning rate of the adam optimizer. defaults to 2e-5.
             warmup_proportion (float, optional): proportion of training to
                 perform linear learning rate warmup for. e.g., 0.1 = 10% of
@@ -190,10 +190,9 @@ class BERTSequenceClassifier:
             num_train_optimization_steps: number of steps the optimizer should take.
         """
 
-        device = get_device("cpu" if num_gpus == 0 else "gpu")
+        device, num_gpus = get_device(num_gpus)
 
-        if device:
-            self.model.cuda()
+        self.model = move_to_device(self.model, device, num_gpus)
 
         if bert_optimizer is None:
             bert_optimizer = self.create_optimizer(
@@ -277,7 +276,7 @@ class BERTSequenceClassifier:
             1darray, dict(1darray, 1darray, ndarray): Predicted classes and target labels or
                 a dictionary with classes, target labels, probabilities) if probabilities is True.
         """
-        device = get_device("cpu" if num_gpus == 0 else "gpu")
+        device, num_gpus = get_device(num_gpus)
         self.model = move_to_device(self.model, device, num_gpus)
 
         # score

@@ -3,7 +3,7 @@
 
 
 # This script reuses some code from
-# https://github.com/huggingface/pytorch-transformers/blob/master/examples
+# https://github.com/huggingface/transformers/blob/master/examples
 # /run_glue.py
 
 import csv

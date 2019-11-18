@@ -10,9 +10,14 @@
 import random
 import os
 import pandas as pd
+import logging
 
+from tempfile import TemporaryDirectory
 from utils_nlp.dataset.url_utils import maybe_download
 from utils_nlp.dataset.ner_utils import preprocess_conll
+from utils_nlp.models.transformers.common import MAX_SEQ_LEN
+from utils_nlp.models.transformers.named_entity_recognition import TokenClassificationProcessor
+
 
 URL = (
     "https://raw.githubusercontent.com/juand-r/entity-recognition-datasets"
@@ -72,3 +77,149 @@ def load_train_test_dfs(local_cache_path="./", test_fraction=0.5, random_seed=No
 def get_unique_labels():
     """Get the unique labels in the wikigold dataset."""
     return ["O", "I-LOC", "I-MISC", "I-PER", "I-ORG"]
+
+
+def load_dataset(
+    local_path=TemporaryDirectory().name,
+    test_fraction=0.3,
+    random_seed=None,
+    train_sample_ratio=1.0,
+    test_sample_ratio=1.0,
+    model_name="bert-base-uncased",
+    to_lower=True,
+    cache_dir=TemporaryDirectory().name,
+    max_len=MAX_SEQ_LEN,
+    trailing_piece_tag="X",
+    batch_size=32,
+    num_gpus=None
+):
+    """
+    Load the wikigold dataset and split into training and testing datasets.
+    The datasets are preprocessed and can be used to train a NER model or evaluate
+    on the testing dataset.
+
+    Args:
+        local_path (str, optional): The local file path to save the raw wikigold file.
+            Defautls to "~/.nlp_utils/datasets/".
+        test_fraction (float, optional): The fraction of testing dataset when splitting.
+            Defaults to 0.3.
+        random_seed (float, optional): Random seed used to shuffle the data.
+            Defaults to None.
+        train_sample_ratio (float, optional): The ratio that used to sub-sampling for training.
+            Defaults to 1.0.
+        test_sample_ratio (float, optional): The ratio that used to sub-sampling for testing.
+            Defaults to 1.0.
+        model_name (str, optional): The pretained model name.
+            Defaults to "bert-base-uncased".
+        to_lower (bool, optional): Lower case text input.
+            Defaults to True.
+        cache_dir (str, optional): The default folder for saving cache files.
+            Defaults to './temp'.
+        max_len (int, optional): Maximum length of the list of tokens. Lists longer
+            than this are truncated and shorter ones are padded with "O"s. 
+            Default value is BERT_MAX_LEN=512.
+        trailing_piece_tag (str, optional): Tag used to label trailing word pieces.
+            For example, "criticize" is broken into "critic" and "##ize", "critic"
+            preserves its original label and "##ize" is labeled as trailing_piece_tag.
+            Default value is "X".
+        batch_size (int, optional): The batch size for training and testing.
+            Defaults to 32.
+        num_gpus (int, optional): The number of GPUs.
+            Defaults to None.
+
+    Returns:
+        tuple. The tuple contains four elements.
+        train_dataload (DataLoader): a PyTorch DataLoader instance for training.
+
+        test_dataload (DataLoader): a PyTorch DataLoader instance for testing.
+        
+        label_map (dict): A dictionary object to map a label (str) to an ID (int). 
+
+        test_dataset (TensorDataset): A TensorDataset containing the following four tensors.
+            1. input_ids_all: Tensor. Each sublist contains numerical values,
+                i.e. token ids, corresponding to the tokens in the input 
+                text data.
+            2. input_mask_all: Tensor. Each sublist contains the attention
+                mask of the input token id list, 1 for input tokens and 0 for
+                padded tokens, so that padded tokens are not attended to.
+            3. trailing_token_mask_all: Tensor. Each sublist is
+                a boolean list, True for the first word piece of each
+                original word, False for the trailing word pieces,
+                e.g. "##ize". This mask is useful for removing the
+                predictions on trailing word pieces, so that each
+                original word in the input text has a unique predicted
+                label.
+            4. label_ids_all: Tensor, each sublist contains token labels of
+                a input sentence/paragraph, if labels is provided. If the
+                `labels` argument is not provided, it will not return this tensor.
+    """
+
+    train_df, test_df = load_train_test_dfs(
+        local_cache_path=local_path,
+        test_fraction=test_fraction,
+        random_seed=random_seed
+    )
+
+    if train_sample_ratio > 1.0:
+        train_sample_ratio = 1.0
+        logging.warning("Setting the training sample ratio to 1.0")
+    elif train_sample_ratio < 0:
+        logging.error("Invalid training sample ration: {}".format(train_sample_ratio))
+        raise ValueError("Invalid training sample ration: {}".format(train_sample_ratio))
+    
+    if test_sample_ratio > 1.0:
+        test_sample_ratio = 1.0
+        logging.warning("Setting the testing sample ratio to 1.0")
+    elif test_sample_ratio < 0:
+        logging.error("Invalid testing sample ration: {}".format(test_sample_ratio))
+        raise ValueError("Invalid testing sample ration: {}".format(test_sample_ratio))
+
+    if train_sample_ratio < 1.0:
+        train_df = train_df.sample(frac=train_sample_ratio).reset_index(drop=True)
+    if test_sample_ratio < 1.0:
+        test_df = test_df.sample(frac=test_sample_ratio).reset_index(drop=True)
+
+    processor = TokenClassificationProcessor(
+        model_name=model_name,
+        to_lower=to_lower,
+        cache_dir=cache_dir
+    )
+
+    label_map = TokenClassificationProcessor.create_label_map(
+        label_lists=train_df['labels'],
+        trailing_piece_tag=trailing_piece_tag
+    )
+
+    train_dataset = processor.preprocess_for_bert(
+        text=train_df['sentence'],
+        max_len=max_len,
+        labels=train_df['labels'],
+        label_map=label_map,
+        trailing_piece_tag=trailing_piece_tag
+    )
+
+    test_dataset = processor.preprocess_for_bert(
+        text=test_df['sentence'],
+        max_len=max_len,
+        labels=test_df['labels'],
+        label_map=label_map,
+        trailing_piece_tag=trailing_piece_tag
+    )
+
+    train_dataloader = processor.create_dataloader_from_dataset(
+        train_dataset,
+        shuffle=True,
+        batch_size=batch_size,
+        num_gpus=num_gpus,
+        distributed=False
+    )
+
+    test_dataloader = processor.create_dataloader_from_dataset(
+        test_dataset,
+        shuffle=False,
+        batch_size=batch_size,
+        num_gpus=num_gpus,
+        distributed=False
+    )
+
+    return (train_dataloader, test_dataloader, label_map, test_dataset)

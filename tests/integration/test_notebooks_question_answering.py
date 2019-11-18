@@ -4,9 +4,33 @@
 import pytest
 import papermill as pm
 import scrapbook as sb
-from tests.notebooks_common import OUTPUT_NOTEBOOK
+from tests.notebooks_common import OUTPUT_NOTEBOOK, KERNEL_NAME
 
 ABS_TOL = 0.2
+
+@pytest.mark.gpu
+@pytest.mark.integration
+def test_question_answering_squad_transformers(notebooks, tmp):
+    notebook_path = notebooks["question_answering_squad_transformers"]
+    pm.execute_notebook(
+        notebook_path,
+        OUTPUT_NOTEBOOK,
+        parameters={
+            "TRAIN_DATA_USED_PERCENT": 0.15,
+            "DEV_DATA_USED_PERCENT": 0.15,
+            "NUM_EPOCHS": 1,
+            "MAX_SEQ_LENGTH": 384,
+            "DOC_STRIDE": 128,
+            "PER_GPU_BATCH_SIZE": 4,
+            "MODEL_NAME": "distilbert-base-uncased",
+            "DO_LOWER_CASE": True,
+            "CACHE_DIR": tmp
+        },
+        kernel_name=KERNEL_NAME,
+    )
+    result = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict
+    assert pytest.approx(result["exact"], 0.55, abs=ABS_TOL)
+    assert pytest.approx(result["f1"], 0.70, abs=ABS_TOL)
 
 
 @pytest.mark.integration
@@ -69,7 +93,7 @@ def test_bert_qa_runs(notebooks, subscription_id, resource_group, workspace_name
         parameters=dict(
             AZUREML_CONFIG_PATH=".",
             DATA_FOLDER="./tests/integration/squad",
-            PROJECT_FOLDER="./tests/integration/pytorch-transformers",
+            PROJECT_FOLDER="./tests/integration/transformers",
             EXPERIMENT_NAME="NLP-QA-BERT-deepdive",
             BERT_UTIL_PATH="./utils_nlp/azureml/azureml_bert_util.py",
             EVALUATE_SQAD_PATH="./utils_nlp/eval/evaluate_squad.py",
