@@ -1,19 +1,19 @@
-cd ~  
+cd /home/ 
 
 # clone repo and install the conda env 
 git clone https://github.com/microsoft/nlp-recipes.git
 
 # change permission as we copy this into each user's folder
-chmod -R ugo+rwx /root/nlp-recipes
+chmod -R ugo+rwx /home/nlp-recipes
 
 source /data/anaconda/etc/profile.d/conda.sh
 
-cd /root/nlp-recipes
+cd /home/nlp-recipes
 python tools/generate_conda_file.py
 conda env create -n nlp_cpu -f nlp_cpu.yaml
 
-conda activate my_env_name
-python -m ipykernel install --user --name nlp_cpu --display-name "Python (nlp_cpu)"
+conda activate nlp_cpu
+python -m ipykernel install --name nlp_cpu --display-name "Python (nlp_cpu)"
 
 # Pip install the utils_nlp package in the conda environment
 pip install -e . 
@@ -32,7 +32,7 @@ do
     rm -rf /data/home/$USERNAME/notebooks/*
     
     # copy repo
-    cp -ar /root/nlp-recipes /data/home/$USERNAME/notebooks
+    cp -ar /home/nlp-recipes /data/home/$USERNAME/notebooks
 done
 
 # restart jupyterhub 
