@@ -29,6 +29,7 @@ $ python -m ipykernel install --user --name {conda_env} \
 --display-name "Python ({conda_env})"
 """
 
+
 CHANNELS = ["defaults", "conda-forge", "pytorch"]
 
 CONDA_BASE = {
