@@ -9,17 +9,13 @@ from utils_nlp.models.bert.common import Language
 
 
 @pytest.mark.notebooks
-def test_bert_encoder(notebooks):
+def test_bert_encoder(notebooks, tmp):
     notebook_path = notebooks["bert_encoder"]
     pm.execute_notebook(
         notebook_path,
         OUTPUT_NOTEBOOK,
         kernel_name=KERNEL_NAME,
         parameters=dict(
-            NUM_GPUS=0,
-            LANGUAGE=Language.ENGLISH,
-            TO_LOWER=True,
-            MAX_SEQ_LENGTH=128,
-            CACHE_DIR="./temp",
+            NUM_GPUS=0, LANGUAGE=Language.ENGLISH, TO_LOWER=True, MAX_SEQ_LENGTH=128, CACHE_DIR=tmp
         ),
     )
