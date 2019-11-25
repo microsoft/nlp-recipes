@@ -47,7 +47,7 @@ You can learn how to create a Notebook VM [here](https://docs.microsoft.com/en-u
 We provide a script, [generate_conda_file.py](tools/generate_conda_file.py), to generate a conda-environment yaml file
 which you can use to create the target environment using the Python version 3.6 with all the correct dependencies.
 
-Assuming the repo is cloned as `nlp` in the system, to install **a default (Python CPU) environment**:
+Assuming the repo is cloned as `nlp-recipes` in the system, to install **a default (Python CPU) environment**:
 
     cd nlp-recipes
     python tools/generate_conda_file.py

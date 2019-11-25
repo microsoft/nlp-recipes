@@ -34,7 +34,7 @@ version = ".".join(VERSION.split(".")[:2])
 # The full version, including alpha/beta/rc tags
 release = VERSION
 
-prefix = "NLP"
+prefix = "NLPRecipes"
 
 # -- General configuration ---------------------------------------------------
 
