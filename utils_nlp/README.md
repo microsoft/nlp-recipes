@@ -26,7 +26,7 @@ ws = get_or_create_workspace(
 This submodule contains high-level utilities that are commonly used in multiple algorithms as well as helper functions for managing frameworks like pytorch.
 
 ### [Dataset](dataset)
-This submodule includes helper functions for interacting with well-known datasets,  utility functions to process datasets for different NLP tasks, as well as utilities for splitting data for training/testing. For example, the [snli module](snli.py) will allow you to load a dataframe in pandas from the  Stanford Natural Language Inference (SNLI) Corpus dataset, with the option to set the number of rows to load in order to test algorithms and evaluate performance benchmarks. Information on the datasets used in the repo can be found [here](https://github.com/microsoft/nlp/tree/staging/utils_nlp/dataset#datasets).
+This submodule includes helper functions for interacting with well-known datasets,  utility functions to process datasets for different NLP tasks, as well as utilities for splitting data for training/testing. For example, the [snli module](snli.py) will allow you to load a dataframe in pandas from the  Stanford Natural Language Inference (SNLI) Corpus dataset, with the option to set the number of rows to load in order to test algorithms and evaluate performance benchmarks. Information on the datasets used in the repo can be found [here](https://github.com/microsoft/nlp-recipes/tree/staging/utils_nlp/dataset#datasets).
 
 Most datasets may be split into `train`, `dev`, and `test`.
 
