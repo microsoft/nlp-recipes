@@ -12,12 +12,22 @@ from utils_nlp.models.transformers.question_answering import (
 )
 
 import torch
+from tempfile import TemporaryDirectory
 
 NUM_GPUS = max(1, torch.cuda.device_count())
 BATCH_SIZE = 8
 
 
-@pytest.fixture()
+@pytest.fixture(scope="module")
+def tmp(tmp_path_factory):
+    td = TemporaryDirectory(dir=tmp_path_factory.getbasetemp())
+    try:
+        yield td.name
+    finally:
+        td.cleanup()
+
+
+@pytest.fixture(scope="module")
 def qa_test_data(qa_test_df, tmp):
 
     train_dataset = QADataset(
@@ -63,7 +73,7 @@ def qa_test_data(qa_test_df, tmp):
         qa_id_col=qa_test_df["qa_id_col"],
     )
 
-    qa_processor_bert = QAProcessor()
+    qa_processor_bert = QAProcessor(cache_dir=tmp)
     train_features_bert = qa_processor_bert.preprocess(
         train_dataset,
         batch_size=BATCH_SIZE,
@@ -86,7 +96,7 @@ def qa_test_data(qa_test_df, tmp):
         feature_cache_dir=tmp,
     )
 
-    qa_processor_xlnet = QAProcessor(model_name="xlnet-base-cased")
+    qa_processor_xlnet = QAProcessor(model_name="xlnet-base-cased", cache_dir=tmp)
     train_features_xlnet = qa_processor_xlnet.preprocess(
         train_dataset,
         batch_size=BATCH_SIZE,
@@ -109,7 +119,7 @@ def qa_test_data(qa_test_df, tmp):
         feature_cache_dir=tmp,
     )
 
-    qa_processor_distilbert = QAProcessor(model_name="distilbert-base-uncased")
+    qa_processor_distilbert = QAProcessor(model_name="distilbert-base-uncased", cache_dir=tmp)
     train_features_distilbert = qa_processor_distilbert.preprocess(
         train_dataset,
         batch_size=BATCH_SIZE,
@@ -149,26 +159,40 @@ def qa_test_data(qa_test_df, tmp):
 
 def test_QAProcessor(qa_test_data, tmp):
     for model_name in ["bert-base-cased", "xlnet-base-cased", "distilbert-base-uncased"]:
-        qa_processor = QAProcessor(model_name=model_name)
-        qa_processor.preprocess(qa_test_data["train_dataset"], is_training=True)
-        qa_processor.preprocess(qa_test_data["train_dataset_list"], is_training=True)
-        qa_processor.preprocess(qa_test_data["test_dataset"], is_training=False)
+        qa_processor = QAProcessor(model_name=model_name, cache_dir=tmp)
+        qa_processor.preprocess(
+            qa_test_data["train_dataset"], is_training=True, feature_cache_dir=tmp
+        )
+        qa_processor.preprocess(
+            qa_test_data["train_dataset_list"], is_training=True, feature_cache_dir=tmp
+        )
+        qa_processor.preprocess(
+            qa_test_data["test_dataset"], is_training=False, feature_cache_dir=tmp
+        )
 
     # test unsupported model type
     with pytest.raises(ValueError):
-        qa_processor = QAProcessor(model_name="abc")
+        qa_processor = QAProcessor(model_name="abc", cache_dir=tmp)
 
     # test training data has no ground truth exception
     with pytest.raises(Exception):
-        qa_processor.preprocess(qa_test_data["test_dataset"], is_training=True)
+        qa_processor.preprocess(
+            qa_test_data["test_dataset"], is_training=True, feature_cache_dir=tmp
+        )
 
     # test when answer start is a list, but answer text is not
     with pytest.raises(Exception):
-        qa_processor.preprocess(qa_test_data["train_dataset_start_text_mismatch"], is_training=True)
+        qa_processor.preprocess(
+            qa_test_data["train_dataset_start_text_mismatch"],
+            is_training=True,
+            feature_cache_dir=tmp,
+        )
 
     # test when training data has multiple answers
     with pytest.raises(Exception):
-        qa_processor.preprocess(qa_test_data["train_dataset_multi_answers"], is_training=True)
+        qa_processor.preprocess(
+            qa_test_data["train_dataset_multi_answers"], is_training=True, feature_cache_dir=tmp
+        )
 
 
 def test_AnswerExtractor(qa_test_data, tmp):
@@ -194,7 +218,7 @@ def test_AnswerExtractor(qa_test_data, tmp):
 
 
 def test_postprocess_bert_answer(qa_test_data, tmp):
-    qa_processor = QAProcessor()
+    qa_processor = QAProcessor(cache_dir=tmp)
     test_features = qa_processor.preprocess(
         qa_test_data["test_dataset"],
         is_training=False,
@@ -210,6 +234,9 @@ def test_postprocess_bert_answer(qa_test_data, tmp):
         results=predictions,
         examples_file=os.path.join(tmp, CACHED_EXAMPLES_TEST_FILE),
         features_file=os.path.join(tmp, CACHED_FEATURES_TEST_FILE),
+        output_prediction_file=os.path.join(tmp, "qa_predictions.json"),
+        output_nbest_file=os.path.join(tmp, "nbest_predictions.json"),
+        output_null_log_odds_file=os.path.join(tmp, "null_odds.json"),
     )
 
     qa_processor.postprocess(
@@ -218,11 +245,14 @@ def test_postprocess_bert_answer(qa_test_data, tmp):
         features_file=os.path.join(tmp, CACHED_FEATURES_TEST_FILE),
         unanswerable_exists=True,
         verbose_logging=True,
+        output_prediction_file=os.path.join(tmp, "qa_predictions.json"),
+        output_nbest_file=os.path.join(tmp, "nbest_predictions.json"),
+        output_null_log_odds_file=os.path.join(tmp, "null_odds.json"),
     )
 
 
 def test_postprocess_xlnet_answer(qa_test_data, tmp):
-    qa_processor = QAProcessor(model_name="xlnet-base-cased")
+    qa_processor = QAProcessor(model_name="xlnet-base-cased", cache_dir=tmp)
     test_features = qa_processor.preprocess(
         qa_test_data["test_dataset"],
         is_training=False,
@@ -238,6 +268,9 @@ def test_postprocess_xlnet_answer(qa_test_data, tmp):
         results=predictions,
         examples_file=os.path.join(tmp, CACHED_EXAMPLES_TEST_FILE),
         features_file=os.path.join(tmp, CACHED_FEATURES_TEST_FILE),
+        output_prediction_file=os.path.join(tmp, "qa_predictions.json"),
+        output_nbest_file=os.path.join(tmp, "nbest_predictions.json"),
+        output_null_log_odds_file=os.path.join(tmp, "null_odds.json"),
     )
 
     qa_processor.postprocess(
@@ -246,4 +279,7 @@ def test_postprocess_xlnet_answer(qa_test_data, tmp):
         features_file=os.path.join(tmp, CACHED_FEATURES_TEST_FILE),
         unanswerable_exists=True,
         verbose_logging=True,
+        output_prediction_file=os.path.join(tmp, "qa_predictions.json"),
+        output_nbest_file=os.path.join(tmp, "nbest_predictions.json"),
+        output_null_log_odds_file=os.path.join(tmp, "null_odds.json"),
     )
