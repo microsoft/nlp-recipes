@@ -9,7 +9,7 @@ from utils_nlp.models.transformers.sequence_classification import SequenceClassi
 
 @pytest.fixture()
 def data():
-    return (["hi", "hello", "what's wrong with us", "can I leave?"])
+    return (["hi", "hello", "what's wrong with us", "can I leave?"], [0, 0, 1, 2])
 
 
 @pytest.mark.cpu
