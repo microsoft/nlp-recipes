@@ -18,7 +18,6 @@ def data():
     ]
 
 
-@pytest.mark.cpu
 def test_sentence_encoding(tmp, data):
     se = BERTSentenceEncoder(
         language=Language.ENGLISH,
