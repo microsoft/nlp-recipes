@@ -145,7 +145,7 @@ class Transformer:
 
         # multi-gpu training (should be after apex fp16 initialization)
         if n_gpu > 1:
-            self.model = torch.nn.DataParallel(self.model)
+            self.model = torch.nn.DataParallel(self.model, device_ids=[0, 1, 2, 3])
 
         # Distributed training (should be after apex fp16 initialization)
         if local_rank != -1:
