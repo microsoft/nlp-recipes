@@ -12,7 +12,7 @@ def data():
     return (["hi", "hello", "what's wrong with us", "can I leave?"], [0, 0, 1, 2])
 
 
-@pytest.mark.cpu
+@pytest.mark.gpu
 def test_classifier(data, tmpdir):
 
     df = pd.DataFrame({"text": data[0], "label": data[1]})
