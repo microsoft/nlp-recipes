@@ -190,7 +190,6 @@ def test_QAProcessor(qa_test_data, tmp_module):
         )
 
 
-@pytest.mark.gpu
 def test_AnswerExtractor(qa_test_data, tmp_module):
     # test bert
     qa_extractor_bert = AnswerExtractor(cache_dir=tmp_module)
@@ -217,7 +216,6 @@ def test_AnswerExtractor(qa_test_data, tmp_module):
     qa_extractor_distilbert.predict(qa_test_data["test_features_distilbert"])
 
 
-@pytest.mark.gpu
 def test_postprocess_bert_answer(qa_test_data, tmp_module):
     qa_processor = QAProcessor(cache_dir=tmp_module)
     test_features = qa_processor.preprocess(
@@ -252,7 +250,6 @@ def test_postprocess_bert_answer(qa_test_data, tmp_module):
     )
 
 
-@pytest.mark.gpu
 def test_postprocess_xlnet_answer(qa_test_data, tmp_module):
     qa_processor = QAProcessor(model_name="xlnet-base-cased", cache_dir=tmp_module)
     test_features = qa_processor.preprocess(
