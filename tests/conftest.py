@@ -99,6 +99,15 @@ def tmp(tmp_path_factory):
 
 
 @pytest.fixture(scope="module")
+def tmp_module(tmp_path_factory):
+    td = TemporaryDirectory(dir=tmp_path_factory.getbasetemp())
+    try:
+        yield td.name
+    finally:
+        td.cleanup()
+
+
+@pytest.fixture(scope="module")
 def ner_test_data():
     UNIQUE_LABELS = ["O", "I-LOC", "I-MISC", "I-PER", "I-ORG", "X"]
     LABEL_MAP = {label: i for i, label in enumerate(UNIQUE_LABELS)}

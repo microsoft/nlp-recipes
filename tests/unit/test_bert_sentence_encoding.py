@@ -18,8 +18,7 @@ def data():
     ]
 
 
-@pytest.mark.cpu
-def test_sentence_encoding(data):
+def test_sentence_encoding(tmp, data):
     se = BERTSentenceEncoder(
         language=Language.ENGLISH,
         num_gpus=0,
@@ -27,6 +26,7 @@ def test_sentence_encoding(data):
         max_len=128,
         layer_index=-2,
         pooling_strategy=PoolingStrategy.MEAN,
+        cache_dir=tmp,
     )
 
     result = se.encode(data, as_numpy=False)
