@@ -2,9 +2,9 @@
 NLP Utilities
 ===================================================
 
-The `NLP repository <https://github.com/Microsoft/NLP>`_ provides examples and best practices for building NLP systems, provided as Jupyter notebooks. 
+The `NLP repository <https://github.com/microsoft/nlp-recipes>`_ provides examples and best practices for building NLP systems, provided as Jupyter notebooks. 
 
-The module `utils_nlp <https://github.com/microsoft/nlp/tree/master/utils_nlp>`_ contains functions to simplify common tasks used when developing and 
+The module `utils_nlp <https://github.com/microsoft/nlp-recipes/tree/master/utils_nlp>`_ contains functions to simplify common tasks used when developing and 
 evaluating NLP systems. 
 
 .. toctree::

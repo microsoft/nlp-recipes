@@ -76,12 +76,6 @@ def notebooks():
         "tc_mnli_transformers": os.path.join(
             folder_notebooks, "text_classification", "tc_mnli_transformers.ipynb"
         ),
-        "tc_dac_bert_ar": os.path.join(
-            folder_notebooks, "text_classification", "tc_dac_bert_ar.ipynb"
-        ),
-        "tc_bbc_bert_hi": os.path.join(
-            folder_notebooks, "text_classification", "tc_bbc_bert_hi.ipynb"
-        ),
         "tc_multi_languages_transformers": os.path.join(
             folder_notebooks, "text_classification", "tc_multi_languages_transformers.ipynb"
         ),
@@ -97,6 +91,15 @@ def notebooks():
 
 @pytest.fixture
 def tmp(tmp_path_factory):
+    td = TemporaryDirectory(dir=tmp_path_factory.getbasetemp())
+    try:
+        yield td.name
+    finally:
+        td.cleanup()
+
+
+@pytest.fixture(scope="module")
+def tmp_module(tmp_path_factory):
     td = TemporaryDirectory(dir=tmp_path_factory.getbasetemp())
     try:
         yield td.name
