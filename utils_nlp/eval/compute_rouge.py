@@ -3,8 +3,8 @@ import shutil
 import time
 import tempfile
 
-import pyrouge
-import rouge
+from pyrouge import Rouge155
+from rouge import Rouge
 
 
 def compute_rouge_perl(cand, ref, input_files=False):
@@ -18,8 +18,8 @@ def compute_rouge_perl(cand, ref, input_files=False):
         candidates = cand
         references = ref
 
-    print(len(candidates))
-    print(len(references))
+    print("Number of candidates: {}".format(len(candidates)))
+    print("Number of references: {}".format(len(references)))
     assert len(candidates) == len(references)
 
     cnt = len(candidates)
@@ -37,7 +37,7 @@ def compute_rouge_perl(cand, ref, input_files=False):
                 f.write(candidates[i])
             with open(tmp_dir + "/reference/ref.{}.txt".format(i), "w", encoding="utf-8") as f:
                 f.write(references[i])
-        r = pyrouge.Rouge155(temp_dir=temp_dir)
+        r = Rouge155()
         r.model_dir = tmp_dir + "/reference/"
         r.system_dir = tmp_dir + "/candidate/"
         r.model_filename_pattern = "ref.#ID#.txt"
@@ -60,17 +60,11 @@ def compute_rouge_python(cand, ref, input_files=False):
         candidates = cand
         references = ref
 
-    print(len(candidates))
-    print(len(references))
+    print("Number of candidates: {}".format(len(candidates)))
+    print("Number of references: {}".format(len(references)))
     assert len(candidates) == len(references)
 
-    evaluator = rouge.Rouge(
-        metrics=["rouge-n", "rouge-l"],
-        max_n=2,
-        limit_length=False,
-        apply_avg=True,
-        weight_factor=1.2,
-    )
+    evaluator = Rouge(metrics=["rouge-n", "rouge-l"], max_n=2, limit_length=False, apply_avg=True)
 
     scores = evaluator.get_scores(candidates, [[it] for it in references])
 
