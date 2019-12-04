@@ -31,7 +31,7 @@ The repository aims to expand NLP capabilities along three separate dimensions
 We aim to have end-to-end examples of common tasks and scenarios such as text classification, named entity recognition etc.
 
 ### Algorithms
-We aim to support multiple models for each of the supported scenarios. Currently, BERT-based models are supported across most scenarios. We are working to integrate [pytorch-transformers](https://github.com/huggingface/pytorch-transformers) to allow use of many more models.
+We aim to support multiple models for each of the supported scenarios. Currently, transformer-based models are supported across most scenarios. We have been working on integrating the [transformers package](https://github.com/huggingface/transformers) from [Hugging Face](https://huggingface.co/) which allows users to easily load pretrained models and fine-tune them for different tasks.
 
 ### Languages 
 We strongly subscribe to the multi-language principles laid down by ["Emily Bender"](http://faculty.washington.edu/ebender/papers/Bender-SDSS-2019.pdf)

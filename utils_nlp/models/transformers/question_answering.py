@@ -117,6 +117,20 @@ class QAProcessor:
 
     @staticmethod
     def get_inputs(batch, model_name, train_mode=True):
+        """
+        Creates an input dictionary given a model name.
+
+        Args:
+            batch (tuple): A tuple containing input ids, attention mask,
+                segment ids, and labels tensors.
+            model_name (bool, optional): Model name used to format the inputs.
+            train_mode (bool, optional): Training mode flag.
+                Defaults to True.
+
+        Returns:
+            dict: Dictionary containing input ids, segment ids, masks, and labels.
+                Labels are only returned when train_mode is True.
+        """        
         model_type = model_name.split("-")[0]
 
         inputs = {"input_ids": batch[0], "attention_mask": batch[1]}
