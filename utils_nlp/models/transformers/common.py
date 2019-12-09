@@ -12,12 +12,7 @@ import numpy as np
 import torch
 from tqdm import tqdm, trange
 from transformers import AdamW
-try:
-    from transformers import WarmupLinearSchedule
-    TRANSFORMERS_VERSION = '<2.2.0'
-except ImportError:
-    from transformers import get_linear_schedule_with_warmup
-    TRANSFORMERS_VERSION = '>=2.2.0'
+from transformers import get_linear_schedule_with_warmup
 
 from transformers.modeling_bert import BERT_PRETRAINED_MODEL_ARCHIVE_MAP
 from transformers.modeling_distilbert import DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP
@@ -141,10 +136,7 @@ class Transformer:
             optimizer = AdamW(optimizer_grouped_parameters, lr=learning_rate, eps=adam_epsilon)
 
         if scheduler is None:
-            if TRANSFORMERS_VERSION == '<2.2.0':
-                scheduler = WarmupLinearSchedule(optimizer, warmup_steps=warmup_steps, t_total=t_total)
-            else:
-                scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=warmup_steps, num_training_steps=t_total)
+            scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=warmup_steps, num_training_steps=t_total)
 
 
         if fp16:
