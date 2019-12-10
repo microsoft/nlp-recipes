@@ -20,24 +20,22 @@ from transformers.modeling_xlnet import (
     XLNET_PRETRAINED_MODEL_ARCHIVE_MAP,
     XLNetForSequenceClassification,
 )
-
+from utils_nlp.common.pytorch_utils import get_device
 from utils_nlp.models.transformers.common import (
     MAX_SEQ_LEN,
     TOKENIZER_CLASS,
     Transformer,
-    get_device,
 )
 
 from transformers import PreTrainedModel,  PretrainedConfig, DistilBertModel, BertModel, DistilBertConfig
 
 import torch
+import torch.nn as nn
 from transformers import *
 
-# Transformers has a unified API
-# for 8 transformer architectures and 30 pretrained weights.
-#          Model          | Tokenizer          | Pretrained weights shortcut
 MODEL_CLASS= {"bert-base-uncased": BertModel, 
               'distilbert-base-uncased': DistilBertModel}
+
 from bertsum.prepro.data_builder import greedy_selection, combination_selection
 from bertsum.prepro.data_builder import TransformerData
 from bertsum.models.model_builder import Summarizer
@@ -99,19 +97,21 @@ def get_dataloader(data_iter, is_labeled=False, batch_size=3000):
             
 
 class ExtSumProcessor:    
-    def __init__(self, model_name="bert-base-cased", to_lower=False, cache_dir="."):
+    def __init__(self, model_name="bert-base-cased", to_lower=False, cache_dir=".",
+                 max_nsents=200, max_src_ntokens=2000, min_nsents=3, min_src_ntokens=5, use_interval=True):
         self.tokenizer = TOKENIZER_CLASS[model_name].from_pretrained(
             model_name, do_lower_case=to_lower, cache_dir=cache_dir
         )
 
 
         default_preprocessing_parameters = {
-            "max_nsents": 200,
-            "max_src_ntokens": 2000,
-            "min_nsents": 3,
-            "min_src_ntokens": 5,
-            "use_interval": True,
+            "max_nsents": max_nsents,
+            "max_src_ntokens": max_src_ntokens,
+            "min_nsents": min_nsents,
+            "min_src_ntokens": min_src_ntokens,
+            "use_interval": use_interval,
         }
+        print(default_preprocessing_parameters)
         args = Bunch(default_preprocessing_parameters)
         self.preprossor = TransformerData(args, self.tokenizer)
         
@@ -166,7 +166,7 @@ class ExtractiveSummarizer(Transformer):
             num_labels=0,
             cache_dir=cache_dir,
         )
-        model_class  =MODEL_CLASS[model_name]
+        model_class = MODEL_CLASS[model_name]
         default_summarizer_layer_parameters = {
         "ff_size": 512, 
         "heads": 4, 
@@ -184,8 +184,62 @@ class ExtractiveSummarizer(Transformer):
     @staticmethod
     def list_supported_models():
         return list(MODEL_CLASS)
-
+    
     def fit(
+        self,
+        train_dataloader,
+        num_gpus=None,
+        local_rank=-1,
+        max_steps=5e5,
+        optimization_method='adam', 
+        lr=2e-3, 
+        max_grad_norm=0, 
+        beta1=0.9, 
+        beta2=0.999, 
+        decay_method='noam', 
+        warmup_steps=1e5,
+        verbose=True,
+        seed=None,
+        gradient_accumulation_steps=2,
+        report_every=50,  
+        clip_grad_norm=False,
+        **kwargs
+    ):
+        
+        device, num_gpus = get_device(num_gpus=num_gpus, local_rank=local_rank)
+        
+        def move_batch_to_device(batch, device):
+            return batch.to(device)
+        
+        #if isinstance(self.model, nn.DataParallel):
+        #    self.model.module.to(device)
+        #else:
+        self.model.to(device)  
+        
+        optimizer = model_builder.build_optim(optimization_method, lr, max_grad_norm, beta1, 
+                                              beta2, decay_method, warmup_steps, self.model, None) 
+
+        #train_dataloader = get_dataloader(train_iter(), is_labeled=True, batch_size=batch_size)
+        
+        super().fine_tune(
+            train_dataloader=train_dataloader,
+            get_inputs=ExtSumProcessor.get_inputs,
+            device=device,
+            move_batch_to_device=move_batch_to_device,
+            n_gpu=num_gpus,
+            num_train_epochs=-1,
+            max_steps=max_steps,
+            optimizer=optimizer,
+            warmup_steps=warmup_steps,
+            gradient_accumulation_steps=gradient_accumulation_steps,
+            verbose=verbose,
+            seed=seed,
+            report_every=report_every,
+            clip_grad_norm=clip_grad_norm,
+            max_grad_norm=max_grad_norm,
+        )
+
+    def fit2(
         self,
         train_iter,
         batch_size=3000,
@@ -209,7 +263,8 @@ class ExtractiveSummarizer(Transformer):
         """
         train_dataset is data iterator
         """
-        device, num_gpus = get_device(device=device, num_gpus=num_gpus, local_rank=local_rank)
+        torch.backends.cudnn.benchmark=True
+        device, num_gpus = get_device(num_gpus=num_gpus, local_rank=local_rank)
         print(device)
         device = torch.device("cuda:{}".format(0))
         #gpu_rank = distributed.multi_init(0, 1, "0")
@@ -223,6 +278,7 @@ class ExtractiveSummarizer(Transformer):
         #args = Bunch(default_parameters)
         optimizer = model_builder.build_optim(optimization_method, lr, max_grad_norm, beta1, 
                                               beta2, decay_method, warmup_steps, self.model, None)
+         
         
         if seed is not None:
             super(ExtractiveSummarizer).set_seed(seed, n_gpu > 0)
@@ -301,9 +357,78 @@ class ExtractiveSummarizer(Transformer):
             # empty cache
             #del [batch]
             torch.cuda.empty_cache()
-        return global_step, tr_loss / global_step        
+        return global_step, tr_loss / global_step  
+    
+    def predict(self, eval_dataloader, num_gpus=1, batch_size=16, sentence_seperator="<q>", top_n=3, block_trigram=True, verbose=True, cal_lead=False):
+        def _get_ngrams(n, text):
+            ngram_set = set()
+            text_length = len(text)
+            max_index_ngram_start = text_length - n
+            for i in range(max_index_ngram_start + 1):
+                ngram_set.add(tuple(text[i:i + n]))
+            return ngram_set
 
-    def predict(self, eval_data_iterator, device, batch_size=16, sentence_seperator="<q>", top_n=3, block_trigram=True, num_gpus=1, verbose=True, cal_lead=False):
+        def _block_tri(c, p):
+            tri_c = _get_ngrams(3, c.split())
+            for s in p:
+                tri_s = _get_ngrams(3, s.split())
+                if len(tri_c.intersection(tri_s))>0:
+                    return True
+            return False
+        def _get_pred(batch, sent_scores):
+            #return sent_scores
+            if cal_lead:
+                selected_ids = list(range(batch.clss.size(1)))*len(batch.clss)
+            else:
+                #negative_sent_score = [-i for i in sent_scores[0]]
+                selected_ids = np.argsort(-sent_scores, 1)   
+                # selected_ids = np.sort(selected_ids,1)
+            pred = []
+            for i, idx in enumerate(selected_ids):
+                _pred = []
+                if(len(batch.src_str[i])==0):
+                    pred.append('')
+                    continue
+                for j in selected_ids[i][:len(batch.src_str[i])]:
+                    if(j>=len( batch.src_str[i])):
+                        continue
+                    candidate = batch.src_str[i][j].strip()
+                    if(block_trigram):
+                        if(not _block_tri(candidate,_pred)):
+                            _pred.append(candidate)
+                    else:
+                        _pred.append(candidate)
+
+                    # only select the top 3
+                    if len(_pred) == top_n:
+                        break
+
+                #_pred = '<q>'.join(_pred)
+                _pred = sentence_seperator.join(_pred)  
+                pred.append(_pred.strip())
+            return pred
+        
+        device, num_gpus = get_device(num_gpus=num_gpus, local_rank=-1)
+        #if isinstance(self.model, nn.DataParallel):
+        #    self.model.module.to(device)
+        #else:
+        self.model.to(device)
+
+        sent_scores = list(
+            super().predict(
+                eval_dataloader=eval_dataloader,
+                get_inputs=ExtSumProcessor.get_inputs,
+                device=device,
+                verbose=verbose,
+            )
+        )
+        sent_scores = np.concatenate(sent_scores)
+        
+        return _get_pred(batch, sent_scores)
+        
+    
+
+    def predict2(self, eval_data_iterator, device, batch_size=16, sentence_seperator="<q>", top_n=3, block_trigram=True, num_gpus=1, verbose=True, cal_lead=False):
         def _get_ngrams(n, text):
             ngram_set = set()
             text_length = len(text)
