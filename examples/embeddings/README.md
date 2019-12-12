@@ -26,5 +26,5 @@ therefore can be very useful for  tasks like sentence similary, text classifcati
 
 
 |Notebook|Environment|Description|Dataset| Language | 
-|---|---|---|---|
+|---|---|---|---|---|
 |[Developing Word Embeddings](embedding_trainer.ipynb)|Local| A notebook shows how to learn word representation with Word2Vec, fastText and Glove|[STS Benchmark dataset](http://ixa2.si.ehu.es/stswiki/index.php/STSbenchmark#STS_benchmark_dataset_and_companion_dataset) | en |
