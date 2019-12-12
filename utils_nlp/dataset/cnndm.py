@@ -1,28 +1,32 @@
-import torch
-from torchtext.utils import extract_archive
-import torchtext
-from utils_nlp.dataset.url_utils import maybe_download
-import regex as re
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License.
 
-import nltk
+"""
+    Utility functions for downloading, extracting, and reading the
+    CNN/DM dataset at https://github.com/harvardnlp/sent-summary.
+"""
 
-nltk.download("punkt")
-
-from nltk import tokenize
-import torch
-import sys
-import os
-from bertsum.others.utils import clean
-from multiprocess import Pool
-from tqdm import tqdm
+import glob
 import itertools
+import nltk
+nltk.download("punkt")
+from nltk import tokenize
+import os
+from os.path import isfile, join
+import sys
+import regex as re
+import torch
+import torchtext
 from torchtext.utils import download_from_url, extract_archive
 import zipfile
-import glob
-from os.path import isfile, join
 
+from bertsum.others.utils import clean
+
+from utils_nlp.dataset.url_utils import maybe_download
 from utils_nlp.models.transformers.extractive_summarization import get_dataset, get_dataloader
-#https://torchtext.readthedocs.io/en/latest/datasets.html#sentiment-analysis
+
+
+
 def _line_iter(file_path):
     with open(file_path, "r", encoding="utf8") as fd:
         for line in fd:
@@ -39,7 +43,7 @@ def _create_data_from_iterator(iterator, preprocessing, word_tokenizer):
 def _remove_ttags(line):
     line = re.sub(r"<t>", "", line)
     # change </t> to <q>
-    # pyrouge test requires <q> as  sentence splitter
+    # pyrouge test requires <q> as sentence splitter
     line = re.sub(r"</t>", "<q>", line)
     return line
 
@@ -156,9 +160,10 @@ def CNNDMSummarization(*args, **kwargs):
 
 class CNNDMBertSumProcessedData():      
     @staticmethod
-    def save_data(data_iter, is_test=False, path_and_prefix="./", chunk_size=None):
+    def save_data(data_iter, is_test=False, save_path="./", chunk_size=None):
+        os.makedirs(save_path, exist_ok=True)
         def chunks(iterable, chunk_size):
-            iterator = iter(iterable)
+            iterator = filter(None, iterable) #iter(iterable)
             for first in iterator:
                 if chunk_size:
                     yield itertools.chain([first], itertools.islice(iterator, chunk_size - 1))
@@ -167,20 +172,26 @@ class CNNDMBertSumProcessedData():
         chunks = chunks(data_iter, chunk_size)
         filename_list = []
         for i,chunked_data in enumerate(chunks):
-            filename = f"{path_and_prefix}_{i}_test" if is_test else f"{path_and_prefix}_{i}_train"
-            torch.save(list(chunked_data), filename)
-            filename_list.append(filename)
+            filename = f"{i}_test" if is_test else f"{i}_train"
+            torch.save(list(chunked_data), os.path.join(save_path, filename))
+            filename_list.append(os.path.join(save_path,filename))
         return filename_list
 
 
     @staticmethod
     def download(local_path=".data"):
-
         file_name = "bertsum_data.zip"
         url = "https://drive.google.com/uc?export=download&id=1x0d61LP9UAN389YN00z0Pv-7jQgirVg6"
-        dataset_zip = download_from_url(url, root=local_path)
-        zip=zipfile.ZipFile(dataset_zip)
-        #zip=zipfile.ZipFile("./temp_data3/"+file_name)
+        try:
+            if os.path.exists(os.path.join(local_path,file_name)):
+                zip=zipfile.ZipFile(os.path.join(local_path, file_name))
+            else:
+                dataset_zip = download_from_url(url, root=local_path)
+                zip=zipfile.ZipFile(dataset_zip)
+        except:
+            print("Unexpected dataset downloading or reading error:", sys.exc_info()[0])
+            raise
+     
         zip.extractall(local_path)
         return local_path
             
