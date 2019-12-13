@@ -34,10 +34,12 @@ def _line_iter(file_path):
 
 
 def _create_data_from_iterator(iterator, preprocessing, word_tokenizer):
-    data = []
+    #data = []
+    #for line in iterator:
+    #    data.append(preprocess((line, preprocessing, word_tokenizer)))
+    #return data
     for line in iterator:
-        data.append(preprocess((line, preprocessing, word_tokenizer)))
-    return data
+        yield preprocess((line, preprocessing, word_tokenizer))
 
 
 def _remove_ttags(line):
@@ -102,11 +104,11 @@ class Summarization(torch.utils.data.Dataset):
             target_iter, target_preprocessing, word_tokenization
         )
 
-    def __getitem__(self, i):
-        return self._source[i]
+    #def __getitem__(self, i):
+    #    return self._source[i]
 
-    def __len__(self):
-        return len(self._source)
+    #def __len__(self):
+    #    return len(self._source)
 
     def __iter__(self):
         for x in self._source:
@@ -207,7 +209,8 @@ class CNNDMBertSumProcessedData():
             elif fname.find('test') != -1:
                 test_files.append(fname)
         def get_train_dataset():
-            return get_dataset(train_files)
+            return get_dataset(train_files, True)
         def get_test_dataset():
             return get_dataset(test_files)
         return get_train_dataset, get_test_dataset
+        #return get_cycled_dataset(get_dataset(train_files)), get_dataset(test_files)
