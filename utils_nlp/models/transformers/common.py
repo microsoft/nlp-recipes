@@ -4,17 +4,18 @@
 # This script reuses some code from
 # https://github.com/huggingface/pytorch-transformers/blob/master/examples/run_glue.py
 
+from itertools import cycle
 import logging
+import numpy as np
 import os
 import random
 import time
-
-import numpy as np
 import torch
 from tqdm import tqdm, trange
-from itertools import cycle
 
-from transformers import AdamW, WarmupLinearSchedule
+
+from transformers import AdamW
+from transformers import get_linear_schedule_with_warmup
 from transformers.modeling_bert import BERT_PRETRAINED_MODEL_ARCHIVE_MAP
 from transformers.modeling_distilbert import DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP
 from transformers.modeling_roberta import ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP
@@ -149,8 +150,9 @@ class Transformer:
             ]
             optimizer = AdamW(optimizer_grouped_parameters, lr=learning_rate, eps=adam_epsilon)
 
+
             if t_total != -1 and scheduler is None:
-                scheduler = WarmupLinearSchedule(optimizer, warmup_steps=warmup_steps, t_total=t_total)
+                scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=warmup_steps, num_training_steps=t_total)
 
         if fp16:
             try:
