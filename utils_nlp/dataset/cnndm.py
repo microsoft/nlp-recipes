@@ -1,9 +1,12 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
+# This script reuses some code from https://github.com/nlpyang/BertSum
+
 """
     Utility functions for downloading, extracting, and reading the
     CNN/DM dataset at https://github.com/harvardnlp/sent-summary.
+    
 """
 
 import glob
@@ -21,10 +24,17 @@ import torchtext
 from torchtext.utils import download_from_url, extract_archive
 import zipfile
 
-from bertsum.others.utils import clean
 
 from utils_nlp.dataset.url_utils import maybe_download
 from utils_nlp.models.transformers.extractive_summarization import get_dataset, get_dataloader
+
+REMAP = {"-lrb-": "(", "-rrb-": ")", "-lcb-": "{", "-rcb-": "}",
+         "-lsb-": "[", "-rsb-": "]", "``": '"', "''": '"'}
+
+def clean(x):
+    return re.sub(
+        r"-lrb-|-rrb-|-lcb-|-rcb-|-lsb-|-rsb-|``|''",
+        lambda m: REMAP.get(m.group()), x)
 
 
 def _line_iter(file_path):
