@@ -1,6 +1,8 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
+# This script reuses some code from https://github.com/nlpyang/BertSum
+
 import itertools
 import logging
 import numpy as np
@@ -9,9 +11,6 @@ import random
 import time
 import torch
 import torch.nn as nn
-
-# from torch.utils.data import Dataset, TensorDataset
-# from transformers import *
 
 
 from transformers.modeling_bert import (
@@ -41,7 +40,7 @@ from utils_nlp.models.transformers.common import MAX_SEQ_LEN, TOKENIZER_CLASS, T
 from bertsum.models import model_builder, data_loader
 from bertsum.models.data_loader import DataIterator
 from bertsum.models.model_builder import Summarizer
-from bertsum.prepro.data_builder import combination_selection, greedy_selection, TransformerData
+from utils_nlp.dataset.sentence_selection import combination_selection, greedy_selection
 
 MODEL_CLASS = {"bert-base-uncased": BertModel, "distilbert-base-uncased": DistilBertModel}
 
@@ -105,6 +104,69 @@ def get_dataloader(data_iter, shuffle=True, is_labeled=False, batch_size=3000):
 
     return data_loader.Dataloader(data_iter, batch_size, shuffle=shuffle, is_labeled=is_labeled)
 
+class TransformerSumData():
+    def __init__(self, args, tokenizer):
+        self.args = args
+        self.tokenizer = tokenizer
+        self.sep_vid = self.tokenizer.vocab['[SEP]']
+        self.cls_vid = self.tokenizer.vocab['[CLS]']
+        self.pad_vid = self.tokenizer.vocab['[PAD]']
+
+
+    def preprocess(self, src, tgt=None, oracle_ids=None):
+
+        if (len(src) == 0):
+            return None
+
+        original_src_txt = [' '.join(s) for s in src]
+
+        labels = None
+        if oracle_ids is not None and tgt is not None:
+            labels = [0] * len(src)
+            for l in oracle_ids:
+                labels[l] = 1
+
+        idxs = [i for i, s in enumerate(src) if (len(s) > self.args.min_src_ntokens)]
+
+        src = [src[i][:self.args.max_src_ntokens] for i in idxs]
+        src = src[:self.args.max_nsents]
+        if labels:
+            labels = [labels[i] for i in idxs]
+            labels = labels[:self.args.max_nsents]
+
+        if (len(src) < self.args.min_nsents):
+            return None
+        if labels:
+            if (len(labels) == 0):
+                return None
+
+        src_txt = [' '.join(sent) for sent in src]
+        # text = [' '.join(ex['src_txt'][i].split()[:self.args.max_src_ntokens]) for i in idxs]
+        # text = [_clean(t) for t in text]
+        text = ' [SEP] [CLS] '.join(src_txt)
+        src_subtokens = self.tokenizer.tokenize(text)
+        src_subtokens = src_subtokens[:510]
+        src_subtokens = ['[CLS]'] + src_subtokens + ['[SEP]']
+
+        src_subtoken_idxs = self.tokenizer.convert_tokens_to_ids(src_subtokens)
+        _segs = [-1] + [i for i, t in enumerate(src_subtoken_idxs) if t == self.sep_vid]
+        segs = [_segs[i] - _segs[i - 1] for i in range(1, len(_segs))]
+        segments_ids = []
+        for i, s in enumerate(segs):
+            if (i % 2 == 0):
+                segments_ids += s * [0]
+            else:
+                segments_ids += s * [1]
+        cls_ids = [i for i, t in enumerate(src_subtoken_idxs) if t == self.cls_vid]
+        if labels:
+            labels = labels[:len(cls_ids)]
+
+        tgt_txt = None
+        if tgt:
+            tgt_txt = '<q>'.join([' '.join(tt) for tt in tgt])
+        src_txt = [original_src_txt[i] for i in idxs]
+        return src_subtoken_idxs, labels, segments_ids, cls_ids, src_txt, tgt_txt
+    
 
 class ExtSumProcessor:
     def __init__(
@@ -131,7 +193,7 @@ class ExtSumProcessor:
         }
         print(default_preprocessing_parameters)
         args = Bunch(default_preprocessing_parameters)
-        self.preprossor = TransformerData(args, self.tokenizer)
+        self.preprossor = TransformerSumData(args, self.tokenizer)
 
     @staticmethod
     def get_inputs(batch, model_name, train_mode=True):
