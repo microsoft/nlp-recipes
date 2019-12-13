@@ -14,7 +14,7 @@ import torch
 from tqdm import tqdm, trange
 from itertools import cycle
 
-from transformers import AdamW, WarmupLinearSchedule
+from transformers import AdamW, get_linear_schedule_with_warmup
 from transformers.modeling_bert import BERT_PRETRAINED_MODEL_ARCHIVE_MAP
 from transformers.modeling_distilbert import DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP
 from transformers.modeling_roberta import ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP
@@ -34,6 +34,7 @@ TOKENIZER_CLASS.update({k: DistilBertTokenizer for k in DISTILBERT_PRETRAINED_MO
 MAX_SEQ_LEN = 512
 
 logger = logging.getLogger(__name__)
+
 
 class Transformer:
     def __init__(
@@ -108,23 +109,20 @@ class Transformer:
     ):
         if seed is not None:
             Transformer.set_seed(seed, n_gpu > 0)
-            
+
         try:
             dataset_length = len(train_dataloader)
         except:
             dataset_length = -1
-            
 
         if max_steps > 0:
             t_total = max_steps
             if dataset_length != -1:
-                num_train_epochs = (
-                    max_steps // (data_set_length // gradient_accumulation_steps) + 1
-                )
+                num_train_epochs = max_steps // (data_set_length // gradient_accumulation_steps) + 1
             else:
                 num_train_epochs = -1
         else:
-            if dataset_length != -1 and num_train_epochs != -1 :
+            if dataset_length != -1 and num_train_epochs != -1:
                 t_total = len(train_dataloader) // gradient_accumulation_steps * num_train_epochs
             else:
                 t_total = -1
@@ -152,7 +150,9 @@ class Transformer:
             optimizer = AdamW(optimizer_grouped_parameters, lr=learning_rate, eps=adam_epsilon)
 
             if t_total != -1 and scheduler is None:
-                scheduler = WarmupLinearSchedule(optimizer, warmup_steps=warmup_steps, t_total=t_total)
+                scheduler = get_linear_schedule_with_warmup(
+                    optimizer, num_warmup_steps=warmup_steps, num_training_steps=t_total
+                )
 
         if fp16:
             try:
@@ -179,25 +179,30 @@ class Transformer:
         self.model.zero_grad()
         if num_train_epochs != -1:
             train_iterator = trange(
-                int(num_train_epochs), desc="Epoch", disable=local_rank not in [-1, 0] or not verbose
+                int(num_train_epochs),
+                desc="Epoch",
+                disable=local_rank not in [-1, 0] or not verbose,
             )
         else:
-            train_iterator =  cycle('1') # use this as an infinite cycle
-         
+            train_iterator = cycle("1")  # use this as an infinite cycle
+
         if move_batch_to_device is None:
+
             def move_batch_to_device(batch, device):
                 return tuple(t.to(device) for t in batch)
-            
+
         start = time.time()
         accum_loss = 0
-      
+
         self.model.train()
         for _ in train_iterator:
             epoch_iterator = tqdm(
-                train_dataloader, desc="Iteration", disable= True #local_rank not in [-1, 0] or not verbose
+                train_dataloader,
+                desc="Iteration",
+                disable=True,  # local_rank not in [-1, 0] or not verbose
             )
             for step, batch in enumerate(epoch_iterator):
-                
+
                 batch = move_batch_to_device(batch, device)
                 inputs = get_inputs(batch, self.model_name)
                 outputs = self.model(**inputs)
@@ -207,7 +212,6 @@ class Transformer:
                     loss = loss.mean()
                 if gradient_accumulation_steps > 1:
                     loss = loss / gradient_accumulation_steps
-       
 
                 if fp16:
                     with amp.scale_loss(loss, optimizer) as scaled_loss:
@@ -220,40 +224,44 @@ class Transformer:
                         torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_grad_norm)
 
                 tr_loss += loss.item()
-                
+
                 accum_loss += loss.item()
                 if (step + 1) % gradient_accumulation_steps == 0:
                     global_step += 1
                     if global_step % report_every == 0 and verbose:
-                        #tqdm.write("Loss:{:.6f}".format(loss))
+                        # tqdm.write("Loss:{:.6f}".format(loss))
                         end = time.time()
-                        print("loss: {0:.6f}, time: {1:f}, number of examples in current step: {2:.0f}, step {3:.0f} out of total {4:.0f}".format(
-                            accum_loss/report_every, end-start, len(batch), global_step, max_steps))
+                        print(
+                            "loss: {0:.6f}, time: {1:f}, number of examples in current step: {2:.0f}, step {3:.0f} out of total {4:.0f}".format(
+                                accum_loss / report_every,
+                                end - start,
+                                len(batch),
+                                global_step,
+                                max_steps,
+                            )
+                        )
                         accum_loss = 0
                         start = end
-                        
+
                     optimizer.step()
                     if scheduler:
                         scheduler.step()
                     self.model.zero_grad()
-                    
-                    
-                    
 
                 if max_steps > 0 and global_step > max_steps:
                     epoch_iterator.close()
                     break
-               
+
             if max_steps > 0 and global_step > max_steps:
                 break
-            # empty cache  
+            # empty cache
             torch.cuda.empty_cache()
         return global_step, tr_loss / global_step
 
-    def predict(self, eval_dataloader, get_inputs, device,  verbose=True):
-        
-        self.model.eval() 
-        for batch in tqdm(eval_dataloader, desc="Evaluating", disable=not verbose):  
+    def predict(self, eval_dataloader, get_inputs, device, verbose=True):
+
+        self.model.eval()
+        for batch in tqdm(eval_dataloader, desc="Evaluating", disable=not verbose):
             batch = tuple(t.to(device) for t in batch)
             with torch.no_grad():
                 inputs = get_inputs(batch, self.model_name, train_mode=False)
