@@ -5,6 +5,7 @@ import itertools
 import logging
 import numpy as np
 import os
+import random
 import time
 import torch
 import torch.nn as nn
@@ -62,6 +63,21 @@ class Bunch(object):
 
     def __init__(self, adict):
         self.__dict__.update(adict)
+        
+        
+def get_sequential_dataloader(dataset,is_labeled=False, batch_size=3000):
+    """
+    Function to get sequential data iterator over a list of data objects.
+    Args:
+        dataset (list of objects): a list of data objects.
+        is_test (bool): it specifies whether the data objects are labeled data.
+        batch_size (int): number of tokens per batch.
+        
+    Returns:
+        DataIterator
+    """
+
+    return DataIterator(dataset, batch_size, is_labeled=is_labeled, shuffle=False, sort=False)
 
 def get_cycled_dataset(train_dataset_generator):
     """
@@ -80,13 +96,14 @@ def get_dataset(file_list, is_train=False):
         for file in file_list:
             yield torch.load(file)
             
-def get_dataloader(data_iter, is_labeled=False, batch_size=3000):
+def get_dataloader(data_iter, shuffle=True, is_labeled=False, batch_size=3000):
     """
     Function to get data iterator over a list of data objects.
 
     Args:
         data_iter (generator): data generator.
-        is_test (bool): it specifies whether the data objects are labeled data.
+        shuffle (bool): whether the data is shuffled
+        is_labeled (bool): it specifies whether the data objects are labeled data.
         batch_size (int): number of tokens per batch.
         
     Returns:
@@ -94,7 +111,7 @@ def get_dataloader(data_iter, is_labeled=False, batch_size=3000):
 
     """
     
-    return data_loader.Dataloader(data_iter, batch_size, shuffle=False, is_labeled=is_labeled)
+    return data_loader.Dataloader(data_iter, batch_size, shuffle=shuffle, is_labeled=is_labeled)
             
 
 class ExtSumProcessor:    
