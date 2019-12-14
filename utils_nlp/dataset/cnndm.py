@@ -169,7 +169,49 @@ def CNNDMSummarization(*args, **kwargs):
 
     return _setup_datasets(*((urls[0],) + args), **kwargs)
 
+class ExtSumProcessedData:
+    @staticmethod
+    def save_data(data_iter, is_test=False, save_path="./", chunk_size=None):
+        os.makedirs(save_path, exist_ok=True)
 
+        def chunks(iterable, chunk_size):
+            iterator = filter(None, iterable)  # iter(iterable)
+            for first in iterator:
+                if chunk_size:
+                    yield itertools.chain([first], itertools.islice(iterator, chunk_size - 1))
+                else:
+                    yield itertools.chain([first], itertools.islice(iterator, None))
+
+        chunks = chunks(data_iter, chunk_size)
+        filename_list = []
+        for i, chunked_data in enumerate(chunks):
+            filename = f"{i}_test" if is_test else f"{i}_train"
+            torch.save(list(chunked_data), os.path.join(save_path, filename))
+            filename_list.append(os.path.join(save_path, filename))
+        return filename_list
+    
+    @classmethod
+    def splits(cls, root):
+        train_files = []
+        test_files = []
+        files = [join(root, f) for f in os.listdir(root) if isfile(join(root, f))]
+        for fname in files:
+            if fname.find("train") != -1:
+                train_files.append(fname)
+            elif fname.find("test") != -1:
+                test_files.append(fname)
+
+        def get_train_dataset():
+            return get_dataset(train_files, True)
+
+        def get_test_dataset():
+            return get_dataset(test_files)
+
+        return get_train_dataset, get_test_dataset
+        # return get_cycled_dataset(get_dataset(train_files)), get_dataset(test_files)
+
+    
+    
 class CNNDMBertSumProcessedData:
     @staticmethod
     def save_data(data_iter, is_test=False, save_path="./", chunk_size=None):
@@ -208,22 +250,4 @@ class CNNDMBertSumProcessedData:
         zip.extractall(local_path)
         return local_path
 
-    @classmethod
-    def splits(cls, root):
-        train_files = []
-        test_files = []
-        files = [join(root, f) for f in os.listdir(root) if isfile(join(root, f))]
-        for fname in files:
-            if fname.find("train") != -1:
-                train_files.append(fname)
-            elif fname.find("test") != -1:
-                test_files.append(fname)
-
-        def get_train_dataset():
-            return get_dataset(train_files, True)
-
-        def get_test_dataset():
-            return get_dataset(test_files)
-
-        return get_train_dataset, get_test_dataset
-        # return get_cycled_dataset(get_dataset(train_files)), get_dataset(test_files)
+    
