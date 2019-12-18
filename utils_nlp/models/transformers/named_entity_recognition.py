@@ -123,7 +123,7 @@ class TokenClassificationProcessor:
         Returns:
             TensorDataset: A TensorDataset containing the following four tensors.
                 1. input_ids_all: Tensor. Each sublist contains numerical values,
-                    i.e. token ids, corresponding to the tokens in the input 
+                    i.e. token ids, corresponding to the tokens in the input
                     text data.
                 2. input_mask_all: Tensor. Each sublist contains the attention
                     mask of the input token id list, 1 for input tokens and 0 for
@@ -245,12 +245,7 @@ class TokenClassificationProcessor:
         return td
 
     def create_dataloader_from_dataset(
-        self,
-        dataset,
-        shuffle=False,
-        batch_size=32,
-        num_gpus=None,
-        distributed=False
+        self, dataset, shuffle=False, batch_size=32, num_gpus=None, distributed=False
     ):
         if num_gpus is None:
             num_gpus = torch.cuda.device_count()
@@ -263,7 +258,6 @@ class TokenClassificationProcessor:
             sampler = RandomSampler(dataset) if shuffle else SequentialSampler(dataset)
 
         return DataLoader(dataset, sampler=sampler, batch_size=batch_size)
-
 
 
 class TokenClassifier(Transformer):
@@ -350,12 +344,7 @@ class TokenClassifier(Transformer):
             seed=seed,
         )
 
-    def predict(
-        self,
-        eval_dataloader,
-        num_gpus=None,
-        verbose=True
-    ):
+    def predict(self, eval_dataloader, num_gpus=None, verbose=True):
         """
         Test on an evaluation dataset and get the token label predictions.
 
@@ -379,13 +368,14 @@ class TokenClassifier(Transformer):
             self.model.module.to(device)
         else:
             self.model.to(device)
-        
+
         preds = list(
             super().predict(
                 eval_dataloader=eval_dataloader,
                 get_inputs=TokenClassificationProcessor.get_inputs,
                 device=device,
-                verbose=verbose
+                verbose=verbose,
+                n_gpu=num_gpus,
             )
         )
         preds_np = np.concatenate(preds)
@@ -398,13 +388,13 @@ class TokenClassifier(Transformer):
         Args:
             predictions (ndarray): A numpy ndarray produced from the `predict` function call.
                 The shape of the ndarray is [number_of_examples, sequence_length, number_of_labels].
-            label_map (dict): A dictionary object to map a label (str) to an ID (int). 
+            label_map (dict): A dictionary object to map a label (str) to an ID (int).
                 dataset (TensorDataset): The TensorDataset for evaluation.
             dataset (Dataset): The test Dataset instance.
 
         Returns:
             list: A list of lists. The size of the retured list is the number of testing samples.
-            Each sublist represents the predicted label for each token. 
+            Each sublist represents the predicted label for each token.
         """
 
         num_samples = len(dataset.tensors[0])
@@ -444,13 +434,13 @@ class TokenClassifier(Transformer):
         Get the true testing label values.
 
         Args:
-            label_map (dict): A dictionary object to map a label (str) to an ID (int). 
+            label_map (dict): A dictionary object to map a label (str) to an ID (int).
                 dataset (TensorDataset): The TensorDataset for evaluation.
             dataset (Dataset): The test Dataset instance.
 
         Returns:
             list: A list of lists. The size of the retured list is the number of testing samples.
-            Each sublist represents the predicted label for each token. 
+            Each sublist represents the predicted label for each token.
         """
 
         num_samples = len(dataset.tensors[0])

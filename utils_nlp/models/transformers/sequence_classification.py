@@ -305,7 +305,7 @@ class SequenceClassifier(Transformer):
             seed=seed,
         )
 
-    def predict(self, eval_dataloader, num_gpus=1, verbose=True):
+    def predict(self, eval_dataloader, num_gpus=None, verbose=True):
         """
         Scores a dataset using a fine-tuned model and a given dataloader.
 
@@ -315,7 +315,7 @@ class SequenceClassifier(Transformer):
                 be used. If set to 0 or GPUs are not available, CPU device will be used.
                 Defaults to None.
             verbose (bool, optional): Whether to print out the training log. Defaults to True.
-        
+
         Returns
             1darray: numpy array of predicted label indices.
         """
@@ -331,6 +331,7 @@ class SequenceClassifier(Transformer):
                 get_inputs=Processor.get_inputs,
                 device=device,
                 verbose=verbose,
+                n_gpu=num_gpus,
             )
         )
         preds = np.concatenate(preds)

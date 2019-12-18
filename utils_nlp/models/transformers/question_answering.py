@@ -130,7 +130,7 @@ class QAProcessor:
         Returns:
             dict: Dictionary containing input ids, segment ids, masks, and labels.
                 Labels are only returned when train_mode is True.
-        """        
+        """
         model_type = model_name.split("-")[0]
 
         inputs = {"input_ids": batch[0], "attention_mask": batch[1]}
@@ -589,8 +589,10 @@ class AnswerExtractor(Transformer):
             return tensor.detach().cpu().tolist()
 
         device, num_gpus = get_device(num_gpus=num_gpus, local_rank=local_rank)
-
-        self.model.to(device)
+        if num_gpus > 1:
+            self.model = torch.nn.DataParallel(self.model)
+        else:
+            self.model.to(device)
 
         # score
         self.model.eval()

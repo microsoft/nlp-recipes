@@ -209,9 +209,14 @@ class Transformer:
             torch.cuda.empty_cache()
         return global_step, tr_loss / global_step
 
-    def predict(self, eval_dataloader, get_inputs, device, verbose=True):
+    def predict(self, eval_dataloader, get_inputs, device, n_gpu=1, verbose=True):
+        if n_gpu > 1:
+            self.model = torch.nn.DataParallel(self.model)
+        else:
+            self.model.to(device)
+        self.model.eval()
+
         for batch in tqdm(eval_dataloader, desc="Evaluating", disable=not verbose):
-            self.model.eval()
             batch = tuple(t.to(device) for t in batch)
             with torch.no_grad():
                 inputs = get_inputs(batch, self.model_name, train_mode=False)
