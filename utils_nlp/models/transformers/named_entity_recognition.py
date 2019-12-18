@@ -325,10 +325,6 @@ class TokenClassifier(Transformer):
         """
 
         device, num_gpus = get_device(num_gpus=num_gpus, local_rank=local_rank)
-        if isinstance(self.model, nn.DataParallel):
-            self.model.module.to(device)
-        else:
-            self.model.to(device)
 
         super().fine_tune(
             train_dataloader=train_dataloader,

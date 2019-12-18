@@ -320,10 +320,6 @@ class SequenceClassifier(Transformer):
             1darray: numpy array of predicted label indices.
         """
         device, num_gpus = get_device(num_gpus=num_gpus, local_rank=-1)
-        if isinstance(self.model, nn.DataParallel):
-            self.model.module.to(device)
-        else:
-            self.model.to(device)
 
         preds = list(
             super().predict(
