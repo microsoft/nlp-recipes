@@ -163,12 +163,12 @@ class Transformer:
             int(num_train_epochs), desc="Epoch", disable=local_rank not in [-1, 0] or not verbose
         )
 
+        self.model.train()
         for _ in train_iterator:
             epoch_iterator = tqdm(
                 train_dataloader, desc="Iteration", disable=local_rank not in [-1, 0] or not verbose
             )
-            for step, batch in enumerate(epoch_iterator):
-                self.model.train()
+            for step, batch in enumerate(epoch_iterator):                
                 batch = tuple(t.to(device) for t in batch)
                 inputs = get_inputs(batch, self.model_name)
                 outputs = self.model(**inputs)
