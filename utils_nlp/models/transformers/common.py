@@ -210,7 +210,7 @@ class Transformer:
         return global_step, tr_loss / global_step
 
     def predict(self, eval_dataloader, get_inputs, device, n_gpu=1, verbose=True):
-        if isinstance(self.model, nn.DataParallel):
+        if isinstance(self.model, torch.nn.DataParallel):
             self.model.module.to(device)
         elif n_gpu > 1:
             self.model = torch.nn.DataParallel(self.model)
