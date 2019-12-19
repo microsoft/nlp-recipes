@@ -194,7 +194,7 @@ class ExtSumProcessor:
         print(default_preprocessing_parameters)
         args = Bunch(default_preprocessing_parameters)
         self.preprossor = TransformerSumData(args, self.tokenizer)
-
+    
     @staticmethod
     def get_inputs(batch, model_name, train_mode=True):
         if model_name.split("-")[0] in ["bert", "distilbert"]:
@@ -215,6 +215,30 @@ class ExtSumProcessor:
                     "clss": batch.clss,
                     "mask": batch.mask,
                     "mask_cls": batch.mask_cls,
+                }
+        else:
+            raise ValueError("Model not supported: {}".format(model_name))
+    
+    @staticmethod
+    def get_inputs2(batch, model_name, train_mode=True):
+        if model_name.split("-")[0] in ["bert", "distilbert"]:
+            if train_mode:
+                # labels must be the last
+                return {
+                    "x": batch[0][0],
+                    "segs": batch[1][0],
+                    "clss": batch[2][0],
+                    "mask": batch[3][0],
+                    "mask_cls": batch[4][0],
+                    "labels": batch[5][0],
+                }
+            else:
+                return {
+                    "x": batch[0][0],
+                    "segs": batch[1][0],
+                    "clss": batch[2][0],
+                    "mask": batch[3][0],
+                    "mask_cls": batch[4][0],
                 }
         else:
             raise ValueError("Model not supported: {}".format(model_name))
@@ -342,7 +366,8 @@ class ExtractiveSummarizer(Transformer):
 
     def predict(
         self,
-        eval_dataloader,
+        #eval_dataloader,
+        eval_dataset,
         num_gpus=1,
         local_rank=-1,
         batch_size=16,
@@ -409,54 +434,61 @@ class ExtractiveSummarizer(Transformer):
 
         world_size = num_gpus 
         device, num_gpus = get_device(num_gpus=num_gpus, local_rank=local_rank)
-        #local_rank = range(0,num_gpus)
-        print(local_rank)
-        print(device)
-        #from torch.nn.parallel import DistributedDataParallel as DDP
-        #self.model = DDP(self.model)
-
-        # if isinstance(self.model, nn.DataParallel):
-        #    self.model.module.to(device)
-        # else:
-        #if num_gpus > 1:
-        #    self.model = nn.DataParallel(self.model, device_ids=local_rank)
+        
         self.model.to(device)
-        self.model = torch.nn.parallel.DistributedDataParallel(self.model,  device_ids=[local_rank])
+        if local_rank!= -1:
+            self.model = torch.nn.parallel.DistributedDataParallel(self.model,  device_ids=[local_rank])
+        #else:
+        #    self.model = torch.nn.DataParallel(self.model)
         
         def move_batch_to_device(batch, device):
             return batch.to(device)
+        
+        def move_dict_to_device(dictionary, device):
+            temp = (batch['x'], batch['segs'], batch['clss'], batch['mask'], batch['mask_cls'], batch['labels'])
+            new_batch = tuple(t.to(device) for t in temp)
+            return new_batch
 
         self.model.eval()
         pred = []
         target = []
         j = 0
         
+        from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
+        from torch.utils.data.distributed import DistributedSampler
+        
+        eval_sampler = SequentialSampler(eval_dataset)
+        eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=1)
+        
+        sent_scores = []
         for batch in eval_dataloader:
-            #print("rank {}, j {}".format(local_rank, j) )
-            if j%world_size != local_rank:
-                j += 1
-                #print(j%world_size)
-                continue
-            batch = move_batch_to_device(batch, device)
-            #print("actual work: rank {}, j {}".format(local_rank, j) )
-            #batch = move_batch_to_device(batch, "cuda:{}".format(local_rank[j%num_gpus]))
+            #if local_rank != -1:
+            #    if j%world_size != local_rank:
+            #        j += 1
+            #        continue
+            print(batch)
+            new_batch = move_dict_to_device(batch, device)
             j += 1
             with torch.no_grad():
-                inputs = ExtSumProcessor.get_inputs(batch, self.model_name, train_mode=False)
+                inputs = ExtSumProcessor.get_inputs2(new_batch, self.model_name, train_mode=False)
+                #print(inputs)
                 outputs = self.model(**inputs)
                 sent_scores = outputs[0]
                 sent_scores = sent_scores.detach().cpu().numpy()
-                temp_pred, temp_target = _get_pred(batch, sent_scores)
-                pred.extend(temp_pred)
-                target.extend(temp_target)
+                yield sent_scores
+                #sent_scores.extend(sent_scores)
+                #temp_pred, temp_target = _get_pred(batch, sent_scores)
+                #pred.extend(temp_pred)
+                #target.extend(temp_target)
+        #return sent_scores
         #torch.dist.barrier()
-        print(len(pred))
-        print(pred[0])
-        print(len(target))
-        print(target[0])
-        torch.save(pred, "{}.predict".format(local_rank))
-        torch.save(target, "{}.target".format(local_rank))
-        return pred
+        #print(len(pred))
+        #print(pred[0])
+        #print(len(target))
+        #print(target[0])
+        #torch.save(pred, "{}.predict".format(local_rank))
+        #torch.save(target, "{}.target".format(local_rank))
+        return pred #, target
 
     def save_model(self, name):
         output_model_dir = os.path.join(self.cache_dir, "fine_tuned")
