@@ -102,8 +102,11 @@ class Transformer:
         verbose=True,
         seed=None,
     ):
+
+        device, num_gpus = get_device(num_gpus=n_gpu, local_rank=-1)
+
         if seed is not None:
-            Transformer.set_seed(seed, n_gpu > 0)
+            Transformer.set_seed(seed, num_gpus > 0)
 
         if max_steps > 0:
             t_total = max_steps
@@ -138,15 +141,12 @@ class Transformer:
         if scheduler is None:
             scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=warmup_steps, num_training_steps=t_total)
 
-
         if fp16:
             try:
                 from apex import amp
             except ImportError:
                 raise ImportError("Please install apex from https://www.github.com/nvidia/apex")
             self.model, optimizer = amp.initialize(self.model, optimizer, opt_level=fp16_opt_level)
-
-        device, num_gpus = get_device(num_gpus=n_gpu, local_rank=-1)
 
         if local_rank != -1:
             self.model = torch.nn.parallel.DistributedDataParallel(
