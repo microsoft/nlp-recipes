@@ -245,12 +245,7 @@ class TokenClassificationProcessor:
         return td
 
     def create_dataloader_from_dataset(
-        self,
-        dataset,
-        shuffle=False,
-        batch_size=32,
-        num_gpus=None,
-        distributed=False
+        self, dataset, shuffle=False, batch_size=32, num_gpus=None, distributed=False
     ):
         if num_gpus is None:
             num_gpus = torch.cuda.device_count()
@@ -263,7 +258,6 @@ class TokenClassificationProcessor:
             sampler = RandomSampler(dataset) if shuffle else SequentialSampler(dataset)
 
         return DataLoader(dataset, sampler=sampler, batch_size=batch_size)
-
 
 
 class TokenClassifier(Transformer):
@@ -330,16 +324,9 @@ class TokenClassifier(Transformer):
                 Defaults to None, use the default seed.
         """
 
-        device, num_gpus = get_device(num_gpus=num_gpus, local_rank=local_rank)
-        if isinstance(self.model, nn.DataParallel):
-            self.model.module.to(device)
-        else:
-            self.model.to(device)
-
         super().fine_tune(
             train_dataloader=train_dataloader,
             get_inputs=TokenClassificationProcessor.get_inputs,
-            device=device,
             n_gpu=num_gpus,
             num_train_epochs=num_epochs,
             weight_decay=weight_decay,
@@ -350,12 +337,7 @@ class TokenClassifier(Transformer):
             seed=seed,
         )
 
-    def predict(
-        self,
-        eval_dataloader,
-        num_gpus=None,
-        verbose=True
-    ):
+    def predict(self, eval_dataloader, num_gpus=None, verbose=True):
         """
         Test on an evaluation dataset and get the token label predictions.
 
@@ -374,18 +356,12 @@ class TokenClassifier(Transformer):
             to get the probability for each class label.
         """
 
-        device, num_gpus = get_device(num_gpus=num_gpus, local_rank=-1)
-        if isinstance(self.model, nn.DataParallel):
-            self.model.module.to(device)
-        else:
-            self.model.to(device)
-        
         preds = list(
             super().predict(
                 eval_dataloader=eval_dataloader,
                 get_inputs=TokenClassificationProcessor.get_inputs,
-                device=device,
-                verbose=verbose
+                n_gpu=num_gpus,
+                verbose=verbose,
             )
         )
         preds_np = np.concatenate(preds)

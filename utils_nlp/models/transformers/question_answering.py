@@ -542,13 +542,9 @@ class AnswerExtractor(Transformer):
 
         """
 
-        device, num_gpus = get_device(num_gpus=num_gpus, local_rank=local_rank)
-
-        self.model.to(device)
         super().fine_tune(
             train_dataloader=train_dataloader,
             get_inputs=QAProcessor.get_inputs,
-            device=device,
             max_steps=max_steps,
             num_train_epochs=num_epochs,
             max_grad_norm=max_grad_norm,
