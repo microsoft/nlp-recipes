@@ -179,7 +179,7 @@ class Transformer:
                 outputs = self.model(**inputs)
                 loss = outputs[0]
 
-                if n_gpu > 1:
+                if num_gpus > 1:
                     loss = loss.mean()
                 if gradient_accumulation_steps > 1:
                     loss = loss / gradient_accumulation_steps
