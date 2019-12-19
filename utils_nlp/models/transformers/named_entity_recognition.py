@@ -4,6 +4,7 @@
 import logging
 import numpy as np
 import torch
+import torch.nn as nn
 
 from collections import Iterable
 from torch.utils.data import TensorDataset
@@ -122,7 +123,7 @@ class TokenClassificationProcessor:
         Returns:
             TensorDataset: A TensorDataset containing the following four tensors.
                 1. input_ids_all: Tensor. Each sublist contains numerical values,
-                    i.e. token ids, corresponding to the tokens in the input
+                    i.e. token ids, corresponding to the tokens in the input 
                     text data.
                 2. input_mask_all: Tensor. Each sublist contains the attention
                     mask of the input token id list, 1 for input tokens and 0 for
@@ -323,12 +324,9 @@ class TokenClassifier(Transformer):
                 Defaults to None, use the default seed.
         """
 
-        device, num_gpus = get_device(num_gpus=num_gpus, local_rank=local_rank)
-
         super().fine_tune(
             train_dataloader=train_dataloader,
             get_inputs=TokenClassificationProcessor.get_inputs,
-            device=device,
             n_gpu=num_gpus,
             num_train_epochs=num_epochs,
             weight_decay=weight_decay,
@@ -358,15 +356,12 @@ class TokenClassifier(Transformer):
             to get the probability for each class label.
         """
 
-        device, num_gpus = get_device(num_gpus=num_gpus, local_rank=-1)
-
         preds = list(
             super().predict(
                 eval_dataloader=eval_dataloader,
                 get_inputs=TokenClassificationProcessor.get_inputs,
-                device=device,
-                verbose=verbose,
                 n_gpu=num_gpus,
+                verbose=verbose,
             )
         )
         preds_np = np.concatenate(preds)
@@ -379,13 +374,13 @@ class TokenClassifier(Transformer):
         Args:
             predictions (ndarray): A numpy ndarray produced from the `predict` function call.
                 The shape of the ndarray is [number_of_examples, sequence_length, number_of_labels].
-            label_map (dict): A dictionary object to map a label (str) to an ID (int).
+            label_map (dict): A dictionary object to map a label (str) to an ID (int). 
                 dataset (TensorDataset): The TensorDataset for evaluation.
             dataset (Dataset): The test Dataset instance.
 
         Returns:
             list: A list of lists. The size of the retured list is the number of testing samples.
-            Each sublist represents the predicted label for each token.
+            Each sublist represents the predicted label for each token. 
         """
 
         num_samples = len(dataset.tensors[0])
@@ -425,13 +420,13 @@ class TokenClassifier(Transformer):
         Get the true testing label values.
 
         Args:
-            label_map (dict): A dictionary object to map a label (str) to an ID (int).
+            label_map (dict): A dictionary object to map a label (str) to an ID (int). 
                 dataset (TensorDataset): The TensorDataset for evaluation.
             dataset (Dataset): The test Dataset instance.
 
         Returns:
             list: A list of lists. The size of the retured list is the number of testing samples.
-            Each sublist represents the predicted label for each token.
+            Each sublist represents the predicted label for each token. 
         """
 
         num_samples = len(dataset.tensors[0])
