@@ -589,7 +589,7 @@ class AnswerExtractor(Transformer):
             return tensor.detach().cpu().tolist()
 
         device, num_gpus = get_device(num_gpus=num_gpus, local_rank=local_rank)
-        if isinstance(self.model, nn.DataParallel):
+        if isinstance(self.model, torch.nn.DataParallel):
             self.model.module.to(device)
         elif num_gpus > 1:
             self.model = torch.nn.DataParallel(self.model)
