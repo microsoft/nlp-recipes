@@ -13,16 +13,16 @@ import time
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, IterableDataset
+from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
+from torch.utils.data.distributed import DistributedSampler
 from transformers import DistilBertModel, BertModel
 
+from bertsum.models import model_builder, data_loader
+from bertsum.models.data_loader import Batch, DataIterator
+from bertsum.models.model_builder import Summarizer
 
 from utils_nlp.common.pytorch_utils import get_device
 from utils_nlp.models.transformers.common import MAX_SEQ_LEN, TOKENIZER_CLASS, Transformer
-
-
-from bertsum.models import model_builder, data_loader
-from bertsum.models.data_loader import DataIterator
-from bertsum.models.model_builder import Summarizer
 from utils_nlp.dataset.sentence_selection import combination_selection, greedy_selection
 
 MODEL_CLASS = {"bert-base-uncased": BertModel, "distilbert-base-uncased": DistilBertModel}
@@ -35,35 +35,6 @@ class Bunch(object):
 
     def __init__(self, adict):
         self.__dict__.update(adict)
-
-
-def get_sequential_dataloader(dataset, is_labeled=False, batch_size=3000):
-    """
-    Function to get sequential data iterator over a list of data objects.
-    Args:
-        dataset (list of objects): a list of data objects.
-        is_test (bool): it specifies whether the data objects are labeled data.
-        batch_size (int): number of tokens per batch.
-        
-    Returns:
-        DataIterator
-    """
-
-    return DataIterator(dataset, batch_size, is_labeled=is_labeled, shuffle=False, sort=False)
-
-
-def get_cycled_dataset(train_dataset_generator):
-    """
-    Function to get iterator over the dataset specified by train_iter.
-    It cycles through the dataset.
-    """
-    cycle_iterator = itertools.cycle("123")
-    for _ in cycle_iterator:
-        for batch in train_dataset_generator():
-            yield batch
-
-
-
 
 
 def get_dataloader(data_iter, shuffle=True, is_labeled=False, batch_size=3000):
@@ -147,17 +118,12 @@ class TransformerSumData():
         return src_subtoken_idxs, labels, segments_ids, cls_ids, src_txt, tgt_txt
 
 def get_dataset(file):
-    #if is_shuffle:
-    #    random.shuffle(file_list)
-    #print(file_list)
-    #for file in file_list:
     yield torch.load(file)
             
 class ExmSumProcessedIterableDataset(IterableDataset):
     
     def __init__(self, file_list, is_shuffle=False):
         self.file_list = file_list
-        print(self.file_list)
         self.is_shuffle = is_shuffle
         
     def get_stream(self):
@@ -184,15 +150,62 @@ class ExmSumProcessedDataset(Dataset):
                                                      
     def __getitem__(self, idx):
         return self.data[idx]
-     
+
     
+def get_pred(example, sent_scores, cal_lead=False, sentence_seperator='<q>', block_trigram=True, top_n=3):
+    def _get_ngrams(n, text):
+        ngram_set = set()
+        text_length = len(text)
+        max_index_ngram_start = text_length - n
+        for i in range(max_index_ngram_start + 1):
+            ngram_set.add(tuple(text[i : i + n]))
+        return ngram_set
+
+    def _block_tri(c, p):
+        tri_c = _get_ngrams(3, c.split())
+        for s in p:
+            tri_s = _get_ngrams(3, s.split())
+            if len(tri_c.intersection(tri_s)) > 0:
+                return True
+        return False
+
+    selected_ids = np.argsort(-sent_scores)
+    #selected_ids = np.argsort(-sent_scores, 1)
+    if cal_lead:
+        selected_ids = range(len(example['clss']))
+    pred = []
+    #target = []
+    #for i, idx in enumerate(selected_ids):
+    _pred = []
+    if len(example['src_txt']) == 0:
+        pred.append("")
+    for j in selected_ids[: len(example['src_txt'])]:
+        if j >= len(example['src_txt']):
+            continue
+        candidate = example['src_txt'][j].strip()
+        if block_trigram:
+            if not _block_tri(candidate, _pred):
+                _pred.append(candidate)
+        else:
+            _pred.append(candidate)
+
+        # only select the top n
+        if len(_pred) == top_n:
+            break
+
+    # _pred = '<q>'.join(_pred)
+    _pred = sentence_seperator.join(_pred)
+    pred.append(_pred.strip())
+    #target.append(example['tgt_txt'])
+    return pred #, target
+
 class ExtSumProcessedData:
     @staticmethod
     def save_data(data_iter, is_test=False, save_path="./", chunk_size=None):
         os.makedirs(save_path, exist_ok=True)
 
         def chunks(iterable, chunk_size):
-            iterator = filter(None, iterable)  # iter(iterable)
+            iterator = filter(None, iterable)  
             for first in iterator:
                 if chunk_size:
                     yield itertools.chain([first], itertools.islice(iterator, chunk_size - 1))
@@ -224,7 +237,7 @@ class ExtSumProcessedData:
     def splits(self, root):
         train_files, test_files = self.get_files(root)
         return ExmSumProcessedIterableDataset(train_files, is_shuffle=True), ExmSumProcessedDataset(test_files, is_shuffle=False)
-        # return get_cycled_dataset(get_dataset(train_files)), get_dataset(test_files)
+        
         
 
 class ExtSumProcessor:
@@ -252,7 +265,7 @@ class ExtSumProcessor:
         }
         print(default_preprocessing_parameters)
         args = Bunch(default_preprocessing_parameters)
-        self.preprossor = TransformerSumData(args, self.tokenizer)
+        self.processor = TransformerSumData(args, self.tokenizer)
 
     @staticmethod
     def get_inputs(batch, model_name, train_mode=True):
@@ -281,14 +294,12 @@ class ExtSumProcessor:
     def preprocess(self, sources, targets=None, oracle_mode="greedy", selections=3):
         """preprocess multiple data points"""
 
-        is_labeled = False
         if targets is None:
             for source in sources:
                 yield self._preprocess_single(source, None, oracle_mode, selections)
         else:
             for (source, target) in zip(sources, targets):
                 yield self._preprocess_single(source, target, oracle_mode, selections)
-            is_labeled = True
 
     def _preprocess_single(self, source, target=None, oracle_mode="greedy", selections=3):
         """preprocess single data point"""
@@ -299,7 +310,7 @@ class ExtSumProcessor:
             elif oracle_mode == "combination":
                 oracle_ids = combination_selection(source, target, selections)
 
-        b_data = self.preprossor.preprocess(source, target, oracle_ids)
+        b_data = self.processor.preprocess(source, target, oracle_ids)
         if b_data is None:
             return None
         indexed_tokens, labels, segments_ids, cls_ids, src_txt, tgt_txt = b_data
@@ -402,7 +413,7 @@ class ExtractiveSummarizer(Transformer):
 
     def predict(
         self,
-        eval_dataloader,
+        test_dataset,
         num_gpus=1,
         batch_size=16,
         sentence_seperator="<q>",
@@ -411,68 +422,56 @@ class ExtractiveSummarizer(Transformer):
         verbose=True,
         cal_lead=False,
     ):
-        def _get_ngrams(n, text):
-            ngram_set = set()
-            text_length = len(text)
-            max_index_ngram_start = text_length - n
-            for i in range(max_index_ngram_start + 1):
-                ngram_set.add(tuple(text[i : i + n]))
-            return ngram_set
-
-        def _block_tri(c, p):
-            tri_c = _get_ngrams(3, c.split())
-            for s in p:
-                tri_s = _get_ngrams(3, s.split())
-                if len(tri_c.intersection(tri_s)) > 0:
-                    return True
-            return False
-
-        def _get_pred(batch, sent_scores):
-            # return sent_scores
-            if cal_lead:
-                selected_ids = list(range(batch.clss.size(1))) * len(batch.clss)
+    
+        def collate_fn(dict_list):
+            # tuple_batch =  [list(col) for col in zip(*[d.values() for d in dict_list]
+            if dict_list is None or len(dict_list) <= 0:
+                return None
+            is_labeled = False
+            if "labels" in dict_list[0]:
+                is_labeled = True
+            tuple_batch = [list(d.values()) for d in dict_list]
+            ## generate mask and mask_cls, and only select tensors for the model input
+            batch = Batch(tuple_batch, is_labeled=True)    
+            if is_labeled:
+                return {
+                    "src": batch.src,
+                    "segs": batch.segs,
+                    "clss": batch.clss,
+                    "mask": batch.mask,
+                    "mask_cls": batch.mask_cls,
+                    "labels": batch.labels,
+                }
             else:
-                # negative_sent_score = [-i for i in sent_scores[0]]
-                selected_ids = np.argsort(-sent_scores, 1)
-                # selected_ids = np.sort(selected_ids,1)
-            pred = []
-            for i, idx in enumerate(selected_ids):
-                _pred = []
-                if len(batch.src_str[i]) == 0:
-                    pred.append("")
-                    continue
-                for j in selected_ids[i][: len(batch.src_str[i])]:
-                    if j >= len(batch.src_str[i]):
-                        continue
-                    candidate = batch.src_str[i][j].strip()
-                    if block_trigram:
-                        if not _block_tri(candidate, _pred):
-                            _pred.append(candidate)
-                    else:
-                        _pred.append(candidate)
-
-                    # only select the top 3
-                    if len(_pred) == top_n:
-                        break
-
-                # _pred = '<q>'.join(_pred)
-                _pred = sentence_seperator.join(_pred)
-                pred.append(_pred.strip())
-            return pred
+                return {
+                    "src": batch.src,
+                    "segs": batch.segs,
+                    "clss": batch.clss,
+                    "mask": batch.mask,
+                    "mask_cls": batch.mask_cls,
+                }
         
-        sent_scores = summarizer.predict(test_dataloader)
+        test_sampler = SequentialSampler(test_dataset)
+        test_dataloader = DataLoader(test_dataset, sampler=test_sampler, batch_size=batch_size, collate_fn=collate_fn)
+        sent_scores = self.predict_scores(test_dataloader, num_gpus=num_gpus)
+        sent_scores_list = list(sent_scores)
+        scores_list = []
+        for i in sent_scores_list:
+            scores_list.extend(i)
+        prediction = []
+        for i in range(len(test_dataset)):
+            temp_pred = get_pred(test_dataset[i], scores_list[i])
+            prediction.extend(temp_pred)
+            print(temp_pred[0])
+            print(temp_target[0])
+        return prediction
         
         
     def predict_scores(
         self,
         eval_dataloader,
-        num_gpus=1,
-        batch_size=16,
-        sentence_seperator="<q>",
-        top_n=3,
-        block_trigram=True,
+        num_gpus=1,        
         verbose=True,
-        cal_lead=False,
     ):
 
         device, num_gpus = get_device(num_gpus=num_gpus, local_rank=-1)
@@ -489,13 +488,12 @@ class ExtractiveSummarizer(Transformer):
             batch['clss'] = batch['clss'].to(device)
             batch['mask'] = batch['mask'].to(device)
             batch['mask_cls'] = batch['mask_cls'].to(device)
-
-            if 'labels' in batch.keys():
+            if 'labels' in batch:
                 batch['labels'] = batch['labels'].to(device)
             return Bunch(batch)
 
         self.model.eval()
-        #pred = []
+
         for batch in eval_dataloader:
             batch = move_batch_to_device(batch, device)
             with torch.no_grad():
@@ -504,8 +502,7 @@ class ExtractiveSummarizer(Transformer):
                 sent_scores = outputs[0]
                 sent_scores = sent_scores.detach().cpu().numpy()
                 yield sent_scores
-                #pred.extend(_get_pred(batch, sent_scores))
-        #return pred
+               
 
     def save_model(self, name):
         output_model_dir = os.path.join(self.cache_dir, "fine_tuned")
@@ -516,55 +513,4 @@ class ExtractiveSummarizer(Transformer):
         full_name = os.path.join(output_model_dir, name)
         logger.info("Saving model checkpoint to %s", full_name)
         torch.save(self.model, name)
-        
-def _get_ngrams(n, text):
-    ngram_set = set()
-    text_length = len(text)
-    max_index_ngram_start = text_length - n
-    for i in range(max_index_ngram_start + 1):
-        ngram_set.add(tuple(text[i : i + n]))
-    return ngram_set
-
-def _block_tri(c, p):
-    tri_c = _get_ngrams(3, c.split())
-    for s in p:
-        tri_s = _get_ngrams(3, s.split())
-        if len(tri_c.intersection(tri_s)) > 0:
-            return True
-    return False
-
-def get_pred(batch, sent_scores, cal_lead=False, sentence_seperator='<q>', block_trigram=True, top_n=3):
-    print(type(sent_scores))
-    selected_ids = np.argsort(-sent_scores)
-    #selected_ids = np.argsort(-sent_scores, 1)
-    if cal_lead:
-        selected_ids = range(len(batch['clss']))
-    pred = []
-    target = []
-    #for i, idx in enumerate(selected_ids):
-    _pred = []
-    if len(batch['src_txt']) == 0:
-        pred.append("")
-    for j in selected_ids[: len(batch['src_txt'])]:
-        if j >= len(batch['src_txt']):
-            continue
-        candidate = batch['src_txt'][j].strip()
-        if block_trigram:
-            if not _block_tri(candidate, _pred):
-                _pred.append(candidate)
-        else:
-            _pred.append(candidate)
-
-        # only select the top 3
-        if len(_pred) == top_n:
-            break
-
-    # _pred = '<q>'.join(_pred)
-    _pred = sentence_seperator.join(_pred)
-    pred.append(_pred.strip())
-    target.append(batch['tgt_txt'])
-    print("=======================")
-    print(pred)
-    print("=======================")
-    print(target)
-    return pred, target
+      
