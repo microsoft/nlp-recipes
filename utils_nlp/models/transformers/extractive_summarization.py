@@ -3,6 +3,7 @@
 
 # This script reuses some code from https://github.com/nlpyang/BertSum
 
+import functools
 import itertools
 import logging
 import numpy as np
@@ -11,25 +12,7 @@ import random
 import time
 import torch
 import torch.nn as nn
-
-
-from transformers.modeling_bert import (
-    BERT_PRETRAINED_MODEL_ARCHIVE_MAP,
-    BertForSequenceClassification,
-)
-from transformers.modeling_distilbert import (
-    DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP,
-    DistilBertForSequenceClassification,
-)
-from transformers.modeling_roberta import (
-    ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP,
-    RobertaForSequenceClassification,
-)
-from transformers.modeling_xlnet import (
-    XLNET_PRETRAINED_MODEL_ARCHIVE_MAP,
-    XLNetForSequenceClassification,
-)
-
+from torch.utils.data import Dataset, IterableDataset
 from transformers import DistilBertModel, BertModel
 
 
@@ -80,11 +63,7 @@ def get_cycled_dataset(train_dataset_generator):
             yield batch
 
 
-def get_dataset(file_list, is_train=False):
-    if is_train:
-        random.shuffle(file_list)
-    for file in file_list:
-        yield torch.load(file)
+
 
 
 def get_dataloader(data_iter, shuffle=True, is_labeled=False, batch_size=3000):
@@ -166,7 +145,87 @@ class TransformerSumData():
             tgt_txt = '<q>'.join([' '.join(tt) for tt in tgt])
         src_txt = [original_src_txt[i] for i in idxs]
         return src_subtoken_idxs, labels, segments_ids, cls_ids, src_txt, tgt_txt
+
+def get_dataset(file):
+    #if is_shuffle:
+    #    random.shuffle(file_list)
+    #print(file_list)
+    #for file in file_list:
+    yield torch.load(file)
+            
+class ExmSumProcessedIterableDataset(IterableDataset):
     
+    def __init__(self, file_list, is_shuffle=False):
+        self.file_list = file_list
+        print(self.file_list)
+        self.is_shuffle = is_shuffle
+        
+    def get_stream(self):
+        if self.is_shuffle:
+            return itertools.chain.from_iterable(map(get_dataset, itertools.cycle(self.file_list)))
+        else:
+            return itertools.chain.from_iterable(map(get_dataset, itertools.cycle(random.shuffle(self.file_list))))
+                                             
+    def __iter__(self):
+        return self.get_stream()
+                                            
+class ExmSumProcessedDataset(Dataset):
+    
+    def __init__(self, file_list, is_shuffle=False):
+        self.file_list = file_list
+        if is_shuffle:
+            random.shuffle(file_list)
+        self.data = []
+        for file in file_list:
+            self.data.extend(torch.load(file))
+    
+    def __len__(self):
+        return len(self.data)
+                                                     
+    def __getitem__(self, idx):
+        return self.data[idx]
+     
+    
+class ExtSumProcessedData:
+    @staticmethod
+    def save_data(data_iter, is_test=False, save_path="./", chunk_size=None):
+        os.makedirs(save_path, exist_ok=True)
+
+        def chunks(iterable, chunk_size):
+            iterator = filter(None, iterable)  # iter(iterable)
+            for first in iterator:
+                if chunk_size:
+                    yield itertools.chain([first], itertools.islice(iterator, chunk_size - 1))
+                else:
+                    yield itertools.chain([first], itertools.islice(iterator, None))
+
+        chunks = chunks(data_iter, chunk_size)
+        filename_list = []
+        for i, chunked_data in enumerate(chunks):
+            filename = f"{i}_test" if is_test else f"{i}_train"
+            torch.save(list(chunked_data), os.path.join(save_path, filename))
+            filename_list.append(os.path.join(save_path, filename))
+        return filename_list
+    
+   
+    def get_files(self, root):
+        train_files = []
+        test_files = []
+        files = [os.path.join(root, f) for f in os.listdir(root) if os.path.isfile(os.path.join(root, f))]
+        for fname in files:
+            if fname.find("train") != -1:
+                train_files.append(fname)
+            elif fname.find("test") != -1:
+                test_files.append(fname)
+                
+        return train_files, test_files
+    
+ 
+    def splits(self, root):
+        train_files, test_files = self.get_files(root)
+        return ExmSumProcessedIterableDataset(train_files, is_shuffle=True), ExmSumProcessedDataset(test_files, is_shuffle=False)
+        # return get_cycled_dataset(get_dataset(train_files)), get_dataset(test_files)
+        
 
 class ExtSumProcessor:
     def __init__(
@@ -272,7 +331,7 @@ class ExtractiveSummarizer(Transformer):
         }
 
         args = Bunch(default_summarizer_layer_parameters)
-        self.model = Summarizer("transformer", args, model_class, model_name, None, cache_dir)
+        self.model = Summarizer(encoder, args, model_class, model_name, None, cache_dir)
 
     @staticmethod
     def list_supported_models():
@@ -400,6 +459,21 @@ class ExtractiveSummarizer(Transformer):
                 _pred = sentence_seperator.join(_pred)
                 pred.append(_pred.strip())
             return pred
+        
+        sent_scores = summarizer.predict(test_dataloader)
+        
+        
+    def predict_scores(
+        self,
+        eval_dataloader,
+        num_gpus=1,
+        batch_size=16,
+        sentence_seperator="<q>",
+        top_n=3,
+        block_trigram=True,
+        verbose=True,
+        cal_lead=False,
+    ):
 
         device, num_gpus = get_device(num_gpus=num_gpus, local_rank=-1)
         # if isinstance(self.model, nn.DataParallel):
@@ -407,11 +481,21 @@ class ExtractiveSummarizer(Transformer):
         # else:
         self.model.to(device)
 
+        #def move_batch_to_device(batch, device):
+        #    return batch.to(device)
         def move_batch_to_device(batch, device):
-            return batch.to(device)
+            batch['src'] = batch['src'].to(device)
+            batch['segs'] = batch['segs'].to(device)
+            batch['clss'] = batch['clss'].to(device)
+            batch['mask'] = batch['mask'].to(device)
+            batch['mask_cls'] = batch['mask_cls'].to(device)
+
+            if 'labels' in batch.keys():
+                batch['labels'] = batch['labels'].to(device)
+            return Bunch(batch)
 
         self.model.eval()
-        pred = []
+        #pred = []
         for batch in eval_dataloader:
             batch = move_batch_to_device(batch, device)
             with torch.no_grad():
@@ -419,8 +503,9 @@ class ExtractiveSummarizer(Transformer):
                 outputs = self.model(**inputs)
                 sent_scores = outputs[0]
                 sent_scores = sent_scores.detach().cpu().numpy()
-                pred.extend(_get_pred(batch, sent_scores))
-        return pred
+                yield sent_scores
+                #pred.extend(_get_pred(batch, sent_scores))
+        #return pred
 
     def save_model(self, name):
         output_model_dir = os.path.join(self.cache_dir, "fine_tuned")
@@ -431,3 +516,55 @@ class ExtractiveSummarizer(Transformer):
         full_name = os.path.join(output_model_dir, name)
         logger.info("Saving model checkpoint to %s", full_name)
         torch.save(self.model, name)
+        
+def _get_ngrams(n, text):
+    ngram_set = set()
+    text_length = len(text)
+    max_index_ngram_start = text_length - n
+    for i in range(max_index_ngram_start + 1):
+        ngram_set.add(tuple(text[i : i + n]))
+    return ngram_set
+
+def _block_tri(c, p):
+    tri_c = _get_ngrams(3, c.split())
+    for s in p:
+        tri_s = _get_ngrams(3, s.split())
+        if len(tri_c.intersection(tri_s)) > 0:
+            return True
+    return False
+
+def get_pred(batch, sent_scores, cal_lead=False, sentence_seperator='<q>', block_trigram=True, top_n=3):
+    print(type(sent_scores))
+    selected_ids = np.argsort(-sent_scores)
+    #selected_ids = np.argsort(-sent_scores, 1)
+    if cal_lead:
+        selected_ids = range(len(batch['clss']))
+    pred = []
+    target = []
+    #for i, idx in enumerate(selected_ids):
+    _pred = []
+    if len(batch['src_txt']) == 0:
+        pred.append("")
+    for j in selected_ids[: len(batch['src_txt'])]:
+        if j >= len(batch['src_txt']):
+            continue
+        candidate = batch['src_txt'][j].strip()
+        if block_trigram:
+            if not _block_tri(candidate, _pred):
+                _pred.append(candidate)
+        else:
+            _pred.append(candidate)
+
+        # only select the top 3
+        if len(_pred) == top_n:
+            break
+
+    # _pred = '<q>'.join(_pred)
+    _pred = sentence_seperator.join(_pred)
+    pred.append(_pred.strip())
+    target.append(batch['tgt_txt'])
+    print("=======================")
+    print(pred)
+    print("=======================")
+    print(target)
+    return pred, target
