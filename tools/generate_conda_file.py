@@ -86,6 +86,8 @@ PIP_BASE = {
     "gensim": "gensim>=3.7.0",
     "nltk": "nltk>=3.4",
     "seqeval": "seqeval>=0.0.12",
+    "pyrouge": "pyrouge>=0.1.3",
+    "py-rouge": "py-rouge>=1.1",
 }
 
 PIP_GPU = {}
