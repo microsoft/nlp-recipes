@@ -187,7 +187,6 @@ class Transformer:
             train_iterator = cycle("1")  # use this as an infinite cycle
 
         if move_batch_to_device is None:
-
             def move_batch_to_device(batch, device):
                 return tuple(t.to(device) for t in batch)
 
