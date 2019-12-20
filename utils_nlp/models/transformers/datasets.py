@@ -2,8 +2,9 @@
 # Licensed under the MIT License.
 
 import collections
+import itertools
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, IterableDataset
 
 
 class SCDataSet(Dataset):
@@ -214,3 +215,75 @@ class QADataset(Dataset):
 
     def __len__(self):
         return self.df.shape[0]
+
+
+def _line_iter(file_path):
+    with open(file_path, "r", encoding="utf8") as fd:
+        for line in fd:
+            yield line
+
+def _preprocess(param):
+    """
+    Helper function to preprocess a list of paragraphs.
+
+    Args:
+        param (Tuple): params are tuple of (a list of strings, a list of preprocessing functions, and function to tokenize setences into words). A paragraph is represented with a single string with multiple setnences.
+
+    Returns:
+        list of list of strings, where each string is a token or word.
+    """
+
+    sentences, preprocess_pipeline, word_tokenize = param
+    for function in preprocess_pipeline:
+        sentences = function(sentences)
+    return [word_tokenize(sentence) for sentence in sentences]
+
+def _create_data_from_iterator(iterator, preprocessing, word_tokenizer):
+    # data = []
+    # for line in iterator:
+    #    data.append(preprocess((line, preprocessing, word_tokenizer)))
+    # return data
+    for line in iterator:
+        yield _preprocess((line, preprocessing, word_tokenizer))
+
+
+
+
+class SummarizationDataset(IterableDataset):
+    
+    def __init__(
+        self,
+        source_file,
+        target_file,
+        source_preprocessing,
+        target_preprocessing,
+        word_tokenization,
+        top_n=-1,
+        **kwargs,
+    ):
+        """ create a summarization dataset instance given the paths of source file and target file"""
+
+        #super(SummarizationDataset, self).__init__()
+        source_iter = _line_iter(source_file)
+        target_iter = _line_iter(target_file)
+
+        if top_n != -1:
+            source_iter = itertools.islice(source_iter, top_n)
+            target_iter = itertools.islice(target_iter, top_n)
+
+        self._source = _create_data_from_iterator(
+            source_iter, source_preprocessing, word_tokenization
+        )
+
+        self._target = _create_data_from_iterator(
+            target_iter, target_preprocessing, word_tokenization
+        )
+
+    def __iter__(self):
+        for x in self._source:
+            yield x
+
+    def get_target(self):
+        return self._target
+    
+
