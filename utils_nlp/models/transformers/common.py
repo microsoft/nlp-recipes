@@ -139,7 +139,9 @@ class Transformer:
             optimizer = AdamW(optimizer_grouped_parameters, lr=learning_rate, eps=adam_epsilon)
 
         if scheduler is None:
-            scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=warmup_steps, num_training_steps=t_total)
+            scheduler = get_linear_schedule_with_warmup(
+                optimizer, num_warmup_steps=warmup_steps, num_training_steps=t_total
+            )
 
         if fp16:
             try:
@@ -155,12 +157,12 @@ class Transformer:
                 output_device=local_rank,
                 find_unused_parameters=True,
             )
-        elif num_gpus > 1:
-            if not isinstance(self.model, torch.nn.DataParallel):
-                self.model = torch.nn.DataParallel(self.model)
         else:
             if isinstance(self.model, torch.nn.DataParallel):
                 self.model = self.model.module
+
+            if num_gpus > 1:
+                self.model = torch.nn.DataParallel(self.model, device_ids=list(range(num_gpus)))
 
         self.model.to(device)
         self.model.train()
@@ -220,12 +222,11 @@ class Transformer:
     def predict(self, eval_dataloader, get_inputs, n_gpu=1, verbose=True):
         device, num_gpus = get_device(num_gpus=n_gpu, local_rank=-1)
 
+        if isinstance(self.model, torch.nn.DataParallel):
+            self.model = self.model.module
+
         if num_gpus > 1:
-            if not isinstance(self.model, torch.nn.DataParallel):
-                self.model = torch.nn.DataParallel(self.model)
-        else:
-            if isinstance(self.model, torch.nn.DataParallel):
-                self.model = self.model.module
+            self.model = torch.nn.DataParallel(self.model, device_ids=list(range(num_gpus)))
 
         self.model.to(device)
         self.model.eval()

@@ -586,12 +586,11 @@ class AnswerExtractor(Transformer):
 
         device, num_gpus = get_device(num_gpus=num_gpus, local_rank=-1)
 
+        if isinstance(self.model, torch.nn.DataParallel):
+            self.model = self.model.module
+
         if num_gpus > 1:
-            if not isinstance(self.model, torch.nn.DataParallel):
-                self.model = torch.nn.DataParallel(self.model)
-        else:
-            if isinstance(self.model, torch.nn.DataParallel):
-                self.model = self.model.module
+            self.model = torch.nn.DataParallel(self.model, device_ids=list(range(num_gpus)))
 
         self.model.to(device)
         self.model.eval()
