@@ -11,7 +11,9 @@ import random
 import numpy as np
 import torch
 from tqdm import tqdm, trange
-from transformers import AdamW, WarmupLinearSchedule
+from transformers import AdamW
+from transformers import get_linear_schedule_with_warmup
+
 from transformers.modeling_bert import BERT_PRETRAINED_MODEL_ARCHIVE_MAP
 from transformers.modeling_distilbert import DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP
 from transformers.modeling_roberta import ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP
@@ -20,6 +22,7 @@ from transformers.tokenization_bert import BertTokenizer
 from transformers.tokenization_distilbert import DistilBertTokenizer
 from transformers.tokenization_roberta import RobertaTokenizer
 from transformers.tokenization_xlnet import XLNetTokenizer
+from utils_nlp.common.pytorch_utils import get_device
 
 TOKENIZER_CLASS = {}
 TOKENIZER_CLASS.update({k: BertTokenizer for k in BERT_PRETRAINED_MODEL_ARCHIVE_MAP})
@@ -82,7 +85,6 @@ class Transformer:
         self,
         train_dataloader,
         get_inputs,
-        device,
         max_steps=-1,
         num_train_epochs=1,
         max_grad_norm=1.0,
@@ -100,8 +102,11 @@ class Transformer:
         verbose=True,
         seed=None,
     ):
+
+        device, num_gpus = get_device(num_gpus=n_gpu, local_rank=-1)
+
         if seed is not None:
-            Transformer.set_seed(seed, n_gpu > 0)
+            Transformer.set_seed(seed, num_gpus > 0)
 
         if max_steps > 0:
             t_total = max_steps
@@ -134,7 +139,9 @@ class Transformer:
             optimizer = AdamW(optimizer_grouped_parameters, lr=learning_rate, eps=adam_epsilon)
 
         if scheduler is None:
-            scheduler = WarmupLinearSchedule(optimizer, warmup_steps=warmup_steps, t_total=t_total)
+            scheduler = get_linear_schedule_with_warmup(
+                optimizer, num_warmup_steps=warmup_steps, num_training_steps=t_total
+            )
 
         if fp16:
             try:
@@ -143,11 +150,6 @@ class Transformer:
                 raise ImportError("Please install apex from https://www.github.com/nvidia/apex")
             self.model, optimizer = amp.initialize(self.model, optimizer, opt_level=fp16_opt_level)
 
-        # multi-gpu training (should be after apex fp16 initialization)
-        if n_gpu > 1:
-            self.model = torch.nn.DataParallel(self.model)
-
-        # Distributed training (should be after apex fp16 initialization)
         if local_rank != -1:
             self.model = torch.nn.parallel.DistributedDataParallel(
                 self.model,
@@ -155,6 +157,15 @@ class Transformer:
                 output_device=local_rank,
                 find_unused_parameters=True,
             )
+        else:
+            if isinstance(self.model, torch.nn.DataParallel):
+                self.model = self.model.module
+
+            if num_gpus > 1:
+                self.model = torch.nn.DataParallel(self.model, device_ids=list(range(num_gpus)))
+
+        self.model.to(device)
+        self.model.train()
 
         global_step = 0
         tr_loss = 0.0
@@ -168,13 +179,12 @@ class Transformer:
                 train_dataloader, desc="Iteration", disable=local_rank not in [-1, 0] or not verbose
             )
             for step, batch in enumerate(epoch_iterator):
-                self.model.train()
                 batch = tuple(t.to(device) for t in batch)
                 inputs = get_inputs(batch, self.model_name)
                 outputs = self.model(**inputs)
                 loss = outputs[0]
 
-                if n_gpu > 1:
+                if num_gpus > 1:
                     loss = loss.mean()
                 if gradient_accumulation_steps > 1:
                     loss = loss / gradient_accumulation_steps
@@ -209,9 +219,19 @@ class Transformer:
             torch.cuda.empty_cache()
         return global_step, tr_loss / global_step
 
-    def predict(self, eval_dataloader, get_inputs, device, verbose=True):
+    def predict(self, eval_dataloader, get_inputs, n_gpu=1, verbose=True):
+        device, num_gpus = get_device(num_gpus=n_gpu, local_rank=-1)
+
+        if isinstance(self.model, torch.nn.DataParallel):
+            self.model = self.model.module
+
+        if num_gpus > 1:
+            self.model = torch.nn.DataParallel(self.model, device_ids=list(range(num_gpus)))
+
+        self.model.to(device)
+        self.model.eval()
+
         for batch in tqdm(eval_dataloader, desc="Evaluating", disable=not verbose):
-            self.model.eval()
             batch = tuple(t.to(device) for t in batch)
             with torch.no_grad():
                 inputs = get_inputs(batch, self.model_name, train_mode=False)

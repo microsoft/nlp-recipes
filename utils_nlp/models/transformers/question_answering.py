@@ -130,7 +130,7 @@ class QAProcessor:
         Returns:
             dict: Dictionary containing input ids, segment ids, masks, and labels.
                 Labels are only returned when train_mode is True.
-        """        
+        """
         model_type = model_name.split("-")[0]
 
         inputs = {"input_ids": batch[0], "attention_mask": batch[1]}
@@ -542,13 +542,9 @@ class AnswerExtractor(Transformer):
 
         """
 
-        device, num_gpus = get_device(num_gpus=num_gpus, local_rank=local_rank)
-
-        self.model.to(device)
         super().fine_tune(
             train_dataloader=train_dataloader,
             get_inputs=QAProcessor.get_inputs,
-            device=device,
             max_steps=max_steps,
             num_train_epochs=num_epochs,
             max_grad_norm=max_grad_norm,
@@ -567,7 +563,7 @@ class AnswerExtractor(Transformer):
         if cache_model:
             self.save_model()
 
-    def predict(self, test_dataloader, num_gpus=None, local_rank=-1, verbose=True):
+    def predict(self, test_dataloader, num_gpus=None, verbose=True):
 
         """
         Predicts answer start and end logits.
@@ -588,11 +584,15 @@ class AnswerExtractor(Transformer):
         def _to_list(tensor):
             return tensor.detach().cpu().tolist()
 
-        device, num_gpus = get_device(num_gpus=num_gpus, local_rank=local_rank)
+        device, num_gpus = get_device(num_gpus=num_gpus, local_rank=-1)
+
+        if isinstance(self.model, torch.nn.DataParallel):
+            self.model = self.model.module
+
+        if num_gpus > 1:
+            self.model = torch.nn.DataParallel(self.model, device_ids=list(range(num_gpus)))
 
         self.model.to(device)
-
-        # score
         self.model.eval()
 
         all_results = []
