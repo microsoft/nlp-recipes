@@ -24,7 +24,7 @@ from transformers.tokenization_bert import BertTokenizer
 from transformers.tokenization_distilbert import DistilBertTokenizer
 from transformers.tokenization_roberta import RobertaTokenizer
 from transformers.tokenization_xlnet import XLNetTokenizer
-
+from utils_nlp.common.pytorch_utils import get_device
 
 TOKENIZER_CLASS = {}
 TOKENIZER_CLASS.update({k: BertTokenizer for k in BERT_PRETRAINED_MODEL_ARCHIVE_MAP})
@@ -256,12 +256,27 @@ class Transformer:
             # empty cache
             torch.cuda.empty_cache()
         return global_step, tr_loss / global_step
+    
+    
+    def predict(self, eval_dataloader, get_inputs, n_gpu=1, verbose=True, move_batch_to_device=None):
+        device, num_gpus = get_device(num_gpus=n_gpu, local_rank=-1)
 
-    def predict(self, eval_dataloader, get_inputs, device, verbose=True):
+        if num_gpus > 1:
+            if not isinstance(self.model, torch.nn.DataParallel):
+                self.model = torch.nn.DataParallel(self.model)
+        else:
+            if isinstance(self.model, torch.nn.DataParallel):
+                self.model = self.model.module
 
+        self.model.to(device)
         self.model.eval()
+        
+        if move_batch_to_device is None:
+            def move_batch_to_device(batch, device):
+                return tuple(t.to(device) for t in batch)
+
         for batch in tqdm(eval_dataloader, desc="Evaluating", disable=not verbose):
-            batch = tuple(t.to(device) for t in batch)
+            batch = move_batch_to_device(batch, device) #tuple(t.to(device) for t in batch)
             with torch.no_grad():
                 inputs = get_inputs(batch, self.model_name, train_mode=False)
                 outputs = self.model(**inputs)

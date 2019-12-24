@@ -10,12 +10,13 @@ import os
 import shutil
 
 
-from utils_nlp.dataset.cnndm import ExtSumProcessedData, Summarization
+from utils_nlp.models.transformers.datasets import SummarizationDataset
 from utils_nlp.models.transformers.extractive_summarization import (
     get_cycled_dataset,
     get_dataloader,
     get_sequential_dataloader,
     ExtractiveSummarizer,
+    ExtSumProcessedData,
     ExtSumProcessor,
 )
 
@@ -44,14 +45,14 @@ def data_to_file(tmp_module):
     f = open(target_file, "w")
     f.write(target)
     f.close()
-    train_dataset = Summarization(
+    train_dataset = SummarizationDataset(
         source_file,
         target_file,
         [tokenize.sent_tokenize],
         [tokenize.sent_tokenize],
         nltk.word_tokenize,
     )
-    test_dataset = Summarization(
+    test_dataset = SummarizationDataset(
         source_file,
         target_file,
         [tokenize.sent_tokenize],

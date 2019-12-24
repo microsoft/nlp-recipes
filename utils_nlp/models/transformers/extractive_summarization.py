@@ -462,26 +462,24 @@ class ExtractiveSummarizer(Transformer):
         for i in range(len(test_dataset)):
             temp_pred = get_pred(test_dataset[i], scores_list[i])
             prediction.extend(temp_pred)
-            print(temp_pred[0])
-            print(temp_target[0])
         return prediction
         
         
     def predict_scores(
         self,
         eval_dataloader,
-        num_gpus=1,        
+        num_gpus=1,   
         verbose=True,
     ):
 
         device, num_gpus = get_device(num_gpus=num_gpus, local_rank=-1)
-        # if isinstance(self.model, nn.DataParallel):
-        #    self.model.module.to(device)
-        # else:
-        self.model.to(device)
+   
+        if isinstance(self.model, nn.DataParallel):
+            self.model.module.to(device)
+        else:
+            self.model.to(device)
 
-        #def move_batch_to_device(batch, device):
-        #    return batch.to(device)
+
         def move_batch_to_device(batch, device):
             batch['src'] = batch['src'].to(device)
             batch['segs'] = batch['segs'].to(device)
@@ -492,17 +490,16 @@ class ExtractiveSummarizer(Transformer):
                 batch['labels'] = batch['labels'].to(device)
             return Bunch(batch)
 
-        self.model.eval()
-
-        for batch in eval_dataloader:
-            batch = move_batch_to_device(batch, device)
-            with torch.no_grad():
-                inputs = ExtSumProcessor.get_inputs(batch, self.model_name, train_mode=False)
-                outputs = self.model(**inputs)
-                sent_scores = outputs[0]
-                sent_scores = sent_scores.detach().cpu().numpy()
-                yield sent_scores
-               
+        preds = list(
+            super().predict(
+                eval_dataloader=eval_dataloader,
+                get_inputs=ExtSumProcessor.get_inputs,
+                n_gpu=num_gpus,
+                verbose=verbose,
+                move_batch_to_device=move_batch_to_device,
+            )
+        )
+        return preds                
 
     def save_model(self, name):
         output_model_dir = os.path.join(self.cache_dir, "fine_tuned")
@@ -514,3 +511,4 @@ class ExtractiveSummarizer(Transformer):
         logger.info("Saving model checkpoint to %s", full_name)
         torch.save(self.model, name)
       
+
