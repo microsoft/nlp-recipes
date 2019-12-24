@@ -263,7 +263,11 @@ class Transformer:
 
         if num_gpus > 1:
             if not isinstance(self.model, torch.nn.DataParallel):
-                self.model = torch.nn.DataParallel(self.model)
+                self.model = torch.nn.DataParallel(self.model, device_ids=range(0,num_gpus))
+            else:
+                # make sure the prediction can switch between different numbers of multiple gpus
+                self.model = self.model.module
+                self.model = torch.nn.DataParallel(self.model, device_ids=range(0,num_gpus))
         else:
             if isinstance(self.model, torch.nn.DataParallel):
                 self.model = self.model.module
