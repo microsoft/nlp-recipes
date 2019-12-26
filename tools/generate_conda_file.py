@@ -89,6 +89,7 @@ PIP_BASE = {
     "seqeval": "seqeval>=0.0.12",
     "pyrouge": "pyrouge>=0.1.3",
     "py-rouge": "py-rouge>=1.1",
+    "indic-nlp-library": "indic-nlp-library>=0.6",
 }
 
 PIP_GPU = {}

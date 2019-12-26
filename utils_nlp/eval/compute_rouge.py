@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT License.
+
 import os
 import shutil
 import time
@@ -5,6 +8,7 @@ import tempfile
 
 from pyrouge import Rouge155
 from rouge import Rouge
+from .rouge_ext import RougeExt
 
 
 def compute_rouge_perl(cand, ref, input_files=False):
@@ -13,10 +17,10 @@ def compute_rouge_perl(cand, ref, input_files=False):
     (https://github.com/bheinzerling/pyrouge) of perl ROUGE package.
 
     Args:
-        cand (list or string): If `input_files` is `False`, `cand` is a list of strings
+        cand (list or str): If `input_files` is `False`, `cand` is a list of strings
             containing predicted summaries. if `input_files` is `True`, `cand` is the path
             to the file containing the predicted summaries.
-        ref (list or string): If `input_files` is `False`, `cand` is a list of strings
+        ref (list or str): If `input_files` is `False`, `cand` is a list of strings
             containing reference summaries. if `input_files` is `True`, `cand` is the path
             to the file containing the reference summaries.
         input_files (bool, optional): If True, inputs are file names. Otherwise, inputs are lists
@@ -70,24 +74,34 @@ def compute_rouge_perl(cand, ref, input_files=False):
     return results_dict
 
 
-def compute_rouge_python(cand, ref, input_files=False):
+def compute_rouge_python(cand, ref, input_files=False, language="en"):
     """
     Computes ROUGE scores using the python package (https://pypi.org/project/py-rouge/).
 
     Args:
-        cand (list or string): If `input_files` is `False`, `cand` is a list of strings
+        cand (list or str): If `input_files` is `False`, `cand` is a list of strings
             containing predicted summaries. if `input_files` is `True`, `cand` is the path
             to the file containing the predicted summaries.
-        ref (list or string): If `input_files` is `False`, `cand` is a list of strings
+        ref (list or str): If `input_files` is `False`, `cand` is a list of strings
             containing reference summaries. if `input_files` is `True`, `cand` is the path
             to the file containing the reference summaries.
-        input_files (bool, optional): If True, inputs are file names. Otherwise, inputs are lists of
-            predicted and reference summaries. Defaults to False.
+        input_files (bool, optional): If True, inputs are file names. Otherwise, inputs are
+            lists of predicted and reference summaries. Defaults to False.
+        language (str, optional): Language of the input text. Supported values are "en" and
+            "hi". Defaults to "en".
 
     Returns:
         dict: Dictionary of ROUGE scores.
 
     """
+    supported_langauges = ["en", "hi"]
+    if language not in supported_langauges:
+        raise Exception(
+            "Language {0} is not supported. Supported languages are: {1}".format(
+                language, supported_langauges
+            )
+        )
+
     if input_files:
         candidates = [line.strip() for line in open(cand, encoding="utf-8")]
         references = [line.strip() for line in open(ref, encoding="utf-8")]
@@ -99,7 +113,14 @@ def compute_rouge_python(cand, ref, input_files=False):
     print("Number of references: {}".format(len(references)))
     assert len(candidates) == len(references)
 
-    evaluator = Rouge(metrics=["rouge-n", "rouge-l"], max_n=2, limit_length=False, apply_avg=True)
+    if language == "en":
+        evaluator = Rouge(
+            metrics=["rouge-n", "rouge-l"], max_n=2, limit_length=False, apply_avg=True
+        )
+    else:
+        evaluator = RougeExt(
+            metrics=["rouge-n", "rouge-l"], max_n=2, limit_length=False, apply_avg=True
+        )
 
     scores = evaluator.get_scores(candidates, [[it] for it in references])
 

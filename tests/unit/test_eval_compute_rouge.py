@@ -14,10 +14,20 @@ RLR = 0.67857
 RLP = 0.73810
 RLF = 0.70605
 
+R1R_hi = 0.53571
+R1P_hi = 0.68125
+R1F_hi = 0.59804
+R2R_hi = 0.28431
+R2P_hi = 0.38334
+R2F_hi = 0.325
+RLR_hi = 0.53571
+RLP_hi = 0.68125
+RLF_hi = 0.59804
+
 
 @pytest.fixture()
 def rouge_test_data():
-    ## First testing case:
+    ## First English testing case:
     # Unigrams in candidate: 14
     # Unigrams in reference: 14
     # Unigram overlapping: 10
@@ -35,7 +45,7 @@ def rouge_test_data():
     # ROUGE-L P: 0.64286
     # ROUGE-L F: 0.64286
 
-    ## Second testing case:
+    ## Second English testing case:
     # Unigrams in candidate: 6
     # Unigrams in reference: 7
     # Unigram overlapping: 5
@@ -62,7 +72,57 @@ def rouge_test_data():
         "The movie is very popular among millennials.",
     ]
 
-    return {"candidates": summary_candidates, "references": summary_references}
+    ## First Hindi testing case:
+    # Unigrams in candidate: 16
+    # Unigrams in reference: 18
+    # Unigram overlapping: 9
+    # Bigrams in candidate: 15
+    # Bigrams in reference: 17
+    # Bigram overlapping: 4
+    # LCS: 6, 3 (for each reference sentence, the code checks each candidate sentence)
+    # ROUGE-1 R: 9/18 = 0.5
+    # ROUGE-1 P: 9/16 = 0.5625
+    # ROUGE-1 F: 2/(18/9 + 16/9) = 18/34 = 0.52941
+    # ROUGE-2 R: 4/17 = 0.23529
+    # ROUGE-2 P: 4/15 = 0.26667
+    # ROUGE-2 F: 2/(17/4 + 15/4) = 8/32 = 0.25
+    # ROUGE-L R: (6+3)/18 = 0.5
+    # ROUGE-L P: (6+3)/16 = 0.5625
+    # ROUGE-L F: 2/(18/9 + 16/9) = 18/34 = 0.52941
+
+    ## Second Hindi testing case:
+    # Unigrams in candidate: 5
+    # Unigrams in reference: 7
+    # Unigram overlapping: 4
+    # Bigrams in candidate: 4
+    # Bigrams in reference: 6
+    # Bigram overlapping: 2
+    # LCS: 4
+    # ROUGE-1 R: 4/7 = 0.57143
+    # ROUGE-1 P: 4/5 = 0.8
+    # ROUGE-1 F: 2/(7/4 + 5/4) = 8/12 = 0.66667
+    # ROUGE-2 R: 2/6 = 0.33333
+    # ROUGE-2 P: 2/4 = 0.5
+    # ROUGE-2 F: 2/(6/2 + 4/2) = 4/10 = 0.4
+    # ROUGE-L R: 4/7 = 0.57143
+    # ROUGE-L P: 4/5 = 0.8
+    # ROUGE-L F: 2/(7/4 + 5/4) = 8/12 = 0.66667
+
+    summary_candidates_hi = [
+        "शेयर बाजार इस साल बहुत अच्छा कर रहा है। 2020 के लिए भी यही उम्मीद है।",
+        "नई फिल्म बहुत लोकप्रिय है।",
+    ]
+    summary_references_hi = [
+        "शेयर बाजार 2019 में वास्तव में अच्छा कर रहा है। आशा है कि 2020 भी ऐसा ही होगा।",
+        "फिल्म सदियों के बीच बहुत लोकप्रिय है।",
+    ]
+
+    return {
+        "candidates": summary_candidates,
+        "references": summary_references,
+        "candidates_hi": summary_candidates_hi,
+        "references_hi": summary_references_hi,
+    }
 
 
 def test_compute_rouge_perl(rouge_test_data):
@@ -95,6 +155,22 @@ def test_compute_rouge_python(rouge_test_data):
     pytest.approx(rouge_python["rouge-l"]["r"], RLR, abs=ABS_TOL)
     pytest.approx(rouge_python["rouge-l"]["p"], RLP, abs=ABS_TOL)
     pytest.approx(rouge_python["rouge-l"]["f"], RLF, abs=ABS_TOL)
+
+
+def test_compute_rouge_python_hi(rouge_test_data):
+    rouge_python = compute_rouge_python(
+        cand=rouge_test_data["candidates_hi"], ref=rouge_test_data["references_hi"], language="hi"
+    )
+
+    pytest.approx(rouge_python["rouge-1"]["r"], R1R_hi, abs=ABS_TOL)
+    pytest.approx(rouge_python["rouge-1"]["p"], R1P_hi, abs=ABS_TOL)
+    pytest.approx(rouge_python["rouge-1"]["f"], R1F_hi, abs=ABS_TOL)
+    pytest.approx(rouge_python["rouge-2"]["r"], R2R_hi, abs=ABS_TOL)
+    pytest.approx(rouge_python["rouge-2"]["p"], R2P_hi, abs=ABS_TOL)
+    pytest.approx(rouge_python["rouge-2"]["f"], R2F_hi, abs=ABS_TOL)
+    pytest.approx(rouge_python["rouge-l"]["r"], RLR_hi, abs=ABS_TOL)
+    pytest.approx(rouge_python["rouge-l"]["p"], RLP_hi, abs=ABS_TOL)
+    pytest.approx(rouge_python["rouge-l"]["f"], RLF_hi, abs=ABS_TOL)
 
 
 def test_compute_rouge_perl_file(rouge_test_data, tmp):
