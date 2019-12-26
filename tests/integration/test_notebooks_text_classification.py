@@ -37,50 +37,6 @@ def test_tc_mnli_transformers(notebooks, tmp):
     assert pytest.approx(result["f1"], 0.89, abs=ABS_TOL)
 
 
-@pytest.mark.gpu
-@pytest.mark.integration
-def test_tc_dac_bert_ar(notebooks, tmp):
-    notebook_path = notebooks["tc_dac_bert_ar"]
-    pm.execute_notebook(
-        notebook_path,
-        OUTPUT_NOTEBOOK,
-        kernel_name=KERNEL_NAME,
-        parameters=dict(
-            NUM_GPUS=1,
-            DATA_FOLDER=tmp,
-            BERT_CACHE_DIR=tmp,
-            MAX_LEN=175,
-            BATCH_SIZE=16,
-            NUM_EPOCHS=1,
-            TRAIN_SIZE=0.8,
-            NUM_ROWS=8000,
-            RANDOM_STATE=0,
-        ),
-    )
-    result = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict
-    assert pytest.approx(result["accuracy"], 0.871, abs=ABS_TOL)
-    assert pytest.approx(result["precision"], 0.865, abs=ABS_TOL)
-    assert pytest.approx(result["recall"], 0.852, abs=ABS_TOL)
-    assert pytest.approx(result["f1"], 0.845, abs=ABS_TOL)
-
-
-@pytest.mark.gpu
-@pytest.mark.integration
-def test_tc_bbc_bert_hi(notebooks, tmp):
-    notebook_path = notebooks["tc_bbc_bert_hi"]
-    pm.execute_notebook(
-        notebook_path,
-        OUTPUT_NOTEBOOK,
-        kernel_name=KERNEL_NAME,
-        parameters=dict(NUM_GPUS=1, DATA_FOLDER=tmp, BERT_CACHE_DIR=tmp, NUM_EPOCHS=1),
-    )
-    result = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict
-    assert pytest.approx(result["accuracy"], 0.71, abs=ABS_TOL)
-    assert pytest.approx(result["precision"], 0.25, abs=ABS_TOL)
-    assert pytest.approx(result["recall"], 0.28, abs=ABS_TOL)
-    assert pytest.approx(result["f1"], 0.26, abs=ABS_TOL)
-
-
 @pytest.mark.integration
 @pytest.mark.azureml
 @pytest.mark.gpu
@@ -118,6 +74,7 @@ def test_tc_bert_azureml(
     if os.path.exists("outputs"):
         shutil.rmtree("outputs")
 
+
 @pytest.mark.gpu
 @pytest.mark.integration
 def test_multi_languages_transformer(notebooks, tmp):
@@ -126,10 +83,7 @@ def test_multi_languages_transformer(notebooks, tmp):
         notebook_path,
         OUTPUT_NOTEBOOK,
         kernel_name=KERNEL_NAME,
-        parameters={
-            "QUICK_RUN": True,
-            "USE_DATASET": "dac"
-        },
+        parameters={"QUICK_RUN": True, "USE_DATASET": "dac"},
     )
     result = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict
     assert pytest.approx(result["precision"], 0.94, abs=ABS_TOL)

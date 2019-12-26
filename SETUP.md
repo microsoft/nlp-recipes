@@ -47,9 +47,9 @@ You can learn how to create a Notebook VM [here](https://docs.microsoft.com/en-u
 We provide a script, [generate_conda_file.py](tools/generate_conda_file.py), to generate a conda-environment yaml file
 which you can use to create the target environment using the Python version 3.6 with all the correct dependencies.
 
-Assuming the repo is cloned as `nlp` in the system, to install **a default (Python CPU) environment**:
+Assuming the repo is cloned as `nlp-recipes` in the system, to install **a default (Python CPU) environment**:
 
-    cd nlp
+    cd nlp-recipes
     python tools/generate_conda_file.py
     conda env create -f nlp_cpu.yaml
 
@@ -62,7 +62,7 @@ Click on the following menus to see how to install the Python GPU environment:
 
 Assuming that you have a GPU machine, to install the Python GPU environment, which by default installs the CPU environment:
 
-    cd nlp
+    cd nlp-recipes
     python tools/generate_conda_file.py --gpu
     conda env create -n nlp_gpu -f nlp_gpu.yaml
 
@@ -79,7 +79,7 @@ Assuming that you have an Azure GPU DSVM machine, here are the steps to setup th
 
 2. Install the GPU environment.
 
-        cd nlp
+        cd nlp-recipes
         python tools/generate_conda_file.py --gpu
         conda env create -n nlp_gpu -f nlp_gpu.yaml
 
@@ -110,7 +110,7 @@ Running the command tells pip to install the `utils_nlp` package from source in 
 
 > It is also possible to install directly from Github, which is the best way to utilize the `utils_nlp` package in external projects (while still reflecting updates to the source as it's installed as an editable `'-e'` package). 
 
->   `pip install -e  git+git@github.com:microsoft/nlp.git@master#egg=utils_nlp`  
+>   `pip install -e  git+git@github.com:microsoft/nlp-recipes.git@master#egg=utils_nlp`  
 
 Either command, from above, makes `utils_nlp` available in your conda virtual environment. You can verify it was properly installed by running:  
 

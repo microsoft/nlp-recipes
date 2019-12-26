@@ -31,7 +31,7 @@ The repository aims to expand NLP capabilities along three separate dimensions
 We aim to have end-to-end examples of common tasks and scenarios such as text classification, named entity recognition etc.
 
 ### Algorithms
-We aim to support multiple models for each of the supported scenarios. Currently, BERT-based models are supported across most scenarios. We are working to integrate [pytorch-transformers](https://github.com/huggingface/pytorch-transformers) to allow use of many more models.
+We aim to support multiple models for each of the supported scenarios. Currently, transformer-based models are supported across most scenarios. We have been working on integrating the [transformers package](https://github.com/huggingface/transformers) from [Hugging Face](https://huggingface.co/) which allows users to easily load pretrained models and fine-tune them for different tasks.
 
 ### Languages 
 We strongly subscribe to the multi-language principles laid down by ["Emily Bender"](http://faculty.washington.edu/ebender/papers/Bender-SDSS-2019.pdf)
@@ -39,7 +39,7 @@ We strongly subscribe to the multi-language principles laid down by ["Emily Bend
 * "English isn't generic for language, despite what NLP papers might lead you to believe" 
 * "Always name the language you are working on" ([Bender rule](https://www.aclweb.org/anthology/Q18-1041/))
 
-The repository aims to support non-English languages  across all the scenarios. Pre-trianed models used in the repository such as BERT, FastText support 100+ languages out of the box. Our goal is to provide end-to-end examples in as many languages as possible. We encourage community contributions in this area.
+The repository aims to support non-English languages  across all the scenarios. Pre-trained models used in the repository such as BERT, FastText support 100+ languages out of the box. Our goal is to provide end-to-end examples in as many languages as possible. We encourage community contributions in this area.
 
 
 
@@ -63,7 +63,7 @@ While solving NLP problems, it is always good to start with the prebuilt [Cognit
 [Azure Machine Learning service](https://azure.microsoft.com/en-us/services/machine-learning-service/) is a cloud service used to train, deploy, automate, and manage machine learning models, all at the broad scale that the cloud provides. AzureML is presented in notebooks across different scenarios to enhance the efficiency of developing Natural Language systems at scale and for various AI model development related tasks like:
   * [**Accessing Datastores**](https://docs.microsoft.com/en-us/azure/machine-learning/service/how-to-access-data) to easily read and write your data in Azure storage services such as blob storage or file share.
   * Scaling up and out on [**Azure Machine Learning Compute**](https://docs.microsoft.com/en-us/azure/machine-learning/service/how-to-set-up-training-targets#amlcompute).
-  * [**Automated Machine Learning**](https://docs.microsoft.com/en-us/azure/machine-learning/service/how-to-configure-auto-train) which builds high quality machine learning models by automating model and hyperparameter selection.
+  * [**Automated Machine Learning**](https://docs.microsoft.com/en-us/azure/machine-learning/service/how-to-configure-auto-train) which builds high quality machine learning models by automating model and hyperparameter selection. AutoML explores BERT, BiLSTM, bag-of-words, and word embeddings on the user's dataset to handle text columns.
   * [**Tracking experiments and monitoring metrics**](https://docs.microsoft.com/en-us/azure/machine-learning/service/how-to-track-experiments) to enhance the model creation process.
   * [**Distributed Training**](https://docs.microsoft.com/en-us/azure/machine-learning/service/how-to-train-ml-models#distributed-training-and-custom-docker-images)
   * [**Hyperparameter tuning**](https://docs.microsoft.com/en-us/azure/machine-learning/service/how-to-tune-hyperparameters)
@@ -85,6 +85,8 @@ The following is a list of related repositories that we like and think are usefu
 |[AzureML-BERT](https://github.com/Microsoft/AzureML-BERT)|End-to-end recipes for pre-training and fine-tuning BERT using Azure Machine Learning service.|
 |[MASS](https://github.com/microsoft/MASS)|MASS: Masked Sequence to Sequence Pre-training for Language Generation.|
 |[MT-DNN](https://github.com/namisan/mt-dnn)|Multi-Task Deep Neural Networks for Natural Language Understanding.|
+|[UniLM](https://github.com/microsoft/unilm)|Unified Language Model Pre-training.|
+
 
 
 ## Build Status

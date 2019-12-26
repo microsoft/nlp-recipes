@@ -2,14 +2,17 @@
 # Licensed under the MIT License.
 
 import logging
-from collections import Iterable
-
 import numpy as np
 import torch
+import torch.nn as nn
+
+from collections import Iterable
 from torch.utils.data import TensorDataset
 from transformers.modeling_bert import BERT_PRETRAINED_MODEL_ARCHIVE_MAP, BertForTokenClassification
 from utils_nlp.common.pytorch_utils import get_device
 from utils_nlp.models.transformers.common import MAX_SEQ_LEN, TOKENIZER_CLASS, Transformer
+from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
+from torch.utils.data.distributed import DistributedSampler
 
 
 TC_MODEL_CLASS = {k: BertForTokenClassification for k in BERT_PRETRAINED_MODEL_ARCHIVE_MAP}
@@ -241,6 +244,21 @@ class TokenClassificationProcessor:
             )
         return td
 
+    def create_dataloader_from_dataset(
+        self, dataset, shuffle=False, batch_size=32, num_gpus=None, distributed=False
+    ):
+        if num_gpus is None:
+            num_gpus = torch.cuda.device_count()
+
+        batch_size = batch_size * max(1, num_gpus)
+
+        if distributed:
+            sampler = DistributedSampler(dataset)
+        else:
+            sampler = RandomSampler(dataset) if shuffle else SequentialSampler(dataset)
+
+        return DataLoader(dataset, sampler=sampler, batch_size=batch_size)
+
 
 class TokenClassifier(Transformer):
     """
@@ -269,27 +287,24 @@ class TokenClassifier(Transformer):
 
     def fit(
         self,
-        train_dataset,
+        train_dataloader,
         num_epochs=1,
-        batch_size=32,
         num_gpus=None,
         local_rank=-1,
         weight_decay=0.0,
         learning_rate=5e-5,
         adam_epsilon=1e-8,
         warmup_steps=0,
-        verbose=False,
+        verbose=True,
         seed=None,
     ):
         """
         Fit the TokenClassifier model using the given training dataset.
 
         Args:
-            train_dataset (Dataset): Dataset for training.
+            train_dataloader (DataLoader): DataLoader instance for training.
             num_epochs (int, optional): Number of training epochs.
                 Defaults to 1.
-            batch_size (int, optional): Training batch size.
-                Defaults to 32.
             num_gpus (int, optional): The number of GPUs to use. If None, all available GPUs will
                 be used. If set to 0 or GPUs are not available, CPU device will
                 be used. Defaults to None.
@@ -309,16 +324,11 @@ class TokenClassifier(Transformer):
                 Defaults to None, use the default seed.
         """
 
-        device, num_gpus = get_device(num_gpus=num_gpus, local_rank=local_rank)
-        self.model.to(device)
-
         super().fine_tune(
-            train_dataset=train_dataset,
+            train_dataloader=train_dataloader,
             get_inputs=TokenClassificationProcessor.get_inputs,
-            device=device,
             n_gpu=num_gpus,
             num_train_epochs=num_epochs,
-            per_gpu_train_batch_size=batch_size,
             weight_decay=weight_decay,
             learning_rate=learning_rate,
             adam_epsilon=adam_epsilon,
@@ -327,19 +337,15 @@ class TokenClassifier(Transformer):
             seed=seed,
         )
 
-    def predict(self, eval_dataset, batch_size=32, num_gpus=None, local_rank=-1, verbose=False):
+    def predict(self, eval_dataloader, num_gpus=None, verbose=True):
         """
         Test on an evaluation dataset and get the token label predictions.
 
         Args:
             eval_dataset (TensorDataset): A TensorDataset for evaluation.
-            batch_size (int, optional): The batch size for evaluation.
-                Defaults to 32.
             num_gpus (int, optional): The number of GPUs to use. If None, all available GPUs will
                 be used. If set to 0 or GPUs are not available, CPU device will
                 be used. Defaults to None.
-            local_rank (int, optional): Whether need to do distributed training.
-                Defaults to -1, no distributed training.
             verbose (bool, optional): Verbose model.
                 Defaults to False.
 
@@ -350,15 +356,11 @@ class TokenClassifier(Transformer):
             to get the probability for each class label.
         """
 
-        device, num_gpus = get_device(num_gpus=num_gpus, local_rank=-1)
         preds = list(
             super().predict(
-                eval_dataset=eval_dataset,
+                eval_dataloader=eval_dataloader,
                 get_inputs=TokenClassificationProcessor.get_inputs,
-                device=device,
-                per_gpu_eval_batch_size=batch_size,
                 n_gpu=num_gpus,
-                local_rank=local_rank,
                 verbose=verbose,
             )
         )
@@ -374,6 +376,7 @@ class TokenClassifier(Transformer):
                 The shape of the ndarray is [number_of_examples, sequence_length, number_of_labels].
             label_map (dict): A dictionary object to map a label (str) to an ID (int). 
                 dataset (TensorDataset): The TensorDataset for evaluation.
+            dataset (Dataset): The test Dataset instance.
 
         Returns:
             list: A list of lists. The size of the retured list is the number of testing samples.
@@ -408,6 +411,46 @@ class TokenClassifier(Transformer):
                     continue
 
                 label_id = seq_probs[sid].argmax()
+                one_sample.append(label_id2str[label_id])
+            labels.append(one_sample)
+        return labels
+
+    def get_true_test_labels(self, label_map, dataset):
+        """
+        Get the true testing label values.
+
+        Args:
+            label_map (dict): A dictionary object to map a label (str) to an ID (int). 
+                dataset (TensorDataset): The TensorDataset for evaluation.
+            dataset (Dataset): The test Dataset instance.
+
+        Returns:
+            list: A list of lists. The size of the retured list is the number of testing samples.
+            Each sublist represents the predicted label for each token. 
+        """
+
+        num_samples = len(dataset.tensors[0])
+        label_id2str = {v: k for k, v in label_map.items()}
+        attention_mask_all = dataset.tensors[1].data.numpy()
+        trailing_mask_all = dataset.tensors[2].data.numpy()
+        label_ids_all = dataset.tensors[3].data.numpy()
+        seq_len = len(trailing_mask_all[0])
+        labels = []
+
+        for idx in range(num_samples):
+            attention_mask = attention_mask_all[idx]
+            trailing_mask = trailing_mask_all[idx]
+            label_ids = label_ids_all[idx]
+            one_sample = []
+
+            for sid in range(seq_len):
+                if attention_mask[sid] == 0:
+                    break
+
+                if not trailing_mask[sid]:
+                    continue
+
+                label_id = label_ids[sid]
                 one_sample.append(label_id2str[label_id])
             labels.append(one_sample)
         return labels

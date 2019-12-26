@@ -89,7 +89,9 @@ def load_dataset(
     to_lower=True,
     cache_dir=TemporaryDirectory().name,
     max_len=MAX_SEQ_LEN,
-    trailing_piece_tag="X"
+    trailing_piece_tag="X",
+    batch_size=32,
+    num_gpus=None
 ):
     """
     Load the wikigold dataset and split into training and testing datasets.
@@ -120,26 +122,18 @@ def load_dataset(
             For example, "criticize" is broken into "critic" and "##ize", "critic"
             preserves its original label and "##ize" is labeled as trailing_piece_tag.
             Default value is "X".
+        batch_size (int, optional): The batch size for training and testing.
+            Defaults to 32.
+        num_gpus (int, optional): The number of GPUs.
+            Defaults to None.
 
     Returns:
-        tuple. The tuple contains three elements.
-        train_dataset (TensorDataset): A TensorDataset containing the following four tensors.
-            1. input_ids_all: Tensor. Each sublist contains numerical values,
-                i.e. token ids, corresponding to the tokens in the input 
-                text data.
-            2. input_mask_all: Tensor. Each sublist contains the attention
-                mask of the input token id list, 1 for input tokens and 0 for
-                padded tokens, so that padded tokens are not attended to.
-            3. trailing_token_mask_all: Tensor. Each sublist is
-                a boolean list, True for the first word piece of each
-                original word, False for the trailing word pieces,
-                e.g. "##ize". This mask is useful for removing the
-                predictions on trailing word pieces, so that each
-                original word in the input text has a unique predicted
-                label.
-            4. label_ids_all: Tensor, each sublist contains token labels of
-                a input sentence/paragraph, if labels is provided. If the
-                `labels` argument is not provided, it will not return this tensor.
+        tuple. The tuple contains four elements.
+        train_dataload (DataLoader): a PyTorch DataLoader instance for training.
+
+        test_dataload (DataLoader): a PyTorch DataLoader instance for testing.
+        
+        label_map (dict): A dictionary object to map a label (str) to an ID (int). 
 
         test_dataset (TensorDataset): A TensorDataset containing the following four tensors.
             1. input_ids_all: Tensor. Each sublist contains numerical values,
@@ -158,8 +152,6 @@ def load_dataset(
             4. label_ids_all: Tensor, each sublist contains token labels of
                 a input sentence/paragraph, if labels is provided. If the
                 `labels` argument is not provided, it will not return this tensor.
-        
-        label_map (dict): A dictionary object to map a label (str) to an ID (int). 
     """
 
     train_df, test_df = load_train_test_dfs(
@@ -214,4 +206,20 @@ def load_dataset(
         trailing_piece_tag=trailing_piece_tag
     )
 
-    return (train_dataset, test_dataset, label_map)
+    train_dataloader = processor.create_dataloader_from_dataset(
+        train_dataset,
+        shuffle=True,
+        batch_size=batch_size,
+        num_gpus=num_gpus,
+        distributed=False
+    )
+
+    test_dataloader = processor.create_dataloader_from_dataset(
+        test_dataset,
+        shuffle=False,
+        batch_size=batch_size,
+        num_gpus=num_gpus,
+        distributed=False
+    )
+
+    return (train_dataloader, test_dataloader, label_map, test_dataset)
