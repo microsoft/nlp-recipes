@@ -6,14 +6,13 @@
 # 1) sentence splitter (SENTENCE_SPLIT_DICT)
 # 2) word tokenizer (WORD_TOKENIZE_DICT)
 # 3) pattern of characters to remove (REMOVE_CHAR_PATTERN_DICT)
-# 4) changes to _split_into_words if the text words are not separated by space
+# 4) stemmer (STEMMER_DICT), this is optional since stemming is not applicable to all languages
+# 5) changes to _split_into_words if the text words are not separated by space
 
 # Major changes made to the original rouge.py include:
 # 1) Don't remove non-English or non-numeric characters
 # 2) Removed the ensure_compatibility argument as we don't need to reproduce the results of
 #    the original perl script that only supports English.
-# 3) Removed the stemming step. Stemming is not applicable to all languages. It can be added
-#    on an as-needed basis
 
 
 import re
@@ -22,6 +21,7 @@ import itertools
 import collections
 
 from indicnlp.tokenize import sentence_tokenize, indic_tokenize
+from ..language_utils.hi.hindi_stemmer import hi_stem
 
 
 class RougeExt:
@@ -36,6 +36,7 @@ class RougeExt:
     REMOVE_CHAR_PATTERN_DICT = {
         "hi": re.compile(r"([" + string.punctuation + r"\u0964\u0965" + r"])")
     }
+    STEMMER_DICT = {"hi": hi_stem}
 
     # REMOVE_CHAR_PATTERN = re.compile('[^A-Za-z0-9]')
 
@@ -59,7 +60,7 @@ class RougeExt:
         length_limit_type="bytes",
         apply_avg=True,
         apply_best=False,
-        stemming=False,
+        stemming=True,
         alpha=0.5,
         weight_factor=1.0,
         language="hi",
@@ -87,7 +88,7 @@ class RougeExt:
               apply_Avg & apply_best = False, then each ROUGE scores are independant
           apply_best: Take the best instead of the average. Default: False, then each ROUGE
               scores are independant
-          stemming: Apply stemming to summaries. Default: False
+          stemming: Apply stemming to summaries. Default: True
           alpha: Alpha use to compute f1 score: P*R/((1-a)*P + a*R). Default:0.5
           weight_factor: Weight factor to be used for ROUGE-W. Official rouge score defines
               it at 1.2. Default: 1.0
@@ -134,6 +135,11 @@ class RougeExt:
         self.sentence_split = RougeExt.SENTENCE_SPLIT_DICT[self.language]
         self.word_tokenize = RougeExt.WORD_TOKENIZE_DICT[self.language]
         self.remove_char_pattern = RougeExt.REMOVE_CHAR_PATTERN_DICT[self.language]
+        if self.language not in RougeExt.STEMMER_DICT.keys():
+            self.stemmer = None
+            warnings.warn("Language-specific stemmer is not available. Skipping stemming.")
+        else:
+            self.stemmer = RougeExt.STEMMER_DICT[self.language]
 
         # # Load static objects
         # if len(Rouge.WORDNET_KEY_VALUE) == 0:
@@ -231,6 +237,21 @@ class RougeExt:
     #                 tokens[i] = token
 
     #     return tokens
+
+    def stem_tokens(self, tokens):
+        """
+        Stem each token of tokens
+
+        Args:
+          tokens: List of tokens to stem
+
+        Returns:
+          List of final stems
+        """
+        for i, token in enumerate(tokens):
+            tokens[i] = self.stemmer(token)
+
+        return tokens
 
     @staticmethod
     def _get_ngrams(n, text):
@@ -874,6 +895,8 @@ class RougeExt:
         # return preprocessed_summary
 
         tokens = self.tokenize_text(summary)
+        if self.stemming:
+            self.stem_tokens(tokens)  # stemming in-place
         summary = [" ".join(tokens)]
 
         return summary
@@ -947,6 +970,8 @@ class RougeExt:
             #         sentence = ' '.join(tokens)
 
             tokens = self.tokenize_text(sentence)
+            if self.stemming:
+                self.stem_tokens(tokens)  # stemming in-place
             sentence = " ".join(tokens)
             final_sentences.append(sentence)
 
