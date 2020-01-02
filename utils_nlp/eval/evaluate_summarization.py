@@ -22,6 +22,7 @@ def get_rouge(predictions, targets, temp_dir):
                 filehandle.write('%s\n' % item)
     seed(42)
     random_number = random()
+    os.makedirs(temp_dir, exist_ok=True)
     candidate_path = os.path.join(temp_dir, "candidate"+str(random_number))
     gold_path = os.path.join(temp_dir, "gold"+str(random_number))
     _write_list_to_file(predictions, candidate_path)
