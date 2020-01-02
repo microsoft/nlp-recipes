@@ -12,9 +12,7 @@ import shutil
 
 from utils_nlp.models.transformers.datasets import SummarizationDataset
 from utils_nlp.models.transformers.extractive_summarization import (
-    get_cycled_dataset,
     get_dataloader,
-    get_sequential_dataloader,
     ExtractiveSummarizer,
     ExtSumProcessedData,
     ExtSumProcessor,
@@ -22,16 +20,21 @@ from utils_nlp.models.transformers.extractive_summarization import (
 
 # @pytest.fixture()
 def source_data():
-    return """Boston, MA welcome to Microsoft/nlp. Welcome to text summarization. Welcome to Microsoft NERD. Look outside, waht a beautiful Charlse River fall view."""
+    return (
+        "Boston, MA welcome to Microsoft/nlp. Welcome to text summarization."
+        "Welcome to Microsoft NERD."
+        "Look outside, what a beautiful Charlse River fall view."
+    )
 
 
 # @pytest.fixture()
 def target_data():
-    return (
-        """ welcome to microsoft/nlp. Welcome to text summarization. Welcome to Microsoft NERD."""
-    )
+    return "welcome to microsoft/nlp." "Welcome to text summarization." "Welcome to Microsoft NERD."
+
 
 MODEL_NAME = "distilbert-base-uncased"
+NUM_GPUS = 1
+
 
 @pytest.fixture(scope="module")
 def data_to_file(tmp_module):
@@ -102,13 +105,9 @@ def test_bert_training(data_to_file, tmp_module):
     DATA_SAVED_PATH = data_to_file
     result_base_path = "./results"
 
-    train_dataset_generator, test_dataset_generator = ExtSumProcessedData().splits(
-        root=DATA_SAVED_PATH
-    )
+    train_dataset, test_dataset = ExtSumProcessedData().splits(root=DATA_SAVED_PATH)
     summarizer = ExtractiveSummarizer(MODEL_NAME, ENCODER, CACHE_DIR)
-    train_dataloader = get_dataloader(
-        get_cycled_dataset(train_dataset_generator), is_labeled=True, batch_size=3000
-    )
+    train_dataloader = get_dataloader(train_dataset.get_stream(), is_labeled=True, batch_size=3000)
     summarizer.fit(
         train_dataloader,
         num_gpus=1,
@@ -121,10 +120,6 @@ def test_bert_training(data_to_file, tmp_module):
         clip_grad_norm=False,
     )
 
-    test_dataset = []
-    for i in test_dataset_generator():
-        test_dataset.extend(i)
-    target = [test_dataset[i]["tgt_txt"] for i in range(len(test_dataset))]
-
-    prediction = summarizer.predict(get_sequential_dataloader(test_dataset))
+    target = [i["tgt_txt"] for i in test_dataset]
+    prediction = summarizer.predict(test_dataset, num_gpus=NUM_GPUS, batch_size=128)
     assert len(prediction) == 1
