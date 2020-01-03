@@ -227,7 +227,10 @@ def _preprocess(param):
     Helper function to preprocess a list of paragraphs.
 
     Args:
-        param (Tuple): params are tuple of (a list of strings, a list of preprocessing functions, and function to tokenize setences into words). A paragraph is represented with a single string with multiple setnences.
+        param (Tuple): params are tuple of (a list of strings, 
+            a list of preprocessing functions, and function to tokenize 
+            setences into words). A paragraph is represented with a 
+            single string with multiple setnences.
 
     Returns:
         list of list of strings, where each string is a token or word.
@@ -239,14 +242,8 @@ def _preprocess(param):
     return [word_tokenize(sentence) for sentence in sentences]
 
 def _create_data_from_iterator(iterator, preprocessing, word_tokenizer):
-    # data = []
-    # for line in iterator:
-    #    data.append(preprocess((line, preprocessing, word_tokenizer)))
-    # return data
     for line in iterator:
         yield _preprocess((line, preprocessing, word_tokenizer))
-
-
 
 
 class SummarizationDataset(IterableDataset):
@@ -261,9 +258,28 @@ class SummarizationDataset(IterableDataset):
         top_n=-1,
         **kwargs,
     ):
-        """ create a summarization dataset instance given the paths of source file and target file"""
+        """ 
+        Create a summarization dataset instance given the
+        paths of the source file and the target file
 
-        #super(SummarizationDataset, self).__init__()
+        Args: 
+            source_file (str): Full path of the file which contains a list of 
+                the paragraphs with line break as seperator
+            target_file (str): Full path of the file which contains a list of 
+                the summaries for the paragraphs in the source file with line break as seperator.
+            source_preprocessing (list of functions): A list of preprocessing functions 
+                to process the paragraphs in the source file.
+            target_preprocessing (list of functions): A list of preprocessing functions to
+                process the paragraphs in the source file.
+            word_tokenization (function): Tokenization function for tokenize the paragraphs 
+                and summaries. The tokenization method is used for sentence selection 
+                in :meth:`utils_nlp.models.transformers.extractive_summarization.ExtSumProcessor.preprocess`
+            top_n (int, optional): The number which specifies how many examples in the 
+                beginning of the paragraph and summary lists that will be processed by this function. 
+                Defaults to -1, which means the whole lists of paragraphs and summaries should be procsssed. 
+        """
+
+
         source_iter = _line_iter(source_file)
         target_iter = _line_iter(target_file)
 

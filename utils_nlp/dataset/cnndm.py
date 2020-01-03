@@ -1,4 +1,4 @@
-# Copyright (c) Microsoft Corporation. All rights reserved.
+# Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
 # This script reuses some code from https://github.com/nlpyang/BertSum
@@ -32,7 +32,8 @@ from utils_nlp.models.transformers.extractive_summarization import get_dataset, 
 
 
 def CNNDMSummarizationDataset(*args, **kwargs):
-    
+    """Load the CNN/Daily Mail dataset preprocessed by harvardnlp group."""
+
     REMAP = {"-lrb-": "(", "-rrb-": ")", "-lcb-": "{", "-rcb-": "}",
          "-lsb-": "[", "-rsb-": "]", "``": '"', "''": '"'}
 
@@ -95,6 +96,10 @@ def CNNDMSummarizationDataset(*args, **kwargs):
     
     
 class CNNDMBertSumProcessedData:
+    """Class to load dataset preprocessed by BertSum paper at 
+        https://github.com/nlpyang/BertSum
+    """
+
     @staticmethod
     def download(local_path=".data"):
         file_name = "bertsum_data.zip"
