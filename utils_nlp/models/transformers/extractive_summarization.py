@@ -1,28 +1,26 @@
-# Copyright (c) Microsoft Corporation. 
+# Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
 # This script reuses some code from https://github.com/nlpyang/BertSum
 
-import functools
 import itertools
 import logging
 import numpy as np
 import os
 import random
-import time
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, IterableDataset
-from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
-from torch.utils.data.distributed import DistributedSampler
+from torch.utils.data import DataLoader  # , RandomSampler, SequentialSampler
+# from torch.utils.data.distributed import DistributedSampler
 from transformers import DistilBertModel, BertModel
 
 from bertsum.models import model_builder, data_loader
-from bertsum.models.data_loader import Batch, DataIterator
+from bertsum.models.data_loader import Batch
 from bertsum.models.model_builder import Summarizer
 
 from utils_nlp.common.pytorch_utils import get_device
-from utils_nlp.models.transformers.common import MAX_SEQ_LEN, TOKENIZER_CLASS, Transformer
+from utils_nlp.models.transformers.common import TOKENIZER_CLASS, Transformer
 from utils_nlp.dataset.sentence_selection import combination_selection, greedy_selection
 
 MODEL_CLASS = {"bert-base-uncased": BertModel, "distilbert-base-uncased": DistilBertModel}
@@ -46,10 +44,9 @@ def get_dataloader(data_iter, shuffle=True, is_labeled=False, batch_size=3000):
         shuffle (bool): whether the data is shuffled
         is_labeled (bool): it specifies whether the data objects are labeled data.
         batch_size (int): number of tokens per batch.
-        
+
     Returns:
         DataIterator
-
     """
 
     return data_loader.Dataloader(data_iter, batch_size, shuffle=shuffle, is_labeled=is_labeled)
@@ -57,80 +54,91 @@ def get_dataloader(data_iter, shuffle=True, is_labeled=False, batch_size=3000):
 
 def get_dataset(file):
     yield torch.load(file)
-            
+
+
 class ExmSumProcessedIterableDataset(IterableDataset):
-    """Iterable dataset for extractive summarization preprocessed data 
+    """Iterable dataset for extractive summarization preprocessed data
     """
-    
+
     def __init__(self, file_list, is_shuffle=False):
         """ Initiation function for iterable dataset for extractive summarization preprocessed data.
-        
+
         Args:
             file_list (list of strings): List of files that the dataset is loaded from.
-            is_shuffle (bool, optional): A boolean value specifies whether the list of files is shuffled 
-                when the dataset is loaded. Defaults to False.         
+            is_shuffle (bool, optional): A boolean value specifies whether the list of
+                files is shuffled when the dataset is loaded. Defaults to False.
         """
-        
+
         self.file_list = file_list
         self.is_shuffle = is_shuffle
-        
+
     def get_stream(self):
         """ get a stream of cycled data from the dataset"""
-        
+
         if self.is_shuffle:
             return itertools.chain.from_iterable(map(get_dataset, itertools.cycle(self.file_list)))
         else:
-            return itertools.chain.from_iterable(map(get_dataset, itertools.cycle(random.shuffle(self.file_list))))
-                                             
+            return itertools.chain.from_iterable(
+                map(get_dataset, itertools.cycle(random.shuffle(self.file_list)))
+            )
+
     def __iter__(self):
         return self.get_stream()
-                                            
+
+
 class ExmSumProcessedDataset(Dataset):
-    """Dataset for extractive summarization preprocessed data 
+    """Dataset for extractive summarization preprocessed data
     """
-    
+
     def __init__(self, file_list, is_shuffle=False):
         """ Initiation function for dataset for extractive summarization preprocessed data.
-        
+
         Args:
             file_list (list of strings): List of files that the dataset is loaded from.
-            is_shuffle (bool, optional): A boolean value specifies whether the list of files is shuffled 
-                when the dataset is loaded. Defaults to False.
+            is_shuffle (bool, optional): A boolean value specifies whether the list of
+                files is shuffled when the dataset is loaded. Defaults to False.
         """
-        
+
         self.file_list = file_list
         if is_shuffle:
             random.shuffle(file_list)
         self.data = []
         for file in file_list:
             self.data.extend(torch.load(file))
-    
+
     def __len__(self):
         return len(self.data)
-                                                     
+
     def __getitem__(self, idx):
         return self.data[idx]
 
-    
-def get_pred(example, sent_scores, cal_lead=False, sentence_seperator='<q>', block_trigram=True, top_n=3):
+
+def get_pred(
+    example, sent_scores, cal_lead=False, sentence_seperator="<q>", block_trigram=True, top_n=3
+):
     """
-        get the summarization prediction for the paragraph example based on the scores returned by the transformer summarization model. 
-        
+        Get the summarization prediction for the paragraph example based on the scores
+        returned by the transformer summarization model.
+
         Args:
-            example (str): The object with "src_txt" field as the paragraph which requries summarization.
-                The "src_txt" is a list of strings.
-            sent_scores (list of floats): List of scores of how likely of the sentence is included in the summary.
-            cal_lead (bool, optional): Boolean value which specifies whether the prediction uses 
+            example (str): The object with "src_txt" field as the paragraph which requries
+                summarization. The "src_txt" is a list of strings.
+            sent_scores (list of floats): List of scores of how likely of the sentence is
+                included in the summary.
+            cal_lead (bool, optional): Boolean value which specifies whether the prediction uses
                 the first few sentences as summary. Defaults to False
-            sentence_seperator (str, optional): Seperator used in the generated summary. Defaults to '<q>'.
-            block_trigram (bool, optional): Boolean value which specifies whether the summary should include
-                any sentence that has the same trigram as the already selected sentences. Defaults to True.                          
-            top_n (int, optional): The maximum number of sentences that the summary should included. Defaults to 3.
-            
+            sentence_seperator (str, optional): Seperator used in the generated summary.
+                Defaults to '<q>'.
+            block_trigram (bool, optional): Boolean value which specifies whether the
+                summary should include any sentence that has the same trigram as the
+                already selected sentences. Defaults to True.
+            top_n (int, optional): The maximum number of sentences that the summary
+                should included. Defaults to 3.
+
         Returns:
             A string which is the summary for the example.
     """
-        
+
     def _get_ngrams(n, text):
         ngram_set = set()
         text_length = len(text)
@@ -148,19 +156,19 @@ def get_pred(example, sent_scores, cal_lead=False, sentence_seperator='<q>', blo
         return False
 
     selected_ids = np.argsort(-sent_scores)
-    #selected_ids = np.argsort(-sent_scores, 1)
+    # selected_ids = np.argsort(-sent_scores, 1)
     if cal_lead:
-        selected_ids = range(len(example['clss']))
+        selected_ids = range(len(example["clss"]))
     pred = []
-    #target = []
-    #for i, idx in enumerate(selected_ids):
+    # target = []
+    # for i, idx in enumerate(selected_ids):
     _pred = []
-    if len(example['src_txt']) == 0:
+    if len(example["src_txt"]) == 0:
         pred.append("")
-    for j in selected_ids[: len(example['src_txt'])]:
-        if j >= len(example['src_txt']):
+    for j in selected_ids[: len(example["src_txt"])]:
+        if j >= len(example["src_txt"]):
             continue
-        candidate = example['src_txt'][j].strip()
+        candidate = example["src_txt"][j].strip()
         if block_trigram:
             if not _block_tri(candidate, _pred):
                 _pred.append(candidate)
@@ -174,32 +182,35 @@ def get_pred(example, sent_scores, cal_lead=False, sentence_seperator='<q>', blo
     # _pred = '<q>'.join(_pred)
     _pred = sentence_seperator.join(_pred)
     pred.append(_pred.strip())
-    #target.append(example['tgt_txt'])
-    return pred #, target
+    # target.append(example['tgt_txt'])
+    return pred  # , target
+
 
 class ExtSumProcessedData:
-    """class loaded data preprocessed as in 
+    """class loaded data preprocessed as in
     :class:`utils_nlp.models.transformers.datasets.SummarizationDataset`"""
-    
+
     @staticmethod
     def save_data(data_iter, is_test=False, save_path="./", chunk_size=None):
-        """ Save the preprocessed data into files with specified chunk size 
-        
+        """ Save the preprocessed data into files with specified chunk size
+
         Args:
-            data_iter (iterator): Data iterator returned from :class:`utils_nlp.models.transformers.datasets.SummarizationDataset`
-            is_test (bool): Boolean value which indicates whether target data is included. 
-                If it is set True, the file name contains "test", otherwise, the file name contains "train". 
-                Defaults to False.  
+            data_iter (iterator): Data iterator returned from
+                :class:`utils_nlp.models.transformers.datasets.SummarizationDataset`
+            is_test (bool): Boolean value which indicates whether target data is included.
+                If it is set True, the file name contains "test", otherwise,
+                the file name contains "train". Defaults to False.
             save_path (str): Directory where the data should be saved. Defaults to "./".
-            chunk_size (int): The number of examples that should be included in each file. Defaults to None, which means only one file is used.
-        
+            chunk_size (int): The number of examples that should be included in each file.
+                Defaults to None, which means only one file is used.
+
         Returns:
             a list of strings which are the files the data is saved to.
         """
         os.makedirs(save_path, exist_ok=True)
 
         def _chunks(iterable, chunk_size):
-            iterator = filter(None, iterable)  
+            iterator = filter(None, iterable)
             for first in iterator:
                 if chunk_size:
                     yield itertools.chain([first], itertools.islice(iterator, chunk_size - 1))
@@ -213,38 +224,41 @@ class ExtSumProcessedData:
             torch.save(list(chunked_data), os.path.join(save_path, filename))
             filename_list.append(os.path.join(save_path, filename))
         return filename_list
-    
-   
+
     def _get_files(self, root):
         train_files = []
         test_files = []
-        files = [os.path.join(root, f) for f in os.listdir(root) if os.path.isfile(os.path.join(root, f))]
+        files = [
+            os.path.join(root, f) for f in os.listdir(root) if os.path.isfile(os.path.join(root, f))
+        ]
         for fname in files:
             if fname.find("train") != -1:
                 train_files.append(fname)
             elif fname.find("test") != -1:
                 test_files.append(fname)
-                
+
         return train_files, test_files
-    
- 
+
     def splits(self, root):
-        """Get the train and test dataset from the folder 
-        
+        """Get the train and test dataset from the folder
+
         Args:
             root (str): Directory where the data can be loaded.
-            
+
         Returns:
-            Tuple of ExmSumProcessedIterableDataset as train dataset and ExmSumProcessedDataset as test dataset.
+            Tuple of ExmSumProcessedIterableDataset as train dataset
+            and ExmSumProcessedDataset as test dataset.
         """
         train_files, test_files = self._get_files(root)
-        return ExmSumProcessedIterableDataset(train_files, is_shuffle=True), ExmSumProcessedDataset(test_files, is_shuffle=False)
-        
-        
+        return (
+            ExmSumProcessedIterableDataset(train_files, is_shuffle=True),
+            ExmSumProcessedDataset(test_files, is_shuffle=False),
+        )
+
 
 class ExtSumProcessor:
     """Class for preprocessing extractive summarization data."""
-    
+
     def __init__(
         self,
         model_name="distilbert-base-uncased",
@@ -256,41 +270,43 @@ class ExtSumProcessor:
         min_src_ntokens=5,
     ):
         """ Initialize the preprocessor.
-        
+
         Args:
-            model_name (str, optional): Transformer model name used in preprocessing. 
+            model_name (str, optional): Transformer model name used in preprocessing.
                 check MODEL_CLASS for supported models. Defaults to "bert-base-cased".
             to_lower (bool, optional): Whether to convert all letters to lower case during
-                tokenization. This is determined by if a cased model is used. Defaults to False,
-                which corresponds to a cased model.
+                tokenization. This is determined by if a cased model is used.
+                Defaults to False, which corresponds to a cased model.
             cache_dir (str, optional): Directory to cache the tokenizer. Defaults to ".".
-            max_nsents (int, optional): Max number of sentences that can be used as input. Defaults to 200.
-            max_src_ntokens (int, optional): Max number of tokens that be used as input. Defaults to 2000.
-            min_nsents (int, optional): Minimum number of sentences that are required as input. If the input 
-                has less number of sentences than this value, it's skipped and cannot be used as a valid input. '
-                Defaults to 3.
-            min_src_ntokens (int, optional): Minimum number of tokens that are required as an input sentence.If the input 
-                sentence has less number of tokens than this value, it's skipped and cannot be used as a 
-                valid sentence. Defaults to 5.
-                
+            max_nsents (int, optional): Max number of sentences that can be used
+                as input. Defaults to 200.
+            max_src_ntokens (int, optional): Max number of tokens that be used
+                as input. Defaults to 2000.
+            min_nsents (int, optional): Minimum number of sentences that are required
+                as input. If the input has less number of sentences than this value,
+                it's skipped and cannot be used as a valid input. Defaults to 3.
+            min_src_ntokens (int, optional): Minimum number of tokens that are required
+                as an input sentence.If the input sentence has less number of tokens than
+                this value, it's skipped and cannot be used as a valid sentence. Defaults to 5.
+
         """
         self.model_name = model_name
         self.tokenizer = TOKENIZER_CLASS[self.model_name].from_pretrained(
             self.model_name, do_lower_case=to_lower, cache_dir=cache_dir
         )
-        self.sep_vid = self.tokenizer.vocab['[SEP]']
-        self.cls_vid = self.tokenizer.vocab['[CLS]']
-        self.pad_vid = self.tokenizer.vocab['[PAD]']
-        
+        self.sep_vid = self.tokenizer.vocab["[SEP]"]
+        self.cls_vid = self.tokenizer.vocab["[CLS]"]
+        self.pad_vid = self.tokenizer.vocab["[PAD]"]
+
         self.max_nsents = max_nsents
         self.max_src_ntokens = max_src_ntokens
         self.min_nsents = min_nsents
         self.min_src_ntokens = min_src_ntokens
-               
+
     @staticmethod
     def list_supported_models():
         return list(TOKENIZER_CLASS.keys())
-    
+
     @property
     def model_name(self):
         return self._model_name
@@ -312,16 +328,17 @@ class ExtSumProcessor:
         Creates an input dictionary given a model name.
 
         Args:
-            batch (object): A Batch containing input ids, segment ids, sentence class ids,  
-                masks for the input ids, masks for  sentence class ids and source text. 
+            batch (object): A Batch containing input ids, segment ids, sentence class ids,
+                masks for the input ids, masks for  sentence class ids and source text.
                 If train_model is True, it also contains the labels and target text.
             model_name (bool, optional): Model name used to format the inputs.
             train_mode (bool, optional): Training mode flag.
                 Defaults to True.
 
         Returns:
-            dict: Dictionary containing input ids, segment ids, sentence class ids,  masks for the input ids, 
-            masks for the sentence class ids and labels. Labels are only returned when train_mode is True.
+            dict: Dictionary containing input ids, segment ids, sentence class ids,
+            masks for the input ids, masks for the sentence class ids and labels.
+            Labels are only returned when train_mode is True.
         """
 
         if model_name.split("-")[0] in ["bert", "distilbert"]:
@@ -348,18 +365,18 @@ class ExtSumProcessor:
 
     def preprocess(self, sources, targets=None, oracle_mode="greedy", selections=3):
         """preprocess multiple data points
-        
+
            Args:
               sources (list of list of strings): List of word tokenized sentences.
               targets (list of list of strings, optional): List of word tokenized sentences.
-                  Defaults to None, which means it doesn't include summary and is 
+                  Defaults to None, which means it doesn't include summary and is
                   not training data.
               oracle_mode (str, optional): Sentence selection method. Defaults to "greedy".
               selections (int, optional): The number of sentence used as summary. Defaults to 3.
-        
+
             Returns:
-                Iterator of dictory objects containing input ids, segment ids, sentence class ids,  
-                labels, source text and target text. If targets is None, the label and target text 
+                Iterator of dictory objects containing input ids, segment ids, sentence class ids,
+                labels, source text and target text. If targets is None, the label and target text
                 are None.
         """
 
@@ -372,20 +389,20 @@ class ExtSumProcessor:
 
     def _preprocess_single(self, source, target=None, oracle_mode="greedy", selections=3):
         """preprocess single data point"""
-        
+
         oracle_ids = None
         if target is not None:
             if oracle_mode == "greedy":
                 oracle_ids = greedy_selection(source, target, selections)
             elif oracle_mode == "combination":
                 oracle_ids = combination_selection(source, target, selections)
-        
+
         def _preprocess(src, tgt=None, oracle_ids=None):
 
-            if (len(src) == 0):
+            if len(src) == 0:
                 return None
 
-            original_src_txt = [' '.join(s) for s in src]
+            original_src_txt = [" ".join(s) for s in src]
 
             labels = None
             if oracle_ids is not None and tgt is not None:
@@ -395,47 +412,47 @@ class ExtSumProcessor:
 
             idxs = [i for i, s in enumerate(src) if (len(s) > self.min_src_ntokens)]
 
-            src = [src[i][:self.max_src_ntokens] for i in idxs]
-            src = src[:self.max_nsents]
+            src = [src[i][: self.max_src_ntokens] for i in idxs]
+            src = src[: self.max_nsents]
             if labels:
                 labels = [labels[i] for i in idxs]
-                labels = labels[:self.max_nsents]
+                labels = labels[: self.max_nsents]
 
-            if (len(src) < self.min_nsents):
+            if len(src) < self.min_nsents:
                 return None
             if labels:
-                if (len(labels) == 0):
+                if len(labels) == 0:
                     return None
 
-            src_txt = [' '.join(sent) for sent in src]
+            src_txt = [" ".join(sent) for sent in src]
             # text = [' '.join(ex['src_txt'][i].split()[:self.args.max_src_ntokens]) for i in idxs]
             # text = [_clean(t) for t in text]
-            text = ' [SEP] [CLS] '.join(src_txt)
+            text = " [SEP] [CLS] ".join(src_txt)
             src_subtokens = self.tokenizer.tokenize(text)
             src_subtokens = src_subtokens[:510]
-            src_subtokens = ['[CLS]'] + src_subtokens + ['[SEP]']
+            src_subtokens = ["[CLS]"] + src_subtokens + ["[SEP]"]
 
             src_subtoken_idxs = self.tokenizer.convert_tokens_to_ids(src_subtokens)
             _segs = [-1] + [i for i, t in enumerate(src_subtoken_idxs) if t == self.sep_vid]
             segs = [_segs[i] - _segs[i - 1] for i in range(1, len(_segs))]
             segments_ids = []
             for i, s in enumerate(segs):
-                if (i % 2 == 0):
+                if i % 2 == 0:
                     segments_ids += s * [0]
                 else:
                     segments_ids += s * [1]
             cls_ids = [i for i, t in enumerate(src_subtoken_idxs) if t == self.cls_vid]
             if labels:
-                labels = labels[:len(cls_ids)]
+                labels = labels[: len(cls_ids)]
 
             tgt_txt = None
             if tgt:
-                tgt_txt = '<q>'.join([' '.join(tt) for tt in tgt])
+                tgt_txt = "<q>".join([" ".join(tt) for tt in tgt])
             src_txt = [original_src_txt[i] for i in idxs]
             return src_subtoken_idxs, labels, segments_ids, cls_ids, src_txt, tgt_txt
-        
+
         b_data = _preprocess(source, target, oracle_ids)
-    
+
         if b_data is None:
             return None
         indexed_tokens, labels, segments_ids, cls_ids, src_txt, tgt_txt = b_data
@@ -451,18 +468,18 @@ class ExtSumProcessor:
 
 class ExtractiveSummarizer(Transformer):
     """class which performs extractive summarization fine tuning and prediction """
-    
+
     def __init__(self, model_name="distilbert-base-uncased", encoder="transformer", cache_dir="."):
         """Initialize a ExtractiveSummarizer.
-        
+
         Args:
-            model_name (str, optional): Transformer model name used in preprocessing. 
+            model_name (str, optional): Transformer model name used in preprocessing.
                 check MODEL_CLASS for supported models. Defaults to "distilbert-base-uncased".
-            encoder (str, optional): Encoder algorithm used by summarization layer. 
+            encoder (str, optional): Encoder algorithm used by summarization layer.
                 Defaults to "transformer".
             cache_dir (str, optional): Directory to cache the tokenizer. Defaults to ".".
         """
-        
+
         super().__init__(
             model_class=MODEL_CLASS, model_name=model_name, num_labels=0, cache_dir=cache_dir
         )
@@ -481,7 +498,7 @@ class ExtractiveSummarizer(Transformer):
 
         args = Bunch(default_summarizer_layer_parameters)
         self.model = Summarizer(encoder, args, self.model_class, self.model_name, None, cache_dir)
-    
+
     @property
     def model_name(self):
         return self._model_name
@@ -518,11 +535,11 @@ class ExtractiveSummarizer(Transformer):
         report_every=50,
         verbose=True,
         seed=None,
-        **kwargs
+        **kwargs,
     ):
         """
         Fine-tune pre-trained transofmer models for extractive summarization.
-        
+
         Args:
             train_dataloader (Dataloader): Dataloader for the training data.
             num_gpus (int, optional): The number of GPUs to use. If None, all available GPUs will
@@ -549,7 +566,7 @@ class ExtractiveSummarizer(Transformer):
                 This value should be set close to 1.0 on problems with a sparse gradient.
                 Defaults to 0.99.
             verbose (bool, optional): Whether to print out the training log. Defaults to True.
-            seed (int, optional): Random seed used to improve reproducibility. Defaults to None. 
+            seed (int, optional): Random seed used to improve reproducibility. Defaults to None.
         """
 
         device, num_gpus = get_device(num_gpus=num_gpus, local_rank=local_rank)
@@ -607,27 +624,27 @@ class ExtractiveSummarizer(Transformer):
     ):
         """
         Predict the summarization for the input data iterator.
-        
+
         Args:
             test_dataset (Dataset): Dataset for which the summary to be predicted
             num_gpus (int, optional): The number of GPUs used in prediction. Defaults to 1.
             batch_size (int, optional): Maximum number of tokens in each batch. Defaults to 16.
             sentence_seperator (str, optional): String to be inserted between sentences in
                 the prediction. Defaults to '<q>'.
-            top_n (int, optional): The number of sentences that should be selected from the paragraph 
-                as summary. Defaults to 3.
-            block_trigram (bool, optional): voolean value which specifies whether the summary should include
-                any sentence that has the same trigram as the already selected sentences. Defaults to True.                          
-            top_n (int, optional): The maximum number of sentences that the summary should included. Defaults to 3.
-            cal_lead (bool, optional): Boolean value which specifies whether the prediction uses 
-                the first few sentences as summary. Defaults to False.
+            top_n (int, optional): The number of sentences that should be selected
+                from the paragraph as summary. Defaults to 3.
+            block_trigram (bool, optional): voolean value which specifies whether
+                the summary should include any sentence that has the same trigram
+                as the already selected sentences. Defaults to True.
+            cal_lead (bool, optional): Boolean value which specifies whether the
+                prediction uses the first few sentences as summary. Defaults to False.
             verbose (bool, optional): Whether to print out the training log. Defaults to True.
-        
+
         Returns:
             List of strings which are the summaries
-            
+
         """
-    
+
         def collate_fn(dict_list):
             # tuple_batch =  [list(col) for col in zip(*[d.values() for d in dict_list]
             if dict_list is None or len(dict_list) <= 0:
@@ -637,7 +654,7 @@ class ExtractiveSummarizer(Transformer):
                 is_labeled = True
             tuple_batch = [list(d.values()) for d in dict_list]
             ## generate mask and mask_cls, and only select tensors for the model input
-            batch = Batch(tuple_batch, is_labeled=True)    
+            batch = Batch(tuple_batch, is_labeled=True)
             if is_labeled:
                 return {
                     "src": batch.src,
@@ -655,9 +672,11 @@ class ExtractiveSummarizer(Transformer):
                     "mask": batch.mask,
                     "mask_cls": batch.mask_cls,
                 }
-        
+
         test_sampler = SequentialSampler(test_dataset)
-        test_dataloader = DataLoader(test_dataset, sampler=test_sampler, batch_size=batch_size, collate_fn=collate_fn)
+        test_dataloader = DataLoader(
+            test_dataset, sampler=test_sampler, batch_size=batch_size, collate_fn=collate_fn
+        )
         sent_scores = self.predict_scores(test_dataloader, num_gpus=num_gpus)
         sent_scores_list = list(sent_scores)
         scores_list = []
@@ -668,14 +687,8 @@ class ExtractiveSummarizer(Transformer):
             temp_pred = get_pred(test_dataset[i], scores_list[i])
             prediction.extend(temp_pred)
         return prediction
-        
-        
-    def predict_scores(
-        self,
-        eval_dataloader,
-        num_gpus=1,   
-        verbose=True,
-    ):
+
+    def predict_scores(self, eval_dataloader, num_gpus=1, verbose=True):
         """
         Scores a dataset using a fine-tuned model and a given dataloader.
 
@@ -689,23 +702,22 @@ class ExtractiveSummarizer(Transformer):
         Returns
             1darray: numpy array of predicted sentence scores.
         """
-        
+
         device, num_gpus = get_device(num_gpus=num_gpus, local_rank=-1)
-   
+
         if isinstance(self.model, nn.DataParallel):
             self.model.module.to(device)
         else:
             self.model.to(device)
 
-
         def move_batch_to_device(batch, device):
-            batch['src'] = batch['src'].to(device)
-            batch['segs'] = batch['segs'].to(device)
-            batch['clss'] = batch['clss'].to(device)
-            batch['mask'] = batch['mask'].to(device)
-            batch['mask_cls'] = batch['mask_cls'].to(device)
-            if 'labels' in batch:
-                batch['labels'] = batch['labels'].to(device)
+            batch["src"] = batch["src"].to(device)
+            batch["segs"] = batch["segs"].to(device)
+            batch["clss"] = batch["clss"].to(device)
+            batch["mask"] = batch["mask"].to(device)
+            batch["mask_cls"] = batch["mask_cls"].to(device)
+            if "labels" in batch:
+                batch["labels"] = batch["labels"].to(device)
             return Bunch(batch)
 
         preds = list(
@@ -717,7 +729,7 @@ class ExtractiveSummarizer(Transformer):
                 move_batch_to_device=move_batch_to_device,
             )
         )
-        return preds                
+        return preds
 
     def save_model(self, name):
         output_model_dir = os.path.join(self.cache_dir, "fine_tuned")
@@ -728,5 +740,3 @@ class ExtractiveSummarizer(Transformer):
         full_name = os.path.join(output_model_dir, name)
         logger.info("Saving model checkpoint to %s", full_name)
         torch.save(self.model, name)
-      
-
