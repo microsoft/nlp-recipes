@@ -21,7 +21,7 @@ df = load_pandas_df(DATA_FOLDER, file_split ="train", nrows = 1000)
 |[The STSbenchmark dataset](http://ixa2.si.ehu.es/stswiki/index.php/STSbenchmark)|[stsbenchmark.py](./stsbenchmark.py)|
 |[The Stanford Question Answering Dataset (SQuAD)](https://rajpurkar.github.io/SQuAD-explorer/)|[squad.py](./squad.py)|
 |[CNN/Daily Mail(CNN/DM) Dataset](https://github.com/harvardnlp/sent-summary)|[cnndm.py](./cnndm.py)|
-|[Preprocessed CNN/Daily Mail(CNN/DM) Dataset by (https://arxiv.org/pdf/1903.10318.pdf)](https://github.com/nlpyang/BertSum)|[cnndm.py](./cnndm.py)|
+|[Preprocessed CNN/Daily Mail(CNN/DM) Dataset for Extractive Summarization](https://github.com/nlpyang/BertSum)|[cnndm.py](./cnndm.py)|
 
 ## Dataset References
 Please see [Dataset References](../../DatasetReferences.md) for notice and information regarding datasets used.
