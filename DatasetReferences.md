@@ -2,6 +2,8 @@ MICROSOFT PROVIDES THE DATASETS ON AN "AS IS" BASIS. MICROSOFT MAKES NO WARRANTI
 
 The datasets are provided under the original terms that Microsoft received such datasets. See below for more information about each dataset.
 
+### CNN/Daily Mail (CNN/DM) Dataset
+The training and evaluation for CNN/DM  dataset is available https://s3.amazonaws.com/opennmt-models/Summary/cnndm.tar.gz and released under MIT License. This is a processed version of data that's originally released by Hermann et al. (2015) in ["Teaching machines to read and comprehend"](https://arxiv.org/abs/1506.03340) and then made available by Kyunghyun Cho at https://cs.nyu.edu/~kcho/DMQA/.
 
 ### Microsoft Research Paraphrase Corpus
 >Original source: https://www.microsoft.com/en-us/download/details.aspx?id=52398
