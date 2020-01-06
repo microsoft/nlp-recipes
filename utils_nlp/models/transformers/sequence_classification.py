@@ -3,10 +3,8 @@
 
 import numpy as np
 import torch
-import torch.nn as nn
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
 from torch.utils.data.distributed import DistributedSampler
-
 from transformers.modeling_bert import (
     BERT_PRETRAINED_MODEL_ARCHIVE_MAP,
     BertForSequenceClassification,
@@ -23,10 +21,8 @@ from transformers.modeling_xlnet import (
     XLNET_PRETRAINED_MODEL_ARCHIVE_MAP,
     XLNetForSequenceClassification,
 )
-from utils_nlp.common.pytorch_utils import get_device
 from utils_nlp.models.transformers.common import MAX_SEQ_LEN, TOKENIZER_CLASS, Transformer
 from utils_nlp.models.transformers.datasets import SCDataSet, SPCDataSet
-
 
 MODEL_CLASS = {}
 MODEL_CLASS.update({k: BertForSequenceClassification for k in BERT_PRETRAINED_MODEL_ARCHIVE_MAP})
@@ -285,16 +281,9 @@ class SequenceClassifier(Transformer):
             seed (int, optional): Random seed used to improve reproducibility. Defaults to None.
         """
 
-        device, num_gpus = get_device(num_gpus=num_gpus, local_rank=local_rank)
-        if isinstance(self.model, nn.DataParallel):
-            self.model.module.to(device)
-        else:
-            self.model.to(device)
-
         super().fine_tune(
             train_dataloader=train_dataloader,
             get_inputs=Processor.get_inputs,
-            device=device,
             n_gpu=num_gpus,
             num_train_epochs=num_epochs,
             weight_decay=weight_decay,
@@ -305,7 +294,7 @@ class SequenceClassifier(Transformer):
             seed=seed,
         )
 
-    def predict(self, eval_dataloader, num_gpus=1, verbose=True):
+    def predict(self, eval_dataloader, num_gpus=None, verbose=True):
         """
         Scores a dataset using a fine-tuned model and a given dataloader.
 
@@ -315,21 +304,16 @@ class SequenceClassifier(Transformer):
                 be used. If set to 0 or GPUs are not available, CPU device will be used.
                 Defaults to None.
             verbose (bool, optional): Whether to print out the training log. Defaults to True.
-        
+
         Returns
             1darray: numpy array of predicted label indices.
         """
-        device, num_gpus = get_device(num_gpus=num_gpus, local_rank=-1)
-        if isinstance(self.model, nn.DataParallel):
-            self.model.module.to(device)
-        else:
-            self.model.to(device)
 
         preds = list(
             super().predict(
                 eval_dataloader=eval_dataloader,
                 get_inputs=Processor.get_inputs,
-                device=device,
+                n_gpu=num_gpus,
                 verbose=verbose,
             )
         )

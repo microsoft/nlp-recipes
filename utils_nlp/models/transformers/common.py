@@ -106,8 +106,11 @@ class Transformer:
         report_every=10,
         clip_grad_norm=True,
     ):
+
+        device, num_gpus = get_device(num_gpus=n_gpu, local_rank=-1)
+
         if seed is not None:
-            Transformer.set_seed(seed, n_gpu > 0)
+            Transformer.set_seed(seed, num_gpus > 0)
 
         try:
             dataset_length = len(train_dataloader)
@@ -145,7 +148,9 @@ class Transformer:
 
             
             if scheduler is None:
-                scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=warmup_steps, num_training_steps=max_steps)
+                scheduler = get_linear_schedule_with_warmup(
+                    optimizer, num_warmup_steps=warmup_steps, num_training_steps=max_steps
+                )
 
         if fp16:
             try:
@@ -154,11 +159,6 @@ class Transformer:
                 raise ImportError("Please install apex from https://www.github.com/nvidia/apex")
             self.model, optimizer = amp.initialize(self.model, optimizer, opt_level=fp16_opt_level)
 
-        # multi-gpu training (should be after apex fp16 initialization)
-        if n_gpu > 1:
-            self.model = torch.nn.DataParallel(self.model)
-
-        # Distributed training (should be after apex fp16 initialization)
         if local_rank != -1:
             self.model = torch.nn.parallel.DistributedDataParallel(
                 self.model,
@@ -166,6 +166,15 @@ class Transformer:
                 output_device=local_rank,
                 find_unused_parameters=True,
             )
+        else:
+            if isinstance(self.model, torch.nn.DataParallel):
+                self.model = self.model.module
+
+            if num_gpus > 1:
+                self.model = torch.nn.DataParallel(self.model, device_ids=list(range(num_gpus)))
+
+        self.model.to(device)
+        self.model.train()
 
         global_step = 0
         tr_loss = 0.0
@@ -188,13 +197,12 @@ class Transformer:
                 disable=local_rank not in [-1, 0] or not verbose
             )
             for step, batch in enumerate(epoch_iterator):
-
                 batch = move_batch_to_device(batch, device)
                 inputs = get_inputs(batch, self.model_name)
                 outputs = self.model(**inputs)
                 loss = outputs[0]
 
-                if n_gpu > 1:
+                if num_gpus > 1:
                     loss = loss.mean()
                 if gradient_accumulation_steps > 1:
                     loss = loss / gradient_accumulation_steps
