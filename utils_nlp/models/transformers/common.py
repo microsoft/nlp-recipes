@@ -13,7 +13,6 @@ import time
 import torch
 from tqdm import tqdm, trange
 
-
 from transformers import AdamW
 from transformers import get_linear_schedule_with_warmup
 from transformers.modeling_bert import BERT_PRETRAINED_MODEL_ARCHIVE_MAP
@@ -87,7 +86,6 @@ class Transformer:
         self,
         train_dataloader,
         get_inputs,
-        device,
         max_steps=-1,
         num_train_epochs=1,
         max_grad_norm=1.0,
@@ -115,18 +113,13 @@ class Transformer:
             dataset_length = len(train_dataloader)
         except:
             dataset_length = -1
-
-        if max_steps > 0:
-            t_total = max_steps
-            if dataset_length != -1:
-                num_train_epochs = max_steps // (data_set_length // gradient_accumulation_steps) + 1
-            else:
-                num_train_epochs = -1
-        else:
-            if dataset_length != -1 and num_train_epochs != -1:
-                t_total = len(train_dataloader) // gradient_accumulation_steps * num_train_epochs
-            else:
-                t_total = -1
+            
+        if max_steps <= 0:
+            if dataset_length != -1 and num_train_epochs > 0:
+                max_steps = data_set_length // gradient_accumulation_steps * num_train_epochs
+                
+        if max_steps <= 0:
+            raise Exception("Max steps cannot be determined for fine tuning!")
 
         if optimizer is None:
             no_decay = ["bias", "LayerNorm.weight"]
@@ -150,9 +143,9 @@ class Transformer:
             ]
             optimizer = AdamW(optimizer_grouped_parameters, lr=learning_rate, eps=adam_epsilon)
 
-
-            if t_total != -1 and scheduler is None:
-                scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=warmup_steps, num_training_steps=t_total)
+            
+            if scheduler is None:
+                scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=warmup_steps, num_training_steps=max_steps)
 
         if fp16:
             try:
@@ -177,14 +170,7 @@ class Transformer:
         global_step = 0
         tr_loss = 0.0
         self.model.zero_grad()
-        if num_train_epochs != -1:
-            train_iterator = trange(
-                int(num_train_epochs),
-                desc="Epoch",
-                disable=local_rank not in [-1, 0] or not verbose,
-            )
-        else:
-            train_iterator = cycle("1")  # use this as an infinite cycle
+        
 
         if move_batch_to_device is None:
             def move_batch_to_device(batch, device):
@@ -194,11 +180,12 @@ class Transformer:
         accum_loss = 0
 
         self.model.train()
-        for _ in train_iterator:
+
+        while global_step < max_steps:  
             epoch_iterator = tqdm(
                 train_dataloader,
                 desc="Iteration",
-                disable=True,  # local_rank not in [-1, 0] or not verbose
+                disable=local_rank not in [-1, 0] or not verbose
             )
             for step, batch in enumerate(epoch_iterator):
 
@@ -247,12 +234,10 @@ class Transformer:
                         scheduler.step()
                     self.model.zero_grad()
 
-                if max_steps > 0 and global_step > max_steps:
+                if global_step > max_steps:
                     epoch_iterator.close()
                     break
 
-            if max_steps > 0 and global_step > max_steps:
-                break
             # empty cache
             torch.cuda.empty_cache()
         return global_step, tr_loss / global_step
