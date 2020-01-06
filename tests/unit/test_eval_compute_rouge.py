@@ -1,6 +1,6 @@
 import os
 import pytest
-from utils_nlp.eval.compute_rouge import compute_rouge_perl, compute_rouge_python
+from utils_nlp.eval import compute_rouge_perl, compute_rouge_python
 
 ABS_TOL = 0.00001
 
@@ -184,7 +184,7 @@ def test_compute_rouge_perl_file(rouge_test_data, tmp):
         for s in rouge_test_data["references"]:
             f.write(s + "\n")
 
-    rouge_perl = compute_rouge_perl(cand=tmp_cand_file, ref=tmp_ref_file, input_files=True)
+    rouge_perl = compute_rouge_perl(cand=tmp_cand_file, ref=tmp_ref_file, is_input_files=True)
 
     pytest.approx(rouge_perl["rouge_1_recall"], R1R, abs=ABS_TOL)
     pytest.approx(rouge_perl["rouge_1_precision"], R1P, abs=ABS_TOL)
@@ -208,7 +208,7 @@ def test_compute_rouge_python_file(rouge_test_data, tmp):
         for s in rouge_test_data["references"]:
             f.write(s + "\n")
 
-    rouge_python = compute_rouge_python(cand=tmp_cand_file, ref=tmp_ref_file, input_files=True)
+    rouge_python = compute_rouge_python(cand=tmp_cand_file, ref=tmp_ref_file, is_input_files=True)
 
     pytest.approx(rouge_python["rouge-1"]["r"], R1R, abs=ABS_TOL)
     pytest.approx(rouge_python["rouge-1"]["p"], R1P, abs=ABS_TOL)
