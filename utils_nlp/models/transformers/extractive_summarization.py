@@ -11,7 +11,8 @@ import random
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, IterableDataset
-from torch.utils.data import DataLoader  # , RandomSampler, SequentialSampler
+from torch.utils.data import DataLoader, SequentialSampler
+
 # from torch.utils.data.distributed import DistributedSampler
 from transformers import DistilBertModel, BertModel
 
@@ -56,7 +57,7 @@ def get_dataset(file):
     yield torch.load(file)
 
 
-class ExmSumProcessedIterableDataset(IterableDataset):
+class ExtSumProcessedIterableDataset(IterableDataset):
     """Iterable dataset for extractive summarization preprocessed data
     """
 
@@ -86,7 +87,7 @@ class ExmSumProcessedIterableDataset(IterableDataset):
         return self.get_stream()
 
 
-class ExmSumProcessedDataset(Dataset):
+class ExtSumProcessedDataset(Dataset):
     """Dataset for extractive summarization preprocessed data
     """
 
@@ -114,7 +115,7 @@ class ExmSumProcessedDataset(Dataset):
 
 
 def get_pred(
-    example, sent_scores, cal_lead=False, sentence_seperator="<q>", block_trigram=True, top_n=3
+    example, sent_scores, cal_lead=False, sentence_separator="<q>", block_trigram=True, top_n=3
 ):
     """
         Get the summarization prediction for the paragraph example based on the scores
@@ -127,7 +128,7 @@ def get_pred(
                 included in the summary.
             cal_lead (bool, optional): Boolean value which specifies whether the prediction uses
                 the first few sentences as summary. Defaults to False
-            sentence_seperator (str, optional): Seperator used in the generated summary.
+            sentence_separator (str, optional): Seperator used in the generated summary.
                 Defaults to '<q>'.
             block_trigram (bool, optional): Boolean value which specifies whether the
                 summary should include any sentence that has the same trigram as the
@@ -180,7 +181,7 @@ def get_pred(
             break
 
     # _pred = '<q>'.join(_pred)
-    _pred = sentence_seperator.join(_pred)
+    _pred = sentence_separator.join(_pred)
     pred.append(_pred.strip())
     # target.append(example['tgt_txt'])
     return pred  # , target
@@ -246,13 +247,13 @@ class ExtSumProcessedData:
             root (str): Directory where the data can be loaded.
 
         Returns:
-            Tuple of ExmSumProcessedIterableDataset as train dataset
-            and ExmSumProcessedDataset as test dataset.
+            Tuple of ExtSumProcessedIterableDataset as train dataset
+            and ExtSumProcessedDataset as test dataset.
         """
         train_files, test_files = self._get_files(root)
         return (
-            ExmSumProcessedIterableDataset(train_files, is_shuffle=True),
-            ExmSumProcessedDataset(test_files, is_shuffle=False),
+            ExtSumProcessedIterableDataset(train_files, is_shuffle=True),
+            ExtSumProcessedDataset(test_files, is_shuffle=False),
         )
 
 
@@ -475,16 +476,30 @@ class ExtractiveSummarizer(Transformer):
         Args:
             model_name (str, optional): Transformer model name used in preprocessing.
                 check MODEL_CLASS for supported models. Defaults to "distilbert-base-uncased".
-            encoder (str, optional): Encoder algorithm used by summarization layer.
-                Defaults to "transformer".
+            encoder (str, optional): Encoder algorithm used by summarization layer. 
+                There are four options:
+                    - baseline: it used a smaller transformer model to replace the bert model
+                      and with transformer summarization layer.
+                    - classifier: it uses pretrained BERT and fine-tune BERT with simple logistic
+                      classification summarization layer.
+                    - transformer: it uses pretrained BERT and fine-tune BERT with transformer
+                      summarization layer.
+                    - RNN: it uses pretrained BERT and fine-tune BERT with LSTM summarization layer.
+                Defaults to "transformer". 
             cache_dir (str, optional): Directory to cache the tokenizer. Defaults to ".".
         """
 
         super().__init__(
             model_class=MODEL_CLASS, model_name=model_name, num_labels=0, cache_dir=cache_dir
         )
-        self.model_name = model_name
-        self.model_class = MODEL_CLASS[self.model_name]
+        if model_name not in self.list_supported_models():
+            raise ValueError(
+                "Model name {} is not supported by ExtractiveSummarizer. "
+                "Call 'ExtractiveSummarizer.list_supported_models()' to get all supported model "
+                "names.".format(value)
+            )
+
+        self.model_class = MODEL_CLASS[model_name]
         default_summarizer_layer_parameters = {
             "ff_size": 512,
             "heads": 4,
@@ -497,22 +512,7 @@ class ExtractiveSummarizer(Transformer):
         }
 
         args = Bunch(default_summarizer_layer_parameters)
-        self.model = Summarizer(encoder, args, self.model_class, self.model_name, None, cache_dir)
-
-    @property
-    def model_name(self):
-        return self._model_name
-
-    @model_name.setter
-    def model_name(self, value):
-        if value not in self.list_supported_models():
-            raise ValueError(
-                "Model name {} is not supported by ExtractiveSummarizer. "
-                "Call 'ExtractiveSummarizer.list_supported_models()' to get all supported model "
-                "names.".format(value)
-            )
-
-        self._model_name = value
+        self.model = Summarizer(encoder, args, self.model_class, model_name, None, cache_dir)
 
     @staticmethod
     def list_supported_models():
@@ -520,8 +520,9 @@ class ExtractiveSummarizer(Transformer):
 
     def fit(
         self,
-        train_dataloader,
+        train_dataset,
         num_gpus=None,
+        batch_size=3000,
         local_rank=-1,
         max_steps=5e5,
         warmup_steps=1e5,
@@ -541,10 +542,11 @@ class ExtractiveSummarizer(Transformer):
         Fine-tune pre-trained transofmer models for extractive summarization.
 
         Args:
-            train_dataloader (Dataloader): Dataloader for the training data.
+            train_dataset (ExtSumProcessedIterableDataset): Training dataset.
             num_gpus (int, optional): The number of GPUs to use. If None, all available GPUs will
                 be used. If set to 0 or GPUs are not available, CPU device will
                 be used. Defaults to None.
+            batch_size (int, optional): Maximum number of tokens in each batch. 
             local_rank (int, optional): Local_rank for distributed training on GPUs. Defaults to
                 -1, which means non-distributed training.
             max_steps (int, optional): Maximum number of training steps. Defaults to 5e5.
@@ -591,7 +593,10 @@ class ExtractiveSummarizer(Transformer):
             None,
         )
 
-        # train_dataloader = get_dataloader(train_iter(), is_labeled=True, batch_size=batch_size)
+        # batch_size is the number of tokens in a batch
+        train_dataloader = get_dataloader(
+            train_dataset.get_stream(), is_labeled=True, batch_size=batch_size
+        )
 
         super().fine_tune(
             train_dataloader=train_dataloader,
@@ -616,7 +621,7 @@ class ExtractiveSummarizer(Transformer):
         test_dataset,
         num_gpus=1,
         batch_size=16,
-        sentence_seperator="<q>",
+        sentence_separator="<q>",
         top_n=3,
         block_trigram=True,
         cal_lead=False,
@@ -628,8 +633,8 @@ class ExtractiveSummarizer(Transformer):
         Args:
             test_dataset (Dataset): Dataset for which the summary to be predicted
             num_gpus (int, optional): The number of GPUs used in prediction. Defaults to 1.
-            batch_size (int, optional): Maximum number of tokens in each batch. Defaults to 16.
-            sentence_seperator (str, optional): String to be inserted between sentences in
+            batch_size (int, optional): The number of test examples in each batch. Defaults to 16.
+            sentence_separator (str, optional): String to be inserted between sentences in
                 the prediction. Defaults to '<q>'.
             top_n (int, optional): The number of sentences that should be selected
                 from the paragraph as summary. Defaults to 3.
@@ -684,7 +689,14 @@ class ExtractiveSummarizer(Transformer):
             scores_list.extend(i)
         prediction = []
         for i in range(len(test_dataset)):
-            temp_pred = get_pred(test_dataset[i], scores_list[i])
+            temp_pred = get_pred(
+                test_dataset[i],
+                scores_list[i],
+                cal_lead=cal_lead,
+                sentence_separator=sentence_separator,
+                block_trigram=block_trigram,
+                top_n=top_n,
+            )
             prediction.extend(temp_pred)
         return prediction
 
@@ -704,11 +716,6 @@ class ExtractiveSummarizer(Transformer):
         """
 
         device, num_gpus = get_device(num_gpus=num_gpus, local_rank=-1)
-
-        if isinstance(self.model, nn.DataParallel):
-            self.model.module.to(device)
-        else:
-            self.model.to(device)
 
         def move_batch_to_device(batch, device):
             batch["src"] = batch["src"].to(device)
