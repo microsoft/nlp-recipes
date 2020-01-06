@@ -119,7 +119,7 @@ class Transformer:
             
         if max_steps <= 0:
             if dataset_length != -1 and num_train_epochs > 0:
-                max_steps = data_set_length // gradient_accumulation_steps * num_train_epochs
+                max_steps = dataset_length // gradient_accumulation_steps * num_train_epochs
                 
         if max_steps <= 0:
             raise Exception("Max steps cannot be determined for fine tuning!")
