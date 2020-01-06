@@ -12,7 +12,6 @@ import shutil
 
 from utils_nlp.models.transformers.datasets import SummarizationDataset
 from utils_nlp.models.transformers.extractive_summarization import (
-    get_dataloader,
     ExtractiveSummarizer,
     ExtSumProcessedData,
     ExtSumProcessor,
@@ -70,7 +69,6 @@ def data_to_file(tmp_module):
         max_src_ntokens=2000,
         min_nsents=0,
         min_src_ntokens=1,
-        use_interval=True,
     )
     ext_sum_train = processor.preprocess(
         train_dataset, train_dataset.get_target(), oracle_mode="greedy"
@@ -98,6 +96,7 @@ def test_bert_training(data_to_file, tmp_module):
 
     CACHE_DIR = tmp_module
     ENCODER = "transformer"
+    BATCH_SIZE = 200
     LEARNING_RATE = 2e-3
     REPORT_EVERY = 100
     MAX_STEPS = 5e2
@@ -107,10 +106,10 @@ def test_bert_training(data_to_file, tmp_module):
 
     train_dataset, test_dataset = ExtSumProcessedData().splits(root=DATA_SAVED_PATH)
     summarizer = ExtractiveSummarizer(MODEL_NAME, ENCODER, CACHE_DIR)
-    train_dataloader = get_dataloader(train_dataset.get_stream(), is_labeled=True, batch_size=3000)
     summarizer.fit(
-        train_dataloader,
+        train_dataset,
         num_gpus=1,
+        batch_size=BATCH_SIZE,
         gradient_accumulation_steps=2,
         max_steps=MAX_STEPS,
         lr=LEARNING_RATE,
