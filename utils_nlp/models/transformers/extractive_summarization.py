@@ -601,7 +601,6 @@ class ExtractiveSummarizer(Transformer):
         super().fine_tune(
             train_dataloader=train_dataloader,
             get_inputs=ExtSumProcessor.get_inputs,
-            device=device,
             move_batch_to_device=move_batch_to_device,
             n_gpu=num_gpus,
             num_train_epochs=-1,
