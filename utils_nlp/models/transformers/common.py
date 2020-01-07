@@ -4,16 +4,17 @@
 # This script reuses some code from
 # https://github.com/huggingface/pytorch-transformers/blob/master/examples/run_glue.py
 
+from itertools import cycle
 import logging
+import numpy as np
 import os
 import random
-
-import numpy as np
+import time
 import torch
 from tqdm import tqdm, trange
+
 from transformers import AdamW
 from transformers import get_linear_schedule_with_warmup
-
 from transformers.modeling_bert import BERT_PRETRAINED_MODEL_ARCHIVE_MAP
 from transformers.modeling_distilbert import DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP
 from transformers.modeling_roberta import ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP
@@ -90,6 +91,7 @@ class Transformer:
         max_grad_norm=1.0,
         gradient_accumulation_steps=1,
         n_gpu=1,
+        move_batch_to_device=None,
         optimizer=None,
         scheduler=None,
         weight_decay=0.0,
@@ -101,6 +103,8 @@ class Transformer:
         local_rank=-1,
         verbose=True,
         seed=None,
+        report_every=10,
+        clip_grad_norm=True,
     ):
 
         device, num_gpus = get_device(num_gpus=n_gpu, local_rank=-1)
@@ -108,13 +112,17 @@ class Transformer:
         if seed is not None:
             Transformer.set_seed(seed, num_gpus > 0)
 
-        if max_steps > 0:
-            t_total = max_steps
-            num_train_epochs = (
-                max_steps // (len(train_dataloader) // gradient_accumulation_steps) + 1
-            )
-        else:
-            t_total = len(train_dataloader) // gradient_accumulation_steps * num_train_epochs
+        try:
+            dataset_length = len(train_dataloader)
+        except:
+            dataset_length = -1
+            
+        if max_steps <= 0:
+            if dataset_length != -1 and num_train_epochs > 0:
+                max_steps = dataset_length // gradient_accumulation_steps * num_train_epochs
+                
+        if max_steps <= 0:
+            raise Exception("Max steps cannot be determined for fine tuning!")
 
         if optimizer is None:
             no_decay = ["bias", "LayerNorm.weight"]
@@ -138,10 +146,11 @@ class Transformer:
             ]
             optimizer = AdamW(optimizer_grouped_parameters, lr=learning_rate, eps=adam_epsilon)
 
-        if scheduler is None:
-            scheduler = get_linear_schedule_with_warmup(
-                optimizer, num_warmup_steps=warmup_steps, num_training_steps=t_total
-            )
+            
+            if scheduler is None:
+                scheduler = get_linear_schedule_with_warmup(
+                    optimizer, num_warmup_steps=warmup_steps, num_training_steps=max_steps
+                )
 
         if fp16:
             try:
@@ -170,16 +179,25 @@ class Transformer:
         global_step = 0
         tr_loss = 0.0
         self.model.zero_grad()
-        train_iterator = trange(
-            int(num_train_epochs), desc="Epoch", disable=local_rank not in [-1, 0] or not verbose
-        )
+        
 
-        for _ in train_iterator:
+        if move_batch_to_device is None:
+            def move_batch_to_device(batch, device):
+                return tuple(t.to(device) for t in batch)
+
+        start = time.time()
+        accum_loss = 0
+
+        self.model.train()
+
+        while global_step < max_steps:  
             epoch_iterator = tqdm(
-                train_dataloader, desc="Iteration", disable=local_rank not in [-1, 0] or not verbose
+                train_dataloader,
+                desc="Iteration",
+                disable=local_rank not in [-1, 0] or not verbose
             )
             for step, batch in enumerate(epoch_iterator):
-                batch = tuple(t.to(device) for t in batch)
+                batch = move_batch_to_device(batch, device)
                 inputs = get_inputs(batch, self.model_name)
                 outputs = self.model(**inputs)
                 loss = outputs[0]
@@ -189,37 +207,51 @@ class Transformer:
                 if gradient_accumulation_steps > 1:
                     loss = loss / gradient_accumulation_steps
 
-                if step % 10 == 0 and verbose:
-                    tqdm.write("Loss:{:.6f}".format(loss))
-
                 if fp16:
                     with amp.scale_loss(loss, optimizer) as scaled_loss:
                         scaled_loss.backward()
-                    torch.nn.utils.clip_grad_norm_(amp.master_params(optimizer), max_grad_norm)
+                    if clip_grad_norm:
+                        torch.nn.utils.clip_grad_norm_(amp.master_params(optimizer), max_grad_norm)
                 else:
                     loss.backward()
-                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_grad_norm)
+                    if clip_grad_norm:
+                        torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_grad_norm)
 
                 tr_loss += loss.item()
-                if (step + 1) % gradient_accumulation_steps == 0:
-                    optimizer.step()
-                    scheduler.step()
-                    self.model.zero_grad()
-                    global_step += 1
 
-                if max_steps > 0 and global_step > max_steps:
+                accum_loss += loss.item()
+                if (step + 1) % gradient_accumulation_steps == 0:
+                    global_step += 1
+                    if global_step % report_every == 0 and verbose:
+                        # tqdm.write("Loss:{:.6f}".format(loss))
+                        end = time.time()
+                        print(
+                            "loss: {0:.6f}, time: {1:f}, number of examples in current step: {2:.0f}, step {3:.0f} out of total {4:.0f}".format(
+                                accum_loss / report_every,
+                                end - start,
+                                len(batch),
+                                global_step,
+                                max_steps,
+                            )
+                        )
+                        accum_loss = 0
+                        start = end
+
+                    optimizer.step()
+                    if scheduler:
+                        scheduler.step()
+                    self.model.zero_grad()
+
+                if global_step > max_steps:
                     epoch_iterator.close()
                     break
-            if max_steps > 0 and global_step > max_steps:
-                train_iterator.close()
-                break
 
             # empty cache
-            del [batch]
             torch.cuda.empty_cache()
         return global_step, tr_loss / global_step
-
-    def predict(self, eval_dataloader, get_inputs, n_gpu=1, verbose=True):
+    
+    
+    def predict(self, eval_dataloader, get_inputs, n_gpu=1, verbose=True, move_batch_to_device=None):
         device, num_gpus = get_device(num_gpus=n_gpu, local_rank=-1)
 
         if isinstance(self.model, torch.nn.DataParallel):
@@ -230,9 +262,13 @@ class Transformer:
 
         self.model.to(device)
         self.model.eval()
+        
+        if move_batch_to_device is None:
+            def move_batch_to_device(batch, device):
+                return tuple(t.to(device) for t in batch)
 
         for batch in tqdm(eval_dataloader, desc="Evaluating", disable=not verbose):
-            batch = tuple(t.to(device) for t in batch)
+            batch = move_batch_to_device(batch, device) #tuple(t.to(device) for t in batch)
             with torch.no_grad():
                 inputs = get_inputs(batch, self.model_name, train_mode=False)
                 outputs = self.model(**inputs)
