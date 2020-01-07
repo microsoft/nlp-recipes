@@ -22,7 +22,7 @@ from transformers.tokenization_bert import BertTokenizer
 from transformers.tokenization_distilbert import DistilBertTokenizer
 from transformers.tokenization_roberta import RobertaTokenizer
 from transformers.tokenization_xlnet import XLNetTokenizer
-from utils_nlp.common.pytorch_utils import get_device
+
 
 TOKENIZER_CLASS = {}
 TOKENIZER_CLASS.update({k: BertTokenizer for k in BERT_PRETRAINED_MODEL_ARCHIVE_MAP})
@@ -81,6 +81,47 @@ class Transformer:
         if cuda and torch.cuda.is_available():
             torch.cuda.manual_seed_all(seed)
 
+    @staticmethod
+    def get_default_optimizer(model, learning_rate, adam_epsilon):
+        no_decay = ["bias", "LayerNorm.weight"]
+        optimizer_grouped_parameters = [
+            {
+                "params": [
+                    p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)
+                ],
+                "weight_decay": weight_decay,
+            },
+            {
+                "params": [
+                    p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)
+                ],
+                "weight_decay": 0.0,
+            },
+        ]
+        optimizer = AdamW(optimizer_grouped_parameters, lr=learning_rate, eps=adam_epsilon)
+        return optimizer
+
+    @staticmethod
+    def get_default_scheduler(
+        optimizer, warmup_steps, data_loader, max_steps, num_epochs, gradient_accumulation_steps
+    ):
+        try:
+            dataset_length = len(data_loader)
+        except Exception:
+            dataset_length = -1
+
+        if max_steps <= 0:
+            if dataset_length != -1 and num_epochs > 0:
+                max_steps = dataset_length // gradient_accumulation_steps * num_epochs
+
+        if max_steps <= 0:
+            raise Exception("Max steps cannot be determined.")
+
+        scheduler = get_linear_schedule_with_warmup(
+            optimizer, num_warmup_steps=warmup_steps, num_training_steps=max_steps
+        )
+        return scheduler
+
     def fine_tune(
         self,
         train_dataloader,
@@ -89,80 +130,17 @@ class Transformer:
         num_train_epochs=1,
         max_grad_norm=1.0,
         gradient_accumulation_steps=1,
-        n_gpu=1,
         optimizer=None,
         scheduler=None,
-        weight_decay=0.0,
-        learning_rate=5e-5,
-        adam_epsilon=1e-8,
-        warmup_steps=0,
         fp16=False,
         fp16_opt_level="O1",
         local_rank=-1,
         verbose=True,
         seed=None,
     ):
-        # get device
-        device, num_gpus = get_device(num_gpus=n_gpu, local_rank=-1)
-
-        # unwrap model
-        if isinstance(self.model, torch.nn.DataParallel):
-            self.model = self.model.module
-
-        # wrap in DataParallel or DistributedDataParallel
-        if local_rank != -1:
-            self.model = torch.nn.parallel.DistributedDataParallel(
-                self.model,
-                device_ids=[local_rank],
-                output_device=local_rank,
-                find_unused_parameters=True,
-            )
-        else:
-            if num_gpus > 1:
-                self.model = torch.nn.DataParallel(self.model, device_ids=list(range(num_gpus)))
-
-        # move to device
-        self.model.to(device)
 
         if seed is not None:
             Transformer.set_seed(seed, num_gpus > 0)
-
-        if max_steps > 0:
-            t_total = max_steps
-            num_train_epochs = (
-                max_steps // (len(train_dataloader) // gradient_accumulation_steps) + 1
-            )
-        else:
-            t_total = len(train_dataloader) // gradient_accumulation_steps * num_train_epochs
-
-        # set optimizer
-        if optimizer is None:
-            no_decay = ["bias", "LayerNorm.weight"]
-            optimizer_grouped_parameters = [
-                {
-                    "params": [
-                        p
-                        for n, p in self.model.named_parameters()
-                        if not any(nd in n for nd in no_decay)
-                    ],
-                    "weight_decay": weight_decay,
-                },
-                {
-                    "params": [
-                        p
-                        for n, p in self.model.named_parameters()
-                        if any(nd in n for nd in no_decay)
-                    ],
-                    "weight_decay": 0.0,
-                },
-            ]
-            optimizer = AdamW(optimizer_grouped_parameters, lr=learning_rate, eps=adam_epsilon)
-
-        # set scheduler
-        if scheduler is None:
-            scheduler = get_linear_schedule_with_warmup(
-                optimizer, num_warmup_steps=warmup_steps, num_training_steps=t_total
-            )
 
         if fp16:
             try:
@@ -223,18 +201,8 @@ class Transformer:
 
         return global_step, tr_loss / global_step
 
-    def predict(self, eval_dataloader, get_inputs, n_gpu=1, verbose=True):
-        device, num_gpus = get_device(num_gpus=n_gpu, local_rank=-1)
-
-        if isinstance(self.model, torch.nn.DataParallel):
-            self.model = self.model.module
-
-        if num_gpus > 1:
-            self.model = torch.nn.DataParallel(self.model, device_ids=list(range(num_gpus)))
-
-        self.model.to(device)
+    def predict(self, eval_dataloader, get_inputs, verbose=True):
         self.model.eval()
-
         for batch in tqdm(eval_dataloader, desc="Evaluating", disable=not verbose):
             batch = tuple(t.to(device) for t in batch)
             with torch.no_grad():
