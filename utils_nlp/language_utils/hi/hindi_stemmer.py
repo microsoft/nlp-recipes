@@ -1,4 +1,5 @@
 #! /usr/bin/env python3.1
+# Script was downloaded from https://research.variancia.com/hindi_stemmer/
 """ Lightweight Hindi stemmer
 Copyright © 2010 Luís Gomes <luismsgomes@gmail.com>.
 
