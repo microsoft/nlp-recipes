@@ -127,7 +127,7 @@ class Processor:
 
         Args:
             text_1 (str): Input text 1.
-            text_1 (str): Input text 2.
+            text_2 (str): Input text 2.
             tokenizer (PreTrainedTokenizer): A pretrained tokenizer.
             max_len (int, optional): Max sequence length. Defaults to 512.
 
@@ -200,6 +200,32 @@ class Processor:
         num_gpus=None,
         distributed=False,
     ):
+        """
+        Creates a PyTorch DataLoader from a Pandas DataFrame for sequence classification tasks.    
+
+        Args:
+            df (pandas.DataFrame): Input Pandas DataFrame.
+            text_col (str/int): Text column name or index.
+            label_col (str/int, optional): Label column name or index. Defualts to None.
+            text2_col (str/int, optional): Second text column name or index for sequence-pair tasks.
+                Defualts to None.
+            shuffle (bool, optional): If set to True, the DataLoader will use a RandomSampler,
+                otherwise it will use a SequentialSampler.
+                Defaults to False.
+            max_len (int, optional): Maximum sequence length. Defaults to 512.
+            batch_size (int, optional): Batch size. Defaults to 32.
+            num_gpus (int, optional): Number of GPUs to use.
+                If None, all available GPUs will be used.
+                If set to 0 or GPUs are not available, CPU device will be used.
+                Defaults to None.
+            distributed (bool, optional): If set to True, the DataLoader will use
+                a DistributedSampler.
+                Defaults to False.
+
+        Returns:
+            DataLoader: A PyTorch DataLoader object that can be used for training or scoring.
+        """
+
         if text2_col is None:
             ds = SCDataSet(
                 df,
