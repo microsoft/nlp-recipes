@@ -308,7 +308,7 @@ class RougeExt(Rouge):
         return ngram_set
 
     @staticmethod
-    def _split_into_words(sentences):
+    def _split_into_words(self, sentences):
         """
         Splits multiple sentences into words and flattens the result
 
