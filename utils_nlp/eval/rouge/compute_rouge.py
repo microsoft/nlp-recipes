@@ -118,14 +118,9 @@ def compute_rouge_python(
 
     """
     supported_langauges = ["en", "hi"]
-    if language not in supported_langauges and not all(
-        [sentence_split_func, word_tokenize_func, remove_char_pattern]
-    ):
+    if language not in supported_langauges:
         raise Exception(
-            "Language {0} is not supported. Supported languages are: {1}. Provide language "
-            "speicifc sentence_split_func, word_tokenize_func, remove_char_pattern, "
-            "stemming_func(optional), and word_split_func (if words are not separated by space) "
-            "to use this function.".format(language, supported_langauges)
+            "Language {0} is not supported. Supported languages are: {1}.".format(language, supported_langauges)
         )
 
     if is_input_files:
@@ -149,11 +144,6 @@ def compute_rouge_python(
             max_n=2,
             limit_length=False,
             apply_avg=True,
-            sentence_split_func=sentence_split_func,
-            word_tokenize_func=word_tokenize_func,
-            remove_char_pattern=remove_char_pattern,
-            stemming_func=stemming_func,
-            word_split_func=word_split_func,
         )
 
     scores = evaluator.get_scores(candidates, [[it] for it in references])

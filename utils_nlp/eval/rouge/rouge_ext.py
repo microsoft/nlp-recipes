@@ -117,6 +117,14 @@ class RougeExt(Rouge):
                 AVAILABLE_LENGTH_LIMIT_TYPES
             ValueError: raises exception if weight_factor < 0
         """
+        supported_langauges = ["hi"]
+        if language not in supported_langauges and not all([sentence_split_func, word_tokenize_func, remove_char_pattern]):
+            raise Exception(
+                "Language {0} is not supported. Supported languages are: {1}. Provide language "
+                "speicifc sentence_split_func, word_tokenize_func, remove_char_pattern, "
+                "stemming_func(optional), and word_split_func (if words are not separated by "
+                "space) to use this class".format(language, supported_langauges)
+            )
         self.metrics = metrics[:] if metrics is not None else RougeExt.DEFAULT_METRICS
         for m in self.metrics:
             if m not in RougeExt.AVAILABLE_METRICS:
