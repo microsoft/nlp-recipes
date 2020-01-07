@@ -87,6 +87,7 @@ def compute_rouge_python(
     word_tokenize_func=None,
     remove_char_pattern=None,
     stemming_func=None,
+    word_split_func=None,
 ):
     """
     Computes ROUGE scores using the python package (https://pypi.org/project/py-rouge/).
@@ -109,6 +110,8 @@ def compute_rouge_python(
         remove_char_pattern (_sre.SRE_Pattern, optional): Langauge specific regular expression
             pattern for removing special characters, e.g. punctuations. Defaults to None.
         stemming_func (function, optional): Language specific stemmer. Defaults to None.
+        word_split_func (function, optional): Language specific word splitter. Only needed if
+            the language words are not separated by space, e.g. Chinese. Defaults to None.
 
     Returns:
         dict: Dictionary of ROUGE scores.
@@ -116,12 +119,13 @@ def compute_rouge_python(
     """
     supported_langauges = ["en", "hi"]
     if language not in supported_langauges and not all(
-        [sentence_split_func, word_tokenize_func, remove_char_pattern, stemming_func]
+        [sentence_split_func, word_tokenize_func, remove_char_pattern]
     ):
         raise Exception(
             "Language {0} is not supported. Supported languages are: {1}. Provide language "
             "speicifc sentence_split_func, word_tokenize_func, remove_char_pattern, "
-            "stemming_func to use this function.".format(language, supported_langauges)
+            "stemming_func(optional), and word_split_func (if words are not separated by space) "
+            "to use this function.".format(language, supported_langauges)
         )
 
     if is_input_files:
@@ -149,6 +153,7 @@ def compute_rouge_python(
             word_tokenize_func=word_tokenize_func,
             remove_char_pattern=remove_char_pattern,
             stemming_func=stemming_func,
+            word_split_func=word_split_func,
         )
 
     scores = evaluator.get_scores(candidates, [[it] for it in references])

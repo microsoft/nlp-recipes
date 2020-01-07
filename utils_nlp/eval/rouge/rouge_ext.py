@@ -3,11 +3,13 @@
 
 # Currently, the script supports Hindi.
 # Additional language support can be added by adding language specific
-# 1) sentence splitter (SENTENCE_SPLIT_DICT)
-# 2) word tokenizer (WORD_TOKENIZE_DICT)
-# 3) pattern of characters to remove (REMOVE_CHAR_PATTERN_DICT)
-# 4) stemmer (STEMMER_DICT), this is optional since stemming is not applicable to all languages
-# 5) changes to _split_into_words if the text words are not separated by space
+# 1) sentence splitter (SENTENCE_SPLIT_DICT or the sentence_split_func argument)
+# 2) word tokenizer (WORD_TOKENIZE_DICT or the word_tokenize_func argument)
+# 3) pattern of characters to remove (REMOVE_CHAR_PATTERN_DICT or the remove_char_pattern
+#    argument)
+# 4) stemmer (STEMMER_DICT or the stemming_func argument), this is optional since
+#    stemming is not applicable to all languages
+# 5) word splitter (WORD_SPLIT_DICT or the word_split_func_argument)
 
 # Major changes made to the original rouge.py include:
 # 1) Don't remove non-English or non-numeric characters
@@ -22,9 +24,10 @@ import collections
 
 from indicnlp.tokenize import sentence_tokenize, indic_tokenize
 from ...language_utils.hi.hindi_stemmer import hi_stem
+from rouge import Rouge
 
 
-class RougeExt:
+class RougeExt(Rouge):
     DEFAULT_METRICS = {"rouge-n"}
     DEFAULT_N = 1
     STATS = ["f", "p", "r"]
@@ -37,6 +40,7 @@ class RougeExt:
         "hi": re.compile(r"([" + string.punctuation + r"\u0964\u0965" + r"])")
     }
     STEMMER_DICT = {"hi": hi_stem}
+    WORD_SPLIT_DICT = {}
 
     # REMOVE_CHAR_PATTERN = re.compile('[^A-Za-z0-9]')
 
@@ -68,6 +72,7 @@ class RougeExt:
         word_tokenize_func=None,
         remove_char_pattern=None,
         stemming_func=None,
+        word_split_func=None,
     ):
         """
         Handle the ROUGE score computation as in the official perl script.
@@ -103,6 +108,8 @@ class RougeExt:
             remove_char_pattern (_sre.SRE_Pattern, optional): Langauge specific regular expression
                 pattern for removing special characters, e.g. punctuations. Defaults to None.
             stemming_func (function, optional): Language specific stemmer. Defaults to None.
+            word_split_func (function, optional): Language specific word splitter. Only needed if
+            the language words are not separated by space, e.g. Chinese. Defaults to None.
 
         Raises:
             ValueError: raises exception if metric is not among AVAILABLE_METRICS
@@ -161,6 +168,13 @@ class RougeExt:
             self.stemmer = RougeExt.STEMMER_DICT[self.language]
         else:
             self.stemmer = stemming_func
+
+        if self.language not in RougeExt.WORD_SPLIT_DICT.keys() and word_split_func is None:
+            self.word_split = None
+        elif word_split_func is None:
+            self.word_split = RougeExt.WORD_SPLIT_DICT[self.language]
+        else:
+            self.word_split = word_split_func
 
         # # Load static objects
         # if len(Rouge.WORDNET_KEY_VALUE) == 0:
@@ -305,7 +319,10 @@ class RougeExt:
           A list of words (split by white space)
         """
         # Modified from https://github.com/pltrdy/seq2seq/blob/master/seq2seq/metrics/rouge.py
-        return list(itertools.chain(*[_.split() for _ in sentences]))
+        if self.word_split is None:
+            return list(itertools.chain(*[_.split() for _ in sentences]))
+        else:
+            return list(itertools.chain(*[self.word_split(_) for _ in sentences]))
 
     @staticmethod
     def _get_word_ngrams_and_length(n, sentences):
