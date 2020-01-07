@@ -32,6 +32,42 @@ def get_device(
     return device, num_gpus
 
 
+def move_model_to_device(model, device, num_gpus=None, gpu_ids=None, local_rank=-1):
+    """Moves a model to the specified device (cpu or gpu/s)
+       and implements data parallelism when multiple gpus are specified.
+
+    Args:
+        model (Module): A PyTorch model.
+        device (torch.device): A PyTorch device.
+        num_gpus (int): The number of GPUs to be used.
+            If set to None, all available GPUs will be used.
+            Defaults to None.
+        gpu_ids (list): List of GPU IDs to be used.
+            If set to None, the first num_gpus GPUs will be used.
+            Defaults to None.
+        local_rank (int): Local GPU ID within a node. Used in distributed environments.
+            Defaults to -1.
+    """
+    # unwrap model
+    if isinstance(model, torch.nn.DataParallel):
+        model = model.module
+    # wrap in DataParallel or DistributedDataParallel
+    if local_rank != -1:
+        self.model = torch.nn.parallel.DistributedDataParallel(
+            self.model,
+            device_ids=[local_rank],
+            output_device=local_rank,
+            find_unused_parameters=True,
+        )
+    else:
+        if num_gpus > 1:
+            if gpu_ids is None:
+                gpu_ids = list(range(num_gpus))
+            model = torch.nn.DataParallel(model, device_ids=gpu_ids)
+    # move to device
+    model.to(device)
+
+
 def move_to_device(model, device, num_gpus=None):
     """Moves a model to the specified device (cpu or gpu/s)
        and implements data parallelism when multiple gpus are specified.
