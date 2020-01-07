@@ -24,10 +24,9 @@ import collections
 
 from indicnlp.tokenize import sentence_tokenize, indic_tokenize
 from ...language_utils.hi.hindi_stemmer import hi_stem
-from rouge import Rouge
 
 
-class RougeExt(Rouge):
+class RougeExt:
     DEFAULT_METRICS = {"rouge-n"}
     DEFAULT_N = 1
     STATS = ["f", "p", "r"]
@@ -307,7 +306,6 @@ class RougeExt(Rouge):
             ngram_set[tuple(text[i : i + n])] += 1
         return ngram_set
 
-    @staticmethod
     def _split_into_words(self, sentences):
         """
         Splits multiple sentences into words and flattens the result
@@ -324,8 +322,7 @@ class RougeExt(Rouge):
         else:
             return list(itertools.chain(*[self.word_split(_) for _ in sentences]))
 
-    @staticmethod
-    def _get_word_ngrams_and_length(n, sentences):
+    def _get_word_ngrams_and_length(self, n, sentences):
         """
         Calculates word n-grams for multiple sentences.
 
@@ -340,11 +337,10 @@ class RougeExt(Rouge):
         assert len(sentences) > 0
         assert n > 0
 
-        tokens = RougeExt._split_into_words(sentences)
-        return RougeExt._get_ngrams(n, tokens), tokens, len(tokens) - (n - 1)
+        tokens = self._split_into_words(sentences)
+        return self._get_ngrams(n, tokens), tokens, len(tokens) - (n - 1)
 
-    @staticmethod
-    def _get_unigrams(sentences):
+    def _get_unigrams(self, sentences):
         """
         Calcualtes uni-grams.
 
@@ -356,7 +352,7 @@ class RougeExt(Rouge):
         """
         assert len(sentences) > 0
 
-        tokens = RougeExt._split_into_words(sentences)
+        tokens = self._split_into_words(sentences)
         unigram_set = collections.defaultdict(int)
         for token in tokens:
             unigram_set[token] += 1
@@ -407,8 +403,7 @@ class RougeExt(Rouge):
             else precision * recall / ((1 - alpha) * precision + alpha * recall)
         )
 
-    @staticmethod
-    def _compute_ngrams(evaluated_sentences, reference_sentences, n):
+    def _compute_ngrams(self, evaluated_sentences, reference_sentences, n):
         """
         Computes n-grams overlap of two text collections of sentences.
         Source: http://research.microsoft.com/en-us/um/people/cyl/download/
@@ -431,10 +426,10 @@ class RougeExt(Rouge):
         if len(evaluated_sentences) <= 0 or len(reference_sentences) <= 0:
             raise ValueError("Collections must contain at least 1 sentence.")
 
-        evaluated_ngrams, _, evaluated_count = RougeExt._get_word_ngrams_and_length(
+        evaluated_ngrams, _, evaluated_count = self._get_word_ngrams_and_length(
             n, evaluated_sentences
         )
-        reference_ngrams, _, reference_count = RougeExt._get_word_ngrams_and_length(
+        reference_ngrams, _, reference_count = self._get_word_ngrams_and_length(
             n, reference_sentences
         )
 
@@ -446,8 +441,7 @@ class RougeExt(Rouge):
 
         return evaluated_count, reference_count, overlapping_count
 
-    @staticmethod
-    def _compute_ngrams_lcs(evaluated_sentences, reference_sentences, weight_factor=1.0):
+    def _compute_ngrams_lcs(self, evaluated_sentences, reference_sentences, weight_factor=1.0):
         """
         Computes ROUGE-L (summary level) of two text collections of sentences.
         http://research.microsoft.com/en-us/um/people/cyl/download/papers/
@@ -531,8 +525,8 @@ class RougeExt(Rouge):
         if len(evaluated_sentences) <= 0 or len(reference_sentences) <= 0:
             raise ValueError("Collections must contain at least 1 sentence.")
 
-        evaluated_unigrams_dict, evaluated_count = RougeExt._get_unigrams(evaluated_sentences)
-        reference_unigrams_dict, reference_count = RougeExt._get_unigrams(reference_sentences)
+        evaluated_unigrams_dict, evaluated_count = self._get_unigrams(evaluated_sentences)
+        reference_unigrams_dict, reference_count = self._get_unigrams(reference_sentences)
 
         # Has to use weight factor for WLCS
         use_WLCS = weight_factor != 1.0
@@ -682,7 +676,7 @@ class RougeExt(Rouge):
                     total_ngrams_overlapping_count = 0
 
                     for reference in references:
-                        n_grams_counts = RougeExt._compute_ngrams(hypothesis, reference, n)
+                        n_grams_counts = self._compute_ngrams(hypothesis, reference, n)
                         hypothesis_count, reference_count, overlapping_ngrams = n_grams_counts
                         total_hypothesis_ngrams_count += hypothesis_count
                         total_reference_ngrams_count += reference_count
@@ -702,7 +696,7 @@ class RougeExt(Rouge):
                     if self.apply_best:
                         best_current_score = None
                         for reference in references:
-                            n_grams_counts = RougeExt._compute_ngrams(hypothesis, reference, n)
+                            n_grams_counts = self._compute_ngrams(hypothesis, reference, n)
                             hypothesis_count, reference_count, overlapping_ngrams = n_grams_counts
                             score = RougeExt._compute_p_r_f_score(
                                 hypothesis_count, reference_count, overlapping_ngrams, self.alpha
@@ -715,7 +709,7 @@ class RougeExt(Rouge):
                     # Keep all
                     else:
                         for reference in references:
-                            n_grams_counts = RougeExt._compute_ngrams(hypothesis, reference, n)
+                            n_grams_counts = self._compute_ngrams(hypothesis, reference, n)
                             hypothesis_count, reference_count, overlapping_ngrams = n_grams_counts
                             score = RougeExt._compute_p_r_f_score(
                                 hypothesis_count, reference_count, overlapping_ngrams, self.alpha
@@ -780,7 +774,7 @@ class RougeExt(Rouge):
                 total_ngrams_overlapping_count = 0
 
                 for reference_sentences in references_sentences:
-                    n_grams_counts = RougeExt._compute_ngrams_lcs(
+                    n_grams_counts = self._compute_ngrams_lcs(
                         hypothesis_sentences,
                         reference_sentences,
                         self.weight_factor if use_w else 1.0,
@@ -806,7 +800,7 @@ class RougeExt(Rouge):
                     best_current_score = None
                     best_current_score_wlcs = None
                     for reference_sentences in references_sentences:
-                        n_grams_counts = RougeExt._compute_ngrams_lcs(
+                        n_grams_counts = self._compute_ngrams_lcs(
                             hypothesis_sentences,
                             reference_sentences,
                             self.weight_factor if use_w else 1.0,
@@ -844,7 +838,7 @@ class RougeExt(Rouge):
                 # Keep all
                 else:
                     for reference_sentences in references_sentences:
-                        n_grams_counts = RougeExt._compute_ngrams_lcs(
+                        n_grams_counts = self._compute_ngrams_lcs(
                             hypothesis_sentences,
                             reference_sentences,
                             self.weight_factor if use_w else 1.0,
