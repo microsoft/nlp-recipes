@@ -84,7 +84,7 @@ PIP_BASE = {
     "gensim": "gensim>=3.7.0",
     "nltk": "nltk>=3.4",
     "seqeval": "seqeval>=0.0.12",
-    "bertsum": "git+https://github.com/daden-ms/BertSum.git#egg=src",
+    "bertsum": "git+https://github.com/daden-ms/BertSum.git#egg=BertSum",
     "pyrouge": "pyrouge>=0.1.3",
     "torchtext": "torchtext>=0.4.0",
     "multiprocess": "multiprocess==0.70.9",
