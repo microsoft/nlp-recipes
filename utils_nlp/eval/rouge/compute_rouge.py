@@ -78,17 +78,7 @@ def compute_rouge_perl(cand, ref, is_input_files=False, verbose=False):
     return results_dict
 
 
-def compute_rouge_python(
-    cand,
-    ref,
-    is_input_files=False,
-    language="en",
-    sentence_split_func=None,
-    word_tokenize_func=None,
-    remove_char_pattern=None,
-    stemming_func=None,
-    word_split_func=None,
-):
+def compute_rouge_python(cand, ref, is_input_files=False, language="en"):
     """
     Computes ROUGE scores using the python package (https://pypi.org/project/py-rouge/).
 
@@ -103,15 +93,6 @@ def compute_rouge_python(
             lists of predicted and reference summaries. Defaults to False.
         language (str, optional): Language of the input text. Supported values are "en" and
             "hi". Defaults to "en".
-        sentence_split_func (function, optional): Language specific function for splitting
-            sentences. Defaults to None.
-        word_tokenize_func (function, optional): Language specific function for tokenizing text.
-            Defaults to None.
-        remove_char_pattern (_sre.SRE_Pattern, optional): Langauge specific regular expression
-            pattern for removing special characters, e.g. punctuations. Defaults to None.
-        stemming_func (function, optional): Language specific stemmer. Defaults to None.
-        word_split_func (function, optional): Language specific word splitter. Only needed if
-            the language words are not separated by space, e.g. Chinese. Defaults to None.
 
     Returns:
         dict: Dictionary of ROUGE scores.
@@ -120,7 +101,9 @@ def compute_rouge_python(
     supported_langauges = ["en", "hi"]
     if language not in supported_langauges:
         raise Exception(
-            "Language {0} is not supported. Supported languages are: {1}.".format(language, supported_langauges)
+            "Language {0} is not supported. Supported languages are: {1}.".format(
+                language, supported_langauges
+            )
         )
 
     if is_input_files:
@@ -144,6 +127,7 @@ def compute_rouge_python(
             max_n=2,
             limit_length=False,
             apply_avg=True,
+            language=language,
         )
 
     scores = evaluator.get_scores(candidates, [[it] for it in references])

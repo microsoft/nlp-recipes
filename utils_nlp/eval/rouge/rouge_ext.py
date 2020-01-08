@@ -57,6 +57,7 @@ class RougeExt(Rouge):
 
     def __init__(
         self,
+        language,
         metrics=None,
         max_n=None,
         limit_length=True,
@@ -67,7 +68,6 @@ class RougeExt(Rouge):
         stemming=True,
         alpha=0.5,
         weight_factor=1.0,
-        language="hi",
         sentence_split_func=None,
         word_tokenize_func=None,
         remove_char_pattern=None,
@@ -86,6 +86,7 @@ class RougeExt(Rouge):
                 the original script
 
         Args:
+            language: language of the text to be evaluated, e.g. "hi".
             metrics: What ROUGE score to compute. Available: ROUGE-N, ROUGE-L, ROUGE-W.
                 Default: ROUGE-N
             max_n: N-grams for ROUGE-N if specify. Default:1
@@ -118,7 +119,9 @@ class RougeExt(Rouge):
             ValueError: raises exception if weight_factor < 0
         """
         supported_langauges = ["hi"]
-        if language not in supported_langauges and not all([sentence_split_func, word_tokenize_func, remove_char_pattern]):
+        if language not in supported_langauges and not all(
+            [sentence_split_func, word_tokenize_func, remove_char_pattern]
+        ):
             raise Exception(
                 "Language {0} is not supported. Supported languages are: {1}. Provide language "
                 "speicifc sentence_split_func, word_tokenize_func, remove_char_pattern, "
