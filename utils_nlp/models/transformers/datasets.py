@@ -240,7 +240,10 @@ def _preprocess(param):
     sentences, preprocess_pipeline, word_tokenize = param
     for function in preprocess_pipeline:
         sentences = function(sentences)
-    return [word_tokenize(sentence) for sentence in sentences]
+    if word_tokenize:
+        return [word_tokenize(sentence) for sentence in sentences]
+    else:
+        return [sentences]
 
 
 def _create_data_from_iterator(iterator, preprocessing, word_tokenizer):
@@ -299,6 +302,9 @@ class SummarizationDataset(IterableDataset):
     def __iter__(self):
         for x in self._source:
             yield x
+    
+    def get_source(self):
+        return self._source
 
     def get_target(self):
         return self._target
