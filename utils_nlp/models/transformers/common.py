@@ -82,7 +82,7 @@ class Transformer:
             torch.cuda.manual_seed_all(seed)
 
     @staticmethod
-    def get_default_optimizer(model, learning_rate, adam_epsilon):
+    def get_default_optimizer(model, weight_decay, learning_rate, adam_epsilon):
         no_decay = ["bias", "LayerNorm.weight"]
         optimizer_grouped_parameters = [
             {
@@ -125,6 +125,8 @@ class Transformer:
     def fine_tune(
         self,
         train_dataloader,
+        device,
+        num_gpus,
         get_inputs,
         max_steps=-1,
         num_train_epochs=1,
@@ -201,7 +203,7 @@ class Transformer:
 
         return global_step, tr_loss / global_step
 
-    def predict(self, eval_dataloader, get_inputs, verbose=True):
+    def predict(self, eval_dataloader, device, get_inputs, verbose=True):
         self.model.eval()
         for batch in tqdm(eval_dataloader, desc="Evaluating", disable=not verbose):
             batch = tuple(t.to(device) for t in batch)

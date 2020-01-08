@@ -21,6 +21,7 @@ from transformers.modeling_xlnet import (
     XLNET_PRETRAINED_MODEL_ARCHIVE_MAP,
     XLNetForSequenceClassification,
 )
+from utils_nlp.common.pytorch_utils import get_device, move_model_to_device
 from utils_nlp.models.transformers.common import MAX_SEQ_LEN, TOKENIZER_CLASS, Transformer
 from utils_nlp.models.transformers.datasets import SCDataSet, SPCDataSet
 
@@ -188,20 +189,11 @@ class Processor:
 
         return input_ids, attention_mask, token_type_ids
 
-    def create_dataloader_from_df(
-        self,
-        df,
-        text_col,
-        label_col=None,
-        text2_col=None,
-        shuffle=False,
-        max_len=MAX_SEQ_LEN,
-        batch_size=32,
-        num_gpus=None,
-        distributed=False,
+    def dataset_from_dataframe(
+        self, df, text_col, label_col=None, text2_col=None, max_len=MAX_SEQ_LEN
     ):
         if text2_col is None:
-            ds = SCDataSet(
+            return SCDataSet(
                 df,
                 text_col,
                 label_col,
@@ -210,7 +202,7 @@ class Processor:
                 max_len=max_len,
             )
         else:
-            ds = SPCDataSet(
+            return SPCDataSet(
                 df,
                 text_col,
                 text2_col,
@@ -220,6 +212,9 @@ class Processor:
                 max_len=max_len,
             )
 
+    def dataloader_from_dataset(
+        self, ds, batch_size=32, num_gpus=None, shuffle=False, distributed=False
+    ):
         if num_gpus is None:
             num_gpus = torch.cuda.device_count()
 
@@ -250,7 +245,10 @@ class SequenceClassifier(Transformer):
         self,
         train_dataloader,
         num_epochs=1,
+        max_steps=-1,
+        gradient_accumulation_steps=1,
         num_gpus=None,
+        gpu_ids=None,
         local_rank=-1,
         weight_decay=0.0,
         learning_rate=5e-5,
@@ -265,8 +263,15 @@ class SequenceClassifier(Transformer):
         Args:
             train_dataloader (Dataloader): Dataloader for the training data.
             num_epochs (int, optional): Number of training epochs. Defaults to 1.
+            max_steps (int, optional): Total number of training steps. Overrides num_epochs.
+            gradient_accumulation_steps (int, optional): Number of steps to accumulate
+                before performing a backward/update pass.
+                Default to 1.
             num_gpus (int, optional): The number of GPUs to use. If None, all available GPUs will
                 be used. If set to 0 or GPUs are not available, CPU device will be used.
+                Defaults to None.
+            gpu_ids (list): List of GPU IDs to be used.
+                If set to None, the first num_gpus GPUs will be used.
                 Defaults to None.
             local_rank (int, optional): Local_rank for distributed training on GPUs. Defaults to
                 -1, which means non-distributed training.
@@ -281,20 +286,40 @@ class SequenceClassifier(Transformer):
             seed (int, optional): Random seed used to improve reproducibility. Defaults to None.
         """
 
+        # get device
+        device, num_gpus = get_device(num_gpus=num_gpus, local_rank=local_rank)
+        # move model
+        self.model = move_model_to_device(self.model, device, num_gpus, gpu_ids, local_rank)
+
+        # init optimizer and scheduler
+        optimizer = Transformer.get_default_optimizer(
+            self.model, weight_decay, learning_rate, adam_epsilon
+        )
+        scheduler = Transformer.get_default_scheduler(
+            optimizer,
+            warmup_steps,
+            train_dataloader,
+            max_steps,
+            num_epochs,
+            gradient_accumulation_steps=gradient_accumulation_steps,
+        )
+
         super().fine_tune(
             train_dataloader=train_dataloader,
+            device=device,
+            num_gpus=num_gpus,
             get_inputs=Processor.get_inputs,
-            n_gpu=num_gpus,
+            max_steps=max_steps,
             num_train_epochs=num_epochs,
-            weight_decay=weight_decay,
-            learning_rate=learning_rate,
-            adam_epsilon=adam_epsilon,
-            warmup_steps=warmup_steps,
+            gradient_accumulation_steps=gradient_accumulation_steps,
+            optimizer=optimizer,
+            scheduler=scheduler,
+            local_rank=local_rank,
             verbose=verbose,
             seed=seed,
         )
 
-    def predict(self, eval_dataloader, num_gpus=None, verbose=True):
+    def predict(self, eval_dataloader, num_gpus=None, gpu_ids=None, verbose=True):
         """
         Scores a dataset using a fine-tuned model and a given dataloader.
 
@@ -303,17 +328,25 @@ class SequenceClassifier(Transformer):
             num_gpus (int, optional): The number of GPUs to use. If None, all available GPUs will
                 be used. If set to 0 or GPUs are not available, CPU device will be used.
                 Defaults to None.
+            gpu_ids (list): List of GPU IDs to be used.
+                If set to None, the first num_gpus GPUs will be used.
+                Defaults to None.
             verbose (bool, optional): Whether to print out the training log. Defaults to True.
 
         Returns
             1darray: numpy array of predicted label indices.
         """
 
+        # get device
+        device, num_gpus = get_device(num_gpus=num_gpus, local_rank=-1)
+        # move model
+        self.model = move_model_to_device(self.model, device, num_gpus, gpu_ids, local_rank=-1)
+
         preds = list(
             super().predict(
                 eval_dataloader=eval_dataloader,
+                device=device,
                 get_inputs=Processor.get_inputs,
-                n_gpu=num_gpus,
                 verbose=verbose,
             )
         )

@@ -47,6 +47,10 @@ def move_model_to_device(model, device, num_gpus=None, gpu_ids=None, local_rank=
             Defaults to None.
         local_rank (int): Local GPU ID within a node. Used in distributed environments.
             Defaults to -1.
+    
+    Returns:
+        Module, DataParallel, DistributedDataParallel: A PyTorch Module or
+            a DataParallel/DistributedDataParallel wrapper (when multiple gpus are used).
     """
     # unwrap model
     if isinstance(model, torch.nn.DataParallel):
@@ -65,7 +69,7 @@ def move_model_to_device(model, device, num_gpus=None, gpu_ids=None, local_rank=
                 gpu_ids = list(range(num_gpus))
             model = torch.nn.DataParallel(model, device_ids=gpu_ids)
     # move to device
-    model.to(device)
+    return model.to(device)
 
 
 def move_to_device(model, device, num_gpus=None):
