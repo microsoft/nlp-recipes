@@ -1,7 +1,7 @@
 # coding=utf-8
 # Copyright (c) Microsoft. All rights reserved.
 
-from task_config import (
+from ..tasks.config import (
     COLATaskConfig,
     MNLITaskConfig,
     MRPCTaskConfig,
