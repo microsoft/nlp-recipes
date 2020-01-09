@@ -86,6 +86,8 @@ PIP_BASE = {
     "seqeval": "seqeval>=0.0.12",
     "bertsum": "git+https://github.com/daden-ms/BertSum.git@030c139c97bc57d0c31f6515b8bf9649f999a443#egg=BertSum",
     "pyrouge": "pyrouge>=0.1.3",
+    "py-rouge": "py-rouge>=1.1",
+    "indic-nlp-library": "indic-nlp-library>=0.6",
     "torchtext": "torchtext>=0.4.0",
     "multiprocess": "multiprocess==0.70.9",
     "tensorboardX": "tensorboardX==1.8",
