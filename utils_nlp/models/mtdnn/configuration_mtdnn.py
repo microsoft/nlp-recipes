@@ -7,6 +7,8 @@
 
 from transformers import BertConfig, PretrainedConfig
 
+from utils_nlp.models.mtdnn.common.types import EncoderModelType
+
 """MTDNN model configuration"""
 
 
@@ -42,6 +44,7 @@ class MTDNNConfig(PretrainedConfig):
 
     def __init__(
         self,
+        encoder_type=EncoderModelType.BERT,
         vocab_size=30522,
         hidden_size=768,
         num_hidden_layers=12,
