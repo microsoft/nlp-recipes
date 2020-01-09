@@ -10,13 +10,18 @@ import os
 
 import torch
 from torch import nn
-
-from transformers import BertModel, BertPreTrainedModel, PreTrainedModel, PretrainedConfig
+from transformers import (
+    BertModel,
+    BertPreTrainedModel,
+    PretrainedConfig,
+    PreTrainedModel,
+    RobertaModel,
+)
 
 from utils_nlp.dataset.url_utils import maybe_download
+from utils_nlp.models.mtdnn.common.average_meter import AverageMeter
 from utils_nlp.models.mtdnn.configuration_mtdnn import MTDNNConfig
 from utils_nlp.models.mtdnn.utils.archive_maps import PRETRAINED_MODEL_ARCHIVE_MAP
-
 
 logger = logging.getLogger(__name__)
 
@@ -42,17 +47,29 @@ class MTDNNPretrainedModel(BertPreTrainedModel):
 
 
 class MTDNNModel(MTDNNPretrainedModel, BertModel):
-    def __init__(self, config: dict):
+    def __init__(self, config: MTDNNConfig):
         super(MTDNNModel, self).__init__(config)
-
-        self.task_types = config.pop("task_types", [])
+        self.config = config
+        self.local_updates = 0
+        self.train_loss = AverageMeter()
+        self.dropout_list = nn.ModuleList()
         self.scoring_list = nn.ModuleList()
+        self.encoder_type = config.encoder_type
+        self.mtdnn_config = MTDNNConfig.from_dict()
+        self.bert = BertModel()
+
+        # Define the encoder based on config options
+        if self.encoder_type == EncoderModelType.ROBERTA
+
+        self.task_types = config.task_types
         self.labels = [int(ls) for ls in config["label_size"].split(",")]
         self.task_dropout_p = config["tasks_dropout_p"]
 
         for task, lab in enumerate(self.labels):
             task_type = self.task_types[task]
-            dropout = DropoutWrapper(self.task_dropout_p[task], config["enable_variational_dropout"])
+            dropout = DropoutWrapper(
+                self.task_dropout_p[task], config["enable_variational_dropout"]
+            )
             self.dropout_list.append(dropout)
             if task_type == TaskType.Span:
                 out_proj = nn.Linear(hidden_size, 2)
@@ -62,8 +79,13 @@ class MTDNNModel(MTDNNPretrainedModel, BertModel):
                 out_proj = nn.Linear(hidden_size, lab)
             self.scoring_list.append(out_proj)
 
-        # self.config = config
         self._my_init()
+
+    def init_encoder(self, encoder_type: int=1):
+        """ Set the model encoder during initialization
+        encoder_type set to 1 means BERT, 2 means RoBERTa
+        """
+        pass
 
     def _my_init(self):
         def init_weights(module):
