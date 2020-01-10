@@ -56,7 +56,7 @@ class TokenClassificationProcessor:
             dict: A dictionary object contains all needed information for training or testing.
         """
 
-        if model_name.split("-")[0] not in ["bert", "distilbert"]:
+        if model_name not in list(TC_MODEL_CLASS):
             raise ValueError("Model not supported: {}".format(model_name))
 
         if train_mode:
