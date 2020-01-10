@@ -2,20 +2,22 @@
 # Licensed under the MIT License.
 
 import logging
+from collections import Iterable
+
 import numpy as np
 import torch
-import torch.nn as nn
-
-from collections import Iterable
-from torch.utils.data import TensorDataset
-from transformers.modeling_bert import BERT_PRETRAINED_MODEL_ARCHIVE_MAP, BertForTokenClassification
-from utils_nlp.common.pytorch_utils import get_device
-from utils_nlp.models.transformers.common import MAX_SEQ_LEN, TOKENIZER_CLASS, Transformer
-from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
+from torch.utils.data import DataLoader, RandomSampler, SequentialSampler, TensorDataset
 from torch.utils.data.distributed import DistributedSampler
+from transformers.modeling_bert import BERT_PRETRAINED_MODEL_ARCHIVE_MAP, BertForTokenClassification
+from transformers.modeling_distilbert import DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP, DistilBertForTokenClassification
 
+from utils_nlp.common.pytorch_utils import get_device, move_model_to_device
+from utils_nlp.models.transformers.common import MAX_SEQ_LEN, TOKENIZER_CLASS, Transformer
 
-TC_MODEL_CLASS = {k: BertForTokenClassification for k in BERT_PRETRAINED_MODEL_ARCHIVE_MAP}
+TC_MODEL_CLASS = {}
+TC_MODEL_CLASS.update({k: BertForTokenClassification for k in BERT_PRETRAINED_MODEL_ARCHIVE_MAP})
+TC_MODEL_CLASS.update({k: DistilBertForTokenClassification for k in DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP})
+
 
 
 class TokenClassificationProcessor:
