@@ -279,7 +279,7 @@ class SequenceClassifier(Transformer):
             gradient_accumulation_steps=gradient_accumulation_steps,
         )
 
-        # inint scheduler
+        # inin scheduler
         scheduler = Transformer.get_default_scheduler(
             optimizer=optimizer, warmup_steps=warmup_steps, num_training_steps=max_steps,
         )
