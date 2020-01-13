@@ -5,6 +5,7 @@ import pytest
 import pandas as pd
 
 from utils_nlp.models.transformers.sequence_classification import SequenceClassifier, Processor
+from utils_nlp.common.pytorch_utils import dataloader_from_dataset
 
 
 @pytest.fixture()
@@ -20,7 +21,7 @@ def test_classifier(data, tmpdir):
     model_name = "bert-base-uncased"
     processor = Processor(model_name=model_name, cache_dir=tmpdir)
     ds = processor.dataset_from_dataframe(df, "text", "label")
-    dl = processor.dataloader_from_dataset(ds, batch_size=2, num_gpus=0, shuffle=True)
+    dl = dataloader_from_dataset(ds, batch_size=2, num_gpus=0, shuffle=True)
     classifier = SequenceClassifier(model_name=model_name, num_labels=num_labels, cache_dir=tmpdir)
     classifier.fit(train_dataloader=dl, num_epochs=1, num_gpus=0, verbose=False)
     preds = classifier.predict(dl, num_gpus=0, verbose=False)
@@ -35,7 +36,7 @@ def test_classifier_gpu_train_cpu_predict(data, tmpdir):
     model_name = "bert-base-uncased"
     processor = Processor(model_name=model_name, cache_dir=tmpdir)
     ds = processor.dataset_from_dataframe(df, "text", "label")
-    dl = processor.dataloader_from_dataset(ds, batch_size=2, num_gpus=1, shuffle=True)
+    dl = dataloader_from_dataset(ds, batch_size=2, num_gpus=1, shuffle=True)
     classifier = SequenceClassifier(model_name=model_name, num_labels=num_labels, cache_dir=tmpdir)
     classifier.fit(train_dataloader=dl, num_epochs=1, num_gpus=1, verbose=False)
 

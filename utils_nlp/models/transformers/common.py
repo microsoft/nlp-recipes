@@ -7,13 +7,13 @@
 import logging
 import os
 import random
+import time
+from itertools import cycle
 
 import numpy as np
 import torch
 from tqdm import tqdm, trange
-from transformers import AdamW
-from transformers import get_linear_schedule_with_warmup
-
+from transformers import AdamW, get_linear_schedule_with_warmup
 from transformers.modeling_bert import BERT_PRETRAINED_MODEL_ARCHIVE_MAP
 from transformers.modeling_distilbert import DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP
 from transformers.modeling_roberta import ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP
@@ -22,7 +22,6 @@ from transformers.tokenization_bert import BertTokenizer
 from transformers.tokenization_distilbert import DistilBertTokenizer
 from transformers.tokenization_roberta import RobertaTokenizer
 from transformers.tokenization_xlnet import XLNetTokenizer
-
 
 TOKENIZER_CLASS = {}
 TOKENIZER_CLASS.update({k: BertTokenizer for k in BERT_PRETRAINED_MODEL_ARCHIVE_MAP})
@@ -37,12 +36,7 @@ logger = logging.getLogger(__name__)
 
 class Transformer:
     def __init__(
-        self,
-        model_class,
-        model_name="bert-base-cased",
-        num_labels=2,
-        cache_dir=".",
-        load_model_from_dir=None,
+        self, model_class, model_name="bert-base-cased", num_labels=2, cache_dir=".", load_model_from_dir=None,
     ):
 
         if model_name not in self.list_supported_models():
@@ -86,15 +80,11 @@ class Transformer:
         no_decay = ["bias", "LayerNorm.weight"]
         optimizer_grouped_parameters = [
             {
-                "params": [
-                    p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)
-                ],
+                "params": [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)],
                 "weight_decay": weight_decay,
             },
             {
-                "params": [
-                    p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)
-                ],
+                "params": [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)],
                 "weight_decay": 0.0,
             },
         ]
@@ -102,23 +92,9 @@ class Transformer:
         return optimizer
 
     @staticmethod
-    def get_default_scheduler(
-        optimizer, warmup_steps, data_loader, max_steps, num_epochs, gradient_accumulation_steps
-    ):
-        try:
-            dataset_length = len(data_loader)
-        except Exception:
-            dataset_length = -1
-
-        if max_steps <= 0:
-            if dataset_length != -1 and num_epochs > 0:
-                max_steps = dataset_length // gradient_accumulation_steps * num_epochs
-
-        if max_steps <= 0:
-            raise Exception("Max steps cannot be determined.")
-
+    def get_default_scheduler(optimizer, warmup_steps, num_training_steps):
         scheduler = get_linear_schedule_with_warmup(
-            optimizer, num_warmup_steps=warmup_steps, num_training_steps=max_steps
+            optimizer, num_warmup_steps=warmup_steps, num_training_steps=num_training_steps
         )
         return scheduler
 
@@ -129,7 +105,6 @@ class Transformer:
         num_gpus,
         get_inputs,
         max_steps=-1,
-        num_train_epochs=1,
         max_grad_norm=1.0,
         gradient_accumulation_steps=1,
         optimizer=None,
@@ -139,6 +114,8 @@ class Transformer:
         local_rank=-1,
         verbose=True,
         seed=None,
+        report_every=10,
+        clip_grad_norm=True,
     ):
 
         if seed is not None:
@@ -154,20 +131,16 @@ class Transformer:
         # init training
         global_step = 0
         tr_loss = 0.0
+        accum_loss = 0
         self.model.train()
         self.model.zero_grad()
-        train_iterator = trange(
-            int(num_train_epochs), desc="Epoch", disable=local_rank not in [-1, 0] or not verbose
-        )
 
         # train
-        for _ in train_iterator:
-            epoch_iterator = tqdm(
-                train_dataloader, desc="Iteration", disable=local_rank not in [-1, 0] or not verbose
-            )
+        start = time.time()
+        while global_step < max_steps:
+            epoch_iterator = tqdm(train_dataloader, desc="Iteration", disable=local_rank not in [-1, 0] or not verbose)
             for step, batch in enumerate(epoch_iterator):
-                batch = tuple(t.to(device) for t in batch)
-                inputs = get_inputs(batch, self.model_name)
+                inputs = get_inputs(batch, device, self.model_name)
                 outputs = self.model(**inputs)
                 loss = outputs[0]
 
@@ -176,39 +149,47 @@ class Transformer:
                 if gradient_accumulation_steps > 1:
                     loss = loss / gradient_accumulation_steps
 
-                if step % 10 == 0 and verbose:
-                    tqdm.write("Loss:{:.6f}".format(loss))
-
                 if fp16:
                     with amp.scale_loss(loss, optimizer) as scaled_loss:
                         scaled_loss.backward()
-                    torch.nn.utils.clip_grad_norm_(amp.master_params(optimizer), max_grad_norm)
+                    if clip_grad_norm:
+                        torch.nn.utils.clip_grad_norm_(amp.master_params(optimizer), max_grad_norm)
                 else:
                     loss.backward()
-                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_grad_norm)
+                    if clip_grad_norm:
+                        torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_grad_norm)
 
                 tr_loss += loss.item()
-                if (step + 1) % gradient_accumulation_steps == 0:
-                    optimizer.step()
-                    scheduler.step()
-                    self.model.zero_grad()
-                    global_step += 1
 
-                if max_steps > 0 and global_step > max_steps:
+                accum_loss += loss.item()
+                if (step + 1) % gradient_accumulation_steps == 0:
+                    global_step += 1
+                    if global_step % report_every == 0 and verbose:
+                        end = time.time()
+                        print(
+                            "loss: {0:.6f}, time: {1:f}, number of examples in current step: {2:.0f}, step {3:.0f} out of total {4:.0f}".format(
+                                accum_loss / report_every, end - start, len(batch), global_step, max_steps,
+                            )
+                        )
+                        accum_loss = 0
+                        start = end
+
+                    optimizer.step()
+                    if scheduler:
+                        scheduler.step()
+                    self.model.zero_grad()
+
+                if global_step > max_steps:
                     epoch_iterator.close()
                     break
-            if max_steps > 0 and global_step > max_steps:
-                train_iterator.close()
-                break
 
         return global_step, tr_loss / global_step
 
     def predict(self, eval_dataloader, device, get_inputs, verbose=True):
         self.model.eval()
         for batch in tqdm(eval_dataloader, desc="Evaluating", disable=not verbose):
-            batch = tuple(t.to(device) for t in batch)
             with torch.no_grad():
-                inputs = get_inputs(batch, self.model_name, train_mode=False)
+                inputs = get_inputs(batch, device, self.model_name, train_mode=False)
                 outputs = self.model(**inputs)
                 logits = outputs[0]
             yield logits.detach().cpu().numpy()

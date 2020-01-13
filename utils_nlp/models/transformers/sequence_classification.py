@@ -3,8 +3,10 @@
 
 import numpy as np
 import torch
-from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
-from torch.utils.data.distributed import DistributedSampler
+from transformers.modeling_albert import (
+    ALBERT_PRETRAINED_MODEL_ARCHIVE_MAP,
+    AlbertForSequenceClassification,
+)
 from transformers.modeling_bert import (
     BERT_PRETRAINED_MODEL_ARCHIVE_MAP,
     BertForSequenceClassification,
@@ -21,19 +23,17 @@ from transformers.modeling_xlnet import (
     XLNET_PRETRAINED_MODEL_ARCHIVE_MAP,
     XLNetForSequenceClassification,
 )
-from utils_nlp.common.pytorch_utils import get_device, move_model_to_device
+
+from utils_nlp.common.pytorch_utils import get_device, move_model_to_device, compute_training_steps
 from utils_nlp.models.transformers.common import MAX_SEQ_LEN, TOKENIZER_CLASS, Transformer
 from utils_nlp.models.transformers.datasets import SCDataSet, SPCDataSet
 
 MODEL_CLASS = {}
 MODEL_CLASS.update({k: BertForSequenceClassification for k in BERT_PRETRAINED_MODEL_ARCHIVE_MAP})
-MODEL_CLASS.update(
-    {k: RobertaForSequenceClassification for k in ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP}
-)
+MODEL_CLASS.update({k: RobertaForSequenceClassification for k in ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP})
 MODEL_CLASS.update({k: XLNetForSequenceClassification for k in XLNET_PRETRAINED_MODEL_ARCHIVE_MAP})
-MODEL_CLASS.update(
-    {k: DistilBertForSequenceClassification for k in DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP}
-)
+MODEL_CLASS.update({k: DistilBertForSequenceClassification for k in DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP})
+MODEL_CLASS.update({k: AlbertForSequenceClassification for k in ALBERT_PRETRAINED_MODEL_ARCHIVE_MAP})
 
 
 class Processor:
@@ -57,13 +57,14 @@ class Processor:
         )
 
     @staticmethod
-    def get_inputs(batch, model_name, train_mode=True):
+    def get_inputs(batch, device, model_name, train_mode=True):
         """
         Creates an input dictionary given a model name.
 
         Args:
             batch (tuple): A tuple containing input ids, attention mask,
                 segment ids, and labels tensors.
+            device (torch.device): A PyTorch device.
             model_name (bool, optional): Model name used to format the inputs.
             train_mode (bool, optional): Training mode flag.
                 Defaults to True.
@@ -72,7 +73,8 @@ class Processor:
             dict: Dictionary containing input ids, segment ids, masks, and labels.
                 Labels are only returned when train_mode is True.
         """
-        if model_name.split("-")[0] in ["bert", "xlnet", "roberta", "distilbert"]:
+        batch = tuple(t.to(device) for t in batch)
+        if model_name.split("-")[0] in ["bert", "xlnet", "roberta", "distilbert", "albert"]:
             if train_mode:
                 inputs = {"input_ids": batch[0], "attention_mask": batch[1], "labels": batch[3]}
             else:
@@ -104,11 +106,7 @@ class Processor:
             print("setting max_len to max allowed sequence length: {}".format(MAX_SEQ_LEN))
             max_len = MAX_SEQ_LEN
         # truncate and add CLS & SEP markers
-        tokens = (
-            [tokenizer.cls_token]
-            + tokenizer.tokenize(text)[0 : max_len - 2]
-            + [tokenizer.sep_token]
-        )
+        tokens = [tokenizer.cls_token] + tokenizer.tokenize(text)[0 : max_len - 2] + [tokenizer.sep_token]
         # get input ids
         input_ids = tokenizer.convert_tokens_to_ids(tokens)
         # pad sequence
@@ -189,17 +187,10 @@ class Processor:
 
         return input_ids, attention_mask, token_type_ids
 
-    def dataset_from_dataframe(
-        self, df, text_col, label_col=None, text2_col=None, max_len=MAX_SEQ_LEN
-    ):
+    def dataset_from_dataframe(self, df, text_col, label_col=None, text2_col=None, max_len=MAX_SEQ_LEN):
         if text2_col is None:
             return SCDataSet(
-                df,
-                text_col,
-                label_col,
-                transform=Processor.text_transform,
-                tokenizer=self.tokenizer,
-                max_len=max_len,
+                df, text_col, label_col, transform=Processor.text_transform, tokenizer=self.tokenizer, max_len=max_len,
             )
         else:
             return SPCDataSet(
@@ -212,29 +203,11 @@ class Processor:
                 max_len=max_len,
             )
 
-    def dataloader_from_dataset(
-        self, ds, batch_size=32, num_gpus=None, shuffle=False, distributed=False
-    ):
-        if num_gpus is None:
-            num_gpus = torch.cuda.device_count()
-
-        batch_size = batch_size * max(1, num_gpus)
-
-        if distributed:
-            sampler = DistributedSampler(ds)
-        else:
-            sampler = RandomSampler(ds) if shuffle else SequentialSampler(ds)
-
-        return DataLoader(ds, sampler=sampler, batch_size=batch_size)
-
 
 class SequenceClassifier(Transformer):
     def __init__(self, model_name="bert-base-cased", num_labels=2, cache_dir="."):
         super().__init__(
-            model_class=MODEL_CLASS,
-            model_name=model_name,
-            num_labels=num_labels,
-            cache_dir=cache_dir,
+            model_class=MODEL_CLASS, model_name=model_name, num_labels=num_labels, cache_dir=cache_dir,
         )
 
     @staticmethod
@@ -261,9 +234,12 @@ class SequenceClassifier(Transformer):
         Fine-tunes a pre-trained sequence classification model.
 
         Args:
-            train_dataloader (Dataloader): Dataloader for the training data.
+            train_dataloader (Dataloader): A PyTorch DataLoader to be used for training.
             num_epochs (int, optional): Number of training epochs. Defaults to 1.
-            max_steps (int, optional): Total number of training steps. Overrides num_epochs.
+            max_steps (int, optional): Total number of training steps.
+                If set to a positive value, it overrides num_epochs.
+                Otherwise, it's determined by the dataset length, gradient_accumulation_steps, and num_epochs.
+                Defualts to -1.
             gradient_accumulation_steps (int, optional): Number of steps to accumulate
                 before performing a backward/update pass.
                 Default to 1.
@@ -288,29 +264,33 @@ class SequenceClassifier(Transformer):
 
         # get device
         device, num_gpus = get_device(num_gpus=num_gpus, local_rank=local_rank)
+
         # move model
         self.model = move_model_to_device(self.model, device, num_gpus, gpu_ids, local_rank)
 
-        # init optimizer and scheduler
-        optimizer = Transformer.get_default_optimizer(
-            self.model, weight_decay, learning_rate, adam_epsilon
-        )
-        scheduler = Transformer.get_default_scheduler(
-            optimizer,
-            warmup_steps,
+        # init optimizer
+        optimizer = Transformer.get_default_optimizer(self.model, weight_decay, learning_rate, adam_epsilon)
+
+        # compute the max number of training steps
+        max_steps = compute_training_steps(
             train_dataloader,
-            max_steps,
-            num_epochs,
+            num_epochs=num_epochs,
+            max_steps=max_steps,
             gradient_accumulation_steps=gradient_accumulation_steps,
         )
 
+        # inint scheduler
+        scheduler = Transformer.get_default_scheduler(
+            optimizer=optimizer, warmup_steps=warmup_steps, num_training_steps=max_steps,
+        )
+
+        # fine tune
         super().fine_tune(
             train_dataloader=train_dataloader,
             device=device,
             num_gpus=num_gpus,
             get_inputs=Processor.get_inputs,
             max_steps=max_steps,
-            num_train_epochs=num_epochs,
             gradient_accumulation_steps=gradient_accumulation_steps,
             optimizer=optimizer,
             scheduler=scheduler,
@@ -344,12 +324,8 @@ class SequenceClassifier(Transformer):
 
         preds = list(
             super().predict(
-                eval_dataloader=eval_dataloader,
-                device=device,
-                get_inputs=Processor.get_inputs,
-                verbose=verbose,
+                eval_dataloader=eval_dataloader, device=device, get_inputs=Processor.get_inputs, verbose=verbose,
             )
         )
         preds = np.concatenate(preds)
-        # todo generator & probs
         return np.argmax(preds, axis=1)
