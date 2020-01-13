@@ -619,6 +619,7 @@ class ExtractiveSummarizer(Transformer):
         self,
         test_dataset,
         num_gpus=1,
+        local_rank=-1,
         batch_size=16,
         sentence_separator="<q>",
         top_n=3,
@@ -677,15 +678,22 @@ class ExtractiveSummarizer(Transformer):
                     "mask_cls": batch.mask_cls,
                 }
 
-        test_sampler = SequentialSampler(test_dataset)
+        
+        from torch.utils.data.distributed import DistributedSampler
+        if local_rank == -1:
+            test_sampler = SequentialSampler(test_dataset)
+        else:
+            test_sampler = DistributedSampler(test_dataset, num_replicas=num_gpus, rank=local_rank, shuffle=False)
         test_dataloader = DataLoader(
             test_dataset, sampler=test_sampler, batch_size=batch_size, collate_fn=collate_fn
         )
-        sent_scores = self.predict_scores(test_dataloader, num_gpus=num_gpus)
+        sent_scores = self.predict_scores(test_dataloader, num_gpus=num_gpus, local_rank=local_rank)
         sent_scores_list = list(sent_scores)
         scores_list = []
         for i in sent_scores_list:
             scores_list.extend(i)
+        if local_rank != -1:
+            return scores_list
         prediction = []
         for i in range(len(test_dataset)):
             temp_pred = get_pred(
@@ -699,7 +707,7 @@ class ExtractiveSummarizer(Transformer):
             prediction.extend(temp_pred)
         return prediction
 
-    def predict_scores(self, eval_dataloader, num_gpus=1, verbose=True):
+    def predict_scores(self, eval_dataloader, num_gpus=1, local_rank=-1, verbose=True):
         """
         Scores a dataset using a fine-tuned model and a given dataloader.
 
@@ -714,7 +722,7 @@ class ExtractiveSummarizer(Transformer):
             1darray: numpy array of predicted sentence scores.
         """
 
-        device, num_gpus = get_device(num_gpus=num_gpus, local_rank=-1)
+        device, num_gpus = get_device(num_gpus=num_gpus, local_rank=local_rank)
 
         def move_batch_to_device(batch, device):
             batch["src"] = batch["src"].to(device)
