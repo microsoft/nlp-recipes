@@ -10,8 +10,6 @@ import os
 
 import torch
 from torch import nn
-
-from fairseq.models.roberta import RobertaModel as FairseqRobertModel
 from transformers import (
     BertConfig,
     BertModel,
@@ -20,11 +18,14 @@ from transformers import (
     PreTrainedModel,
     RobertaModel,
 )
-from utils_nlp.models.mtdnn.common.linear_pooler import LinearPooler
+
+from fairseq.models.roberta import RobertaModel as FairseqRobertModel
 from utils_nlp.dataset.url_utils import maybe_download
 from utils_nlp.models.mtdnn.common.average_meter import AverageMeter
+from utils_nlp.models.mtdnn.common.linear_pooler import LinearPooler
+from utils_nlp.models.mtdnn.common.types import DataFormat, EncoderModelType, TaskType
 from utils_nlp.models.mtdnn.configuration_mtdnn import MTDNNConfig
-from utils_nlp.models.mtdnn.utils.archive_maps import PRETRAINED_MODEL_ARCHIVE_MAP
+from utils_nlp.models.mtdnn.common.archive_maps import PRETRAINED_MODEL_ARCHIVE_MAP
 
 logger = logging.getLogger(__name__)
 
@@ -56,13 +57,13 @@ class MTDNNModel(MTDNNPretrainedModel, BertModel):
         self.local_updates = 0
         self.train_loss = AverageMeter()
         self.dropout_list = nn.ModuleList()
-        self.scoring_list = nn.ModuleList()
         self.encoder_type = config.encoder_type
-        self.mtdnn_config = MTDNNConfig.from_dict()
+        self.config_dict = self.config.to_dict()
+        self.mtdnn_config = MTDNNConfig.from_dict(self.config_dict)
 
         # Setup the baseline model
         # Define the encoder based on config options
-        self.bert_config = BertConfig.from_dict(config)
+        self.bert_config = BertConfig.from_dict(self.mtdnn_config)
         self.bert = BertModel(self.bert_config)
         self.hidden_size = self.bert_config.hidden_size
         if self.encoder_type == EncoderModelType.ROBERTA:
@@ -72,15 +73,22 @@ class MTDNNModel(MTDNNPretrainedModel, BertModel):
 
         # Dump other features if value is set to true
         if config.dump_feature:
+            return
 
-            # update bert parameters
+        # Set decoder and scoring list parameters
+        self.decoder_opts = config.decoder_opts
+        self.scoring_list = nn.ModuleList()
+
+        # Update bert parameters
+        if config.update_bert_opt > 0:
             for param in self.bert.parameters():
-                param.requires_grad = False 
-        self.task_types = config.task_types
-        self.labels = [int(ls) for ls in config["label_size"].split(",")]
-        self.task_dropout_p = config["tasks_dropout_p"]
+                param.requires_grad = False
 
-        for task, lab in enumerate(self.labels):
+        # Set task specific paramaters
+        self.task_types = config.task_types
+        self.task_dropout_p = config.tasks_dropout_p
+        self.n_class = config.n_class
+        for task, label in enumerate(self.n_class):
             task_type = self.task_types[task]
             dropout = DropoutWrapper(
                 self.task_dropout_p[task], config["enable_variational_dropout"]
@@ -88,10 +96,10 @@ class MTDNNModel(MTDNNPretrainedModel, BertModel):
             self.dropout_list.append(dropout)
             if task_type == TaskType.Span:
                 out_proj = nn.Linear(hidden_size, 2)
-            elif task_type == TaskType.SeqenceLabeling:
-                out_proj = nn.Linear(hidden_size, lab)
+            elif task_type == TaskType.SequenceLabeling:
+                out_proj = nn.Linear(hidden_size, label)
             else:
-                out_proj = nn.Linear(hidden_size, lab)
+                out_proj = nn.Linear(hidden_size, label)
             self.scoring_list.append(out_proj)
 
         self._my_init()
@@ -134,7 +142,7 @@ class MTDNNModel(MTDNNPretrainedModel, BertModel):
             all_encoder_layers, pooled_output = self.bert(input_ids, token_type_ids, attention_mask)
             sequence_output = all_encoder_layers[-1]
 
-        decoder_opt = self.decoder_opt[task_id]
+        decoder_opt = self.decoder_opts[task_id]
         task_type = self.task_types[task_id]
         if task_type == TaskType.Span:
             assert decoder_opt != 1
@@ -144,7 +152,7 @@ class MTDNNModel(MTDNNPretrainedModel, BertModel):
             start_scores = start_scores.squeeze(-1)
             end_scores = end_scores.squeeze(-1)
             return start_scores, end_scores
-        elif task_type == TaskType.SeqenceLabeling:
+        elif task_type == TaskType.SequenceLabeling:
             pooled_output = all_encoder_layers[-1]
             pooled_output = self.dropout_list[task_id](pooled_output)
             pooled_output = pooled_output.contiguous().view(-1, pooled_output.size(2))
@@ -175,3 +183,5 @@ if __name__ == "__main__":
     print(b.encoder)
     print(b.pooler)
     print(b.pretrained_model_archive_map)
+    print(b.base_model_prefix)
+    print(b.bert_config)

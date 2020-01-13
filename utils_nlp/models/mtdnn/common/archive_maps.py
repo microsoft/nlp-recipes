@@ -45,3 +45,11 @@ PRETRAINED_MODEL_ARCHIVE_MAP = {
     "mtdnn-large-uncased": "https://mrc.blob.core.windows.net/mt-dnn-model/mt_dnn_large.pt",
     "mtdnn-kd-large-cased": "https://mrc.blob.core.windows.net/mt-dnn-model/mt_dnn_kd_large_cased.pt",
 }
+
+
+PRETRAINED_CONFIG_ARCHIVE_MAP = {
+    "mtdnn-base-uncased": "https://mrc.blob.core.windows.net/mt-dnn-model/mt_dnn_base.json",
+    "mtdnn-large-uncased": "https://mrc.blob.core.windows.net/mt-dnn-model/mt_dnn_large.json",
+    "mtdnn-kd-large-cased": "https://mrc.blob.core.windows.net/mt-dnn-model/mt_dnn_kd_large_cased.json",
+}
+

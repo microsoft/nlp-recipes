@@ -5,9 +5,11 @@
 # This script reuses some code from
 # https://github.com/huggingface/transformers
 
+import torch
 from transformers import BertConfig, PretrainedConfig
 
 from utils_nlp.models.mtdnn.common.types import EncoderModelType
+from utils_nlp.models.mtdnn.common.archive_maps import PRETRAINED_CONFIG_ARCHIVE_MAP
 
 """MTDNN model configuration"""
 
@@ -42,6 +44,9 @@ class MTDNNConfig(PretrainedConfig):
                 layer_norm_eps: The epsilon used by LayerNorm.
         """
 
+    # TODO - Not needed
+    pretrained_config_archive_map = PRETRAINED_CONFIG_ARCHIVE_MAP
+
     def __init__(
         self,
         encoder_type=EncoderModelType.BERT,
@@ -60,12 +65,29 @@ class MTDNNConfig(PretrainedConfig):
         dump_feature=False,
         update_bert_opt=0,
         decoder_opts=[],
-        label_size="",
+        n_class=2,
         task_types=[],
         tasks_dropout_p=[],
         enable_variational_dropout=True,
         init_ratio=1.0,
         init_checkpoint="bert-base-uncased",
+        # Training config
+        cuda=torch.cuda.is_available(),
+        log_per_updates=500,
+        save_per_updates=10000,
+        save_per_updates_on=False,
+        epochs=5,
+        batch_size=8,
+        batch_size_eval=8,
+        optimizer="adamax",
+        grad_clipping=0.0,
+        global_grad_clipping=1.0,
+        weight_decay=0.0,
+        learning_rate=5e-5,
+        momentum=0.0,
+        warmup=0.1,
+        warmup_schedule="warmup_linear",
+        adam_eps=1e-6,
         **kwargs,
     ):
         super(MTDNNConfig, self).__init__(**kwargs)
@@ -85,10 +107,18 @@ class MTDNNConfig(PretrainedConfig):
         self.dump_feature = dump_feature
         self.update_bert_opt = update_bert_opt
         self.decoder_opts = decoder_opts
-        self.label_size = label_size
+        self.n_class = n_class
         self.task_types = task_types
         self.tasks_dropout_p = tasks_dropout_p
         self.enable_variational_dropout = enable_variational_dropout
         self.init_ratio = init_ratio
         self.init_checkpoint = init_checkpoint
+        self.cuda = cuda
+        self.log_per_updates = log_per_updates
+        self.save_per_updates = save_per_updates
+        self.save_per_updates_on = save_per_updates_on
+        self.epochs = epochs
+        self.batch_size = batch_size
+        self.batch_size_eval = batch_size_eval
+        self.optimizer = optimizer
 
