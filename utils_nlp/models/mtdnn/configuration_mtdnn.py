@@ -65,9 +65,11 @@ class MTDNNConfig(PretrainedConfig):
         tasks_dropout_p=[],
         enable_variational_dropout=True,
         init_ratio=1.0,
+        init_checkpoint="bert-base-uncased",
         **kwargs,
     ):
         super(MTDNNConfig, self).__init__(**kwargs)
+        self.encoder_type = encoder_type
         self.vocab_size = vocab_size
         self.hidden_size = hidden_size
         self.num_hidden_layers = num_hidden_layers
@@ -88,4 +90,5 @@ class MTDNNConfig(PretrainedConfig):
         self.tasks_dropout_p = tasks_dropout_p
         self.enable_variational_dropout = enable_variational_dropout
         self.init_ratio = init_ratio
+        self.init_checkpoint = init_checkpoint
 
