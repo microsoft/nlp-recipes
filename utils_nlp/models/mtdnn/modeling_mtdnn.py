@@ -10,14 +10,17 @@ import os
 
 import torch
 from torch import nn
+
+from fairseq.models.roberta import RobertaModel as FairseqRobertModel
 from transformers import (
+    BertConfig,
     BertModel,
     BertPreTrainedModel,
     PretrainedConfig,
     PreTrainedModel,
     RobertaModel,
 )
-
+from utils_nlp.models.mtdnn.common.linear_pooler import LinearPooler
 from utils_nlp.dataset.url_utils import maybe_download
 from utils_nlp.models.mtdnn.common.average_meter import AverageMeter
 from utils_nlp.models.mtdnn.configuration_mtdnn import MTDNNConfig
@@ -56,11 +59,23 @@ class MTDNNModel(MTDNNPretrainedModel, BertModel):
         self.scoring_list = nn.ModuleList()
         self.encoder_type = config.encoder_type
         self.mtdnn_config = MTDNNConfig.from_dict()
-        self.bert = BertModel()
 
+        # Setup the baseline model
         # Define the encoder based on config options
-        if self.encoder_type == EncoderModelType.ROBERTA
+        self.bert_config = BertConfig.from_dict(config)
+        self.bert = BertModel(self.bert_config)
+        self.hidden_size = self.bert_config.hidden_size
+        if self.encoder_type == EncoderModelType.ROBERTA:
+            self.bert = FairseqRobertModel.from_pretrained(config.init_checkpoint)
+            self.hidden_size = self.bert.args.encoder_embed_dim
+            self.pooler = LinearPooler(hidden_size)
 
+        # Dump other features if value is set to true
+        if config.dump_feature:
+
+            # update bert parameters
+            for param in self.bert.parameters():
+                param.requires_grad = False 
         self.task_types = config.task_types
         self.labels = [int(ls) for ls in config["label_size"].split(",")]
         self.task_dropout_p = config["tasks_dropout_p"]
@@ -81,7 +96,7 @@ class MTDNNModel(MTDNNPretrainedModel, BertModel):
 
         self._my_init()
 
-    def init_encoder(self, encoder_type: int=1):
+    def init_encoder(self, encoder_type: int = 1):
         """ Set the model encoder during initialization
         encoder_type set to 1 means BERT, 2 means RoBERTa
         """
