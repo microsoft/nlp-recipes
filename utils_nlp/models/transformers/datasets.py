@@ -223,7 +223,7 @@ def _line_iter(file_path):
             yield line
 
 
-def _preprocess(param):
+def _preprocess(sentences, preprocess_pipeline, word_tokenize=None):
     """
     Helper function to preprocess a list of paragraphs.
 
@@ -236,11 +236,14 @@ def _preprocess(param):
     Returns:
         list of list of strings, where each string is a token or word.
     """
+    if preprocess_pipeline is not None:
+        for function in preprocess_pipeline:
+            sentences = function(sentences)
 
-    sentences, preprocess_pipeline, word_tokenize = param
-    for function in preprocess_pipeline:
-        sentences = function(sentences)
-    return [word_tokenize(sentence) for sentence in sentences]
+    if word_tokenize is None:
+        return sentences
+    else:
+        return [word_tokenize(sentence) for sentence in sentences]
 
 
 def _create_data_from_iterator(iterator, preprocessing, word_tokenizer):
@@ -253,9 +256,9 @@ class SummarizationDataset(IterableDataset):
         self,
         source_file,
         target_file,
-        source_preprocessing,
-        target_preprocessing,
-        word_tokenization,
+        source_preprocessing=None,
+        target_preprocessing=None,
+        word_tokenization=None,
         top_n=-1,
         **kwargs,
     ):
@@ -274,7 +277,8 @@ class SummarizationDataset(IterableDataset):
                 process the paragraphs in the source file.
             word_tokenization (function): Tokenization function for tokenize the paragraphs
                 and summaries. The tokenization method is used for sentence selection
-                in :meth:`utils_nlp.models.transformers.extractive_summarization.ExtSumProcessor.preprocess`
+                in :meth:`utils_nlp.models.transformers.extractive_summarization.
+                ExtSumProcessor.preprocess`
             top_n (int, optional): The number which specifies how many examples in the
                 beginning of the paragraph and summary lists that will be processed by
                 this function. Defaults to -1, which means the whole lists of paragraphs

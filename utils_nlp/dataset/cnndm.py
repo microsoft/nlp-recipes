@@ -6,43 +6,42 @@
 """
     Utility functions for downloading, extracting, and reading the
     CNN/DM dataset at https://github.com/harvardnlp/sent-summary.
-    
+
 """
 
-import glob
 import nltk
 
 nltk.download("punkt")
 from nltk import tokenize
+from nltk.tokenize.treebank import TreebankWordDetokenizer
 import os
 import sys
 import regex as re
-import torch
-import torchtext
 from torchtext.utils import download_from_url, extract_archive
 import zipfile
 
-
-from utils_nlp.dataset.url_utils import maybe_download
+from utils_nlp.dataset.url_utils import maybe_download, maybe_download_googledrive, extract_zip
 from utils_nlp.models.transformers.datasets import SummarizationDataset
-from utils_nlp.models.transformers.extractive_summarization import get_dataset, get_dataloader
-
-
-
 
 
 def CNNDMSummarizationDataset(*args, **kwargs):
     """Load the CNN/Daily Mail dataset preprocessed by harvardnlp group."""
 
-    REMAP = {"-lrb-": "(", "-rrb-": ")", "-lcb-": "{", "-rcb-": "}",
-         "-lsb-": "[", "-rsb-": "]", "``": '"', "''": '"'}
+    REMAP = {
+        "-lrb-": "(",
+        "-rrb-": ")",
+        "-lcb-": "{",
+        "-rcb-": "}",
+        "-lsb-": "[",
+        "-rsb-": "]",
+        "``": '"',
+        "''": '"',
+    }
 
-    
     def _clean(x):
         return re.sub(
-            r"-lrb-|-rrb-|-lcb-|-rcb-|-lsb-|-rsb-|``|''",
-            lambda m: REMAP.get(m.group()), x)
-
+            r"-lrb-|-rrb-|-lcb-|-rcb-|-lsb-|-rsb-|``|''", lambda m: REMAP.get(m.group()), x
+        )
 
     def _remove_ttags(line):
         line = re.sub(r"<t>", "", line)
@@ -51,12 +50,10 @@ def CNNDMSummarizationDataset(*args, **kwargs):
         line = re.sub(r"</t>", "<q>", line)
         return line
 
-
     def _target_sentence_tokenization(line):
         return line.split("<q>")
 
     URLS = ["https://s3.amazonaws.com/opennmt-models/Summary/cnndm.tar.gz"]
-    
 
     def _setup_datasets(url, top_n=-1, local_cache_path=".data"):
         FILE_NAME = "cnndm.tar.gz"
@@ -93,10 +90,10 @@ def CNNDMSummarizationDataset(*args, **kwargs):
         )
 
     return _setup_datasets(*((URLS[0],) + args), **kwargs)
-    
-    
+
+
 class CNNDMBertSumProcessedData:
-    """Class to load dataset preprocessed by BertSum paper at 
+    """Class to load dataset preprocessed by BertSum paper at
         https://github.com/nlpyang/BertSum
     """
 
@@ -117,4 +114,71 @@ class CNNDMBertSumProcessedData:
         downloaded_zipfile.extractall(local_path)
         return local_path
 
-    
+
+def CNNDMSummarizationDatasetOrg(local_path=".", return_dev_data=False):
+
+    # TODO: Double check if any additional step is needed
+    def _detokenize(line):
+        twd = TreebankWordDetokenizer()
+        s_list = [
+            twd.detokenize(x.strip().split(" "), convert_parentheses=True)
+            for x in line.split("<S_SEP>")
+        ]
+
+        return " ".join(s_list)
+
+    # Download and unzip the data
+    FILE_ID = "1jiDbDbAsqy_5BM79SmX6aSu5DQVCAZq1"
+    FILE_NAME = "cnndm_data.zip"
+
+    output_dir = os.path.join(local_path, "cnndm_data")
+    os.makedirs(output_dir, exist_ok=True)
+
+    maybe_download_googledrive(
+        google_file_id=FILE_ID, file_name=FILE_NAME, work_directory=local_path
+    )
+    extract_zip(
+        file_path=os.path.join(local_path, FILE_NAME),
+        dest_path=os.path.join(local_path, output_dir),
+    )
+
+    org_data_dir = os.path.join(output_dir, "org_data")
+
+    train_source_file = os.path.join(org_data_dir, "training.article")
+    train_target_file = os.path.join(org_data_dir, "training.summary")
+    test_source_file = os.path.join(org_data_dir, "test.article")
+    test_target_file = os.path.join(org_data_dir, "test.summary")
+    dev_source_file = os.path.join(org_data_dir, "dev.article")
+    dev_target_file = os.path.join(org_data_dir, "dev.summary")
+
+    source_preprocessing = [_detokenize]
+    target_preprocessing = [_detokenize]
+
+    train_dataset = SummarizationDataset(
+        source_file=train_source_file,
+        target_file=train_target_file,
+        source_preprocessing=source_preprocessing,
+        target_preprocessing=target_preprocessing,
+        top_n=top_n,
+    )
+
+    test_dataset = SummarizationDataset(
+        source_file=test_source_file,
+        target_file=test_target_file,
+        source_preprocessing=source_preprocessing,
+        target_preprocessing=target_preprocessing,
+        top_n=top_n,
+    )
+
+    if return_dev_data:
+        dev_dataset = SummarizationDataset(
+            source_file=dev_source_file,
+            target_file=dev_target_file,
+            source_preprocessing=source_preprocessing,
+            target_preprocessing=target_preprocessing,
+            top_n=top_n,
+        )
+
+        return train_dataset, test_dataset, dev_dataset
+    else:
+        return train_dataset, test_dataset
