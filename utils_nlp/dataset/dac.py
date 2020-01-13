@@ -8,18 +8,19 @@ paper link:  ("https://www.mendeley.com/catalogue/
         arabic-text-classification-using-deep-learning-technics/")
 """
 
-import os
-import pandas as pd
 import logging
-import numpy as np
-
+import os
 from tempfile import TemporaryDirectory
-from utils_nlp.dataset.url_utils import extract_zip, maybe_download
-from utils_nlp.models.transformers.common import MAX_SEQ_LEN
-from utils_nlp.models.transformers.sequence_classification import Processor
+
+import numpy as np
+import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 
+from utils_nlp.common.pytorch_utils import dataloader_from_dataset
+from utils_nlp.dataset.url_utils import extract_zip, maybe_download
+from utils_nlp.models.transformers.common import MAX_SEQ_LEN
+from utils_nlp.models.transformers.sequence_classification import Processor
 
 URL = (
     "https://data.mendeley.com/datasets/v524p5dhpj/2"
@@ -58,7 +59,7 @@ def load_tc_dataset(
     cache_dir=TemporaryDirectory().name,
     max_len=MAX_SEQ_LEN,
     batch_size=32,
-    num_gpus=None
+    num_gpus=None,
 ):
     """
     Load the multinli dataset and split into training and testing datasets.
@@ -92,9 +93,9 @@ def load_tc_dataset(
 
     Returns:
         tuple. The tuple contains four elements:
-        train_dataload (DataLoader): a PyTorch DataLoader instance for training.
+        train_dataloader (DataLoader): a PyTorch DataLoader instance for training.
 
-        test_dataload (DataLoader): a PyTorch DataLoader instance for testing.
+        test_dataloader (DataLoader): a PyTorch DataLoader instance for testing.
         
         label_encoder (LabelEncoder): a sklearn LabelEncoder instance. The label values
             can be retrieved by calling the `inverse_transform` function.
@@ -104,11 +105,8 @@ def load_tc_dataset(
             label IDs by using the label_encoder.transform function.
     """
 
-     # download and load the original dataset
-    all_df = load_pandas_df(
-        local_cache_path=local_path,
-        num_rows=None
-    )
+    # download and load the original dataset
+    all_df = load_pandas_df(local_cache_path=local_path, num_rows=None)
 
     # set the text and label columns
     text_col = all_df.columns[0]
@@ -123,12 +121,8 @@ def load_tc_dataset(
     if test_fraction < 0 or test_fraction >= 1.0:
         logging.warning("Invalid test fraction value: {}, changed to 0.25".format(test_fraction))
         test_fraction = 0.25
-    
-    train_df, test_df = train_test_split(
-        all_df,
-        train_size=(1.0 - test_fraction),
-        random_state=random_seed
-    )
+
+    train_df, test_df = train_test_split(all_df, train_size=(1.0 - test_fraction), random_state=random_seed)
 
     if train_sample_ratio > 1.0:
         train_sample_ratio = 1.0
@@ -136,7 +130,7 @@ def load_tc_dataset(
     elif train_sample_ratio < 0:
         logging.error("Invalid training sample ration: {}".format(train_sample_ratio))
         raise ValueError("Invalid training sample ration: {}".format(train_sample_ratio))
-    
+
     if test_sample_ratio > 1.0:
         test_sample_ratio = 1.0
         logging.warning("Setting the testing sample ratio to 1.0")
@@ -149,35 +143,17 @@ def load_tc_dataset(
     if test_sample_ratio < 1.0:
         test_df = test_df.sample(frac=test_sample_ratio).reset_index(drop=True)
 
-    processor = Processor(
-        model_name=model_name,
-        to_lower=to_lower,
-        cache_dir=cache_dir
-    )
+    processor = Processor(model_name=model_name, to_lower=to_lower, cache_dir=cache_dir)
 
-    train_dataloader = processor.create_dataloader_from_df(
-        df=train_df,
-        text_col=text_col,
-        label_col=label_col,
-        max_len=max_len,
-        text2_col=None,
-        batch_size=batch_size,
-        num_gpus=num_gpus,
-        shuffle=True,
-        distributed=False
+    train_dataset = processor.dataset_from_dataframe(
+        df=train_df, text_col=text_col, label_col=label_col, max_len=max_len,
     )
+    train_dataloader = dataloader_from_dataset(train_dataset, batch_size=batch_size, num_gpus=num_gpus, shuffle=True)
 
-    test_dataloader = processor.create_dataloader_from_df(
-        df=test_df,
-        text_col=text_col,
-        label_col=label_col,
-        max_len=max_len,
-        text2_col=None,
-        batch_size=batch_size,
-        num_gpus=num_gpus,
-        shuffle=False,
-        distributed=False
+    test_dataset = processor.dataset_from_dataframe(
+        df=test_df, text_col=text_col, label_col=label_col, max_len=max_len,
     )
+    test_dataloader = dataloader_from_dataset(test_dataset, batch_size=batch_size, num_gpus=num_gpus, shuffle=False)
 
     # the DAC dataset already converted the labels to label ID format
     test_labels = test_df[label_col]

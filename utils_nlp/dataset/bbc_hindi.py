@@ -7,24 +7,22 @@
     https://github.com/NirantK/hindi2vec/releases/tag/bbc-hindi-v0.1
 """
 
-import os
-import pandas as pd
 import logging
-import numpy as np
+import os
 import tarfile
-
 from tempfile import TemporaryDirectory
+
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
+
+from utils_nlp.common.pytorch_utils import dataloader_from_dataset
 from utils_nlp.dataset.url_utils import maybe_download
 from utils_nlp.models.transformers.common import MAX_SEQ_LEN
 from utils_nlp.models.transformers.sequence_classification import Processor
-from sklearn.preprocessing import LabelEncoder
-from sklearn.model_selection import train_test_split
 
-
-URL = (
-    "https://github.com/NirantK/hindi2vec/releases/"
-    "download/bbc-hindi-v0.1/bbc-hindiv01.tar.gz"
-)
+URL = "https://github.com/NirantK/hindi2vec/releases/" "download/bbc-hindi-v0.1/bbc-hindiv01.tar.gz"
 
 
 def load_pandas_df(local_cache_path=TemporaryDirectory().name):
@@ -49,19 +47,9 @@ def load_pandas_df(local_cache_path=TemporaryDirectory().name):
     train_csv_file_path = os.path.join(local_cache_path, "hindi-train.csv")
     test_csv_file_path = os.path.join(local_cache_path, "hindi-test.csv")
 
-    train_df = pd.read_csv(
-        train_csv_file_path,
-        sep="\t",
-        encoding='utf-8',
-        header=None
-    )
+    train_df = pd.read_csv(train_csv_file_path, sep="\t", encoding="utf-8", header=None)
 
-    test_df = pd.read_csv(
-        test_csv_file_path,
-        sep="\t",
-        encoding='utf-8',
-        header=None
-    )
+    test_df = pd.read_csv(test_csv_file_path, sep="\t", encoding="utf-8", header=None)
 
     train_df = train_df.fillna("")
     test_df = test_df.fillna("")
@@ -80,7 +68,7 @@ def load_tc_dataset(
     cache_dir=TemporaryDirectory().name,
     max_len=MAX_SEQ_LEN,
     batch_size=32,
-    num_gpus=None
+    num_gpus=None,
 ):
     """
     Load the multinli dataset and split into training and testing datasets.
@@ -114,9 +102,9 @@ def load_tc_dataset(
 
     Returns:
         tuple. The tuple contains four elements:
-        train_dataload (DataLoader): a PyTorch DataLoader instance for training.
+        train_dataloader (DataLoader): a PyTorch DataLoader instance for training.
 
-        test_dataload (DataLoader): a PyTorch DataLoader instance for testing.
+        test_dataloader (DataLoader): a PyTorch DataLoader instance for testing.
         
         label_encoder (LabelEncoder): a sklearn LabelEncoder instance. The label values
             can be retrieved by calling the `inverse_transform` function.
@@ -140,12 +128,8 @@ def load_tc_dataset(
     if test_fraction < 0 or test_fraction >= 1.0:
         logging.warning("Invalid test fraction value: {}, changed to 0.25".format(test_fraction))
         test_fraction = 0.25
-    
-    train_df, test_df = train_test_split(
-        all_df,
-        train_size=(1.0 - test_fraction),
-        random_state=random_seed
-    )
+
+    train_df, test_df = train_test_split(all_df, train_size=(1.0 - test_fraction), random_state=random_seed)
 
     if train_sample_ratio > 1.0:
         train_sample_ratio = 1.0
@@ -153,7 +137,7 @@ def load_tc_dataset(
     elif train_sample_ratio < 0:
         logging.error("Invalid training sample ration: {}".format(train_sample_ratio))
         raise ValueError("Invalid training sample ration: {}".format(train_sample_ratio))
-    
+
     if test_sample_ratio > 1.0:
         test_sample_ratio = 1.0
         logging.warning("Setting the testing sample ratio to 1.0")
@@ -171,35 +155,17 @@ def load_tc_dataset(
     test_labels = label_encoder.transform(test_df[label_col])
     test_df[label_col] = test_labels
 
-    processor = Processor(
-        model_name=model_name,
-        to_lower=to_lower,
-        cache_dir=cache_dir
-    )
+    processor = Processor(model_name=model_name, to_lower=to_lower, cache_dir=cache_dir)
 
-    train_dataloader = processor.create_dataloader_from_df(
-        df=train_df,
-        text_col=text_col,
-        label_col=label_col,
-        max_len=max_len,
-        text2_col=None,
-        batch_size=batch_size,
-        num_gpus=num_gpus,
-        shuffle=True,
-        distributed=False
+    train_dataset = processor.dataset_from_dataframe(
+        df=train_df, text_col=text_col, label_col=label_col, max_len=max_len,
     )
+    train_dataloader = dataloader_from_dataset(train_dataset, batch_size=batch_size, num_gpus=num_gpus, shuffle=True)
 
-    test_dataloader = processor.create_dataloader_from_df(
-        df=test_df,
-        text_col=text_col,
-        label_col=label_col,
-        max_len=max_len,
-        text2_col=None,
-        batch_size=batch_size,
-        num_gpus=num_gpus,
-        shuffle=False,
-        distributed=False
+    test_dataset = processor.dataset_from_dataframe(
+        df=test_df, text_col=text_col, label_col=label_col, max_len=max_len,
     )
+    test_dataloader = dataloader_from_dataset(test_dataset, batch_size=batch_size, num_gpus=num_gpus, shuffle=False)
 
     return (train_dataloader, test_dataloader, label_encoder, test_labels)
 
