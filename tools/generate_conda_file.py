@@ -87,6 +87,7 @@ PIP_BASE = {
     "gensim": "gensim>=3.7.0",
     "nltk": "nltk>=3.4",
     "seqeval": "seqeval>=0.0.12",
+    "fairseq": "fairseq>=0.8.0",
 }
 
 PIP_GPU = {}
