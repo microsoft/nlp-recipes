@@ -53,7 +53,7 @@ CONDA_BASE = {
 CONDA_GPU = {
     "numba": "numba>=0.38.1",
     "pytorch": "pytorch>=1.0.0",
-    "cudatoolkit": "cudatoolkit",
+    "cudatoolkit": "cudatoolkit==10.2.89",
 }
 
 PIP_BASE = {
