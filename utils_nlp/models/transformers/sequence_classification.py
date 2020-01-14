@@ -2,29 +2,16 @@
 # Licensed under the MIT License.
 
 import numpy as np
-import torch
-from transformers.modeling_albert import (
-    ALBERT_PRETRAINED_MODEL_ARCHIVE_MAP,
-    AlbertForSequenceClassification,
-)
-from transformers.modeling_bert import (
-    BERT_PRETRAINED_MODEL_ARCHIVE_MAP,
-    BertForSequenceClassification,
-)
+from transformers.modeling_albert import ALBERT_PRETRAINED_MODEL_ARCHIVE_MAP, AlbertForSequenceClassification
+from transformers.modeling_bert import BERT_PRETRAINED_MODEL_ARCHIVE_MAP, BertForSequenceClassification
 from transformers.modeling_distilbert import (
     DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP,
     DistilBertForSequenceClassification,
 )
-from transformers.modeling_roberta import (
-    ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP,
-    RobertaForSequenceClassification,
-)
-from transformers.modeling_xlnet import (
-    XLNET_PRETRAINED_MODEL_ARCHIVE_MAP,
-    XLNetForSequenceClassification,
-)
+from transformers.modeling_roberta import ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP, RobertaForSequenceClassification
+from transformers.modeling_xlnet import XLNET_PRETRAINED_MODEL_ARCHIVE_MAP, XLNetForSequenceClassification
 
-from utils_nlp.common.pytorch_utils import get_device, move_model_to_device, compute_training_steps
+from utils_nlp.common.pytorch_utils import compute_training_steps, get_device, move_model_to_device
 from utils_nlp.models.transformers.common import MAX_SEQ_LEN, TOKENIZER_CLASS, Transformer
 from utils_nlp.models.transformers.datasets import SCDataSet, SPCDataSet
 
@@ -279,7 +266,7 @@ class SequenceClassifier(Transformer):
             gradient_accumulation_steps=gradient_accumulation_steps,
         )
 
-        # inin scheduler
+        # init scheduler
         scheduler = Transformer.get_default_scheduler(
             optimizer=optimizer, warmup_steps=warmup_steps, num_training_steps=max_steps,
         )
