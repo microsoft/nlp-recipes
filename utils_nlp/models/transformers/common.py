@@ -183,6 +183,8 @@ class Transformer:
                     epoch_iterator.close()
                     break
 
+        #del [batch]
+        #torch.cuda.empty_cache()
         return global_step, tr_loss / global_step
 
     def predict(self, eval_dataloader, device, get_inputs, verbose=True):
