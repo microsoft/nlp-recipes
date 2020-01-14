@@ -3,6 +3,7 @@
 
 # This script reuses some code from https://github.com/nlpyang/BertSum
 
+import gc
 import itertools
 import logging
 import numpy as np
@@ -17,7 +18,7 @@ from torch.utils.data import DataLoader, SequentialSampler
 from transformers import DistilBertModel, BertModel
 
 from bertsum.models import model_builder, data_loader
-from bertsum.models.data_loader import Batch
+from bertsum.models.data_loader import Batch, DataIterator
 from bertsum.models.model_builder import Summarizer
 
 from utils_nlp.common.pytorch_utils import get_device
@@ -28,6 +29,85 @@ MODEL_CLASS = {"bert-base-uncased": BertModel, "distilbert-base-uncased": Distil
 
 logger = logging.getLogger(__name__)
 
+# https://pytorch.org/docs/1.1.0/_modules/torch/utils/data/dataloader.html
+class IterableDistributedSampler(object):
+    def __init__(self, world_size=1, local_rank=-1):
+        self.world_size = world_size
+        self.local_rank = local_rank
+        
+    def iter(self, iterable):
+        if self.local_rank != -1:
+            return itertools.islice(iterable, self.local_rank, None, self.world_size)
+        else:
+            return iterable
+"""
+import sys
+sys.path.insert(0, "../../")
+from utils_nlp.models.transformers.extractive_summarization import test_sampler
+test_sampler()
+"""
+def test_sampler():
+    sampler = IterableDistributedSampler(1, -1)
+    for item in sampler.iter('abcdefg'):
+        print(item)
+    print("----------------------------")
+    sampler = IterableDistributedSampler(2, -1)
+    for item in sampler.iter('abcdefg'):
+        print(item)
+    print("----------------------------")
+    sampler = IterableDistributedSampler(4, 1)
+    for item in sampler.iter('abcdefg'):
+        print(item)
+    print("----------------------------")
+    sampler = IterableDistributedSampler(4, 2)
+    for item in sampler.iter('abcdefg'):
+        print(item)
+    print("----------------------------")
+    sampler = IterableDistributedSampler(4, 3)
+    for item in sampler.iter('abcdefg'):
+        print(item)
+    print("----------------------------")
+    
+class Dataloader(object):
+    def __init__(self, datasets,  batch_size,
+                 shuffle, is_labeled, sampler):
+        self.datasets = datasets
+        self.batch_size = batch_size
+        self.shuffle = shuffle
+        self.is_labeled = is_labeled
+        self.cur_iter = self._next_dataset_iterator(datasets)
+        assert self.cur_iter is not None
+        self.sampler = sampler
+        
+
+    def eachiter(self):
+        dataset_iter = (d for d in self.datasets)
+        while self.cur_iter is not None:
+            for batch in self.cur_iter:
+                yield batch
+            self.cur_iter = self._next_dataset_iterator(dataset_iter)
+            
+    def __iter__(self):
+        return self.sampler.iter(self.eachiter())
+
+
+    def _next_dataset_iterator(self, dataset_iter):
+        try:
+            # Drop the current dataset for decreasing memory
+            if hasattr(self, "cur_dataset"):
+                self.cur_dataset = None
+                gc.collect()
+                del self.cur_dataset
+                gc.collect()
+
+            self.cur_dataset = next(dataset_iter)
+        except StopIteration:
+            return None
+
+        return DataIterator(
+            dataset=self.cur_dataset,  batch_size=self.batch_size,
+            shuffle=self.shuffle, is_labeled=self.is_labeled)
+    
 
 class Bunch(object):
     """ Class which convert a dictionary to an object """
@@ -36,7 +116,7 @@ class Bunch(object):
         self.__dict__.update(adict)
 
 
-def get_dataloader(data_iter, shuffle=True, is_labeled=False, batch_size=3000):
+def get_dataloader(data_iter, shuffle=True, is_labeled=False, batch_size=3000, world_size=1, local_rank=-1):
     """
     Function to get data iterator over a list of data objects.
 
@@ -49,8 +129,9 @@ def get_dataloader(data_iter, shuffle=True, is_labeled=False, batch_size=3000):
     Returns:
         DataIterator
     """
-
-    return data_loader.Dataloader(data_iter, batch_size, shuffle=shuffle, is_labeled=is_labeled)
+    sampler = IterableDistributedSampler(world_size, local_rank)
+    #return data_loader.Dataloader(data_iter, batch_size, shuffle=shuffle, is_labeled=is_labeled, sampler=sampler)
+    return Dataloader(data_iter, batch_size, shuffle=shuffle, is_labeled=is_labeled, sampler=sampler)
 
 
 def get_dataset(file):
@@ -595,7 +676,7 @@ class ExtractiveSummarizer(Transformer):
 
         # batch_size is the number of tokens in a batch
         train_dataloader = get_dataloader(
-            train_dataset.get_stream(), is_labeled=True, batch_size=batch_size
+            train_dataset.get_stream(), is_labeled=True, batch_size=batch_size, world_size=num_gpus, local_rank=local_rank
         )
 
         super().fine_tune(
@@ -753,4 +834,7 @@ class ExtractiveSummarizer(Transformer):
 
         full_name = os.path.join(output_model_dir, name)
         logger.info("Saving model checkpoint to %s", full_name)
-        torch.save(self.model, name)
+        model_to_save = (
+            self.model.module if hasattr(self.model, "module") else self.model
+        )  # Take care of distributed/parallel training
+        torch.save(model_to_save, full_name)

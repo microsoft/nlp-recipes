@@ -173,8 +173,8 @@ class Transformer:
             if num_gpus > 1:
                 self.model = torch.nn.DataParallel(self.model, device_ids=list(range(num_gpus)))
 
-        self.model.to(device)
-        self.model.train()
+        #self.model.to(device)
+
 
         global_step = 0
         tr_loss = 0.0
