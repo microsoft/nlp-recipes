@@ -85,6 +85,9 @@ def notebooks():
         "deep_and_unified_understanding": os.path.join(
             folder_notebooks, "model_explainability", "interpret_dnn_layers.ipynb"
         ),
+        "extractive_summarization_cnndm_transformer": os.path.join(
+            folder_notebooks, "text_summarization", "extractive_summarization_cnndm_transformer.ipynb"
+        ),
     }
     return paths
 

@@ -113,7 +113,7 @@ class Processor:
 
         Args:
             text_1 (str): Input text 1.
-            text_1 (str): Input text 2.
+            text_2 (str): Input text 2.
             tokenizer (PreTrainedTokenizer): A pretrained tokenizer.
             max_len (int, optional): Max sequence length. Defaults to 512.
 

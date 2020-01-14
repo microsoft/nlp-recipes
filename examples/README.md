@@ -6,6 +6,7 @@ This folder contains examples and best practices, written in Jupyter notebooks, 
 |---| ------------------------ | ------------------- |---|
 |[Text Classification](text_classification)|Topic Classification|BERT, XLNet, RoBERTa, DistilBERT|en, hi, ar|
 |[Named Entity Recognition](named_entity_recognition) |Wikipedia NER|BERT|en|
+|[Text Summarization](text_summarization)|News Summarization, Headline Generation|Extractive: BERTSumExt <br> Abstractive: WIP, ETA: Mar. 2020|en
 |[Entailment](entailment)|MultiNLI Natural Language Inference|BERT|en|
 |[Question Answering](question_answering) |SQuAD|BiDAF, BERT, XLNet, DistilBERT|en|
 |[Sentence Similarity](sentence_similarity)|STS Benchmark|BERT, GenSen|en|
