@@ -44,7 +44,8 @@ CONDA_BASE = {
     "pytorch": "pytorch-cpu>=1.0.0",
     "scipy": "scipy>=1.0.0",
     "h5py": "h5py>=2.8.0",
-    "tensorflow-hub": "tensorflow-hub==0.5.0",
+    "tensorflow": "tensorflow==1.15.0",
+    "tensorflow-hub": "tensorflow-hub==0.7.0",
     "dask": "dask[dataframe]==1.2.2",
     "papermill": "papermill>=1.0.1",
 }
@@ -52,7 +53,7 @@ CONDA_BASE = {
 CONDA_GPU = {
     "numba": "numba>=0.38.1",
     "pytorch": "pytorch>=1.0.0",
-    "cudatoolkit": "cudatoolkit==9.2",
+    "cudatoolkit": "cudatoolkit==10.2.89",
 }
 
 PIP_BASE = {
