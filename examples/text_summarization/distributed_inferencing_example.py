@@ -112,7 +112,7 @@ if __name__ == "__main__":
                   (2, ["dalfsdfha"], ["dahfldsakd"],
                   (1, ["okay", ["okay"]]))]
         predictions = []
-        new_list = sorted([results, key=lambda x: x[0])
+        new_list = sorted(results, key=lambda x: x[0])
         for i in range(len(new_list)):
             print(len(new_list[i][1]))
-            print((results[i][1][2])
+            print(results[i][1][2])

@@ -23,6 +23,7 @@ from transformers.modeling_xlnet import (
 )
 from utils_nlp.models.transformers.common import MAX_SEQ_LEN, TOKENIZER_CLASS, Transformer
 from utils_nlp.models.transformers.datasets import SCDataSet, SPCDataSet
+from utils_nlp.common.pytorch_utils import get_device
 
 MODEL_CLASS = {}
 MODEL_CLASS.update({k: BertForSequenceClassification for k in BERT_PRETRAINED_MODEL_ARCHIVE_MAP})
@@ -187,6 +188,24 @@ class Processor:
         attention_mask = [min(1, x) for x in input_ids]
 
         return input_ids, attention_mask, token_type_ids
+    
+    
+    def dataset_from_dataframe(self, df, text_col, label_col=None, text2_col=None, max_len=MAX_SEQ_LEN):
+        if text2_col is None:
+            return SCDataSet(
+                df, text_col, label_col, transform=Processor.text_transform, tokenizer=self.tokenizer, max_len=max_len,
+            )
+        else:
+            return SPCDataSet(
+                df,
+                text_col,
+                text2_col,
+                label_col,
+                transform=Processor.text_pair_transform,
+                tokenizer=self.tokenizer,
+                max_len=max_len,
+            )
+        
 
     def create_dataloader_from_df(
         self,
@@ -199,6 +218,7 @@ class Processor:
         batch_size=32,
         num_gpus=None,
         distributed=False,
+        rank=-1,
     ):
         """
         Creates a PyTorch DataLoader from a Pandas DataFrame for sequence classification tasks.    
@@ -306,6 +326,8 @@ class SequenceClassifier(Transformer):
             verbose (bool, optional): Whether to print out the training log. Defaults to True.
             seed (int, optional): Random seed used to improve reproducibility. Defaults to None.
         """
+        device, num_gpus = get_device(num_gpus=num_gpus, local_rank=local_rank)
+        self.model.to(device)
 
         super().fine_tune(
             train_dataloader=train_dataloader,

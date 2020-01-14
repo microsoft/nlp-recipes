@@ -107,7 +107,7 @@ class Transformer:
         clip_grad_norm=True,
     ):
 
-        device, num_gpus = get_device(num_gpus=n_gpu, local_rank=-1)
+        device, num_gpus = get_device(num_gpus=n_gpu, local_rank=local_rank)
 
         if seed is not None:
             Transformer.set_seed(seed, num_gpus > 0)
