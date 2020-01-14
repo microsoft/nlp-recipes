@@ -17,38 +17,30 @@
 # Modifications copyright © Microsoft Corporation
 
 
-import os
-import logging
-from tqdm import tqdm
 import collections
 import json
+import logging
 import math
+import os
+
 import jsonlines
-
 import torch
-from torch.utils.data import TensorDataset, SequentialSampler, DataLoader, RandomSampler
-from torch.utils.data.distributed import DistributedSampler
-
-from transformers.tokenization_bert import BasicTokenizer, whitespace_tokenize
+from torch.utils.data import TensorDataset
+from tqdm import tqdm
+from transformers.modeling_albert import ALBERT_PRETRAINED_MODEL_ARCHIVE_MAP, AlbertForQuestionAnswering
 from transformers.modeling_bert import BERT_PRETRAINED_MODEL_ARCHIVE_MAP, BertForQuestionAnswering
-from transformers.modeling_xlnet import (
-    XLNET_PRETRAINED_MODEL_ARCHIVE_MAP,
-    XLNetForQuestionAnswering,
-)
-from transformers.modeling_distilbert import (
-    DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP,
-    DistilBertForQuestionAnswering,
-)
+from transformers.modeling_distilbert import DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP, DistilBertForQuestionAnswering
+from transformers.modeling_xlnet import XLNET_PRETRAINED_MODEL_ARCHIVE_MAP, XLNetForQuestionAnswering
+from transformers.tokenization_bert import BasicTokenizer, whitespace_tokenize
 
-from utils_nlp.common.pytorch_utils import get_device
+from utils_nlp.common.pytorch_utils import compute_training_steps, get_device, move_model_to_device
 from utils_nlp.models.transformers.common import MAX_SEQ_LEN, TOKENIZER_CLASS, Transformer
 
 MODEL_CLASS = {}
 MODEL_CLASS.update({k: BertForQuestionAnswering for k in BERT_PRETRAINED_MODEL_ARCHIVE_MAP})
 MODEL_CLASS.update({k: XLNetForQuestionAnswering for k in XLNET_PRETRAINED_MODEL_ARCHIVE_MAP})
-MODEL_CLASS.update(
-    {k: DistilBertForQuestionAnswering for k in DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP}
-)
+MODEL_CLASS.update({k: DistilBertForQuestionAnswering for k in DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP})
+MODEL_CLASS.update({k: AlbertForQuestionAnswering for k in ALBERT_PRETRAINED_MODEL_ARCHIVE_MAP})
 
 # cached files during preprocessing
 # these are used in postprocessing to generate the final answer texts
@@ -85,9 +77,7 @@ class QAProcessor:
         cache_dir (str, optional): Directory to cache the tokenizer. Defaults to ".".
     """
 
-    def __init__(
-        self, model_name="bert-base-cased", to_lower=False, custom_tokenize=None, cache_dir="."
-    ):
+    def __init__(self, model_name="bert-base-cased", to_lower=False, custom_tokenize=None, cache_dir="."):
         self.model_name = model_name
         self.tokenizer = TOKENIZER_CLASS[model_name].from_pretrained(
             model_name, do_lower_case=to_lower, cache_dir=cache_dir, output_loading_info=False
@@ -116,13 +106,14 @@ class QAProcessor:
         return self._model_type
 
     @staticmethod
-    def get_inputs(batch, model_name, train_mode=True):
+    def get_inputs(batch, device, model_name, train_mode=True):
         """
         Creates an input dictionary given a model name.
 
         Args:
             batch (tuple): A tuple containing input ids, attention mask,
                 segment ids, and labels tensors.
+            device (torch.device): A PyTorch device.
             model_name (bool, optional): Model name used to format the inputs.
             train_mode (bool, optional): Training mode flag.
                 Defaults to True.
@@ -131,6 +122,7 @@ class QAProcessor:
             dict: Dictionary containing input ids, segment ids, masks, and labels.
                 Labels are only returned when train_mode is True.
         """
+        batch = tuple(t.to(device) for t in batch)
         model_type = model_name.split("-")[0]
 
         inputs = {"input_ids": batch[0], "attention_mask": batch[1]}
@@ -191,6 +183,8 @@ class QAProcessor:
                 directory. These files are required during postprocessing to generate the final
                 answer texts from predicted answer start and answer end indices. Defaults to
                 "./cached_qa_features".
+        Returns:
+            DataSet: A Pytorch DataSet.        
         """
 
         if not os.path.exists(feature_cache_dir):
@@ -223,9 +217,7 @@ class QAProcessor:
 
                 qa_examples.append(qa_example_cur)
 
-                qa_examples_json.append(
-                    {"qa_id": qa_example_cur.qa_id, "doc_tokens": qa_example_cur.doc_tokens}
-                )
+                qa_examples_json.append({"qa_id": qa_example_cur.qa_id, "doc_tokens": qa_example_cur.doc_tokens})
 
                 features_cur = _create_qa_features(
                     qa_example_cur,
@@ -271,28 +263,13 @@ class QAProcessor:
             start_positions = torch.tensor([f.start_position for f in features], dtype=torch.long)
             end_positions = torch.tensor([f.end_position for f in features], dtype=torch.long)
             qa_dataset = TensorDataset(
-                input_ids,
-                input_mask,
-                segment_ids,
-                start_positions,
-                end_positions,
-                cls_index,
-                p_mask,
+                input_ids, input_mask, segment_ids, start_positions, end_positions, cls_index, p_mask,
             )
         else:
             unique_id_all = torch.tensor(unique_id_all, dtype=torch.long)
-            qa_dataset = TensorDataset(
-                input_ids, input_mask, segment_ids, cls_index, p_mask, unique_id_all
-            )
+            qa_dataset = TensorDataset(input_ids, input_mask, segment_ids, cls_index, p_mask, unique_id_all)
 
-        if num_gpus is not None:
-            batch_size = batch_size * max(1, num_gpus)
-        if distributed:
-            sampler = DistributedSampler(qa_dataset)
-        else:
-            sampler = RandomSampler(qa_dataset) if is_training else SequentialSampler(qa_dataset)
-
-        return DataLoader(qa_dataset, sampler=sampler, batch_size=batch_size)
+        return qa_dataset
 
     def postprocess(
         self,
@@ -420,14 +397,7 @@ class QAResult(QAResult_):
 
 QAResultExtended_ = collections.namedtuple(
     "QAResultExtended",
-    [
-        "unique_id",
-        "start_top_log_probs",
-        "start_top_index",
-        "end_top_log_probs",
-        "end_top_index",
-        "cls_logits",
-    ],
+    ["unique_id", "start_top_log_probs", "start_top_index", "end_top_log_probs", "end_top_index", "cls_logits",],
 )
 
 
@@ -489,18 +459,16 @@ class AnswerExtractor(Transformer):
     def fit(
         self,
         train_dataloader,
-        num_gpus=None,
         num_epochs=1,
-        learning_rate=5e-5,
-        max_grad_norm=1.0,
         max_steps=-1,
         gradient_accumulation_steps=1,
-        warmup_steps=0,
-        weight_decay=0.0,
-        adam_epsilon=1e-8,
-        fp16=False,
-        fp16_opt_level="O1",
+        num_gpus=None,
+        gpu_ids=None,
         local_rank=-1,
+        weight_decay=0.0,
+        learning_rate=5e-5,
+        adam_epsilon=1e-8,
+        warmup_steps=0,
         verbose=True,
         seed=None,
         cache_model=True,
@@ -509,31 +477,30 @@ class AnswerExtractor(Transformer):
         Fine-tune pre-trained transofmer models for question answering.
 
         Args:
-            train_dataloader (Dataloader): Dataloader for the training data.
-            num_gpus (int, optional): The number of GPUs to use. If None, all available GPUs will
-                be used. If set to 0 or GPUs are not available, CPU device will
-                be used. Defaults to None.
+            train_dataloader (Dataloader): A PyTorch DataLoader to be used for training.
             num_epochs (int, optional): Number of training epochs. Defaults to 1.
-            learning_rate (float, optional):  Learning rate of the AdamW optimizer. Defaults to
-                5e-5.
-            max_grad_norm (float, optional): Maximum gradient norm for gradient clipping.
-                Defaults to 1.0.
-            max_steps (int, optional): Maximum number of training steps. If specified,
-                `num_epochs` will be ignored. Defaults to -1.
-            gradient_accumulation_steps (int, optional): Number of batches to accumulate
-                gradients on between each model parameter update. Defaults to 1.
-            warmup_steps (int, optional): Number of steps taken to increase learning rate from 0
-                to `learning rate`. Defaults to 0.
-            weight_decay (float, optional): Weight decay to apply after each parameter update.
-                Defaults to 0.0.
-            adam_epsilon (float, optional): Epsilon of the AdamW optimizer. Defaults to 1e-8.
-            fp16 (bool, optional): Whether to use 16-bit (mixed) precision (through NVIDIA apex)
-                instead of 32-bit. Defaults to False.
-            fp16_opt_level (str, optional): For fp16: Apex AMP optimization level selected in
-                ['O0', 'O1', 'O2', and 'O3']. See details at https://nvidia.github.io/apex/amp.html.
-                Defaults to "O1",
+            max_steps (int, optional): Total number of training steps.
+                If set to a positive value, it overrides num_epochs.
+                Otherwise, it's determined by the dataset length, gradient_accumulation_steps, and num_epochs.
+                Defualts to -1.
+            gradient_accumulation_steps (int, optional): Number of steps to accumulate
+                before performing a backward/update pass.
+                Default to 1.
+            num_gpus (int, optional): The number of GPUs to use. If None, all available GPUs will
+                be used. If set to 0 or GPUs are not available, CPU device will be used.
+                Defaults to None.
+            gpu_ids (list): List of GPU IDs to be used.
+                If set to None, the first num_gpus GPUs will be used.
+                Defaults to None.
             local_rank (int, optional): Local_rank for distributed training on GPUs. Defaults to
                 -1, which means non-distributed training.
+            weight_decay (float, optional): Weight decay to apply after each parameter update.
+                Defaults to 0.0.
+            learning_rate (float, optional):  Learning rate of the AdamW optimizer. Defaults to
+                5e-5.
+            adam_epsilon (float, optional): Epsilon of the AdamW optimizer. Defaults to 1e-8.
+            warmup_steps (int, optional): Number of steps taken to increase learning rate from 0
+                to `learning rate`. Defaults to 0.
             verbose (bool, optional): Whether to print out the training log. Defaults to True.
             seed (int, optional): Random seed used to improve reproducibility. Defaults to None.
             cache_model (bool, optional): Whether to save the fine-tuned model. If True,
@@ -542,28 +509,47 @@ class AnswerExtractor(Transformer):
 
         """
 
+        # get device
+        device, num_gpus = get_device(num_gpus=num_gpus, local_rank=local_rank)
+
+        # move model
+        self.model = move_model_to_device(self.model, device, num_gpus, gpu_ids, local_rank)
+
+        # init optimizer
+        optimizer = Transformer.get_default_optimizer(self.model, weight_decay, learning_rate, adam_epsilon)
+
+        # compute the max number of training steps
+        max_steps = compute_training_steps(
+            train_dataloader,
+            num_epochs=num_epochs,
+            max_steps=max_steps,
+            gradient_accumulation_steps=gradient_accumulation_steps,
+        )
+
+        # inin scheduler
+        scheduler = Transformer.get_default_scheduler(
+            optimizer=optimizer, warmup_steps=warmup_steps, num_training_steps=max_steps,
+        )
+
+        # fine tune
         super().fine_tune(
             train_dataloader=train_dataloader,
+            device=device,
+            num_gpus=num_gpus,
             get_inputs=QAProcessor.get_inputs,
             max_steps=max_steps,
-            num_train_epochs=num_epochs,
-            max_grad_norm=max_grad_norm,
             gradient_accumulation_steps=gradient_accumulation_steps,
-            n_gpu=num_gpus,
-            weight_decay=weight_decay,
-            learning_rate=learning_rate,
-            adam_epsilon=adam_epsilon,
-            warmup_steps=warmup_steps,
-            fp16=fp16,
-            fp16_opt_level=fp16_opt_level,
+            optimizer=optimizer,
+            scheduler=scheduler,
             local_rank=local_rank,
             verbose=verbose,
             seed=seed,
         )
+
         if cache_model:
             self.save_model()
 
-    def predict(self, test_dataloader, num_gpus=None, verbose=True):
+    def predict(self, test_dataloader, num_gpus=None, gpu_ids=None, verbose=True):
 
         """
         Predicts answer start and end logits.
@@ -573,8 +559,9 @@ class AnswerExtractor(Transformer):
             num_gpus (int, optional): The number of GPUs to use. If None, all available GPUs will
                 be used. If set to 0 or GPUs are not available, CPU device will
                 be used. Defaults to None.
-            local_rank (int, optional): Local_rank for distributed training on GPUs. Defaults to
-                -1, which means non-distributed.
+            gpu_ids (list): List of GPU IDs to be used.
+                If set to None, the first num_gpus GPUs will be used.
+                Defaults to None.
             verbose (bool, optional): Whether to print out the predicting log. Defaults to True.
 
         Returns:
@@ -584,25 +571,16 @@ class AnswerExtractor(Transformer):
         def _to_list(tensor):
             return tensor.detach().cpu().tolist()
 
+        # get device
         device, num_gpus = get_device(num_gpus=num_gpus, local_rank=-1)
-
-        if isinstance(self.model, torch.nn.DataParallel):
-            self.model = self.model.module
-
-        if num_gpus > 1:
-            self.model = torch.nn.DataParallel(self.model, device_ids=list(range(num_gpus)))
-
-        self.model.to(device)
-        self.model.eval()
+        # move model
+        self.model = move_model_to_device(self.model, device, num_gpus, gpu_ids, local_rank=-1)
 
         all_results = []
         for batch in tqdm(test_dataloader, desc="Evaluating", disable=not verbose):
-            batch = tuple(t.to(device) for t in batch)
             with torch.no_grad():
-                inputs = QAProcessor.get_inputs(batch, self.model_name, train_mode=False)
-
+                inputs = QAProcessor.get_inputs(batch, device, self.model_name, train_mode=False)
                 outputs = self.model(**inputs)
-
                 unique_id_tensor = batch[5]
 
             for i, u_id in enumerate(unique_id_tensor):
@@ -617,9 +595,7 @@ class AnswerExtractor(Transformer):
                     )
                 else:
                     result = QAResult(
-                        unique_id=u_id.item(),
-                        start_logits=_to_list(outputs[0][i]),
-                        end_logits=_to_list(outputs[1][i]),
+                        unique_id=u_id.item(), start_logits=_to_list(outputs[0][i]), end_logits=_to_list(outputs[1][i]),
                     )
                 all_results.append(result)
             torch.cuda.empty_cache()
@@ -783,9 +759,7 @@ def postprocess_bert_answer(
 
         # Sort by the sum of the start and end logits in ascending order,
         # so that the first element is the most probable answer
-        prelim_predictions = sorted(
-            prelim_predictions, key=lambda x: (x.start_logit + x.end_logit), reverse=True
-        )
+        prelim_predictions = sorted(prelim_predictions, key=lambda x: (x.start_logit + x.end_logit), reverse=True)
 
         seen_predictions = {}
         nbest = []
@@ -818,19 +792,11 @@ def postprocess_bert_answer(
                 final_text = ""
                 seen_predictions[final_text] = True
 
-            nbest.append(
-                _NbestPrediction(
-                    text=final_text, start_logit=pred.start_logit, end_logit=pred.end_logit
-                )
-            )
+            nbest.append(_NbestPrediction(text=final_text, start_logit=pred.start_logit, end_logit=pred.end_logit))
         # if we didn't include the empty option in the n-best, include it
         if unanswerable_exists:
             if "" not in seen_predictions:
-                nbest.append(
-                    _NbestPrediction(
-                        text="", start_logit=null_start_logit, end_logit=null_end_logit
-                    )
-                )
+                nbest.append(_NbestPrediction(text="", start_logit=null_start_logit, end_logit=null_end_logit))
 
             # In very rare edge cases we could only have single null prediction.
             # So we just create a nonce prediction in this case to avoid failure.
@@ -874,9 +840,7 @@ def postprocess_bert_answer(
             all_probs[example["qa_id"]] = nbest_json[0]["probability"]
         else:
             # predict "" iff the null score - the score of best non-null > threshold
-            score_diff = (
-                score_null - best_non_null_entry.start_logit - (best_non_null_entry.end_logit)
-            )
+            score_diff = score_null - best_non_null_entry.start_logit - (best_non_null_entry.end_logit)
             scores_diff_json[example["qa_id"]] = score_diff
             if score_diff > null_score_diff_threshold:
                 all_predictions[example["qa_id"]] = ""
@@ -1042,9 +1006,7 @@ def postprocess_xlnet_answer(
                         )
                     )
 
-        prelim_predictions = sorted(
-            prelim_predictions, key=lambda x: (x.start_logit + x.end_logit), reverse=True
-        )
+        prelim_predictions = sorted(prelim_predictions, key=lambda x: (x.start_logit + x.end_logit), reverse=True)
 
         seen_predictions = {}
         nbest = []
@@ -1075,20 +1037,14 @@ def postprocess_xlnet_answer(
             tok_text = " ".join(tok_text.split())
             orig_text = " ".join(orig_tokens)
 
-            final_text = _get_final_text(
-                tok_text, orig_text, tokenizer.do_lower_case, verbose_logging
-            )
+            final_text = _get_final_text(tok_text, orig_text, tokenizer.do_lower_case, verbose_logging)
 
             if final_text in seen_predictions:
                 continue
 
             seen_predictions[final_text] = True
 
-            nbest.append(
-                _NbestPrediction(
-                    text=final_text, start_logit=pred.start_logit, end_logit=pred.end_logit
-                )
-            )
+            nbest.append(_NbestPrediction(text=final_text, start_logit=pred.start_logit, end_logit=pred.end_logit))
 
         # In very rare edge cases we could have no valid predictions. So we
         # just create a nonce prediction in this case to avoid failure.
@@ -1235,9 +1191,7 @@ def _create_qa_example(qa_input, is_training):
             actual_text = " ".join(d_tokens[start_position : (end_position + 1)])
             cleaned_answer_text = " ".join(whitespace_tokenize(a_text))
             if actual_text.find(cleaned_answer_text) == -1:
-                logger.warning(
-                    "Could not find answer: '%s' vs. '%s'", actual_text, cleaned_answer_text
-                )
+                logger.warning("Could not find answer: '%s' vs. '%s'", actual_text, cleaned_answer_text)
                 return
         else:
             start_position = -1
@@ -1696,9 +1650,7 @@ def _get_final_text(pred_text, orig_text, do_lower_case, verbose_logging=False):
 
     if len(orig_ns_text) != len(tok_ns_text):
         if verbose_logging:
-            logger.info(
-                "Length not equal after stripping spaces: '%s' vs '%s'", orig_ns_text, tok_ns_text
-            )
+            logger.info("Length not equal after stripping spaces: '%s' vs '%s'", orig_ns_text, tok_ns_text)
         return orig_text
 
     # We then project the characters in `pred_text` back to `orig_text` using
