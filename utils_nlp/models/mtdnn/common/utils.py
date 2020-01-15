@@ -1,3 +1,7 @@
+# coding=utf-8
+# Copyright (c) Microsoft. All rights reserved.
+
+
 class MTDNNCommonUtils:
     @staticmethod
     def set_environment(seed, set_cuda=False):
