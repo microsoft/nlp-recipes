@@ -101,7 +101,13 @@ class MTDNNConfig(PretrainedConfig):
         grad_accumulation_step=1,
         # fp16
         fp16=False,
-        fp16_opt_level="01" ** kwargs,
+        fp16_opt_level="01",
+        # loss map
+        loss_types=[],
+        kd_loss_types=[],
+        mkd_opt=0,
+        weighted_on=False,
+        **kwargs,
     ):
         super(MTDNNConfig, self).__init__(**kwargs)
         self.encoder_type = encoder_type
@@ -153,5 +159,10 @@ class MTDNNConfig(PretrainedConfig):
         self.seed = seed
         self.grad_accumulation_step = grad_accumulation_step
         self.fp16 = fp16
+        self.fp16_opt_level = fp16_opt_level
+        self.loss_types = loss_types
+        self.kd_loss_types = kd_loss_types
+        self.mkd_opt = mkd_opt
+        self.weighted_on = weighted_on
         self.kwargs = kwargs
 
