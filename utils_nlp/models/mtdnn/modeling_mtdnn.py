@@ -7,9 +7,14 @@
 
 import logging
 import os
+import sys
 
+import numpy as np
 import torch
+import torch.nn.functional as F
+import torch.optim as optim
 from torch import nn
+from torch.optim.lr_scheduler import *
 from transformers import (
     BertConfig,
     BertModel,
@@ -19,15 +24,17 @@ from transformers import (
     RobertaModel,
 )
 
+import utils_nlp.models.mtdnn.common.squad_utils as mrc_utils
 from fairseq.models.roberta import RobertaModel as FairseqRobertModel
 from utils_nlp.dataset.url_utils import maybe_download
 from utils_nlp.models.mtdnn.common.archive_maps import PRETRAINED_MODEL_ARCHIVE_MAP
 from utils_nlp.models.mtdnn.common.average_meter import AverageMeter
+from utils_nlp.models.mtdnn.common.bert_optim import Adamax, RAdam
 from utils_nlp.models.mtdnn.common.linear_pooler import LinearPooler
+from utils_nlp.models.mtdnn.common.loss import LOSS_REGISTRY
 from utils_nlp.models.mtdnn.common.san import SANClassifier, SANNetwork
 from utils_nlp.models.mtdnn.common.types import DataFormat, EncoderModelType, TaskType
 from utils_nlp.models.mtdnn.configuration_mtdnn import MTDNNConfig
-
 
 logger = logging.getLogger(__name__)
 
@@ -53,12 +60,17 @@ class MTDNNPretrainedModel(BertPreTrainedModel):
 
 
 class MTDNNModel(MTDNNPretrainedModel, BertModel):
-    def __init__(self, config: MTDNNConfig, num_train_step: int = -1):
+    def __init__(
+        self,
+        config: MTDNNConfig,
+        pretrained_model_name: str = "mtdnn-base-uncased",
+        num_train_step: int = -1,
+    ):
         super(MTDNNModel, self).__init__(config)
         self.config = config
         self.config_dict = self.config.to_dict()
         self.mtdnn_config = MTDNNConfig.from_dict(self.config_dict)
-        self.mtdnn_model = self.from_pretrained("mtdnn-base-uncased")
+        self.mtdnn_model = self.from_pretrained(pretrained_model_name)
         self.state_dict = self.mtdnn_model.state_dict()
         self.updates = (
             self.state_dict["updates"] if self.state_dict and "updates" in self.state_dict else 0
@@ -71,13 +83,14 @@ class MTDNNModel(MTDNNPretrainedModel, BertModel):
         self.mnetwork = nn.DataParallel(self.network) if self.config.multi_gpu_on else self.network
         self.total_param = sum([p.nelement() for p in self.network.parameters() if p.requires_grad])
 
+        # Move network to GPU if device available and flag set
         if self.config.cuda:
             self.network.cuda()
         self.optimizer_parameters = self._get_param_groups()
         self._setup_optim(self.optimizer_parameters, self.state_dict, num_train_step)
         self.para_swapped = False
         self.optimizer.zero_grad()
-        self._setup_lossmap(self.config)
+        self._setup_lossmap()
 
     def _get_param_groups(self):
         no_decay = ["bias", "gamma", "beta", "LayerNorm.bias", "LayerNorm.weight"]
@@ -99,14 +112,15 @@ class MTDNNModel(MTDNNPretrainedModel, BertModel):
         ]
         return optimizer_parameters
 
-    def _setup_optim(self, optimizer_parameters, state_dict=None, num_train_step=-1):
+    def _setup_optim(self, optimizer_parameters, state_dict: dict = None, num_train_step: int = -1):
+
+        # Setup optimizer parameters
         if self.config.optimizer == "sgd":
             self.optimizer = optim.SGD(
                 optimizer_parameters,
-                self.config["learning_rate"],
-                weight_decay=self.config["weight_decay"],
+                self.config.learning_rate,
+                weight_decay=self.config.weight_decay,
             )
-
         elif self.config.optimizer == "adamax":
             self.optimizer = Adamax(
                 optimizer_parameters,
@@ -117,37 +131,39 @@ class MTDNNModel(MTDNNPretrainedModel, BertModel):
                 schedule=self.config.warmup_schedule,
                 weight_decay=self.config.weight_decay,
             )
-            if self.config.get("have_lr_scheduler", False):
-                self.config["have_lr_scheduler"] = False
-        elif self.config["optimizer"] == "radam":
+
+        elif self.config.optimizer == "radam":
             self.optimizer = RAdam(
                 optimizer_parameters,
-                self.config["learning_rate"],
-                warmup=self.config["warmup"],
+                self.config.learning_rate,
+                warmup=self.config.warmup,
                 t_total=num_train_step,
-                max_grad_norm=self.config["grad_clipping"],
-                schedule=self.config["warmup_schedule"],
-                eps=self.config["adam_eps"],
-                weight_decay=self.config["weight_decay"],
+                max_grad_norm=self.config.grad_clipping,
+                schedule=self.config.warmup_schedule,
+                eps=self.config.adam_eps,
+                weight_decay=self.config.weight_decay,
             )
-            if self.config.get("have_lr_scheduler", False):
-                self.config["have_lr_scheduler"] = False
+
             # The current radam does not support FP16.
-            self.config["fp16"] = False
-        elif self.config["optimizer"] == "adam":
+            self.config.fp16 = False
+        elif self.config.optimizer == "adam":
             self.optimizer = Adam(
                 optimizer_parameters,
-                lr=self.config["learning_rate"],
-                warmup=self.config["warmup"],
+                lr=self.config.learning_rate,
+                warmup=self.config.warmup,
                 t_total=num_train_step,
-                max_grad_norm=self.config["grad_clipping"],
-                schedule=self.config["warmup_schedule"],
-                weight_decay=self.config["weight_decay"],
+                max_grad_norm=self.config.grad_clipping,
+                schedule=self.config.warmup_schedule,
+                weight_decay=self.config.weight_decay,
             )
-            if self.config.get("have_lr_scheduler", False):
-                self.config["have_lr_scheduler"] = False
+
         else:
-            raise RuntimeError("Unsupported optimizer: %s" % opt["optimizer"])
+            raise RuntimeError(f"Unsupported optimizer: {self.config.optimizer}")
+
+        # Clear scheduler for certain optimizer choices
+        if self.config.optimizer in ["adam", "adamax", "radam"]:
+            if self.config.have_lr_scheduler:
+                self.config.have_lr_scheduler = False
 
         if state_dict and "optimizer" in state_dict:
             self.optimizer.load_state_dict(state_dict["optimizer"])
@@ -162,44 +178,42 @@ class MTDNNModel(MTDNNPretrainedModel, BertModel):
                     "Please install apex from https://www.github.com/nvidia/apex to use fp16 training."
                 )
             model, optimizer = amp.initialize(
-                self.network, self.optimizer, opt_level=self.config["fp16_opt_level"]
+                self.network, self.optimizer, opt_level=self.config.fp16_opt_level
             )
             self.network = model
             self.optimizer = optimizer
 
-        if self.config.get("have_lr_scheduler", False):
-            if self.config.get("scheduler_type", "rop") == "rop":
+        if self.config.have_lr_scheduler:
+            if self.config.scheduler_type == "rop":
                 self.scheduler = ReduceLROnPlateau(
-                    self.optimizer, mode="max", factor=self.config["lr_gamma"], patience=3
+                    self.optimizer, mode="max", factor=self.config.lr_gamma, patience=3
                 )
-            elif self.config.get("scheduler_type", "rop") == "exp":
-                self.scheduler = ExponentialLR(
-                    self.optimizer, gamma=self.config.get("lr_gamma", 0.95)
-                )
+            elif self.config.scheduler_type == "exp":
+                self.scheduler = ExponentialLR(self.optimizer, gamma=self.config.lr_gamma or 0.95)
             else:
                 milestones = [
-                    int(step) for step in self.config.get("multi_step_lr", "10,20,30").split(",")
+                    int(step) for step in (self.config.multi_step_lr or "10,20,30").split(",")
                 ]
                 self.scheduler = MultiStepLR(
-                    self.optimizer, milestones=milestones, gamma=self.config.get("lr_gamma")
+                    self.optimizer, milestones=milestones, gamma=self.config.lr_gamma
                 )
         else:
             self.scheduler = None
 
-    def _setup_lossmap(self, config):
-        loss_types = config["loss_types"]
+    def _setup_lossmap(self):
+        loss_types = self.config.loss_types
         self.task_loss_criterion = []
         for idx, cs in enumerate(loss_types):
-            assert cs is not None
+            assert cs, "Loss type must be defined."
             lc = LOSS_REGISTRY[cs](name="Loss func of task {}: {}".format(idx, cs))
             self.task_loss_criterion.append(lc)
 
-    def _setup_kd_lossmap(self, config):
-        loss_types = config["kd_loss_types"]
+    def _setup_kd_lossmap(self):
+        loss_types = self.config.kd_loss_types
         self.kd_task_loss_criterion = []
-        if config.get("mkd_opt", 0) > 0:
+        if config.mkd_opt > 0:
             for idx, cs in enumerate(loss_types):
-                assert cs is not None
+                assert cs, "Loss type must be defined."
                 lc = LOSS_REGISTRY[cs](name="Loss func of task {}: {}".format(idx, cs))
                 self.kd_task_loss_criterion.append(lc)
 
@@ -208,7 +222,7 @@ class MTDNNModel(MTDNNPretrainedModel, BertModel):
             self.para_swapped = False
 
     def _to_cuda(self, tensor):
-        if tensor is None:
+        if not tensor:
             return tensor
 
         if isinstance(tensor, list) or isinstance(tensor, tuple):
@@ -226,7 +240,7 @@ class MTDNNModel(MTDNNPretrainedModel, BertModel):
         soft_labels = None
 
         task_type = batch_meta["task_type"]
-        y = self._to_cuda(y) if self.config["cuda"] else y
+        y = self._to_cuda(y) if self.config.cuda else y
 
         task_id = batch_meta["task_id"]
         inputs = batch_data[: batch_meta["input_len"]]
@@ -235,8 +249,8 @@ class MTDNNModel(MTDNNPretrainedModel, BertModel):
             inputs.append(None)
         inputs.append(task_id)
         weight = None
-        if self.config.get("weighted_on", False):
-            if self.config["cuda"]:
+        if self.config.weighted_on:
+            if self.config.cuda:
                 weight = batch_data[batch_meta["factor"]].cuda(non_blocking=True)
             else:
                 weight = batch_data[batch_meta["factor"]]
@@ -250,7 +264,7 @@ class MTDNNModel(MTDNNPretrainedModel, BertModel):
         # compute kd loss
         if self.config.get("mkd_opt", 0) > 0 and ("soft_label" in batch_meta):
             soft_labels = batch_meta["soft_label"]
-            soft_labels = self._to_cuda(soft_labels) if self.config["cuda"] else soft_labels
+            soft_labels = self._to_cuda(soft_labels) if self.config.cuda else soft_labels
             kd_lc = self.kd_task_loss_criterion[task_id]
             kd_loss = kd_lc(logits, soft_labels, weight, ignore_index=-1) if kd_lc else 0
             loss = loss + kd_loss
@@ -258,21 +272,21 @@ class MTDNNModel(MTDNNPretrainedModel, BertModel):
         self.train_loss.update(loss.item(), batch_data[batch_meta["token_id"]].size(0))
         # scale loss
         loss = loss / self.config.get("grad_accumulation_step", 1)
-        if self.config["fp16"]:
+        if self.config.fp16:
             with amp.scale_loss(loss, self.optimizer) as scaled_loss:
                 scaled_loss.backward()
         else:
             loss.backward()
         self.local_updates += 1
-        if self.local_updates % self.config.get("grad_accumulation_step", 1) == 0:
-            if self.config["global_grad_clipping"] > 0:
-                if self.config["fp16"]:
+        if self.local_updates % self.config.grad_accumulation_step == 0:
+            if self.config.global_grad_clipping > 0:
+                if self.config.fp16:
                     torch.nn.utils.clip_grad_norm_(
-                        amp.master_params(self.optimizer), self.config["global_grad_clipping"]
+                        amp.master_params(self.optimizer), self.config.global_grad_clipping
                     )
                 else:
                     torch.nn.utils.clip_grad_norm_(
-                        self.network.parameters(), self.config["global_grad_clipping"]
+                        self.network.parameters(), self.config.global_grad_clipping
                     )
             self.updates += 1
             # reset number of the grad accumulation
@@ -302,7 +316,7 @@ class MTDNNModel(MTDNNPretrainedModel, BertModel):
             predict = predict.reshape(-1).tolist()
             score = score.reshape(-1).tolist()
             return score, predict, batch_meta["true_label"]
-        elif task_type == TaskType.SeqenceLabeling:
+        elif task_type == TaskType.SequenceLabeling:
             mask = batch_data[batch_meta["mask"]]
             score = score.contiguous()
             score = score.data.cpu()
@@ -317,9 +331,7 @@ class MTDNNModel(MTDNNPretrainedModel, BertModel):
         elif task_type == TaskType.Span:
             start, end = score
             predictions = []
-            if self.config["encoder_type"] == EncoderModelType.BERT:
-                import experiments.squad.squad_utils as mrc_utils
-
+            if self.config.encoder_type == EncoderModelType.BERT:
                 scores, predictions = mrc_utils.extract_answer(
                     batch_meta, batch_data, start, end, self.config.get("max_answer_len", 5)
                 )
