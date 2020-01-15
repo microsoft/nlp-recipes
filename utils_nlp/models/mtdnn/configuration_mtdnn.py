@@ -73,6 +73,7 @@ class MTDNNConfig(PretrainedConfig):
         init_checkpoint="bert-base-uncased",
         # Training config
         cuda=torch.cuda.is_available(),
+        multi_gpu_on=False,
         log_per_updates=500,
         save_per_updates=10000,
         save_per_updates_on=False,
@@ -88,7 +89,19 @@ class MTDNNConfig(PretrainedConfig):
         warmup=0.1,
         warmup_schedule="warmup_linear",
         adam_eps=1e-6,
-        **kwargs,
+        # Scheduler config
+        have_lr_scheduler=True,
+        multi_step_lr="10,20,30",
+        freeze_layers=1,
+        embedding_opt=0,
+        lr_gamma=0.5,
+        bert_l2norm=0.0,
+        scheduler_type="ms",
+        seed=2018,
+        grad_accumulation_step=1,
+        # fp16
+        fp16=False,
+        fp16_opt_level="01" ** kwargs,
     ):
         super(MTDNNConfig, self).__init__(**kwargs)
         self.encoder_type = encoder_type
@@ -114,6 +127,7 @@ class MTDNNConfig(PretrainedConfig):
         self.init_ratio = init_ratio
         self.init_checkpoint = init_checkpoint
         self.cuda = cuda
+        self.multi_gpu_on = multi_gpu_on
         self.log_per_updates = log_per_updates
         self.save_per_updates = save_per_updates
         self.save_per_updates_on = save_per_updates_on
@@ -121,4 +135,23 @@ class MTDNNConfig(PretrainedConfig):
         self.batch_size = batch_size
         self.batch_size_eval = batch_size_eval
         self.optimizer = optimizer
+        self.grad_clipping = grad_clipping
+        self.global_grad_clipping = global_grad_clipping
+        self.weight_decay = weight_decay
+        self.learning_rate = learning_rate
+        self.momentum = momentum
+        self.warmup = warmup
+        self.warmup_schedule = warmup_schedule
+        self.adam_eps = adam_eps
+        self.have_lr_scheduler = have_lr_scheduler
+        self.multi_step_lr = multi_step_lr
+        self.freeze_layers = freeze_layers
+        self.embedding_opt = embedding_opt
+        self.lr_gamma = lr_gamma
+        self.bert_l2norm = bert_l2norm
+        self.scheduler_type = scheduler_type
+        self.seed = seed
+        self.grad_accumulation_step = grad_accumulation_step
+        self.fp16 = fp16
+        self.kwargs = kwargs
 
