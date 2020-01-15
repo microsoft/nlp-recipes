@@ -8,9 +8,9 @@ import torch.nn.functional as F
 from torch.nn.parameter import Parameter
 from torch.nn.utils import weight_norm
 
-from module.dropout_wrapper import DropoutWrapper
-from module.my_optim import weight_norm as WN
-from module.similarity import FlatSimilarityWrapper, SelfAttnWrapper
+from utils_nlp.models.mtdnn.common.dropout_wrapper import DropoutWrapper
+from utils_nlp.models.mtdnn.common.optimizer import weight_norm as WN
+from utils_nlp.models.mtdnn.common.similarity import FlatSimilarityWrapper, SelfAttnWrapper
 from utils_nlp.models.mtdnn.configuration_mtdnn import MTDNNConfig
 
 SMALL_POS_NUM = 1.0e-30
@@ -167,9 +167,7 @@ class SANNetwork(nn.Module):
         for idx, task_num_labels in enumerate(self.n_class):
             decoder_opt = self.decoder_opts[idx]
             task_type = self.task_types[idx]
-            dropout = DropoutWrapper(
-                self.task_dropout_p[idx], config.enable_variational_dropout]
-            )
+            dropout = DropoutWrapper(self.task_dropout_p[idx], config.enable_variational_dropout)
             self.dropout_list.append(dropout)
             if task_type == TaskType.Span:
                 assert decoder_opt != 1
@@ -178,7 +176,14 @@ class SANNetwork(nn.Module):
                 out_proj = nn.Linear(self.hidden_size, task_num_labels)
             else:
                 if decoder_opt == 1:
-                    out_proj = SANClassifier(self.hidden_size, self.hidden_size, task_num_labels, self.config, prefix='answer', dropout=dropout)
+                    out_proj = SANClassifier(
+                        self.hidden_size,
+                        self.hidden_size,
+                        task_num_labels,
+                        self.config,
+                        prefix="answer",
+                        dropout=dropout,
+                    )
                 else:
                     out_proj = nn.Linear(self.hidden_size, task_num_labels)
             self.scoring_list.append(out_proj)
@@ -247,4 +252,3 @@ class SANNetwork(nn.Module):
                 pooled_output = self.dropout_list[task_id](pooled_output)
                 logits = self.scoring_list[task_id](pooled_output)
             return logits
-

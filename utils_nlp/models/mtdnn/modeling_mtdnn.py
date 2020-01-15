@@ -24,15 +24,14 @@ from transformers import (
     RobertaModel,
 )
 
-import utils_nlp.models.mtdnn.common.squad_utils as mrc_utils
 from fairseq.models.roberta import RobertaModel as FairseqRobertModel
-from utils_nlp.dataset.url_utils import maybe_download
 from utils_nlp.models.mtdnn.common.archive_maps import PRETRAINED_MODEL_ARCHIVE_MAP
 from utils_nlp.models.mtdnn.common.average_meter import AverageMeter
 from utils_nlp.models.mtdnn.common.bert_optim import Adamax, RAdam
 from utils_nlp.models.mtdnn.common.linear_pooler import LinearPooler
 from utils_nlp.models.mtdnn.common.loss import LOSS_REGISTRY
 from utils_nlp.models.mtdnn.common.san import SANClassifier, SANNetwork
+from utils_nlp.models.mtdnn.common.squad_utils import extract_answer
 from utils_nlp.models.mtdnn.common.types import DataFormat, EncoderModelType, TaskType
 from utils_nlp.models.mtdnn.configuration_mtdnn import MTDNNConfig
 
@@ -332,7 +331,7 @@ class MTDNNModel(MTDNNPretrainedModel, BertModel):
             start, end = score
             predictions = []
             if self.config.encoder_type == EncoderModelType.BERT:
-                scores, predictions = mrc_utils.extract_answer(
+                scores, predictions = extract_answer(
                     batch_meta, batch_data, start, end, self.config.get("max_answer_len", 5)
                 )
             return scores, predictions, batch_meta["answer"]
@@ -371,15 +370,3 @@ class MTDNNModel(MTDNNPretrainedModel, BertModel):
     def cuda(self):
         self.network.cuda()
 
-
-if __name__ == "__main__":
-    config = MTDNNConfig()
-    b = MTDNNModel(config)
-    print(b.config_class)
-    print(b.config)
-    print(b.embeddings)
-    print(b.encoder)
-    print(b.pooler)
-    print(b.pretrained_model_archive_map)
-    print(b.base_model_prefix)
-    print(b.bert_config)

@@ -1,24 +1,29 @@
-import os
-import six
-import json
-import string
 import collections
-import torch.nn.functional as F
-import numpy as np
-import torch
+import json
 import math
-from data_utils.task_def import EncoderModelType
+import os
+import string
+
+import numpy as np
+import six
+import torch
+import torch.nn.functional as F
 from pytorch_pretrained_bert.tokenization import BertTokenizer
+
+from utils_nlp.models.mtdnn.common.types import EncoderModelType
 
 LARGE_NEG_NUM = -1.0e5
 tokenizer = None
 
+
 def remove_punc(text):
     exclude = set(string.punctuation)
-    return ''.join(ch for ch in text if ch not in exclude)
+    return "".join(ch for ch in text if ch not in exclude)
 
-def calc_tokenized_span_range(context, question, answer, answer_start, answer_end, tokenizer, encoderModelType,
-                              verbose=False):
+
+def calc_tokenized_span_range(
+    context, question, answer, answer_start, answer_end, tokenizer, encoderModelType, verbose=False
+):
     """
     :param context:
     :param question:
@@ -37,37 +42,48 @@ def calc_tokenized_span_range(context, question, answer, answer_start, answer_en
     full_tokens = tokenizer.tokenize(full)
     span_start = len(prefix_tokens)
     span_end = len(full_tokens)
-    span_tokens = full_tokens[span_start: span_end]
+    span_tokens = full_tokens[span_start:span_end]
     recovered_answer = " ".join(span_tokens).replace(" ##", "")
     cleaned_answer = " ".join(tokenizer.basic_tokenizer.tokenize(answer))
     if verbose:
         try:
-            assert recovered_answer == cleaned_answer, "answer: %s, recovered_answer: %s, question: %s, select:%s ext_select:%s context: %s" % (
-                cleaned_answer, recovered_answer, question, context[answer_start:answer_end],
-                context[answer_start - 5:answer_end + 5], context)
+            assert recovered_answer == cleaned_answer, (
+                "answer: %s, recovered_answer: %s, question: %s, select:%s ext_select:%s context: %s"
+                % (
+                    cleaned_answer,
+                    recovered_answer,
+                    question,
+                    context[answer_start:answer_end],
+                    context[answer_start - 5 : answer_end + 5],
+                    context,
+                )
+            )
         except Exception as e:
             pass
             print(e)
     return span_start, span_end
 
+
 def is_valid_sample(context, answer_start, answer_end, answer):
     valid = True
-    constructed = context[answer_start: answer_end]
+    constructed = context[answer_start:answer_end]
     if constructed.lower() != answer.lower():
         valid = False
         return valid
     # check if it is inside of a token
     if answer_start > 0 and answer_end < len(context) - 1:
-        prefix = context[answer_start - 1: answer_start]
-        suffix = context[answer_end: answer_end + 1]
+        prefix = context[answer_start - 1 : answer_start]
+        suffix = context[answer_end : answer_end + 1]
         if len(remove_punc(prefix)) > 0 or len(remove_punc(suffix)):
             valid = False
     return valid
+
 
 def is_whitespace(c):
     if c == " " or c == "\t" or c == "\r" or c == "\n" or ord(c) == 0x202F:
         return True
     return False
+
 
 def parse_squad_label(label):
     """
@@ -81,8 +97,7 @@ def parse_squad_label(label):
     return answer_start, answer_end, answer, is_impossible
 
 
-def _improve_answer_span(doc_tokens, input_start, input_end, tokenizer,
-                         orig_answer_text):
+def _improve_answer_span(doc_tokens, input_start, input_end, tokenizer, orig_answer_text):
     """Returns tokenized answer spans that better match the annotated answer."""
     # It is copyed from: https://github.com/google-research/bert/blob/master/run_squad.py
     # The SQuAD annotations are character based. We first project them to
@@ -111,7 +126,7 @@ def _improve_answer_span(doc_tokens, input_start, input_end, tokenizer,
 
     for new_start in range(input_start, input_end + 1):
         for new_end in range(input_end, new_start - 1, -1):
-            text_span = " ".join(doc_tokens[new_start:(new_end + 1)])
+            text_span = " ".join(doc_tokens[new_start : (new_end + 1)])
             if text_span == tok_answer_text:
                 return (new_start, new_end)
 
@@ -169,19 +184,22 @@ def doc_split(doc_subwords, doc_stride=180, max_tokens_for_doc=384):
         start_offset += min(length, doc_stride)
     return doc_spans
 
+
 def recompute_span(answer, answer_offset, char_to_word_offset):
     answer_length = len(answer)
     start_position = char_to_word_offset[answer_offset]
     end_position = char_to_word_offset[answer_offset + answer_length - 1]
     return start_position, end_position
 
+
 def is_valid_answer(context, answer_start, answer_end, answer):
     valid = True
-    constructed = ' '.join(context[answer_start: answer_end + 1]).lower()
-    cleaned_answer_text = ' '.join(answer.split()).lower()
+    constructed = " ".join(context[answer_start : answer_end + 1]).lower()
+    cleaned_answer_text = " ".join(answer.split()).lower()
     if constructed.find(cleaned_answer_text) == -1:
         valid = False
     return valid
+
 
 def token_doc(paragraph_text):
     doc_tokens = []
@@ -199,21 +217,24 @@ def token_doc(paragraph_text):
         char_to_word_offset.append(len(doc_tokens) - 1)
     return doc_tokens, char_to_word_offset
 
+
 class InputFeatures(object):
-    def __init__(self,
-                unique_id,
-                example_index,
-                doc_span_index,
-                tokens,
-                token_to_orig_map,
-                token_is_max_context,
-                input_ids,
-                input_mask,
-                segment_ids,
-                start_position=None,
-                end_position=None,
-                is_impossible=None,
-                doc_offset=0):
+    def __init__(
+        self,
+        unique_id,
+        example_index,
+        doc_span_index,
+        tokens,
+        token_to_orig_map,
+        token_is_max_context,
+        input_ids,
+        input_mask,
+        segment_ids,
+        start_position=None,
+        end_position=None,
+        is_impossible=None,
+        doc_offset=0,
+    ):
         self.unique_id = unique_id
         self.example_index = example_index
         self.doc_span_index = doc_span_index
@@ -229,28 +250,45 @@ class InputFeatures(object):
         self.doc_offset = doc_offset
 
     def __str__(self):
-        return json.dumps({
-            'unique_id': self.unique_id,
-            'example_index': self.example_index,
-            'doc_span_index':self.doc_span_index,
-            'tokens': self.tokens,
-            'token_to_orig_map': self.token_to_orig_map,
-            'token_is_max_context': self.token_is_max_context,
-            'input_ids' : self.input_ids,
-            'input_mask': self.input_mask,
-            'segment_ids': self.segment_ids,
-            'start_position': self.start_position,
-            'end_position': self.end_position,
-            'is_impossible': self.is_impossible,
-            'doc_offset' : self.doc_offset
-            })
+        return json.dumps(
+            {
+                "unique_id": self.unique_id,
+                "example_index": self.example_index,
+                "doc_span_index": self.doc_span_index,
+                "tokens": self.tokens,
+                "token_to_orig_map": self.token_to_orig_map,
+                "token_is_max_context": self.token_is_max_context,
+                "input_ids": self.input_ids,
+                "input_mask": self.input_mask,
+                "segment_ids": self.segment_ids,
+                "start_position": self.start_position,
+                "end_position": self.end_position,
+                "is_impossible": self.is_impossible,
+                "doc_offset": self.doc_offset,
+            }
+        )
 
-def mrc_feature(tokenizer, unique_id, example_index, query, doc_tokens, answer_start_adjusted, answer_end_adjusted, is_impossible, max_seq_len, max_query_len, doc_stride, answer_text=None, is_training=True):
+
+def mrc_feature(
+    tokenizer,
+    unique_id,
+    example_index,
+    query,
+    doc_tokens,
+    answer_start_adjusted,
+    answer_end_adjusted,
+    is_impossible,
+    max_seq_len,
+    max_query_len,
+    doc_stride,
+    answer_text=None,
+    is_training=True,
+):
     tok_to_orig_index = []
     orig_to_tok_index = []
     all_doc_tokens = []
     query_ids = tokenizer.tokenize(query)
-    query_ids = query_ids[0: max_query_len] if len(query_ids) > max_query_len else query_ids
+    query_ids = query_ids[0:max_query_len] if len(query_ids) > max_query_len else query_ids
     max_tokens_for_doc = max_seq_len - len(query_ids) - 3
     unique_id_cp = unique_id
     for (i, token) in enumerate(doc_tokens):
@@ -271,11 +309,12 @@ def mrc_feature(tokenizer, unique_id, example_index, query, doc_tokens, answer_s
         else:
             tok_end_position = len(all_doc_tokens) - 1
         (tok_start_position, tok_end_position) = _improve_answer_span(
-            all_doc_tokens, tok_start_position, tok_end_position, tokenizer,
-            answer_text)
- 
-    doc_spans = doc_split(all_doc_tokens, doc_stride=doc_stride,
-                                        max_tokens_for_doc=max_tokens_for_doc)
+            all_doc_tokens, tok_start_position, tok_end_position, tokenizer, answer_text
+        )
+
+    doc_spans = doc_split(
+        all_doc_tokens, doc_stride=doc_stride, max_tokens_for_doc=max_tokens_for_doc
+    )
     feature_list = []
     for (doc_span_index, doc_span) in enumerate(doc_spans):
         tokens = ["[CLS]"] + query_ids + ["[SEP]"]
@@ -287,8 +326,7 @@ def mrc_feature(tokenizer, unique_id, example_index, query, doc_tokens, answer_s
             split_token_index = doc_span.start + i
             token_to_orig_map[len(tokens)] = tok_to_orig_index[split_token_index]
 
-            is_max_context = _check_is_max_context(doc_spans, doc_span_index,
-                                                    split_token_index)
+            is_max_context = _check_is_max_context(doc_spans, doc_span_index, split_token_index)
             token_is_max_context[len(tokens)] = is_max_context
             tokens.append(all_doc_tokens[split_token_index])
             segment_ids.append(1)
@@ -310,14 +348,13 @@ def mrc_feature(tokenizer, unique_id, example_index, query, doc_tokens, answer_s
             doc_start = doc_span.start
             doc_end = doc_span.start + doc_span.length - 1
             out_of_span = False
-            if not (tok_start_position >= doc_start and
-                    tok_end_position <= doc_end):
+            if not (tok_start_position >= doc_start and tok_end_position <= doc_end):
                 out_of_span = True
             if out_of_span:
                 start_position = 0
                 end_position = 0
             else:
-                #doc_offset = len(query_ids) + 2
+                # doc_offset = len(query_ids) + 2
                 start_position = tok_start_position - doc_start + doc_offset
                 end_position = tok_end_position - doc_start + doc_offset
 
@@ -326,39 +363,43 @@ def mrc_feature(tokenizer, unique_id, example_index, query, doc_tokens, answer_s
             end_position = 0
         is_impossible = True if is_impossible else False
         feature = InputFeatures(
-          unique_id=unique_id_cp,
-          example_index=example_index,
-          doc_span_index=doc_span_index,
-          tokens=tokens,
-          token_to_orig_map=token_to_orig_map,
-          token_is_max_context=token_is_max_context,
-          input_ids=input_ids,
-          input_mask=input_mask,
-          segment_ids=segment_ids,
-          start_position=start_position,
-          end_position=end_position,
-          is_impossible=is_impossible,
-          doc_offset=doc_offset)
+            unique_id=unique_id_cp,
+            example_index=example_index,
+            doc_span_index=doc_span_index,
+            tokens=tokens,
+            token_to_orig_map=token_to_orig_map,
+            token_is_max_context=token_is_max_context,
+            input_ids=input_ids,
+            input_mask=input_mask,
+            segment_ids=segment_ids,
+            start_position=start_position,
+            end_position=end_position,
+            is_impossible=is_impossible,
+            doc_offset=doc_offset,
+        )
         feature_list.append(feature)
         unique_id_cp += 1
     return feature_list
 
-def gen_gold_name(dir, path, version, suffix='json'):
-    fname = '{}-{}.{}'.format(path, version, suffix)
+
+def gen_gold_name(dir, path, version, suffix="json"):
+    fname = "{}-{}.{}".format(path, version, suffix)
     return os.path.join(dir, fname)
+
 
 def load_squad_label(path):
     rows = {}
     with open(path, encoding="utf8") as f:
-        data = json.load(f)['data']
+        data = json.load(f)["data"]
     for article in tqdm.tqdm(data, total=len(data)):
-        for paragraph in article['paragraphs']:
-            for qa in paragraph['qas']:
-                uid, question = qa['id'], qa['question']
-                is_impossible = qa.get('is_impossible', False)
+        for paragraph in article["paragraphs"]:
+            for qa in paragraph["qas"]:
+                uid, question = qa["id"], qa["question"]
+                is_impossible = qa.get("is_impossible", False)
                 label = 1 if is_impossible else 0
                 rows[uid] = label
     return rows
+
 
 def position_encoding(m, threshold=4):
     encoding = np.ones((m, m), dtype=np.float32)
@@ -367,6 +408,7 @@ def position_encoding(m, threshold=4):
             if j - i > threshold:
                 encoding[i][j] = float(1.0 / math.log(j - i + 1))
     return torch.from_numpy(encoding)
+
 
 def get_final_text(pred_text, orig_text, do_lower_case, verbose_logging=False):
     """Project the tokenized prediction back to the original text."""
@@ -411,10 +453,10 @@ def get_final_text(pred_text, orig_text, do_lower_case, verbose_logging=False):
     # and `pred_text`, and check if they are the same length. If they are
     # NOT the same length, the heuristic has failed. If they are the same
     # length, we assume the characters are one-to-one aligned.
-    #tokenizer = tokenization.BasicTokenizer(do_lower_case=do_lower_case)
+    # tokenizer = tokenization.BasicTokenizer(do_lower_case=do_lower_case)
     global tokenizer
     if tokenizer is None:
-        tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+        tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
 
     tok_text = " ".join(tokenizer.tokenize(orig_text))
 
@@ -453,8 +495,9 @@ def get_final_text(pred_text, orig_text, do_lower_case, verbose_logging=False):
     if orig_end_position is None:
         return orig_text
 
-    output_text = orig_text[orig_start_position:(orig_end_position + 1)]
+    output_text = orig_text[orig_start_position : (orig_end_position + 1)]
     return output_text
+
 
 def masking_score(mask, batch_meta, start, end, keep_first_token=False):
     """For MRC, e.g., SQuAD
@@ -463,9 +506,9 @@ def masking_score(mask, batch_meta, start, end, keep_first_token=False):
     end = end.data.cpu()
     score_mask = start.new(mask.size()).zero_()
     score_mask = score_mask.data.cpu()
-    token_is_max_contexts = batch_meta['token_is_max_context']
-    doc_offsets = batch_meta['doc_offset']
-    word_maps = batch_meta['token_to_orig_map']
+    token_is_max_contexts = batch_meta["token_is_max_context"]
+    doc_offsets = batch_meta["doc_offset"]
+    word_maps = batch_meta["token_to_orig_map"]
     batch_size = score_mask.size(0)
     doc_len = score_mask.size(1)
     for i in range(batch_size):
@@ -487,16 +530,17 @@ def masking_score(mask, batch_meta, start, end, keep_first_token=False):
     end = F.softmax(end, 1)
     return start, end
 
+
 def extract_answer(batch_meta, batch_data, start, end, keep_first_token=False, max_len=5):
     doc_len = start.size(1)
     pos_enc = position_encoding(doc_len, max_len)
-    token_is_max_contexts = batch_meta['token_is_max_context']
-    doc_offsets = batch_meta['doc_offset']
-    word_maps = batch_meta['token_to_orig_map']
-    tokens = batch_meta['tokens']
-    contexts = batch_meta['doc']
-    uids = batch_meta['uids']
-    mask = batch_data[batch_meta['mask']].data.cpu()
+    token_is_max_contexts = batch_meta["token_is_max_context"]
+    doc_offsets = batch_meta["doc_offset"]
+    word_maps = batch_meta["token_to_orig_map"]
+    tokens = batch_meta["tokens"]
+    contexts = batch_meta["doc"]
+    uids = batch_meta["uids"]
+    mask = batch_data[batch_meta["mask"]].data.cpu()
     # need to fill mask
     start, end = masking_score(mask, batch_meta, start, end)
     #####
@@ -514,24 +558,25 @@ def extract_answer(batch_meta, batch_data, start, end, keep_first_token=False, m
         s_idx, e_idx = np.unravel_index(best_idx, scores.shape)
         s_idx, e_idx = int(s_idx), int(e_idx)
         ###
-        tok_tokens = tokens[i][s_idx:(e_idx + 1)]
-        tok_text = ' '.join(tok_tokens)
+        tok_tokens = tokens[i][s_idx : (e_idx + 1)]
+        tok_text = " ".join(tok_tokens)
         # De-tokenize WordPieces that have been split off.
-        tok_text = tok_text.replace(' ##', '')
-        tok_text = tok_text.replace('##', '')
+        tok_text = tok_text.replace(" ##", "")
+        tok_text = tok_text.replace("##", "")
         # Clean whitespace
         tok_text = tok_text.strip()
-        tok_text = ' '.join(tok_text.split())
+        tok_text = " ".join(tok_text.split())
         ###
         context = contexts[i].split()
         rs = word_maps[i][str(s_idx)]
         re = word_maps[i][str(e_idx)]
-        raw_answer = ' '.join(context[rs:re+1])
+        raw_answer = " ".join(context[rs : re + 1])
         # extract final answer
         answer = get_final_text(tok_text, raw_answer, True, False)
         predictions.append(answer)
         answer_scores.append(float(best_score))
     return predictions, answer_scores
+
 
 def select_answers(ids, predictions, scores):
     assert len(ids) == len(predictions)
@@ -549,6 +594,7 @@ def select_answers(ids, predictions, scores):
         final[key] = val[idx][1]
         scores[key] = val[idx][0]
     return final, scores
+
 
 def merge_answers(ids, golds):
     gold_list = {}
