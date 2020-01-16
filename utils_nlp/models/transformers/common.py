@@ -12,7 +12,7 @@ from itertools import cycle
 
 import numpy as np
 import torch
-from tqdm import tqdm, trange
+from tqdm import tqdm
 from transformers import AdamW, get_linear_schedule_with_warmup
 from transformers.modeling_bert import BERT_PRETRAINED_MODEL_ARCHIVE_MAP
 from transformers.modeling_distilbert import DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP
@@ -22,6 +22,8 @@ from transformers.tokenization_bert import BertTokenizer
 from transformers.tokenization_distilbert import DistilBertTokenizer
 from transformers.tokenization_roberta import RobertaTokenizer
 from transformers.tokenization_xlnet import XLNetTokenizer
+
+from utils_nlp.common.pytorch_utils import get_device, move_model_to_device
 
 TOKENIZER_CLASS = {}
 TOKENIZER_CLASS.update({k: BertTokenizer for k in BERT_PRETRAINED_MODEL_ARCHIVE_MAP})
@@ -101,9 +103,9 @@ class Transformer:
     def fine_tune(
         self,
         train_dataloader,
-        device,
-        num_gpus,
         get_inputs,
+        num_gpus=None,
+        gpu_ids=None,
         max_steps=-1,
         max_grad_norm=1.0,
         gradient_accumulation_steps=1,
@@ -118,6 +120,9 @@ class Transformer:
         clip_grad_norm=True,
     ):
 
+        # get device
+        device, num_gpus = get_device(num_gpus=num_gpus, local_rank=local_rank)
+
         if seed is not None:
             Transformer.set_seed(seed, num_gpus > 0)
 
@@ -127,6 +132,9 @@ class Transformer:
             except ImportError:
                 raise ImportError("Please install apex from https://www.github.com/nvidia/apex")
             self.model, optimizer = amp.initialize(self.model, optimizer, opt_level=fp16_opt_level)
+
+        # move model
+        self.model = move_model_to_device(self.model, device, num_gpus, gpu_ids, local_rank)
 
         # init training
         global_step = 0
@@ -152,22 +160,25 @@ class Transformer:
                 if fp16:
                     with amp.scale_loss(loss, optimizer) as scaled_loss:
                         scaled_loss.backward()
-                    if clip_grad_norm:
-                        torch.nn.utils.clip_grad_norm_(amp.master_params(optimizer), max_grad_norm)
                 else:
                     loss.backward()
-                    if clip_grad_norm:
-                        torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_grad_norm)
 
                 tr_loss += loss.item()
-
                 accum_loss += loss.item()
+
                 if (step + 1) % gradient_accumulation_steps == 0:
                     global_step += 1
+
+                    if clip_grad_norm:
+                        if fp16:
+                            torch.nn.utils.clip_grad_norm_(amp.master_params(optimizer), max_grad_norm)
+                        else:
+                            torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_grad_norm)
+
                     if global_step % report_every == 0 and verbose:
                         end = time.time()
                         print(
-                            "loss: {0:.6f}, time: {1:f}, number of examples in current step: {2:.0f}, step {3:.0f} out of total {4:.0f}".format(
+                            "loss:{0:.6f}, time:{1:f}, examples:{2:.0f}, step:{3:.0f}/{4:.0f}".format(
                                 accum_loss / report_every, end - start, len(batch), global_step, max_steps,
                             )
                         )
@@ -185,9 +196,16 @@ class Transformer:
 
         return global_step, tr_loss / global_step
 
-    def predict(self, eval_dataloader, device, get_inputs, verbose=True):
+    def predict(self, eval_dataloader, get_inputs, num_gpus, gpu_ids, verbose=True):
+        # get device
+        device, num_gpus = get_device(num_gpus=num_gpus, local_rank=-1)
+
+        # move model
+        self.model = move_model_to_device(self.model, device, num_gpus, gpu_ids, local_rank=-1)
+
+        # predict
         self.model.eval()
-        for batch in tqdm(eval_dataloader, desc="Evaluating", disable=not verbose):
+        for batch in tqdm(eval_dataloader, desc="Scoring", disable=not verbose):
             with torch.no_grad():
                 inputs = get_inputs(batch, device, self.model_name, train_mode=False)
                 outputs = self.model(**inputs)

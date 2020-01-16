@@ -184,7 +184,7 @@ class QAProcessor:
                 answer texts from predicted answer start and answer end indices. Defaults to
                 "./cached_qa_features".
         Returns:
-            DataSet: A Pytorch DataSet.        
+            DataSet: A Pytorch DataSet.
         """
 
         if not os.path.exists(feature_cache_dir):
@@ -509,12 +509,6 @@ class AnswerExtractor(Transformer):
 
         """
 
-        # get device
-        device, num_gpus = get_device(num_gpus=num_gpus, local_rank=local_rank)
-
-        # move model
-        self.model = move_model_to_device(self.model, device, num_gpus, gpu_ids, local_rank)
-
         # init optimizer
         optimizer = Transformer.get_default_optimizer(self.model, weight_decay, learning_rate, adam_epsilon)
 
@@ -534,9 +528,9 @@ class AnswerExtractor(Transformer):
         # fine tune
         super().fine_tune(
             train_dataloader=train_dataloader,
-            device=device,
-            num_gpus=num_gpus,
             get_inputs=QAProcessor.get_inputs,
+            num_gpus=num_gpus,
+            gpu_ids=gpu_ids,          
             max_steps=max_steps,
             gradient_accumulation_steps=gradient_accumulation_steps,
             optimizer=optimizer,
@@ -555,7 +549,7 @@ class AnswerExtractor(Transformer):
         Predicts answer start and end logits.
 
         Args:
-            test_dataloader (QADataset): Dataloader for the testing data.
+            test_dataloader (DataLoader): DataLoader for scoring the data.
             num_gpus (int, optional): The number of GPUs to use. If None, all available GPUs will
                 be used. If set to 0 or GPUs are not available, CPU device will
                 be used. Defaults to None.

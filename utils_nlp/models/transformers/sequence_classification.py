@@ -11,7 +11,7 @@ from transformers.modeling_distilbert import (
 from transformers.modeling_roberta import ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP, RobertaForSequenceClassification
 from transformers.modeling_xlnet import XLNET_PRETRAINED_MODEL_ARCHIVE_MAP, XLNetForSequenceClassification
 
-from utils_nlp.common.pytorch_utils import compute_training_steps, get_device, move_model_to_device
+from utils_nlp.common.pytorch_utils import compute_training_steps
 from utils_nlp.models.transformers.common import MAX_SEQ_LEN, TOKENIZER_CLASS, Transformer
 from utils_nlp.models.transformers.datasets import SCDataSet, SPCDataSet
 
@@ -249,12 +249,6 @@ class SequenceClassifier(Transformer):
             seed (int, optional): Random seed used to improve reproducibility. Defaults to None.
         """
 
-        # get device
-        device, num_gpus = get_device(num_gpus=num_gpus, local_rank=local_rank)
-
-        # move model
-        self.model = move_model_to_device(self.model, device, num_gpus, gpu_ids, local_rank)
-
         # init optimizer
         optimizer = Transformer.get_default_optimizer(self.model, weight_decay, learning_rate, adam_epsilon)
 
@@ -274,9 +268,9 @@ class SequenceClassifier(Transformer):
         # fine tune
         super().fine_tune(
             train_dataloader=train_dataloader,
-            device=device,
-            num_gpus=num_gpus,
             get_inputs=Processor.get_inputs,
+            num_gpus=num_gpus,
+            gpu_ids=gpu_ids,
             max_steps=max_steps,
             gradient_accumulation_steps=gradient_accumulation_steps,
             optimizer=optimizer,
@@ -286,12 +280,12 @@ class SequenceClassifier(Transformer):
             seed=seed,
         )
 
-    def predict(self, eval_dataloader, num_gpus=None, gpu_ids=None, verbose=True):
+    def predict(self, test_dataloader, num_gpus=None, gpu_ids=None, verbose=True):
         """
         Scores a dataset using a fine-tuned model and a given dataloader.
 
         Args:
-            eval_dataloader (Dataloader): Dataloader for the evaluation data.
+            test_dataloader (DataLoader): DataLoader for scoring the data.
             num_gpus (int, optional): The number of GPUs to use. If None, all available GPUs will
                 be used. If set to 0 or GPUs are not available, CPU device will be used.
                 Defaults to None.
@@ -304,14 +298,13 @@ class SequenceClassifier(Transformer):
             1darray: numpy array of predicted label indices.
         """
 
-        # get device
-        device, num_gpus = get_device(num_gpus=num_gpus, local_rank=-1)
-        # move model
-        self.model = move_model_to_device(self.model, device, num_gpus, gpu_ids, local_rank=-1)
-
         preds = list(
             super().predict(
-                eval_dataloader=eval_dataloader, device=device, get_inputs=Processor.get_inputs, verbose=verbose,
+                eval_dataloader=test_dataloader,
+                get_inputs=Processor.get_inputs,
+                num_gpus=num_gpus,
+                gpu_ids=gpu_ids,
+                verbose=verbose,
             )
         )
         preds = np.concatenate(preds)

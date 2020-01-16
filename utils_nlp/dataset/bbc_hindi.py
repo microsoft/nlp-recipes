@@ -12,7 +12,6 @@ import os
 import tarfile
 from tempfile import TemporaryDirectory
 
-import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
@@ -93,7 +92,7 @@ def load_tc_dataset(
         cache_dir (str, optional): The default folder for saving cache files.
             Defaults to TemporaryDirectory().name.
         max_len (int, optional): Maximum length of the list of tokens. Lists longer
-            than this are truncated and shorter ones are padded with "O"s. 
+            than this are truncated and shorter ones are padded with "O"s.
             Default value is BERT_MAX_LEN=512.
         batch_size (int, optional): The batch size for training and testing.
             Defaults to 32.
@@ -105,12 +104,12 @@ def load_tc_dataset(
         train_dataloader (DataLoader): a PyTorch DataLoader instance for training.
 
         test_dataloader (DataLoader): a PyTorch DataLoader instance for testing.
-        
+
         label_encoder (LabelEncoder): a sklearn LabelEncoder instance. The label values
             can be retrieved by calling the `inverse_transform` function.
-        
+
         test_labels (Series): a Pandas Series of testing label (in label ID format). If
-            the labels are in raw label values format, we will need to transform it to 
+            the labels are in raw label values format, we will need to transform it to
             label IDs by using the label_encoder.transform function.
     """
 
@@ -172,7 +171,7 @@ def load_tc_dataset(
 
 def get_label_values(label_encoder, label_ids):
     """
-    Get the label values from label IDs. 
+    Get the label values from label IDs.
 
     Args:
         label_encoder (LabelEncoder): a fitted sklearn LabelEncoder instance
