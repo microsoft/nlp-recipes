@@ -1,14 +1,10 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
-import os
-import json
-import shutil
-import pytest
 import papermill as pm
+import pytest
 import scrapbook as sb
-from tests.notebooks_common import OUTPUT_NOTEBOOK, KERNEL_NAME
-
+from tests.notebooks_common import KERNEL_NAME, OUTPUT_NOTEBOOK
 
 ABS_TOL = 0.02
 
@@ -31,7 +27,7 @@ def test_extractive_summarization_cnndm_transformers(notebooks, tmp):
             CACHE_DIR=tmp,
             BATCH_SIZE=3000,
             REPORT_EVERY=50,
-            MAX_STEPS=1e3,
+            MAX_STEPS=1000,
             WARMUP_STEPS=5e2,
             MODEL_NAME="distilbert-base-uncased",
         ),
@@ -39,5 +35,3 @@ def test_extractive_summarization_cnndm_transformers(notebooks, tmp):
     result = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict
     print(result)
     assert pytest.approx(result["rouge_2_f_score"], 0.1, abs=ABS_TOL)
-
-
