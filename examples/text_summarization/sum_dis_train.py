@@ -86,7 +86,7 @@ ENCODER = "transformer"
 
 
 # Learning rate
-LEARNING_RATE=2e-3/2
+LEARNING_RATE=2e-3
 
 # How often the statistics reports show up in training, unit is step.
 REPORT_EVERY=100
@@ -115,7 +115,7 @@ def train(rank, world_size):
             gradient_accumulation_steps=2,
             max_steps=MAX_STEPS/world_size,
             learning_rate=LEARNING_RATE,
-            warmup_steps=WARMUP_STEPS/world_size,
+            warmup_steps=WARMUP_STEPS,
             verbose=True,
             report_every=REPORT_EVERY,
             clip_grad_norm=False,

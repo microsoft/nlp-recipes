@@ -127,7 +127,7 @@ def score(rank, world_size):
             train_dataloader,
             num_epochs=NUM_EPOCHS,
             num_gpus=world_size,
-            verbose=False,
+            verbose=True,
             local_rank=rank
         )
 
