@@ -6,10 +6,11 @@ from collections import Iterable
 
 import numpy as np
 import torch
+from torch.utils.data import TensorDataset
 from transformers.modeling_bert import BERT_PRETRAINED_MODEL_ARCHIVE_MAP, BertForTokenClassification
 from transformers.modeling_distilbert import DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP, DistilBertForTokenClassification
 
-from utils_nlp.common.pytorch_utils import get_device, move_model_to_device
+from utils_nlp.common.pytorch_utils import compute_training_steps
 from utils_nlp.models.transformers.common import MAX_SEQ_LEN, TOKENIZER_CLASS, Transformer
 
 TC_MODEL_CLASS = {}
@@ -129,7 +130,7 @@ class TokenClassificationProcessor:
         Returns:
             TensorDataset: A TensorDataset containing the following four tensors.
                 1. input_ids_all: Tensor. Each sublist contains numerical values,
-                    i.e. token ids, corresponding to the tokens in the input 
+                    i.e. token ids, corresponding to the tokens in the input
                     text data.
                 2. input_mask_all: Tensor. Each sublist contains the attention
                     mask of the input token id list, 1 for input tokens and 0 for
@@ -229,14 +230,14 @@ class TokenClassificationProcessor:
             td = TensorDataset(
                 torch.tensor(input_ids_all, dtype=torch.long),
                 torch.tensor(input_mask_all, dtype=torch.long),
-                torch.tensor(trailing_token_mask_all, dtype=torch.bool),
+                torch.tensor(trailing_token_mask_all, dtype=torch.long),
                 torch.tensor(label_ids_all, dtype=torch.long),
             )
         else:
             td = TensorDataset(
                 torch.tensor(input_ids_all, dtype=torch.long),
                 torch.tensor(input_mask_all, dtype=torch.long),
-                torch.tensor(trailing_token_mask_all, dtype=torch.bool),
+                torch.tensor(trailing_token_mask_all, dtype=torch.long),
             )
         return td
 
@@ -311,12 +312,6 @@ class TokenClassifier(Transformer):
             seed (int, optional): Random seed used to improve reproducibility. Defaults to None.
         """
 
-        # get device
-        device, num_gpus = get_device(num_gpus=num_gpus, local_rank=local_rank)
-
-        # move model
-        self.model = move_model_to_device(self.model, device, num_gpus, gpu_ids, local_rank)
-
         # init optimizer
         optimizer = Transformer.get_default_optimizer(self.model, weight_decay, learning_rate, adam_epsilon)
 
@@ -336,9 +331,9 @@ class TokenClassifier(Transformer):
         # fine tune
         super().fine_tune(
             train_dataloader=train_dataloader,
-            device=device,
+            get_inputs=TokenClassificationProcessor.get_inputs,
             num_gpus=num_gpus,
-            get_inputs=Processor.get_inputs,
+            gpu_ids=gpu_ids,
             max_steps=max_steps,
             gradient_accumulation_steps=gradient_accumulation_steps,
             optimizer=optimizer,
@@ -348,12 +343,12 @@ class TokenClassifier(Transformer):
             seed=seed,
         )
 
-    def predict(self, eval_dataloader, num_gpus=None, gpu_ids=None, verbose=True):
+    def predict(self, test_dataloader, num_gpus=None, gpu_ids=None, verbose=True):
         """
         Scores a dataset using a fine-tuned model and a given dataloader.
 
         Args:
-            eval_dataloader (Dataloader): Dataloader for the evaluation data.
+            test_dataloader (DataLoader): DataLoader for scoring the data.
             num_gpus (int, optional): The number of GPUs to use. If None, all available GPUs will
                 be used. If set to 0 or GPUs are not available, CPU device will be used.
                 Defaults to None.
@@ -366,18 +361,16 @@ class TokenClassifier(Transformer):
             1darray: numpy array of predicted label indices.
         """
 
-        # get device
-        device, num_gpus = get_device(num_gpus=num_gpus, local_rank=-1)
-        # move model
-        self.model = move_model_to_device(self.model, device, num_gpus, gpu_ids, local_rank=-1)
-
         preds = list(
             super().predict(
-                eval_dataloader=eval_dataloader, device=device, get_inputs=Processor.get_inputs, verbose=verbose,
+                eval_dataloader=test_dataloader,
+                get_inputs=TokenClassificationProcessor.get_inputs,
+                num_gpus=num_gpus,
+                gpu_ids=gpu_ids,
+                verbose=verbose,
             )
         )
-        preds = np.concatenate(preds)
-        return np.argmax(preds, axis=1)
+        return np.concatenate(preds)
 
     def get_predicted_token_labels(self, predictions, label_map, dataset):
         """
@@ -386,13 +379,13 @@ class TokenClassifier(Transformer):
         Args:
             predictions (ndarray): A numpy ndarray produced from the `predict` function call.
                 The shape of the ndarray is [number_of_examples, sequence_length, number_of_labels].
-            label_map (dict): A dictionary object to map a label (str) to an ID (int). 
+            label_map (dict): A dictionary object to map a label (str) to an ID (int).
                 dataset (TensorDataset): The TensorDataset for evaluation.
             dataset (Dataset): The test Dataset instance.
 
         Returns:
             list: A list of lists. The size of the retured list is the number of testing samples.
-            Each sublist represents the predicted label for each token. 
+            Each sublist represents the predicted label for each token.
         """
 
         num_samples = len(dataset.tensors[0])
@@ -417,7 +410,7 @@ class TokenClassifier(Transformer):
                 if attention_mask[sid] == 0:
                     break
 
-                if not trailing_mask[sid]:
+                if not bool(trailing_mask[sid]):
                     continue
 
                 label_id = seq_probs[sid].argmax()
@@ -430,13 +423,13 @@ class TokenClassifier(Transformer):
         Get the true testing label values.
 
         Args:
-            label_map (dict): A dictionary object to map a label (str) to an ID (int). 
+            label_map (dict): A dictionary object to map a label (str) to an ID (int).
                 dataset (TensorDataset): The TensorDataset for evaluation.
             dataset (Dataset): The test Dataset instance.
 
         Returns:
             list: A list of lists. The size of the retured list is the number of testing samples.
-            Each sublist represents the predicted label for each token. 
+            Each sublist represents the predicted label for each token.
         """
 
         num_samples = len(dataset.tensors[0])

@@ -117,7 +117,7 @@ def load_dataset(
         cache_dir (str, optional): The default folder for saving cache files.
             Defaults to './temp'.
         max_len (int, optional): Maximum length of the list of tokens. Lists longer
-            than this are truncated and shorter ones are padded with "O"s. 
+            than this are truncated and shorter ones are padded with "O"s.
             Default value is BERT_MAX_LEN=512.
         trailing_piece_tag (str, optional): Tag used to label trailing word pieces.
             For example, "criticize" is broken into "critic" and "##ize", "critic"
@@ -130,16 +130,12 @@ def load_dataset(
 
     Returns:
         tuple. The tuple contains four elements.
-        train_dataload (DataLoader): a PyTorch DataLoader instance for training.
-
-        test_dataload (DataLoader): a PyTorch DataLoader instance for testing.
-        
-        label_map (dict): A dictionary object to map a label (str) to an ID (int). 
-
+        train_dataloader (DataLoader): a PyTorch DataLoader instance for training.
+        test_dataloader (DataLoader): a PyTorch DataLoader instance for testing.
+        label_map (dict): A dictionary object to map a label (str) to an ID (int).
         test_dataset (TensorDataset): A TensorDataset containing the following four tensors.
             1. input_ids_all: Tensor. Each sublist contains numerical values,
-                i.e. token ids, corresponding to the tokens in the input 
-                text data.
+                i.e. token ids, corresponding to the tokens in the input text data.
             2. input_mask_all: Tensor. Each sublist contains the attention
                 mask of the input token id list, 1 for input tokens and 0 for
                 padded tokens, so that padded tokens are not attended to.
