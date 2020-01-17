@@ -86,7 +86,7 @@ ENCODER = "transformer"
 
 
 # Learning rate
-LEARNING_RATE=2e-3
+LEARNING_RATE=1e-3
 
 # How often the statistics reports show up in training, unit is step.
 REPORT_EVERY=100
@@ -97,10 +97,9 @@ MAX_STEPS=1e3
 WARMUP_STEPS=5e2
 
 if not QUICK_RUN:
-    MAX_STEPS=5e4
-    WARMUP_STEPS=5e3
+    MAX_STEPS=1e4
+    WARMUP_STEPS=1e3*5
 
-summarizer = ExtractiveSummarizer(MODEL_NAME, ENCODER, CACHE_DIR)
 
 
 def train(rank, world_size):
@@ -108,6 +107,8 @@ def train(rank, world_size):
     torch.cuda.set_device(rank)
 
     start = time.time()
+
+    summarizer = ExtractiveSummarizer(MODEL_NAME, ENCODER, CACHE_DIR)
     summarizer.fit(
             train_dataset,
             num_gpus=world_size,
@@ -124,6 +125,8 @@ def train(rank, world_size):
 
     end = time.time()
     print("rank {0}, duration {1:.6f}s".format(rank, end - start))
+    if rank ==0 :
+        summarizer.save_model("dis_sum_model.pt")
     cleanup()
     
 def run_demo(demo_fn, world_size, ):
@@ -134,5 +137,4 @@ def run_demo(demo_fn, world_size, ):
 
 if __name__ == "__main__":
     run_demo(train, NUM_GPUS)
-    summarizer.save_model("dis_sum_model.pt")
 
