@@ -7,12 +7,14 @@
 
 import logging
 import os
+import pathlib
 import sys
 
 import numpy as np
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
+from fairseq.models.roberta import RobertaModel as FairseqRobertModel
 from torch import nn
 from torch.optim.lr_scheduler import *
 from transformers import (
@@ -24,7 +26,7 @@ from transformers import (
     RobertaModel,
 )
 
-from fairseq.models.roberta import RobertaModel as FairseqRobertModel
+from utils_nlp.dataset.url_utils import download_path, maybe_download
 from utils_nlp.models.mtdnn.common.archive_maps import PRETRAINED_MODEL_ARCHIVE_MAP
 from utils_nlp.models.mtdnn.common.average_meter import AverageMeter
 from utils_nlp.models.mtdnn.common.bert_optim import Adamax, RAdam
@@ -33,6 +35,7 @@ from utils_nlp.models.mtdnn.common.loss import LOSS_REGISTRY
 from utils_nlp.models.mtdnn.common.san import SANClassifier, SANNetwork
 from utils_nlp.models.mtdnn.common.squad_utils import extract_answer
 from utils_nlp.models.mtdnn.common.types import DataFormat, EncoderModelType, TaskType
+from utils_nlp.models.mtdnn.common.utils import MTDNNCommonUtils
 from utils_nlp.models.mtdnn.configuration_mtdnn import MTDNNConfig
 
 logger = logging.getLogger(__name__)
@@ -67,10 +70,16 @@ class MTDNNModel(MTDNNPretrainedModel, BertModel):
     ):
         super(MTDNNModel, self).__init__(config)
         self.config = config
-        self.config_dict = self.config.to_dict()
-        self.mtdnn_config = MTDNNConfig.from_dict(self.config_dict)
-        self.mtdnn_model = self.from_pretrained(pretrained_model_name)
-        self.state_dict = self.mtdnn_model.state_dict()
+
+        # Download pretrained model
+        # TODO - Use Model.pretrained_model() after configuration file is hosted.
+        with download_path() as file_path:
+            path = pathlib.Path(file_path)
+            self.local_model_path = maybe_download(
+                url=self.pretrained_model_archive_map[pretrained_model_name]
+            )
+        self.mtdnn_model = MTDNNCommonUtils.load_pytorch_model(self.local_model_path)
+        self.state_dict = self.mtdnn_model["state"]
         self.updates = (
             self.state_dict["updates"] if self.state_dict and "updates" in self.state_dict else 0
         )
@@ -369,4 +378,3 @@ class MTDNNModel(MTDNNPretrainedModel, BertModel):
 
     def cuda(self):
         self.network.cuda()
-

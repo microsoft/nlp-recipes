@@ -85,9 +85,10 @@ def extract_zip(file_path, dest_path="."):
 
 
 @contextmanager
-def download_path(path):
+def download_path(path=None):
     tmp_dir = TemporaryDirectory()
-    if path is None:
+    if not path:
+        print("==> Using a temp directory")
         path = tmp_dir.name
     else:
         path = os.path.realpath(path)

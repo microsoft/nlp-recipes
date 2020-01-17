@@ -65,7 +65,7 @@ class MTDNNConfig(PretrainedConfig):
         dump_feature=False,
         update_bert_opt=0,
         decoder_opts=[],
-        n_class=2,
+        tasks_nclass_list=[3],
         task_types=[],
         tasks_dropout_p=[],
         enable_variational_dropout=True,
@@ -126,7 +126,7 @@ class MTDNNConfig(PretrainedConfig):
         self.dump_feature = dump_feature
         self.update_bert_opt = update_bert_opt
         self.decoder_opts = decoder_opts
-        self.n_class = n_class
+        self.tasks_nclass_list = tasks_nclass_list
         self.task_types = task_types
         self.tasks_dropout_p = tasks_dropout_p
         self.enable_variational_dropout = enable_variational_dropout
