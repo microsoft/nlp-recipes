@@ -33,5 +33,4 @@ def test_extractive_summarization_cnndm_transformers(notebooks, tmp):
         ),
     )
     result = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict
-    print(result)
     assert pytest.approx(result["rouge_2_f_score"], 0.1, abs=ABS_TOL)
