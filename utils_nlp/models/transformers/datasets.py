@@ -246,12 +246,14 @@ def _preprocess(sentences, preprocess_pipeline, word_tokenize=None):
         return [word_tokenize(sentence) for sentence in sentences]
 
 
-def _create_data_from_iterator(iterator, preprocessing, word_tokenizer):
+def _create_data_from_iterator(iterator, preprocessing, word_tokenize):
     for line in iterator:
-        yield _preprocess((line, preprocessing, word_tokenizer))
+        yield _preprocess(
+            sentences=line, preprocess_pipeline=preprocessing, word_tokenize=word_tokenize
+        )
 
 
-class SummarizationDataset(IterableDataset):
+class IterableSummarizationDataset(IterableDataset):
     def __init__(
         self,
         source_file,
@@ -306,3 +308,62 @@ class SummarizationDataset(IterableDataset):
 
     def get_target(self):
         return self._target
+
+
+class SummarizationDataset(Dataset):
+    def __init__(
+        self,
+        source_file,
+        target_file,
+        source_preprocessing=None,
+        target_preprocessing=None,
+        word_tokenization=None,
+        top_n=-1,
+        **kwargs,
+    ):
+        """
+        Create a summarization dataset instance given the
+        paths of the source file and the target file
+
+        Args:
+            source_file (str): Full path of the file which contains a list of
+                the paragraphs with line break as seperator.
+            target_file (str): Full path of the file which contains a list of
+                the summaries for the paragraphs in the source file with line break as seperator.
+            source_preprocessing (list of functions): A list of preprocessing functions
+                to process the paragraphs in the source file.
+            target_preprocessing (list of functions): A list of preprocessing functions to
+                process the paragraphs in the source file.
+            word_tokenization (function): Tokenization function for tokenize the paragraphs
+                and summaries. The tokenization method is used for sentence selection
+                in :meth:`utils_nlp.models.transformers.extractive_summarization.
+                ExtSumProcessor.preprocess`
+            top_n (int, optional): The number which specifies how many examples in the
+                beginning of the paragraph and summary lists that will be processed by
+                this function. Defaults to -1, which means the whole lists of paragraphs
+                and summaries should be procsssed.
+        """
+
+        with open(source_file) as f:
+            if top_n != -1:
+                self._source = list(itertools.islice(f, top_n))
+            else:
+                self._source = f.readlines()
+
+        with open(target_file) as f:
+            if top_n != -1:
+                self._target = list(itertools.islice(f, top_n))
+            else:
+                self._target = f.readlines()
+
+        for i, s in enumerate(self._source):
+            self._source[i] = _preprocess(sentences=s, preprocess_pipeline=source_preprocessing)
+
+        for i, t in enumerate(self._target):
+            self._target[i] = _preprocess(sentences=t, preprocess_pipeline=target_preprocessing)
+
+    def __getitem__(self, idx):
+        return {"src": self._source[idx], "tgt": self._target[idx]}
+
+    def __len__(self):
+        return len(self._source)

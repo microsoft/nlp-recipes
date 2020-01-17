@@ -21,7 +21,10 @@ from torchtext.utils import download_from_url, extract_archive
 import zipfile
 
 from utils_nlp.dataset.url_utils import maybe_download, maybe_download_googledrive, extract_zip
-from utils_nlp.models.transformers.datasets import SummarizationDataset
+from utils_nlp.models.transformers.datasets import (
+    SummarizationDataset,
+    IterableSummarizationDataset,
+)
 
 
 def CNNDMSummarizationDataset(*args, **kwargs):
@@ -71,7 +74,7 @@ def CNNDMSummarizationDataset(*args, **kwargs):
                 test_target_file = fname
 
         return (
-            SummarizationDataset(
+            IterableSummarizationDataset(
                 train_source_file,
                 train_target_file,
                 [_clean, tokenize.sent_tokenize],
@@ -79,7 +82,7 @@ def CNNDMSummarizationDataset(*args, **kwargs):
                 nltk.word_tokenize,
                 top_n,
             ),
-            SummarizationDataset(
+            IterableSummarizationDataset(
                 test_source_file,
                 test_target_file,
                 [_clean, tokenize.sent_tokenize],
@@ -115,10 +118,13 @@ class CNNDMBertSumProcessedData:
         return local_path
 
 
-def CNNDMSummarizationDatasetOrg(local_path=".", return_dev_data=False):
+def CNNDMSummarizationDatasetOrg(
+    local_path=".", top_n=-1, return_iterable=False, return_dev_data=False
+):
 
     # TODO: Double check if any additional step is needed
     def _detokenize(line):
+        line = line.strip().replace("``", '"').replace("''", '"').replace("`", "'")
         twd = TreebankWordDetokenizer()
         s_list = [
             twd.detokenize(x.strip().split(" "), convert_parentheses=True)
@@ -154,30 +160,56 @@ def CNNDMSummarizationDatasetOrg(local_path=".", return_dev_data=False):
     source_preprocessing = [_detokenize]
     target_preprocessing = [_detokenize]
 
-    train_dataset = SummarizationDataset(
-        source_file=train_source_file,
-        target_file=train_target_file,
-        source_preprocessing=source_preprocessing,
-        target_preprocessing=target_preprocessing,
-        top_n=top_n,
-    )
-
-    test_dataset = SummarizationDataset(
-        source_file=test_source_file,
-        target_file=test_target_file,
-        source_preprocessing=source_preprocessing,
-        target_preprocessing=target_preprocessing,
-        top_n=top_n,
-    )
-
-    if return_dev_data:
-        dev_dataset = SummarizationDataset(
-            source_file=dev_source_file,
-            target_file=dev_target_file,
+    if return_iterable:
+        train_dataset = IterableSummarizationDataset(
+            source_file=train_source_file,
+            target_file=train_target_file,
             source_preprocessing=source_preprocessing,
             target_preprocessing=target_preprocessing,
             top_n=top_n,
         )
+
+        test_dataset = IterableSummarizationDataset(
+            source_file=test_source_file,
+            target_file=test_target_file,
+            source_preprocessing=source_preprocessing,
+            target_preprocessing=target_preprocessing,
+            top_n=top_n,
+        )
+    else:
+        train_dataset = SummarizationDataset(
+            source_file=train_source_file,
+            target_file=train_target_file,
+            source_preprocessing=source_preprocessing,
+            target_preprocessing=target_preprocessing,
+            top_n=top_n,
+        )
+
+        test_dataset = SummarizationDataset(
+            source_file=test_source_file,
+            target_file=test_target_file,
+            source_preprocessing=source_preprocessing,
+            target_preprocessing=target_preprocessing,
+            top_n=top_n,
+        )
+
+    if return_dev_data:
+        if return_iterable:
+            dev_dataset = IterableSummarizationDataset(
+                source_file=dev_source_file,
+                target_file=dev_target_file,
+                source_preprocessing=source_preprocessing,
+                target_preprocessing=target_preprocessing,
+                top_n=top_n,
+            )
+        else:
+            dev_dataset = SummarizationDataset(
+                source_file=dev_source_file,
+                target_file=dev_target_file,
+                source_preprocessing=source_preprocessing,
+                target_preprocessing=target_preprocessing,
+                top_n=top_n,
+            )
 
         return train_dataset, test_dataset, dev_dataset
     else:
