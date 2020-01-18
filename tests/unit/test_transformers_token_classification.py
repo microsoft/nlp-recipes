@@ -1,18 +1,8 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
-import pytest
-
 from utils_nlp.common.pytorch_utils import dataloader_from_dataset
-from utils_nlp.models.transformers.named_entity_recognition import (
-    TokenClassificationProcessor,
-    TokenClassifier,    
-)
-
-
-def test_token_classifier_num_labels():
-    with pytest.raises(ValueError):
-        TokenClassifier(num_labels=1)
+from utils_nlp.models.transformers.named_entity_recognition import TokenClassificationProcessor, TokenClassifier
 
 
 def test_token_classifier_fit_predict(tmp_path, ner_test_data):
