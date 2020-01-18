@@ -41,9 +41,6 @@ class Transformer:
         self, model_class, model_name="bert-base-cased", num_labels=2, cache_dir=".", load_model_from_dir=None,
     ):
 
-        if num_labels < 2:
-            raise ValueError("Number of labels should be at least 2.")
-        
         if model_name not in self.list_supported_models():
             raise ValueError(
                 "Model name {0} is not supported by {1}. "
