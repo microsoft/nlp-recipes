@@ -4,19 +4,17 @@
 # This script reuses code from https://github.com/huggingface/pytorch-pretrained-BERT/blob/master/examples
 # /extract_features.py, with necessary modifications.
 
-from pytorch_pretrained_bert.modeling import BertModel
-
-from utils_nlp.common.pytorch_utils import get_device, move_to_device
 from enum import Enum
+
 import numpy as np
 import pandas as pd
-import os
 import torch
-
-from torch.utils.data import DataLoader, RandomSampler, SequentialSampler, TensorDataset
-
-from utils_nlp.models.bert.common import Language, Tokenizer
 from cached_property import cached_property
+from pytorch_pretrained_bert.modeling import BertModel
+from torch.utils.data import DataLoader, SequentialSampler, TensorDataset
+
+from utils_nlp.common.pytorch_utils import get_device, move_model_to_device
+from utils_nlp.models.bert.common import Language, Tokenizer
 
 
 class PoolingStrategy(str, Enum):
@@ -43,27 +41,21 @@ class BERTSentenceEncoder:
         pooling_strategy=PoolingStrategy.MEAN,
     ):
         """Initialize the encoder's underlying model and tokenizer
-        
+
         Args:
             bert_model: BERT model to use for encoding. Defaults to pretrained BertModel.
             tokenizer: Tokenizer to use for preprocessing. Defaults to pretrained BERT tokenizer.
             language: The pretrained model's language. Defaults to Language.ENGLISH.
-            num_gpus: The number of gpus to use. Defaults to None, which forces all available GPUs to be used. 
+            num_gpus: The number of gpus to use. Defaults to None, which forces all available GPUs to be used.
             cache_dir: Location of BERT's cache directory. Defaults to "."
             to_lower: True to lowercase before tokenization. Defaults to False.
             max_len: Maximum number of tokens.
-            layer_index: The layer from which to extract features. 
+            layer_index: The layer from which to extract features.
                          Defaults to the last layer; can also be a list of integers for experimentation.
             pooling_strategy: Pooling strategy to aggregate token embeddings into sentence embedding.
         """
-        self.model = (
-            bert_model.model.bert
-            if bert_model
-            else BertModel.from_pretrained(language, cache_dir=cache_dir)
-        )
-        self.tokenizer = (
-            tokenizer if tokenizer else Tokenizer(language, to_lower=to_lower, cache_dir=cache_dir)
-        )
+        self.model = bert_model.model.bert if bert_model else BertModel.from_pretrained(language, cache_dir=cache_dir)
+        self.tokenizer = tokenizer if tokenizer else Tokenizer(language, to_lower=to_lower, cache_dir=cache_dir)
         self.num_gpus = num_gpus
         self.max_len = max_len
         self.layer_index = layer_index
@@ -98,16 +90,17 @@ class BERTSentenceEncoder:
 
     def get_hidden_states(self, text, batch_size=32):
         """Extract the hidden states from the pretrained model
-        
+
         Args:
             text: List of documents to extract features from.
             batch_size: Batch size, defaults to 32.
-        
+
         Returns:
-            pd.DataFrame with columns text_index (int), token (str), layer_index (int), values (list[float]). 
+            pd.DataFrame with columns:
+                text_index (int), token (str), layer_index (int), values (list[float]).
         """
         device, num_gpus = get_device(self.num_gpus)
-        self.model = move_to_device(self.model, device, self.num_gpus)
+        self.model = move_model_to_device(self.model, device, self.num_gpus)
 
         self.model.eval()
 
@@ -122,9 +115,7 @@ class BERTSentenceEncoder:
         input_type_ids = torch.arange(input_ids.size(0), dtype=torch.long, device=device)
 
         eval_data = TensorDataset(input_ids, input_mask, input_type_ids)
-        eval_dataloader = DataLoader(
-            eval_data, sampler=SequentialSampler(eval_data), batch_size=batch_size
-        )
+        eval_dataloader = DataLoader(eval_data, sampler=SequentialSampler(eval_data), batch_size=batch_size)
 
         hidden_states = {"text_index": [], "token": [], "layer_index": [], "values": []}
         for (input_ids_tensor, input_mask_tensor, example_indices_tensor) in eval_dataloader:
@@ -142,9 +133,7 @@ class BERTSentenceEncoder:
                         hidden_states["text_index"].append(example_index.item())
                         hidden_states["token"].append(token)
                         hidden_states["layer_index"].append(layer_index)
-                        hidden_states["values"].append(
-                            [round(x.item(), 6) for x in layer_output[i]]
-                        )
+                        hidden_states["values"].append([round(x.item(), 6) for x in layer_output[i]])
 
             # empty cache
             del [input_ids_tensor, input_mask_tensor, example_indices_tensor]
@@ -158,7 +147,7 @@ class BERTSentenceEncoder:
 
     def pool(self, df):
         """Pooling to aggregate token-wise embeddings to sentence embeddings
-        
+
         Args:
             df: pd.DataFrame with columns text_index (int), token (str), layer_index (int), values (list[float])
 
@@ -167,31 +156,16 @@ class BERTSentenceEncoder:
         """
 
         def max_pool(x):
-            values = np.array(
-                [
-                    np.reshape(np.array(x.values[i]), self.embedding_dim)
-                    for i in range(x.values.shape[0])
-                ]
-            )
+            values = np.array([np.reshape(np.array(x.values[i]), self.embedding_dim) for i in range(x.values.shape[0])])
             m, _ = torch.max(torch.tensor(values, dtype=torch.float), 0)
             return m.numpy()
 
         def mean_pool(x):
-            values = np.array(
-                [
-                    np.reshape(np.array(x.values[i]), self.embedding_dim)
-                    for i in range(x.values.shape[0])
-                ]
-            )
+            values = np.array([np.reshape(np.array(x.values[i]), self.embedding_dim) for i in range(x.values.shape[0])])
             return torch.mean(torch.tensor(values, dtype=torch.float), 0).numpy()
 
         def cls_pool(x):
-            values = np.array(
-                [
-                    np.reshape(np.array(x.values[i]), self.embedding_dim)
-                    for i in range(x.values.shape[0])
-                ]
-            )
+            values = np.array([np.reshape(np.array(x.values[i]), self.embedding_dim) for i in range(x.values.shape[0])])
             return values[0]
 
         try:
@@ -206,15 +180,11 @@ class BERTSentenceEncoder:
         except ValueError as ve:
             print(ve)
 
-        return (
-            df.groupby(["text_index", "layer_index"])["values"]
-            .apply(lambda x: pool_func(x))
-            .reset_index()
-        )
+        return df.groupby(["text_index", "layer_index"])["values"].apply(lambda x: pool_func(x)).reset_index()
 
     def encode(self, text, batch_size=32, as_numpy=False):
-        """Computes sentence encodings 
-        
+        """Computes sentence encodings
+
         Args:
             text: List of documents to encode.
             batch_size: Batch size, defaults to 32.
