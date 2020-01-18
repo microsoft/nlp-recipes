@@ -1,13 +1,16 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
+import pytest
+
 from utils_nlp.common.pytorch_utils import dataloader_from_dataset
 from utils_nlp.models.transformers.named_entity_recognition import TokenClassificationProcessor, TokenClassifier
 
 
-def test_token_classifier_fit_predict(tmp_path, ner_test_data):
-    token_classifier = TokenClassifier(num_labels=6, cache_dir=tmp_path)
-    processor = TokenClassificationProcessor(cache_dir=tmp_path)
+@pytest.mark.cpu
+def test_token_classifier_fit_predict(tmpdir, ner_test_data):
+    token_classifier = TokenClassifier(num_labels=6, cache_dir=tmpdir)
+    processor = TokenClassificationProcessor(cache_dir=tmpdir)
 
     # test fit, no warmup
     train_dataset = processor.preprocess_for_bert(

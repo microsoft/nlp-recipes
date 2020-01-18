@@ -13,7 +13,7 @@ from pytorch_pretrained_bert.optimization import BertAdam
 from tqdm import tqdm
 
 from utils_nlp.models.bert.common import Language
-from utils_nlp.common.pytorch_utils import get_device, move_to_device
+from utils_nlp.common.pytorch_utils import get_device
 
 from cached_property import cached_property
 
