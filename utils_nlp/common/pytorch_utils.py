@@ -1,7 +1,7 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
-"""Common PyTorch utilities that facilitate building Pytorch models."""
+"""Common PyTorch utilities that facilitate building PyTorch models."""
 
 import torch
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
