@@ -3,10 +3,7 @@
 
 """Common PyTorch utilities that facilitate building Pytorch models."""
 
-import warnings
-
 import torch
-import torch.nn as nn
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
 from torch.utils.data.distributed import DistributedSampler
 
@@ -42,15 +39,20 @@ def move_model_to_device(model, device, num_gpus=None, gpu_ids=None, local_rank=
             If set to None, all available GPUs will be used.
             Defaults to None.
         gpu_ids (list): List of GPU IDs to be used.
-            If set to None, the first num_gpus GPUs will be used.
+            If None, the first num_gpus GPUs will be used.
+            If not None, overrides num_gpus.
             Defaults to None.
         local_rank (int): Local GPU ID within a node. Used in distributed environments.
+            If not -1, num_gpus and gpu_ids are ignored.
             Defaults to -1.
-    
+
     Returns:
         Module, DataParallel, DistributedDataParallel: A PyTorch Module or
             a DataParallel/DistributedDataParallel wrapper (when multiple gpus are used).
     """
+    if not isinstance(device, torch.device):
+        raise ValueError("device must be of type torch.device.")
+
     # unwrap model
     if isinstance(model, torch.nn.DataParallel):
         model = model.module
@@ -60,10 +62,18 @@ def move_model_to_device(model, device, num_gpus=None, gpu_ids=None, local_rank=
             self.model, device_ids=[local_rank], output_device=local_rank, find_unused_parameters=True,
         )
     else:
-        if num_gpus > 1:
+        if device.type == "cuda":
+            if num_gpus is not None:
+                if num_gpus < 1:
+                    raise ValueError("num_gpus must be at least 1 or None")
+            num_cuda_devices = torch.cuda.device_count()
+            if num_cuda_devices < 1:
+                raise Exception("CUDA devices are not available.")
             if gpu_ids is None:
+                num_gpus = num_cuda_devices if num_gpus is None else min(num_gpus, num_cuda_devices)
                 gpu_ids = list(range(num_gpus))
-            model = torch.nn.DataParallel(model, device_ids=gpu_ids)
+            if len(gpu_ids) > 1:
+                model = torch.nn.DataParallel(model, device_ids=gpu_ids)
     # move to device
     return model.to(device)
 
@@ -94,9 +104,10 @@ def dataloader_from_dataset(ds, batch_size=32, num_gpus=None, shuffle=False, dis
 
     return DataLoader(ds, sampler=sampler, batch_size=batch_size)
 
+
 def compute_training_steps(dataloader, num_epochs=1, max_steps=-1, gradient_accumulation_steps=1):
-    """Computes the max training steps given a dataloader. 
-    
+    """Computes the max training steps given a dataloader.
+
     Args:
         dataloader (Dataloader): A PyTorch DataLoader.
         num_epochs (int, optional): Number of training epochs. Defaults to 1.
@@ -107,7 +118,7 @@ def compute_training_steps(dataloader, num_epochs=1, max_steps=-1, gradient_accu
         gradient_accumulation_steps (int, optional): Number of steps to accumulate
             before performing a backward/update pass.
             Default to 1.
-      
+
     Returns:
         int: The max number of steps to be used in a training loop.
     """
