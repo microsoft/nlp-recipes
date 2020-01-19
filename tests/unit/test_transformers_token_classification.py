@@ -9,8 +9,8 @@ from utils_nlp.models.transformers.named_entity_recognition import TokenClassifi
 
 @pytest.mark.cpu
 def test_token_classifier_fit_predict(tmpdir, ner_test_data):
-    token_classifier = TokenClassifier(num_labels=6, cache_dir=tmpdir)
-    processor = TokenClassificationProcessor(cache_dir=tmpdir)
+    token_classifier = TokenClassifier(model_name="bert-base-uncased", num_labels=6, cache_dir=tmpdir)
+    processor = TokenClassificationProcessor(model_name="bert-base-uncased", cache_dir=tmpdir)
 
     # test fit, no warmup
     train_dataset = processor.preprocess_for_bert(
@@ -20,5 +20,4 @@ def test_token_classifier_fit_predict(tmpdir, ner_test_data):
     token_classifier.fit(train_dataloader)
 
     # test predict, no labels
-    preds = token_classifier.predict(train_dataloader, verbose=False)
-    assert len(preds) == len(ner_test_data["INPUT_LABELS"])
+    _ = token_classifier.predict(train_dataloader, verbose=False)
