@@ -5,6 +5,10 @@ import collections
 import itertools
 import torch
 from torch.utils.data import Dataset, IterableDataset
+from multiprocessing import Pool, cpu_count
+from tqdm import tqdm
+from toolz.itertoolz import partition_all
+from functools import partial
 
 
 class SCDataSet(Dataset):
@@ -262,7 +266,6 @@ class IterableSummarizationDataset(IterableDataset):
         target_preprocessing=None,
         word_tokenization=None,
         top_n=-1,
-        **kwargs,
     ):
         """
         Create a summarization dataset instance given the
@@ -319,7 +322,7 @@ class SummarizationDataset(Dataset):
         target_preprocessing=None,
         word_tokenization=None,
         top_n=-1,
-        **kwargs,
+        n_processes=-1
     ):
         """
         Create a summarization dataset instance given the
@@ -356,6 +359,11 @@ class SummarizationDataset(Dataset):
             else:
                 self._target = f.readlines()
 
+        assert len(self._source) == len(self._target)
+
+        # self._source = parallel_preprocess(self._source, preprocess_pipeline=source_preprocessing, num_pool=n_processes)
+        # self._target = parallel_preprocess(self._target, preprocess_pipeline=source_preprocessing, num_pool=n_processes)
+
         for i, s in enumerate(self._source):
             self._source[i] = _preprocess(sentences=s, preprocess_pipeline=source_preprocessing)
 
@@ -367,3 +375,22 @@ class SummarizationDataset(Dataset):
 
     def __len__(self):
         return len(self._source)
+
+
+def parallel_preprocess(input_data, preprocess_pipeline, word_tokenize=None, num_pool=-1):
+    if num_pool == -1:
+        num_pool = cpu_count()
+
+    num_pool = min(num_pool, len(input_data))
+
+    p = Pool(num_pool)
+
+    results = p.map(
+        partial(_preprocess, preprocess_pipeline=preprocess_pipeline, word_tokenize=word_tokenize), 
+        input_data,
+        chunksize=int(len(input_data) / num_pool)
+        )
+    p.close()
+    p.join()
+
+    return results

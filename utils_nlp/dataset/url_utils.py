@@ -15,7 +15,7 @@ import requests
 from tqdm import tqdm
 from google_drive_downloader import GoogleDriveDownloader as gdd
 
-log = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def maybe_download(url, filename=None, work_directory=".", expected_bytes=None):
@@ -47,7 +47,7 @@ def maybe_download(url, filename=None, work_directory=".", expected_bytes=None):
             ):
                 file.write(data)
     else:
-        log.debug("File {} already downloaded".format(filepath))
+        logger.info("File {} already downloaded".format(filepath))
     if expected_bytes is not None:
         statinfo = os.stat(filepath)
         if statinfo.st_size != expected_bytes:
@@ -58,7 +58,7 @@ def maybe_download(url, filename=None, work_directory=".", expected_bytes=None):
 
 
 def maybe_download_googledrive(google_file_id, file_name, work_directory=".", expected_bytes=None):
-    """Download a file if it is not already downloaded.
+    """Download a file from google drive if it is not already downloaded.
 
     Args:
         filename (str): File name.
@@ -74,7 +74,7 @@ def maybe_download_googledrive(google_file_id, file_name, work_directory=".", ex
     if not os.path.exists(filepath):
         gdd.download_file_from_google_drive(file_id=google_file_id, dest_path=filepath)
     else:
-        log.debug("File {} already downloaded".format(filepath))
+        logger.info("File {} already downloaded".format(filepath))
     if expected_bytes is not None:
         statinfo = os.stat(filepath)
         if statinfo.st_size != expected_bytes:

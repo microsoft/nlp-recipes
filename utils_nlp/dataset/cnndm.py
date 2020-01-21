@@ -118,20 +118,22 @@ class CNNDMBertSumProcessedData:
         return local_path
 
 
+def _detokenize(line):
+    line = line.strip().replace("``", '"').replace("''", '"').replace("`", "'")
+    twd = TreebankWordDetokenizer()
+    s_list = [
+        twd.detokenize(x.strip().split(" "), convert_parentheses=True)
+        for x in line.split("<S_SEP>")
+    ]
+
+    return " ".join(s_list)
+
+
 def CNNDMSummarizationDatasetOrg(
     local_path=".", top_n=-1, return_iterable=False, return_dev_data=False
 ):
 
-    # TODO: Double check if any additional step is needed
-    def _detokenize(line):
-        line = line.strip().replace("``", '"').replace("''", '"').replace("`", "'")
-        twd = TreebankWordDetokenizer()
-        s_list = [
-            twd.detokenize(x.strip().split(" "), convert_parentheses=True)
-            for x in line.split("<S_SEP>")
-        ]
 
-        return " ".join(s_list)
 
     # Download and unzip the data
     FILE_ID = "1jiDbDbAsqy_5BM79SmX6aSu5DQVCAZq1"
@@ -143,10 +145,10 @@ def CNNDMSummarizationDatasetOrg(
     maybe_download_googledrive(
         google_file_id=FILE_ID, file_name=FILE_NAME, work_directory=local_path
     )
-    extract_zip(
-        file_path=os.path.join(local_path, FILE_NAME),
-        dest_path=os.path.join(local_path, output_dir),
-    )
+    # extract_zip(
+    #     file_path=os.path.join(local_path, FILE_NAME),
+    #     dest_path=os.path.join(local_path, output_dir),
+    # )
 
     org_data_dir = os.path.join(output_dir, "org_data")
 
