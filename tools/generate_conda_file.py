@@ -52,7 +52,6 @@ CONDA_BASE = {
 
 CONDA_GPU = {
     "numba": "numba>=0.38.1",
-    "pytorch": "pytorch>=1.0.0",
     "cudatoolkit": "cudatoolkit==10.2.89",
 }
 
@@ -94,7 +93,9 @@ PIP_BASE = {
     "tensorboardX": "tensorboardX==1.8",
 }
 
-PIP_GPU = {}
+PIP_GPU = {
+    "torch": "torch==1.4.0",
+}
 
 PIP_DARWIN = {}
 PIP_DARWIN_GPU = {}
