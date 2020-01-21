@@ -94,7 +94,7 @@ PIP_BASE = {
 }
 
 PIP_GPU = {
-    "torch": "torch>=1.0.0",
+    "torch": "torch==1.4.0",
 }
 
 PIP_DARWIN = {}
