@@ -71,6 +71,8 @@ class MTDNNModel(MTDNNPretrainedModel, BertModel):
         super(MTDNNModel, self).__init__(config)
         self.config = config
 
+        # Set the config base on encoder type set for initial checkpoint
+
         # Download pretrained model
         # TODO - Use Model.pretrained_model() after configuration file is hosted.
         with download_path() as file_path:
@@ -79,6 +81,7 @@ class MTDNNModel(MTDNNPretrainedModel, BertModel):
                 url=self.pretrained_model_archive_map[pretrained_model_name]
             )
         self.mtdnn_model = MTDNNCommonUtils.load_pytorch_model(self.local_model_path)
+
         self.state_dict = self.mtdnn_model["state"]
         self.updates = (
             self.state_dict["updates"] if self.state_dict and "updates" in self.state_dict else 0
