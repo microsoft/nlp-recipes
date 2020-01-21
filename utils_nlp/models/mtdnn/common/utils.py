@@ -41,11 +41,11 @@ class MTDNNCommonUtils:
         assert os.path.exists(local_model_path), "Model File path doesn't exist"
         state_dict = torch.load(local_model_path)
         return state_dict
-    
+
     @staticmethod
     def dump(path, data):
-        with open(path, 'w') as f:
-        json.dump(data, f)
+        with open(path, "w") as f:
+            json.dump(data, f)
 
     @staticmethod
     def generate_decoder_opt(enable_san, max_opt):

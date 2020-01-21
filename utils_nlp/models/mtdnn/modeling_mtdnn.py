@@ -87,12 +87,14 @@ class MTDNNModel(MTDNNPretrainedModel, BertModel):
         self.train_loss = AverageMeter()
         self.network = SANNetwork(self.config)
         if self.state_dict:
-            self.network.load_state_dict(self.state_dict["state"], strict=False)
+            self.network.load_state_dict(self.state_dict, strict=False)
         self.mnetwork = nn.DataParallel(self.network) if self.config.multi_gpu_on else self.network
         self.total_param = sum([p.nelement() for p in self.network.parameters() if p.requires_grad])
 
         # Move network to GPU if device available and flag set
+        print(f" =======> Can move to cuda {self.config.cuda} and {torch.cuda.is_available()}")
         if self.config.cuda:
+            print(" =======> Moving to cuda")
             self.network.cuda()
         self.optimizer_parameters = self._get_param_groups()
         self._setup_optim(self.optimizer_parameters, self.state_dict, num_train_step)
@@ -176,7 +178,7 @@ class MTDNNModel(MTDNNPretrainedModel, BertModel):
         if state_dict and "optimizer" in state_dict:
             self.optimizer.load_state_dict(state_dict["optimizer"])
 
-        if self.config["fp16"]:
+        if self.config.fp16:
             try:
                 from apex import amp
 
