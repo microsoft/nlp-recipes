@@ -132,22 +132,12 @@ class SANNetwork(nn.Module):
     https://arxiv.org/abs/1804.07888
     """
 
-    def __init__(self, config: MTDNNConfig):
+    def __init__(self, config: MTDNNConfig, pooler):
         super(SANNetwork, self).__init__()
         self.config = config
         self.dropout_list = nn.ModuleList()
         self.encoder_type = config.encoder_type
-
-        # Setup the baseline network
-        # Define the encoder based on config options
-        self.bert_config = BertConfig.from_dict(self.config.to_dict())
-        self.bert = BertModel(self.bert_config)
-        self.hidden_size = self.bert_config.hidden_size
-
-        if self.encoder_type == EncoderModelType.ROBERTA:
-            self.bert = FairseqRobertModel.from_pretrained(config.init_checkpoint)
-            self.hidden_size = self.bert.args.encoder_embed_dim
-            self.pooler = LinearPooler(self.hidden_size)
+        self.pooler = pooler
 
         # Dump other features if value is set to true
         if config.dump_feature:
@@ -233,7 +223,8 @@ class SANNetwork(nn.Module):
                 logits = self.scoring_list[task_id](pooled_output)
             return logits
 
-    def generate_scoring_options(self):
+    # TODO - Move to training step
+    def generate_tasks_scoring_options(self):
         """ Enumerate over tasks and setup of decoding and scoring list for training """
         assert len(self.tasks_nclass_list) > 0, "Number of classes to train for cannot be 0"
         for idx, task_num_labels in enumerate(self.tasks_nclass_list):

@@ -13,6 +13,8 @@ from utils_nlp.models.mtdnn.common.archive_maps import PRETRAINED_CONFIG_ARCHIVE
 
 """MTDNN model configuration"""
 
+encoder_checkpoint_map = {1: "bert", 2: "roberta"}
+
 
 class MTDNNConfig(PretrainedConfig):
     r"""
@@ -49,7 +51,8 @@ class MTDNNConfig(PretrainedConfig):
 
     def __init__(
         self,
-        encoder_type=EncoderModelType.BERT,
+        use_pretrained_model=False,
+        encoder_type=EncoderModelType.ROBERTA,
         vocab_size=30522,
         hidden_size=768,
         num_hidden_layers=12,
@@ -70,7 +73,7 @@ class MTDNNConfig(PretrainedConfig):
         tasks_dropout_p=[],
         enable_variational_dropout=True,
         init_ratio=1.0,
-        init_checkpoint="bert-base-uncased",
+        init_checkpoint="roberta.base",
         # Training config
         cuda=torch.cuda.is_available(),
         multi_gpu_on=False,
@@ -89,6 +92,7 @@ class MTDNNConfig(PretrainedConfig):
         warmup=0.1,
         warmup_schedule="warmup_linear",
         adam_eps=1e-6,
+        pooler=None,
         # Scheduler config
         have_lr_scheduler=True,
         multi_step_lr="10,20,30",
@@ -109,7 +113,16 @@ class MTDNNConfig(PretrainedConfig):
         weighted_on=False,
         **kwargs,
     ):
+        # basic Configuration validation
+        # assert inital checkpoint and encoder type are same
+        assert init_checkpoint.startswith(
+            encoder_checkpoint_map[encoder_type]
+        ), """Encoder type and initial checkpoint mismatch. 
+            1 - Bert models
+            2 - Roberta models
+            """
         super(MTDNNConfig, self).__init__(**kwargs)
+        self.use_pretrained_model = use_pretrained_model
         self.encoder_type = encoder_type
         self.vocab_size = vocab_size
         self.hidden_size = hidden_size
@@ -148,6 +161,7 @@ class MTDNNConfig(PretrainedConfig):
         self.momentum = momentum
         self.warmup = warmup
         self.warmup_schedule = warmup_schedule
+        self.pooler = pooler
         self.adam_eps = adam_eps
         self.have_lr_scheduler = have_lr_scheduler
         self.multi_step_lr = multi_step_lr

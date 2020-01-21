@@ -41,14 +41,14 @@ from utils_nlp.models.mtdnn.configuration_mtdnn import MTDNNConfig
 logger = logging.getLogger(__name__)
 
 
-class MTDNNPretrainedModel(BertPreTrainedModel):
+class MTDNNPretrainedModel(nn.Module):
     config_class = MTDNNConfig
     pretrained_model_archive_map = PRETRAINED_MODEL_ARCHIVE_MAP
     load_tf_weights = lambda model, config, path: None
     base_model_prefix = "mtdnn"
 
     def __init__(self, config):
-        super(MTDNNPretrainedModel, self).__init__(config)
+        super(MTDNNPretrainedModel, self).__init__()
         if not isinstance(config, PretrainedConfig):
             raise ValueError(
                 "Parameter config in `{}(config)` should be an instance of class `PretrainedConfig`. "
@@ -61,43 +61,69 @@ class MTDNNPretrainedModel(BertPreTrainedModel):
         self.config = config
 
 
-class MTDNNModel(MTDNNPretrainedModel, BertModel):
+class MTDNNModel(MTDNNPretrainedModel):
     def __init__(
         self,
         config: MTDNNConfig,
         pretrained_model_name: str = "mtdnn-base-uncased",
         num_train_step: int = -1,
     ):
+        assert (
+            config.init_checkpoint in self.supported_init_checkpoints()
+        ), f"Initial checkpoint must be in {self.supported_init_checkpoints()}"
         super(MTDNNModel, self).__init__(config)
         self.config = config
 
-        # Set the config base on encoder type set for initial checkpoint
-
-        # Download pretrained model
+        # Setup the baseline network
+        # - Define the encoder based on config options
+        # - Set state dictionary based on configuration setting
+        # - Download pretrained model if flag is set
         # TODO - Use Model.pretrained_model() after configuration file is hosted.
-        with download_path() as file_path:
-            path = pathlib.Path(file_path)
-            self.local_model_path = maybe_download(
-                url=self.pretrained_model_archive_map[pretrained_model_name]
-            )
-        self.mtdnn_model = MTDNNCommonUtils.load_pytorch_model(self.local_model_path)
+        if self.config.use_pretrained_model:
+            with download_path() as file_path:
+                path = pathlib.Path(file_path)
+                self.local_model_path = maybe_download(
+                    url=self.pretrained_model_archive_map[pretrained_model_name]
+                )
+            self.mtdnn_model = MTDNNCommonUtils.load_pytorch_model(self.local_model_path)
+            self.state_dict = self.mtdnn_model["state"]
+        else:
+            # Set the config base on encoder type set for initial checkpoint
+            if config.encoder_type == EncoderModelType.BERT:
+                self.bert_config = BertConfig.from_dict(self.config.to_dict())
+                self.bert_model = BertModel(self.bert_config)
+                self.state_dict = self.bert_model.state_dict()
+            if config.encoder_type == EncoderModelType.ROBERTA:
+                # Download and extract from PyTorch hub if not downloaded before
+                self.bert_model = torch.hub.load("pytorch/fairseq", config.init_checkpoint)
+                self.config.hidden_size = self.bert_model.args.encoder_embed_dim
+                self.pooler = LinearPooler(self.config.hidden_size)
+                new_state_dict = {}
+                for key, val in self.bert_model.state_dict().items():
+                    if key.startswith("model.decoder.sentence_encoder") or key.startswith(
+                        "model.classification_heads"
+                    ):
+                        key = f"bert.{key}"
+                        new_state_dict[key] = val
+                    # backward compatibility PyTorch <= 1.0.0
+                    if key.startswith("classification_heads"):
+                        key = f"bert.model.{key}"
+                        new_state_dict[key] = val
+                self.state_dict = new_state_dict
 
-        self.state_dict = self.mtdnn_model["state"]
         self.updates = (
             self.state_dict["updates"] if self.state_dict and "updates" in self.state_dict else 0
         )
         self.local_updates = 0
         self.train_loss = AverageMeter()
-        self.network = SANNetwork(self.config)
+        self.network = SANNetwork(self.config, self.pooler)
         if self.state_dict:
             self.network.load_state_dict(self.state_dict, strict=False)
         self.mnetwork = nn.DataParallel(self.network) if self.config.multi_gpu_on else self.network
         self.total_param = sum([p.nelement() for p in self.network.parameters() if p.requires_grad])
 
         # Move network to GPU if device available and flag set
-        print(f" =======> Can move to cuda {self.config.cuda} and {torch.cuda.is_available()}")
         if self.config.cuda:
-            print(" =======> Moving to cuda")
             self.network.cuda()
         self.optimizer_parameters = self._get_param_groups()
         self._setup_optim(self.optimizer_parameters, self.state_dict, num_train_step)
@@ -383,3 +409,16 @@ class MTDNNModel(MTDNNPretrainedModel, BertModel):
 
     def cuda(self):
         self.network.cuda()
+
+    def supported_init_checkpoints(self):
+        """List of allowed check points
+        """
+        return [
+            "bert-base-uncased",
+            "bert-base-cased",
+            "bert-large-uncased",
+            "mtdnn-base-uncased",
+            "mtdnn-large-uncased",
+            "roberta.base",
+            "roberta.large",
+        ]
