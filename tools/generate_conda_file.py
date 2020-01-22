@@ -75,7 +75,7 @@ PIP_BASE = {
     "scikit-learn": "scikit-learn>=0.19.0,<=0.20.3",
     "seaborn": "seaborn>=0.9.0",
     "sklearn-crfsuite": "sklearn-crfsuite>=0.3.6",
-    "spacy": "spacy>=2.1.4",
+    "spacy": "spacy==2.1.8",
     "spacy-models": (
         "https://github.com/explosion/spacy-models/releases/download/"
         "en_core_web_sm-2.1.0/en_core_web_sm-2.1.0.tar.gz"
