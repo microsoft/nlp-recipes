@@ -5,9 +5,11 @@ import random
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from fairseq.models.roberta import RobertaModel as FairseqRobertModel
 from pytorch_pretrained_bert.modeling import BertConfig, BertLayerNorm, BertModel
 from torch.nn.parameter import Parameter
 from torch.nn.utils import weight_norm
+from typing import Union
 
 from utils_nlp.models.mtdnn.common.dropout_wrapper import DropoutWrapper
 from utils_nlp.models.mtdnn.common.optimizer import weight_norm as WN
@@ -16,18 +18,6 @@ from utils_nlp.models.mtdnn.common.types import EncoderModelType
 from utils_nlp.models.mtdnn.configuration_mtdnn import MTDNNConfig
 
 SMALL_POS_NUM = 1.0e-30
-
-
-def generate_mask(new_data, dropout_p=0.0, is_training=False):
-    if not is_training:
-        dropout_p = 0.0
-    new_data = (1 - dropout_p) * (new_data.zero_() + 1)
-    for i in range(new_data.size(0)):
-        one = random.randint(0, new_data.size(1) - 1)
-        new_data[i][one] = 1
-    mask = 1.0 / (1 - dropout_p) * torch.bernoulli(new_data)
-    mask.requires_grad = False
-    return mask
 
 
 class Classifier(nn.Module):
@@ -90,6 +80,17 @@ class SANClassifier(nn.Module):
             x_size, self.label_size, opt, prefix=prefix, dropout=self.dropout
         )
 
+    def _generate_mask(self, new_data, dropout_p=0.0, is_training=False):
+        if not is_training:
+            dropout_p = 0.0
+        new_data = (1 - dropout_p) * (new_data.zero_() + 1)
+        for i in range(new_data.size(0)):
+            one = random.randint(0, new_data.size(1) - 1)
+            new_data[i][one] = 1
+        mask = 1.0 / (1 - dropout_p) * torch.bernoulli(new_data)
+        mask.requires_grad = False
+        return mask
+
     def forward(self, x, h0, x_mask=None, h_mask=None):
         h0 = self.query_wsum(h0, h_mask)
         if type(self.rnn) is nn.LSTMCell:
@@ -108,7 +109,7 @@ class SANClassifier(nn.Module):
                 else:
                     h0 = self.rnn(x_sum, h0)
         if self.mem_type == 1:
-            mask = generate_mask(
+            mask = self._generate_mask(
                 self.alpha.data.new(x.size(0), self.num_turn), self.mem_random_drop, self.training
             )
             mask = [m.contiguous() for m in torch.unbind(mask, 1)]
@@ -127,17 +128,23 @@ class SANClassifier(nn.Module):
             return scores
 
 
-class SANNetwork(nn.Module):
+class SANBERTNetwork(nn.Module):
     """Implementation of Stochastic Answer Networks for Natural Language Inference, Xiaodong Liu, Kevin Duh and Jianfeng Gao
     https://arxiv.org/abs/1804.07888
     """
 
-    def __init__(self, config: MTDNNConfig, pooler):
-        super(SANNetwork, self).__init__()
+    def __init__(
+        self,
+        init_checkpoint_model: Union[BertModel, FairseqRobertModel],
+        pooler,
+        config: MTDNNConfig,
+    ):
+        super(SANBERTNetwork, self).__init__()
         self.config = config
+        self.bert = init_checkpoint_model
+        self.pooler = pooler
         self.dropout_list = nn.ModuleList()
         self.encoder_type = config.encoder_type
-        self.pooler = pooler
 
         # Dump other features if value is set to true
         if config.dump_feature:
@@ -156,6 +163,10 @@ class SANNetwork(nn.Module):
         self.task_types = config.task_types
         self.task_dropout_p = config.tasks_dropout_p
         self.tasks_nclass_list = config.tasks_nclass_list
+
+        # TODO - Move to training
+        # Generate tasks decoding and scoring lists
+        # self._generate_tasks_decoding_scoring_options()
 
         # Initialize weights
         self._my_init()
@@ -224,11 +235,11 @@ class SANNetwork(nn.Module):
             return logits
 
     # TODO - Move to training step
-    def generate_tasks_scoring_options(self):
-        """ Enumerate over tasks and setup of decoding and scoring list for training """
+    def _generate_tasks_decoding_scoring_options(self):
+        """ Enumerate over tasks and setup decoding and scoring list for training """
         assert len(self.tasks_nclass_list) > 0, "Number of classes to train for cannot be 0"
         for idx, task_num_labels in enumerate(self.tasks_nclass_list):
-            print("idx: {idx}, number of task labels: {tasks}")
+            print(f"idx: {idx}, number of task labels: {task_num_labels}")
             decoder_opt = self.decoder_opts[idx]
             task_type = self.task_types[idx]
             dropout = DropoutWrapper(self.task_dropout_p[idx], config.enable_variational_dropout)
