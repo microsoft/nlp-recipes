@@ -32,7 +32,7 @@ from utils_nlp.models.mtdnn.common.average_meter import AverageMeter
 from utils_nlp.models.mtdnn.common.bert_optim import Adamax, RAdam
 from utils_nlp.models.mtdnn.common.linear_pooler import LinearPooler
 from utils_nlp.models.mtdnn.common.loss import LOSS_REGISTRY
-from utils_nlp.models.mtdnn.common.san import SANClassifier, SANNetwork
+from utils_nlp.models.mtdnn.common.san import SANClassifier, SANBERTNetwork
 from utils_nlp.models.mtdnn.common.squad_utils import extract_answer
 from utils_nlp.models.mtdnn.common.types import DataFormat, EncoderModelType, TaskType
 from utils_nlp.models.mtdnn.common.utils import MTDNNCommonUtils
@@ -116,7 +116,9 @@ class MTDNNModel(MTDNNPretrainedModel):
         )
         self.local_updates = 0
         self.train_loss = AverageMeter()
-        self.network = SANNetwork(self.config, self.pooler)
+        self.network = SANBERTNetwork(
+            init_checkpoint_model=self.bert_model, pooler=self.pooler, config=self.config
+        )
         if self.state_dict:
             self.network.load_state_dict(self.state_dict, strict=False)
         self.mnetwork = nn.DataParallel(self.network) if self.config.multi_gpu_on else self.network
@@ -256,10 +258,6 @@ class MTDNNModel(MTDNNPretrainedModel):
                 lc = LOSS_REGISTRY[cs](name="Loss func of task {}: {}".format(idx, cs))
                 self.kd_task_loss_criterion.append(lc)
 
-    def train(self):
-        if self.para_swapped:
-            self.para_swapped = False
-
     def _to_cuda(self, tensor):
         if not tensor:
             return tensor
@@ -272,6 +270,10 @@ class MTDNNModel(MTDNNPretrainedModel):
             y = tensor.cuda(non_blocking=True)
             y.requires_grad = False
         return y
+
+    def train(self):
+        if self.para_swapped:
+            self.para_swapped = False
 
     def update(self, batch_meta, batch_data):
         self.network.train()
