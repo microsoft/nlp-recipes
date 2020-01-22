@@ -14,7 +14,7 @@ UNK_ID = 100
 BOS_ID = 101
 
 
-class MultiTaskBatchSampler(BatchSampler):
+class MTDNNMultiTaskBatchSampler(BatchSampler):
     def __init__(self, datasets, batch_size, mix_opt, extra_task_ratio):
         self._datasets = datasets
         self._batch_size = batch_size
@@ -75,7 +75,7 @@ class MultiTaskBatchSampler(BatchSampler):
         return all_indices
 
 
-class MultiTaskDataset(Dataset):
+class MTDNNMultiTaskDataset(Dataset):
     def __init__(self, datasets):
         self._datasets = datasets
         task_id_2_data_set_dic = {}
@@ -94,7 +94,7 @@ class MultiTaskDataset(Dataset):
         return self._task_id_2_data_set_dic[task_id][sample_id]
 
 
-class SingleTaskDataset(Dataset):
+class MTDNNSingleTaskDataset(Dataset):
     def __init__(
         self,
         path,
@@ -148,7 +148,7 @@ class SingleTaskDataset(Dataset):
         }
 
 
-class Collater:
+class MTDNNCollater:
     def __init__(
         self, is_train=True, dropout_w=0.005, soft_label=False, encoder_type=EncoderModelType.BERT
     ):
