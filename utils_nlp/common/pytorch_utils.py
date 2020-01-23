@@ -83,7 +83,9 @@ def dataloader_from_dataset(ds, batch_size=32, num_gpus=None, shuffle=False, dis
 
     Args:
         ds (torch.utils.data.DataSet): A PyTorch dataset.
-        batch_size (int, optional): Batch size. Defaults to 32.
+        batch_size (int, optional): Batch size.
+            If more than 1 gpu is used, this would be the batch size per gpu.
+            Defaults to 32.
         num_gpus (int, optional): The number of GPUs to be used. Defaults to None.
         shuffle (bool, optional): If True, a RandomSampler is used. Defaults to False.
         distributed (book, optional): If True, a DistributedSampler is used. Defaults to False.
