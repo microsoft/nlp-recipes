@@ -73,6 +73,7 @@ class MTDNNModel(MTDNNPretrainedModel):
         ), f"Initial checkpoint must be in {self.supported_init_checkpoints()}"
         super(MTDNNModel, self).__init__(config)
         self.config = config
+        self.pooler = None
 
         # Setup the baseline network
         # - Define the encoder based on config options
