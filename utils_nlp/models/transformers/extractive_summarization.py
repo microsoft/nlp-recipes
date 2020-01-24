@@ -336,9 +336,9 @@ class ExtSumProcessor:
         """
 
         if model_name.split("-")[0] in ["bert", "distilbert"]:
+            batch = batch.to(device)
             if train_mode:
                 # labels must be the last
-                batch = batch.to(device)
                 return {
                     "x": batch.src,
                     "segs": batch.segs,
@@ -348,13 +348,6 @@ class ExtSumProcessor:
                     "labels": batch.labels,
                 }
             else:
-                batch["src"] = batch["src"].to(device)
-                batch["segs"] = batch["segs"].to(device)
-                batch["clss"] = batch["clss"].to(device)
-                batch["mask"] = batch["mask"].to(device)
-                batch["mask_cls"] = batch["mask_cls"].to(device)
-                if "labels" in batch:
-                    batch["labels"] = batch["labels"].to(device)
                 batch = Bunch(batch)
                 return {
                     "x": batch.src,
@@ -478,7 +471,7 @@ class ExtractiveSummarizer(Transformer):
         Args:
             model_name (str, optional): Transformer model name used in preprocessing.
                 check MODEL_CLASS for supported models. Defaults to "distilbert-base-uncased".
-            encoder (str, optional): Encoder algorithm used by summarization layer. 
+            encoder (str, optional): Encoder algorithm used by summarization layer.
                 There are four options:
                     - baseline: it used a smaller transformer model to replace the bert model
                       and with transformer summarization layer.
@@ -487,7 +480,7 @@ class ExtractiveSummarizer(Transformer):
                     - transformer: it uses pretrained BERT and fine-tune BERT with transformer
                       summarization layer.
                     - RNN: it uses pretrained BERT and fine-tune BERT with LSTM summarization layer.
-                Defaults to "transformer". 
+                Defaults to "transformer".
             cache_dir (str, optional): Directory to cache the tokenizer. Defaults to ".".
         """
 
@@ -550,7 +543,7 @@ class ExtractiveSummarizer(Transformer):
             gpu_ids (list): List of GPU IDs to be used.
                 If set to None, the first num_gpus GPUs will be used.
                 Defaults to None.
-            batch_size (int, optional): Maximum number of tokens in each batch. 
+            batch_size (int, optional): Maximum number of tokens in each batch.
             local_rank (int, optional): Local_rank for distributed training on GPUs. Defaults to
                 -1, which means non-distributed training.
             max_steps (int, optional): Maximum number of training steps. Defaults to 5e5.
