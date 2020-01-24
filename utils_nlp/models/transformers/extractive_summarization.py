@@ -336,8 +336,8 @@ class ExtSumProcessor:
         """
 
         if model_name.split("-")[0] in ["bert", "distilbert"]:
-            batch = batch.to(device)
             if train_mode:
+                batch = batch.to(device)
                 # labels must be the last
                 return {
                     "x": batch.src,
@@ -350,11 +350,11 @@ class ExtSumProcessor:
             else:
                 batch = Bunch(batch)
                 return {
-                    "x": batch.src,
-                    "segs": batch.segs,
-                    "clss": batch.clss,
-                    "mask": batch.mask,
-                    "mask_cls": batch.mask_cls,
+                    "x": batch.src.to(device),
+                    "segs": batch.segs.to(device),
+                    "clss": batch.clss.to(device),
+                    "mask": batch.mask.to(device),
+                    "mask_cls": batch.mask_cls.to(device),
                 }
         else:
             raise ValueError("Model not supported: {}".format(model_name))
