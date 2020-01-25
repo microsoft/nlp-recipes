@@ -1,7 +1,7 @@
 <img src="NLP-Logo.png" align="right" alt="" width="300"/>
 
 
-# NLP Best Practices 
+# NLP Best Practices
 
 In recent years, natural language processing (NLP) has seen quick growth in quality and usability, and this has helped to drive business adoption of artificial intelligence (AI) solutions. In the last few years, researchers have been applying newer deep learning methods to NLP. Data scientists started moving from traditional methods to state-of-the-art (SOTA) deep neural network (DNN) algorithms which use language models pretrained on large text corpora.
 
@@ -16,13 +16,13 @@ We hope that the tools can significantly reduce the “time to market” by simp
 
 In an era of transfer learning, transformers, and deep architectures, we believe that pretrained models provide a unified solution to many real-world problems and allow handling different tasks and languages easily. We will, therefore, prioritize such models, as they achieve state-of-the-art results on several NLP benchmarks like [*GLUE*](https://gluebenchmark.com/leaderboard) and [*SQuAD*](https://rajpurkar.github.io/SQuAD-explorer/) leaderboards. The models can be used in a number of applications ranging from simple text classification to sophisticated intelligent chat bots.
 
-Note that for certain kind of NLP problems, you may not need to build your own models. Instead, pre-built or easily customizable solutions exist which do not require any custom coding or machine learning expertise. We strongly recommend evaluating if these can sufficiently solve your problem. If these solutions are not applicable, or the accuracy of these solutions is not sufficient, then resorting to more complex and time-consuming custom approaches may be necessary. The following cognitive services offer simple solutions to address common NLP tasks: 
+Note that for certain kind of NLP problems, you may not need to build your own models. Instead, pre-built or easily customizable solutions exist which do not require any custom coding or machine learning expertise. We strongly recommend evaluating if these can sufficiently solve your problem. If these solutions are not applicable, or the accuracy of these solutions is not sufficient, then resorting to more complex and time-consuming custom approaches may be necessary. The following cognitive services offer simple solutions to address common NLP tasks:
 <br><br><b>[Text Analytics](https://azure.microsoft.com/en-us/services/cognitive-services/text-analytics/) </b> are a set of pre-trained REST APIs which can be called for Sentiment Analysis, Key phrase extraction, Language detection and Named Entity Detection and more. These APIs work out of the box and require minimal expertise in machine learning, but have limited customization capabilities.
 <br><br><b>[QnA Maker](https://azure.microsoft.com/en-us/services/cognitive-services/qna-maker/) </b>is a cloud-based API service that lets you create a conversational question-and-answer layer over your existing data. Use it to build a knowledge base by extracting questions and answers from your semi-structured content, including FAQs, manuals, and documents.
 <br><br><b>[Language Understanding](https://azure.microsoft.com/en-us/services/cognitive-services/language-understanding-intelligent-service/)</b> is a SaaS service to train and deploy a model as a REST API given a user-provided training set. You could do Intent Classification as well as Named Entity Extraction by performing simple steps of providing example utterances and labelling them. It supports Active Learning, so your model always keeps learning and improving.
 
 ## Target Audience
-For this repository our target audience includes data scientists and machine learning engineers with varying levels of NLP knowledge as our content is source-only and targets custom machine learning modelling. The utilities and examples provided are intended to be solution accelerators for real-world NLP problems. 
+For this repository our target audience includes data scientists and machine learning engineers with varying levels of NLP knowledge as our content is source-only and targets custom machine learning modelling. The utilities and examples provided are intended to be solution accelerators for real-world NLP problems.
 
 ## Focus areas
 The repository aims to expand NLP capabilities along three separate dimensions
@@ -33,13 +33,13 @@ We aim to have end-to-end examples of common tasks and scenarios such as text cl
 ### Algorithms
 We aim to support multiple models for each of the supported scenarios. Currently, transformer-based models are supported across most scenarios. We have been working on integrating the [transformers package](https://github.com/huggingface/transformers) from [Hugging Face](https://huggingface.co/) which allows users to easily load pretrained models and fine-tune them for different tasks.
 
-### Languages 
+### Languages
 We strongly subscribe to the multi-language principles laid down by ["Emily Bender"](http://faculty.washington.edu/ebender/papers/Bender-SDSS-2019.pdf)
 * "Natural language is not a synonym for English"
-* "English isn't generic for language, despite what NLP papers might lead you to believe" 
+* "English isn't generic for language, despite what NLP papers might lead you to believe"
 * "Always name the language you are working on" ([Bender rule](https://www.aclweb.org/anthology/Q18-1041/))
 
-The repository aims to support non-English languages  across all the scenarios. Pre-trianed models used in the repository such as BERT, FastText support 100+ languages out of the box. Our goal is to provide end-to-end examples in as many languages as possible. We encourage community contributions in this area.
+The repository aims to support non-English languages  across all the scenarios. Pre-trained models used in the repository such as BERT, FastText support 100+ languages out of the box. Our goal is to provide end-to-end examples in as many languages as possible. We encourage community contributions in this area.
 
 
 
@@ -50,6 +50,7 @@ The following is a summary of the commonly used NLP scenarios covered in the rep
 |-------------------------|  ------------------- |-------|---|
 |Text Classification                     |BERT, XLNet, RoBERTa| Text classification is a supervised learning method of learning and predicting the category or the class of a document given its text content. |English, Hindi, Arabic|
 |Named Entity Recognition                |BERT| Named entity recognition (NER) is the task of classifying words or key phrases of a text into predefined entities of interest. |English|
+|Text Summarization|BERTSum|Text summarization is a language generation task of summarizing the input text into a shorter paragraph of text.|English
 |Entailment                              |BERT, XLNet, RoBERTa| Textual entailment is the task of classifying the binary relation between two natural-language texts,  *text* and *hypothesis*, to determine if the *text* agrees with the *hypothesis* or not. |English|
 |Question Answering                      |BiDAF, BERT, XLNet| Question answering (QA) is the task of retrieving or generating a valid answer for a given query in natural language, provided with a passage related to the query. |English|
 |Sentence Similarity                     |BERT, GenSen| Sentence similarity is the process of computing a similarity score given a pair of text documents. |English|

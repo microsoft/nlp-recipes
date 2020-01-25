@@ -20,6 +20,8 @@ df = load_pandas_df(DATA_FOLDER, file_split ="train", nrows = 1000)
 |[The Cross-Lingual NLI (XNLI) Corpus](https://www.nyu.edu/projects/bowman/xnli/)|[xnli.py](./xnli.py)|
 |[The STSbenchmark dataset](http://ixa2.si.ehu.es/stswiki/index.php/STSbenchmark)|[stsbenchmark.py](./stsbenchmark.py)|
 |[The Stanford Question Answering Dataset (SQuAD)](https://rajpurkar.github.io/SQuAD-explorer/)|[squad.py](./squad.py)|
+|[CNN/Daily Mail(CNN/DM) Dataset](https://github.com/harvardnlp/sent-summary)|[cnndm.py](./cnndm.py)|
+|[Preprocessed CNN/Daily Mail(CNN/DM) Dataset for Extractive Summarization](https://github.com/nlpyang/BertSum)|[cnndm.py](./cnndm.py)|
 
 ## Dataset References
 Please see [Dataset References](../../DatasetReferences.md) for notice and information regarding datasets used.
