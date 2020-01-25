@@ -16,7 +16,7 @@ from pytorch_pretrained_bert.optimization import BertAdam
 from tqdm import tqdm, trange
 
 from utils_nlp.models.bert.common import Language, create_data_loader
-from utils_nlp.common.pytorch_utils import get_device, move_to_device
+from utils_nlp.common.pytorch_utils import get_device, move_model_to_device
 
 from cached_property import cached_property
 
@@ -144,7 +144,7 @@ class BERTTokenClassifier:
 
         device, num_gpus = get_device(num_gpus)
 
-        self.model = move_to_device(self.model, device, num_gpus)
+        self.model = move_model_to_device(self.model, device, num_gpus)
 
         if num_gpus is None:
             num_gpus_used = torch.cuda.device_count()
@@ -228,7 +228,7 @@ class BERTTokenClassifier:
         )
         device, num_gpus = get_device(num_gpus)
 
-        self.model = move_to_device(self.model, device, num_gpus)
+        self.model = move_model_to_device(self.model, device, num_gpus)
 
         self.model.eval()
         eval_loss = 0

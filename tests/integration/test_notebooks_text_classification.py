@@ -33,8 +33,8 @@ def test_tc_mnli_transformers(notebooks, tmp):
         ),
     )
     result = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict
-    assert pytest.approx(result["accuracy"], 0.89, abs=ABS_TOL)
-    assert pytest.approx(result["f1"], 0.89, abs=ABS_TOL)
+    assert pytest.approx(result["accuracy"], 0.885, abs=ABS_TOL)
+    assert pytest.approx(result["f1"], 0.885, abs=ABS_TOL)
 
 
 @pytest.mark.integration

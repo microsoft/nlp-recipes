@@ -2,37 +2,25 @@
 # Licensed under the MIT License.
 
 import numpy as np
-import torch
-from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
-from torch.utils.data.distributed import DistributedSampler
-from transformers.modeling_bert import (
-    BERT_PRETRAINED_MODEL_ARCHIVE_MAP,
-    BertForSequenceClassification,
-)
+from transformers.modeling_albert import ALBERT_PRETRAINED_MODEL_ARCHIVE_MAP, AlbertForSequenceClassification
+from transformers.modeling_bert import BERT_PRETRAINED_MODEL_ARCHIVE_MAP, BertForSequenceClassification
 from transformers.modeling_distilbert import (
     DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP,
     DistilBertForSequenceClassification,
 )
-from transformers.modeling_roberta import (
-    ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP,
-    RobertaForSequenceClassification,
-)
-from transformers.modeling_xlnet import (
-    XLNET_PRETRAINED_MODEL_ARCHIVE_MAP,
-    XLNetForSequenceClassification,
-)
+from transformers.modeling_roberta import ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP, RobertaForSequenceClassification
+from transformers.modeling_xlnet import XLNET_PRETRAINED_MODEL_ARCHIVE_MAP, XLNetForSequenceClassification
+
+from utils_nlp.common.pytorch_utils import compute_training_steps
 from utils_nlp.models.transformers.common import MAX_SEQ_LEN, TOKENIZER_CLASS, Transformer
 from utils_nlp.models.transformers.datasets import SCDataSet, SPCDataSet
 
 MODEL_CLASS = {}
 MODEL_CLASS.update({k: BertForSequenceClassification for k in BERT_PRETRAINED_MODEL_ARCHIVE_MAP})
-MODEL_CLASS.update(
-    {k: RobertaForSequenceClassification for k in ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP}
-)
+MODEL_CLASS.update({k: RobertaForSequenceClassification for k in ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP})
 MODEL_CLASS.update({k: XLNetForSequenceClassification for k in XLNET_PRETRAINED_MODEL_ARCHIVE_MAP})
-MODEL_CLASS.update(
-    {k: DistilBertForSequenceClassification for k in DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP}
-)
+MODEL_CLASS.update({k: DistilBertForSequenceClassification for k in DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP})
+MODEL_CLASS.update({k: AlbertForSequenceClassification for k in ALBERT_PRETRAINED_MODEL_ARCHIVE_MAP})
 
 
 class Processor:
@@ -56,13 +44,14 @@ class Processor:
         )
 
     @staticmethod
-    def get_inputs(batch, model_name, train_mode=True):
+    def get_inputs(batch, device, model_name, train_mode=True):
         """
         Creates an input dictionary given a model name.
 
         Args:
             batch (tuple): A tuple containing input ids, attention mask,
                 segment ids, and labels tensors.
+            device (torch.device): A PyTorch device.
             model_name (bool, optional): Model name used to format the inputs.
             train_mode (bool, optional): Training mode flag.
                 Defaults to True.
@@ -71,7 +60,8 @@ class Processor:
             dict: Dictionary containing input ids, segment ids, masks, and labels.
                 Labels are only returned when train_mode is True.
         """
-        if model_name.split("-")[0] in ["bert", "xlnet", "roberta", "distilbert"]:
+        batch = tuple(t.to(device) for t in batch)
+        if model_name.split("-")[0] in ["bert", "xlnet", "roberta", "distilbert", "albert"]:
             if train_mode:
                 inputs = {"input_ids": batch[0], "attention_mask": batch[1], "labels": batch[3]}
             else:
@@ -103,11 +93,7 @@ class Processor:
             print("setting max_len to max allowed sequence length: {}".format(MAX_SEQ_LEN))
             max_len = MAX_SEQ_LEN
         # truncate and add CLS & SEP markers
-        tokens = (
-            [tokenizer.cls_token]
-            + tokenizer.tokenize(text)[0 : max_len - 2]
-            + [tokenizer.sep_token]
-        )
+        tokens = [tokenizer.cls_token] + tokenizer.tokenize(text)[0 : max_len - 2] + [tokenizer.sep_token]
         # get input ids
         input_ids = tokenizer.convert_tokens_to_ids(tokens)
         # pad sequence
@@ -188,55 +174,13 @@ class Processor:
 
         return input_ids, attention_mask, token_type_ids
 
-    def create_dataloader_from_df(
-        self,
-        df,
-        text_col,
-        label_col=None,
-        text2_col=None,
-        shuffle=False,
-        max_len=MAX_SEQ_LEN,
-        batch_size=32,
-        num_gpus=None,
-        distributed=False,
-    ):
-        """
-        Creates a PyTorch DataLoader from a Pandas DataFrame for sequence classification tasks.    
-
-        Args:
-            df (pandas.DataFrame): Input Pandas DataFrame.
-            text_col (str/int): Text column name or index.
-            label_col (str/int, optional): Label column name or index. Defualts to None.
-            text2_col (str/int, optional): Second text column name or index for sequence-pair tasks.
-                Defualts to None.
-            shuffle (bool, optional): If set to True, the DataLoader will use a RandomSampler,
-                otherwise it will use a SequentialSampler.
-                Defaults to False.
-            max_len (int, optional): Maximum sequence length. Defaults to 512.
-            batch_size (int, optional): Batch size. Defaults to 32.
-            num_gpus (int, optional): Number of GPUs to use.
-                If None, all available GPUs will be used.
-                If set to 0 or GPUs are not available, CPU device will be used.
-                Defaults to None.
-            distributed (bool, optional): If set to True, the DataLoader will use
-                a DistributedSampler.
-                Defaults to False.
-
-        Returns:
-            DataLoader: A PyTorch DataLoader object that can be used for training or scoring.
-        """
-
+    def dataset_from_dataframe(self, df, text_col, label_col=None, text2_col=None, max_len=MAX_SEQ_LEN):
         if text2_col is None:
-            ds = SCDataSet(
-                df,
-                text_col,
-                label_col,
-                transform=Processor.text_transform,
-                tokenizer=self.tokenizer,
-                max_len=max_len,
+            return SCDataSet(
+                df, text_col, label_col, transform=Processor.text_transform, tokenizer=self.tokenizer, max_len=max_len,
             )
         else:
-            ds = SPCDataSet(
+            return SPCDataSet(
                 df,
                 text_col,
                 text2_col,
@@ -246,26 +190,11 @@ class Processor:
                 max_len=max_len,
             )
 
-        if num_gpus is None:
-            num_gpus = torch.cuda.device_count()
-
-        batch_size = batch_size * max(1, num_gpus)
-
-        if distributed:
-            sampler = DistributedSampler(ds)
-        else:
-            sampler = RandomSampler(ds) if shuffle else SequentialSampler(ds)
-
-        return DataLoader(ds, sampler=sampler, batch_size=batch_size)
-
 
 class SequenceClassifier(Transformer):
     def __init__(self, model_name="bert-base-cased", num_labels=2, cache_dir="."):
         super().__init__(
-            model_class=MODEL_CLASS,
-            model_name=model_name,
-            num_labels=num_labels,
-            cache_dir=cache_dir,
+            model_class=MODEL_CLASS, model_name=model_name, num_labels=num_labels, cache_dir=cache_dir,
         )
 
     @staticmethod
@@ -276,7 +205,10 @@ class SequenceClassifier(Transformer):
         self,
         train_dataloader,
         num_epochs=1,
+        max_steps=-1,
+        gradient_accumulation_steps=1,
         num_gpus=None,
+        gpu_ids=None,
         local_rank=-1,
         weight_decay=0.0,
         learning_rate=5e-5,
@@ -289,10 +221,20 @@ class SequenceClassifier(Transformer):
         Fine-tunes a pre-trained sequence classification model.
 
         Args:
-            train_dataloader (Dataloader): Dataloader for the training data.
+            train_dataloader (Dataloader): A PyTorch DataLoader to be used for training.
             num_epochs (int, optional): Number of training epochs. Defaults to 1.
+            max_steps (int, optional): Total number of training steps.
+                If set to a positive value, it overrides num_epochs.
+                Otherwise, it's determined by the dataset length, gradient_accumulation_steps, and num_epochs.
+                Defualts to -1.
+            gradient_accumulation_steps (int, optional): Number of steps to accumulate
+                before performing a backward/update pass.
+                Default to 1.
             num_gpus (int, optional): The number of GPUs to use. If None, all available GPUs will
                 be used. If set to 0 or GPUs are not available, CPU device will be used.
+                Defaults to None.
+            gpu_ids (list): List of GPU IDs to be used.
+                If set to None, the first num_gpus GPUs will be used.
                 Defaults to None.
             local_rank (int, optional): Local_rank for distributed training on GPUs. Defaults to
                 -1, which means non-distributed training.
@@ -307,27 +249,48 @@ class SequenceClassifier(Transformer):
             seed (int, optional): Random seed used to improve reproducibility. Defaults to None.
         """
 
+        # init optimizer
+        optimizer = Transformer.get_default_optimizer(self.model, weight_decay, learning_rate, adam_epsilon)
+
+        # compute the max number of training steps
+        max_steps = compute_training_steps(
+            train_dataloader,
+            num_epochs=num_epochs,
+            max_steps=max_steps,
+            gradient_accumulation_steps=gradient_accumulation_steps,
+        )
+
+        # init scheduler
+        scheduler = Transformer.get_default_scheduler(
+            optimizer=optimizer, warmup_steps=warmup_steps, num_training_steps=max_steps,
+        )
+
+        # fine tune
         super().fine_tune(
             train_dataloader=train_dataloader,
             get_inputs=Processor.get_inputs,
-            n_gpu=num_gpus,
-            num_train_epochs=num_epochs,
-            weight_decay=weight_decay,
-            learning_rate=learning_rate,
-            adam_epsilon=adam_epsilon,
-            warmup_steps=warmup_steps,
+            num_gpus=num_gpus,
+            gpu_ids=gpu_ids,
+            max_steps=max_steps,
+            gradient_accumulation_steps=gradient_accumulation_steps,
+            optimizer=optimizer,
+            scheduler=scheduler,
+            local_rank=local_rank,
             verbose=verbose,
             seed=seed,
         )
 
-    def predict(self, eval_dataloader, num_gpus=None, verbose=True):
+    def predict(self, test_dataloader, num_gpus=None, gpu_ids=None, verbose=True):
         """
         Scores a dataset using a fine-tuned model and a given dataloader.
 
         Args:
-            eval_dataloader (Dataloader): Dataloader for the evaluation data.
+            test_dataloader (DataLoader): DataLoader for scoring the data.
             num_gpus (int, optional): The number of GPUs to use. If None, all available GPUs will
                 be used. If set to 0 or GPUs are not available, CPU device will be used.
+                Defaults to None.
+            gpu_ids (list): List of GPU IDs to be used.
+                If set to None, the first num_gpus GPUs will be used.
                 Defaults to None.
             verbose (bool, optional): Whether to print out the training log. Defaults to True.
 
@@ -337,12 +300,12 @@ class SequenceClassifier(Transformer):
 
         preds = list(
             super().predict(
-                eval_dataloader=eval_dataloader,
+                eval_dataloader=test_dataloader,
                 get_inputs=Processor.get_inputs,
-                n_gpu=num_gpus,
+                num_gpus=num_gpus,
+                gpu_ids=gpu_ids,
                 verbose=verbose,
             )
         )
         preds = np.concatenate(preds)
-        # todo generator & probs
         return np.argmax(preds, axis=1)
