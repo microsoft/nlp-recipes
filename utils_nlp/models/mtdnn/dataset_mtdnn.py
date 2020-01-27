@@ -8,7 +8,8 @@ from shutil import copyfile
 import torch
 from torch.utils.data import BatchSampler, DataLoader, Dataset
 
-from utils_nlp.models.mtdnn.common.types import DataFormat, EncoderModelType, TaskType
+from utils_nlp.models.mtdnn.common.types import (DataFormat, EncoderModelType,
+                                                 TaskType)
 
 UNK_ID = 100
 BOS_ID = 101
