@@ -281,11 +281,11 @@ class MTDNNModel(MTDNNPretrainedModel):
 
     def update(self, batch_meta, batch_data):
         self.network.train()
-        y = batch_data[batch_meta["label"]]
+        target = batch_data[batch_meta["label"]]
         soft_labels = None
 
         task_type = batch_meta["task_type"]
-        y = self._to_cuda(y) if self.config.cuda else y
+        target = self._to_cuda(target) if self.config.cuda else target
 
         task_id = batch_meta["task_id"]
         inputs = batch_data[: batch_meta["input_len"]]
