@@ -52,7 +52,7 @@ class MTDNNConfig(PretrainedConfig):
     def __init__(
         self,
         use_pretrained_model=False,
-        encoder_type=EncoderModelType.ROBERTA,
+        encoder_type=EncoderModelType.BERT,
         vocab_size=30522,
         hidden_size=768,
         num_hidden_layers=12,
@@ -67,13 +67,14 @@ class MTDNNConfig(PretrainedConfig):
         layer_norm_eps=1e-12,
         dump_feature=False,
         update_bert_opt=0,
-        decoder_opts=[],
-        tasks_nclass_list=[3],
-        task_types=[],
-        tasks_dropout_p=[],
+        answer_opt=0,  # answer --> decoder opts flag
         enable_variational_dropout=True,
         init_ratio=1.0,
-        init_checkpoint="roberta.base",
+        init_checkpoint="bert-base-uncased",
+        mtl_opt=0,
+        ratio=0.0,
+        mix_opt=0,
+        max_seq_len=512,
         # Training config
         cuda=torch.cuda.is_available(),
         multi_gpu_on=False,
@@ -93,6 +94,13 @@ class MTDNNConfig(PretrainedConfig):
         warmup_schedule="warmup_linear",
         adam_eps=1e-6,
         pooler=None,
+        bert_dropout_p=0.1,
+        dropout_p=0.1,
+        dropout_w=0.0,
+        vb_dropout=True,
+        # loading config
+        model_ckpt="checkpoints/model_0.pt",
+        resume=False,
         # Scheduler config
         have_lr_scheduler=True,
         multi_step_lr="10,20,30",
@@ -106,9 +114,6 @@ class MTDNNConfig(PretrainedConfig):
         # fp16
         fp16=False,
         fp16_opt_level="01",
-        # loss map
-        loss_types=[],
-        kd_loss_types=[],
         mkd_opt=0,
         weighted_on=False,
         **kwargs,
@@ -138,13 +143,14 @@ class MTDNNConfig(PretrainedConfig):
         self.layer_norm_eps = layer_norm_eps
         self.dump_feature = dump_feature
         self.update_bert_opt = update_bert_opt
-        self.decoder_opts = decoder_opts
-        self.tasks_nclass_list = tasks_nclass_list
-        self.task_types = task_types
-        self.tasks_dropout_p = tasks_dropout_p
+        self.answer_opt = answer_opt
         self.enable_variational_dropout = enable_variational_dropout
         self.init_ratio = init_ratio
         self.init_checkpoint = init_checkpoint
+        self.mtl_opt = mtl_opt
+        self.ratio = ratio
+        self.mix_opt = mix_opt
+        self.max_seq_len = max_seq_len
         self.cuda = cuda
         self.multi_gpu_on = multi_gpu_on
         self.log_per_updates = log_per_updates
@@ -163,6 +169,12 @@ class MTDNNConfig(PretrainedConfig):
         self.warmup_schedule = warmup_schedule
         self.pooler = pooler
         self.adam_eps = adam_eps
+        self.bert_dropout_p = bert_dropout_p
+        self.dropout_p = dropout_p
+        self.dropout_w = dropout_w
+        self.vb_dropout = vb_dropout
+        self.model_ckpt = model_ckpt
+        self.resume = resume
         self.have_lr_scheduler = have_lr_scheduler
         self.multi_step_lr = multi_step_lr
         self.freeze_layers = freeze_layers
@@ -174,8 +186,6 @@ class MTDNNConfig(PretrainedConfig):
         self.grad_accumulation_step = grad_accumulation_step
         self.fp16 = fp16
         self.fp16_opt_level = fp16_opt_level
-        self.loss_types = loss_types
-        self.kd_loss_types = kd_loss_types
         self.mkd_opt = mkd_opt
         self.weighted_on = weighted_on
         self.kwargs = kwargs
