@@ -47,7 +47,7 @@ class MTDNNDataPreprocess:
         self.loss_types = []
         self.kd_loss_types = []
         self.train_data = self.process_train_datasets()
-        self.label_size = nclass_list
+        self.dev_datasets_list, self.test_datasets_list = self.process_dev_test_datasets()
 
     def process_train_datasets(self):
         """Preprocess the training sets and generate decoding and task specific training options needed to update config object
@@ -124,13 +124,16 @@ class MTDNNDataPreprocess:
             pin_memory=args.cuda,
         )
 
+        # Update class configuration with decoder opts
+        self.update_config()
+
         return multi_task_train_data
 
     def process_dev_test_datasets(self):
         """Preprocess the test sets 
         
         Returns:
-            [DataLoader] -- Multiple tasks test data ready for inference
+            [List] -- Multiple tasks test data ready for inference
         """
         logger.info("Starting to process the testing data sets")
         dev_data_list = []
@@ -196,23 +199,12 @@ class MTDNNDataPreprocess:
     def generate_decoder_opt(self, enable_san, max_opt):
         return max_opt if enable_san and max_opt < 3 else 0
 
-    def update_config_post_training_data_processing(self, config):
+    def update_config(self):
         # Update configurations with options obtained from preprocessing training data
-        setattr(config, "decoder_opts", self.decoder_opts)
-        setattr(config, "task_types", self.task_types)
-        setattr(config, "tasks_dropout_p", self.dropout_list)
-        setattr(config, "loss_types", self.loss_types)
-        setattr(config, "kd_loss_types", self.kd_loss_types)
-        setattr(config, "tasks_nclass_list", self.nclass_list)
-        return config
-
-    def process_training_dataset_and_update_config(self):
-        """Process training dataset and update config object dynamically
-        
-        Returns:
-            [Tuple] -- Multiple Task Training data and updated configuration object
-        """
-        multi_task_train_data = self.process_train_datasets()
-        config = self.update_config_post_training_data_processing()
-
-        return multi_task_train_data, config
+        setattr(self.config, "decoder_opts", self.decoder_opts)
+        setattr(self.config, "task_types", self.task_types)
+        setattr(self.config, "tasks_dropout_p", self.dropout_list)
+        setattr(self.config, "loss_types", self.loss_types)
+        setattr(self.config, "kd_loss_types", self.kd_loss_types)
+        setattr(self.config, "tasks_nclass_list", self.nclass_list)
+        return self.config
