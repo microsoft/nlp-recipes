@@ -139,7 +139,7 @@ This will create a docker image containing all the dependencies and will name it
 ## Running the container
 You can run the notebook within the container environment using
 ```
-  docker run -p 8888:8888 nlp-recipes
+  docker run --gpus all -p 8888:8888 nlp-recipes
 ```
 This will map port 8888 of the local machine 
 
@@ -147,5 +147,5 @@ This will map port 8888 of the local machine
 * If you have permission issues with `docker build` or `docker run`, you might need to run docker with sudo permissions. 
 * If you are getting 'port already in use' errors, consider mapping a different port on the local machine to port 8888 on the container e.g.
 ```
-docker run -p 9000:8888 nlp-recipes
+docker run --gpus all -p 9000:8888 nlp-recipes
 ```
