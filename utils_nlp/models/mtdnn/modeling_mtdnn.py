@@ -32,11 +32,14 @@ from utils_nlp.models.mtdnn.common.average_meter import AverageMeter
 from utils_nlp.models.mtdnn.common.bert_optim import Adamax, RAdam
 from utils_nlp.models.mtdnn.common.linear_pooler import LinearPooler
 from utils_nlp.models.mtdnn.common.loss import LOSS_REGISTRY
-from utils_nlp.models.mtdnn.common.san import SANClassifier, SANBERTNetwork
-from utils_nlp.models.mtdnn.common.squad_utils import extract_answer
+from utils_nlp.models.mtdnn.common.metrics import calc_metrics
+from utils_nlp.models.mtdnn.common.san import SANBERTNetwork, SANClassifier
+from utils_nlp.models.mtdnn.common.squad_utils import extract_answer, squad_utils
 from utils_nlp.models.mtdnn.common.types import DataFormat, EncoderModelType, TaskType
 from utils_nlp.models.mtdnn.common.utils import MTDNNCommonUtils
 from utils_nlp.models.mtdnn.configuration_mtdnn import MTDNNConfig
+from utils_nlp.models.mtdnn.dataset_mtdnn import MTDNNCollater
+from utils_nlp.models.mtdnn.tasks.config import TaskDefs
 
 logger = logging.getLogger(__name__)
 
@@ -334,6 +337,39 @@ class MTDNNModel(MTDNNPretrainedModel):
             # reset number of the grad accumulation
             self.optimizer.step()
             self.optimizer.zero_grad()
+
+    def eval(
+        self,
+        data,
+        metric_meta,
+        use_cuda=True,
+        with_label=True,
+        label_mapper=None,
+        task_type=TaskType.Classification,
+    ):
+        if use_cuda:
+            self.cuda()
+        predictions = []
+        golds = []
+        scores = []
+        ids = []
+        metrics = {}
+        for idx, (batch_info, batch_data) in enumerate(data):
+            if idx % 100 == 0:
+                print(f"predicting {idx}")
+            batch_info, batch_data = MTDNNCollater.patch_data(use_cuda, batch_info, batch_data)
+            score, pred, gold = self.predict(batch_info, batch_data)
+            predictions.extend(pred)
+            golds.extend(gold)
+            scores.extend(score)
+            ids.extend(batch_info["uids"])
+
+        if task_type == TaskType.Span:
+            golds = squad_utils.merge_answers(ids, golds)
+            predictions, scores = squad_utils.select_answers(ids, predictions, scores)
+        if with_label:
+            metrics = calc_metrics(metric_meta, golds, predictions, scores, label_mapper)
+        return metrics, predictions, scores, golds, ids
 
     def predict(self, batch_meta, batch_data):
         self.network.eval()
