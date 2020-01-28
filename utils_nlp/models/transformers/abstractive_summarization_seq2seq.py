@@ -97,9 +97,11 @@ class S2SAbsSumProcessor:
         cache_dir=".",
         cached_features_file_name="train_features",
     ):
+
         self.tokenizer = TOKENIZER_CLASS[model_name].from_pretrained(
-            model_name, do_lower_case=to_lower, cache_dir=cache_dir
+            self.model_name, do_lower_case=to_lower, cache_dir=cache_dir
         )
+
         self.cached_features_file = os.path.join(cache_dir, cached_features_file_name)
 
         self._model_name = model_name
