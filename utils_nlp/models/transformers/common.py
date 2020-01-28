@@ -4,6 +4,7 @@
 # This script reuses some code from
 # https://github.com/huggingface/pytorch-transformers/blob/master/examples/run_glue.py
 
+import datetime
 from itertools import cycle
 import logging
 import numpy as np
@@ -104,6 +105,7 @@ class Transformer:
         verbose=True,
         seed=None,
         report_every=10,
+        save_every=100,
         clip_grad_norm=True,
     ):
 
@@ -194,7 +196,7 @@ class Transformer:
             epoch_iterator = tqdm(
                 train_dataloader,
                 desc="Iteration",
-                disable=local_rank not in [-1, 0] or not verbose
+                disable= True#local_rank not in [-1, 0] or not verbose
             )
             for step, batch in enumerate(epoch_iterator):
                 batch = move_batch_to_device(batch, device)
@@ -225,8 +227,10 @@ class Transformer:
                     if global_step % report_every == 0 and verbose:
                         # tqdm.write("Loss:{:.6f}".format(loss))
                         end = time.time()
+                        endtime_string = datetime.datetime.fromtimestamp(end).strftime("%d/%m/%Y %H:%M:%S")
                         print(
-                            "loss: {0:.6f}, time: {1:f}, number of examples in current step: {2:.0f}, step {3:.0f} out of total {4:.0f}".format(
+                                "timestamp: {0:s}, loss: {1:.6f}, time duration: {2:f}, number of examples in current step: {3:.0f}, step {4:.0f} out of total {5:.0f}".format(
+                                endtime_string,
                                 accum_loss / report_every,
                                 end - start,
                                 len(batch),
@@ -241,7 +245,8 @@ class Transformer:
                     if scheduler:
                         scheduler.step()
                     self.model.zero_grad()
-
+                    if global_step % save_every == 0 and verbose:
+                        self.save_model(os.path.join(self.cache_dir, f'{self.model_name}_step_{global_step}.pt'), is_full_name=True)
                 if global_step > max_steps:
                     epoch_iterator.close()
                     break
@@ -275,7 +280,7 @@ class Transformer:
                 logits = outputs[0]
             yield logits.detach().cpu().numpy()
 
-    def save_model(self):
+    def save_model(self, full_name, is_full_name=False):
         output_model_dir = os.path.join(self.cache_dir, "fine_tuned")
 
         os.makedirs(self.cache_dir, exist_ok=True)
