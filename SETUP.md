@@ -16,7 +16,7 @@ For training at scale, operationalization or hyperparameter tuning, it is recomm
   * [Dependencies setup](#dependencies-setup)
   * [Register the conda environment in the DSVM JupyterHub](#register-conda-environment-in-dsvm-jupyterhub)
   * [Installing the Repo's Utils via PIP](#installing-the-repos-utils-via-pip)
-* [Setup guide for docker](#docker)
+* [Setup guide for docker](#Set-up-guide-for-nvidia-docker)
 
 ## Compute Environments
 
