@@ -119,21 +119,23 @@ class CNNDMBertSumProcessedData:
 
 
 def _detokenize(line):
+    # This version of the CNN/DM dataset was originally downloaded from
+    # https://github.com/harvardnlp/sent-summary
+    # and preprocessed following https://github.com/abisee/cnn-dailymail
+    # This function detokenizes the processed dataset to recover the
+    # original dataset, e.g. converts "-LRB-" back to "(" and "-RRB-" back to ")".
     line = line.strip().replace("``", '"').replace("''", '"').replace("`", "'")
     twd = TreebankWordDetokenizer()
     s_list = [
         twd.detokenize(x.strip().split(" "), convert_parentheses=True)
         for x in line.split("<S_SEP>")
     ]
-
     return " ".join(s_list)
 
 
 def CNNDMSummarizationDatasetOrg(
     local_path=".", top_n=-1, return_iterable=False, return_dev_data=False
 ):
-
-
 
     # Download and unzip the data
     FILE_ID = "1jiDbDbAsqy_5BM79SmX6aSu5DQVCAZq1"
@@ -142,15 +144,34 @@ def CNNDMSummarizationDatasetOrg(
     output_dir = os.path.join(local_path, "cnndm_data")
     os.makedirs(output_dir, exist_ok=True)
 
+    org_data_dir = os.path.join(output_dir, "org_data")
+
+    expected_data_files = set(
+        ["train.src", "org_data", "dev.src", "test.tgt", "train.tgt", "dev.tgt", "test.src"]
+    )
+    expected_org_data_files = set(
+        [
+            "training.summary",
+            "test.article",
+            "dev.article",
+            "training.article",
+            "dev.summary",
+            "test.summary",
+        ]
+    )
+
     maybe_download_googledrive(
         google_file_id=FILE_ID, file_name=FILE_NAME, work_directory=local_path
     )
-    # extract_zip(
-    #     file_path=os.path.join(local_path, FILE_NAME),
-    #     dest_path=os.path.join(local_path, output_dir),
-    # )
 
-    org_data_dir = os.path.join(output_dir, "org_data")
+    if (
+        set(os.listdir(output_dir)) != expected_data_files
+        or set(os.listdir(org_data_dir)) != expected_org_data_files
+    ):
+        extract_zip(
+            file_path=os.path.join(local_path, FILE_NAME),
+            dest_path=os.path.join(local_path, output_dir),
+        )
 
     train_source_file = os.path.join(org_data_dir, "training.article")
     train_target_file = os.path.join(org_data_dir, "training.summary")

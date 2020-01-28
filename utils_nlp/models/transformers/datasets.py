@@ -6,8 +6,6 @@ import itertools
 import torch
 from torch.utils.data import Dataset, IterableDataset
 from multiprocessing import Pool, cpu_count
-from tqdm import tqdm
-from toolz.itertoolz import partition_all
 from functools import partial
 
 
@@ -317,12 +315,12 @@ class SummarizationDataset(Dataset):
     def __init__(
         self,
         source_file,
-        target_file,
+        target_file=None,
         source_preprocessing=None,
         target_preprocessing=None,
         word_tokenization=None,
         top_n=-1,
-        n_processes=-1
+        n_processes=-1,
     ):
         """
         Create a summarization dataset instance given the
@@ -353,25 +351,37 @@ class SummarizationDataset(Dataset):
             else:
                 self._source = f.readlines()
 
-        with open(target_file) as f:
-            if top_n != -1:
-                self._target = list(itertools.islice(f, top_n))
-            else:
-                self._target = f.readlines()
+        if target_file is not None:
+            with open(target_file) as f:
+                if top_n != -1:
+                    self._target = list(itertools.islice(f, top_n))
+                else:
+                    self._target = f.readlines()
 
-        assert len(self._source) == len(self._target)
+            assert len(self._source) == len(self._target)
+        else:
+            self._target = None
 
-        # self._source = parallel_preprocess(self._source, preprocess_pipeline=source_preprocessing, num_pool=n_processes)
-        # self._target = parallel_preprocess(self._target, preprocess_pipeline=source_preprocessing, num_pool=n_processes)
+        self._source = parallel_preprocess(
+            self._source, preprocess_pipeline=source_preprocessing, num_pool=n_processes
+        )
 
-        for i, s in enumerate(self._source):
-            self._source[i] = _preprocess(sentences=s, preprocess_pipeline=source_preprocessing)
+        if self._target is not None:
+            self._target = parallel_preprocess(
+                self._target, preprocess_pipeline=target_preprocessing, num_pool=n_processes
+            )
 
-        for i, t in enumerate(self._target):
-            self._target[i] = _preprocess(sentences=t, preprocess_pipeline=target_preprocessing)
+        # for i, s in enumerate(self._source):
+        #     self._source[i] = _preprocess(sentences=s, preprocess_pipeline=source_preprocessing)
+
+        # for i, t in enumerate(self._target):
+        #     self._target[i] = _preprocess(sentences=t, preprocess_pipeline=target_preprocessing)
 
     def __getitem__(self, idx):
-        return {"src": self._source[idx], "tgt": self._target[idx]}
+        if self._target is None:
+            return {"src": self._source[idx]}
+        else:
+            return {"src": self._source[idx], "tgt": self._target[idx]}
 
     def __len__(self):
         return len(self._source)
@@ -386,10 +396,10 @@ def parallel_preprocess(input_data, preprocess_pipeline, word_tokenize=None, num
     p = Pool(num_pool)
 
     results = p.map(
-        partial(_preprocess, preprocess_pipeline=preprocess_pipeline, word_tokenize=word_tokenize), 
+        partial(_preprocess, preprocess_pipeline=preprocess_pipeline, word_tokenize=word_tokenize),
         input_data,
-        chunksize=int(len(input_data) / num_pool)
-        )
+        chunksize=int(len(input_data) / num_pool),
+    )
     p.close()
     p.join()
 
