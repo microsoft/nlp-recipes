@@ -9,4 +9,3 @@ import torch
 @pytest.mark.gpu
 def test_machine_is_gpu_machine():
     assert torch.cuda.is_available() is True
-

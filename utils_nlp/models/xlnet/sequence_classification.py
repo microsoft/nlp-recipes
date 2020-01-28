@@ -2,23 +2,20 @@
 # Licensed under the MIT License.
 
 """Utilities for Xlnet Sequence Classification"""
-import numpy as np
+import os
 from collections import namedtuple
-import torch
-import torch.nn as nn
-from transformers import (
-    XLNetConfig,
-    XLNetForSequenceClassification,
-    AdamW,
-    WarmupLinearSchedule,
-)
-from tqdm import tqdm
-from torch.utils.data import DataLoader, RandomSampler, TensorDataset
-from utils_nlp.common.pytorch_utils import get_device, move_to_device
-from utils_nlp.models.xlnet.common import Language
+
 import mlflow
 import mlflow.pytorch
-import os
+import numpy as np
+import torch
+import torch.nn as nn
+from torch.utils.data import DataLoader, RandomSampler, TensorDataset
+from tqdm import tqdm
+from transformers import AdamW, WarmupLinearSchedule, XLNetConfig, XLNetForSequenceClassification
+
+from utils_nlp.common.pytorch_utils import get_device, move_model_to_device
+from utils_nlp.models.xlnet.common import Language
 
 
 class XLNetSequenceClassifier:
@@ -79,9 +76,7 @@ class XLNetSequenceClassifier:
         self.max_grad_norm = max_grad_norm
 
         # create classifier
-        self.config = XLNetConfig.from_pretrained(
-            self.language.value, num_labels=num_labels, cache_dir=cache_dir
-        )
+        self.config = XLNetConfig.from_pretrained(self.language.value, num_labels=num_labels, cache_dir=cache_dir)
         self.model = XLNetForSequenceClassification(self.config)
 
     def fit(
@@ -114,7 +109,7 @@ class XLNetSequenceClassifier:
         """
 
         device, num_gpus = get_device(self.num_gpus)
-        self.model = move_to_device(self.model, device, self.num_gpus)
+        self.model = move_model_to_device(self.model, device, self.num_gpus)
 
         token_ids_tensor = torch.tensor(token_ids, dtype=torch.long)
         input_mask_tensor = torch.tensor(input_mask, dtype=torch.long)
@@ -128,24 +123,17 @@ class XLNetSequenceClassifier:
             token_type_ids_tensor = torch.tensor(token_type_ids, dtype=torch.long)
             val_token_type_ids_tensor = torch.tensor(val_token_type_ids, dtype=torch.long)
 
-            train_dataset = TensorDataset(
-                token_ids_tensor, input_mask_tensor, token_type_ids_tensor, labels_tensor
-            )
+            train_dataset = TensorDataset(token_ids_tensor, input_mask_tensor, token_type_ids_tensor, labels_tensor)
 
             val_dataset = TensorDataset(
-                val_token_ids_tensor,
-                val_input_mask_tensor,
-                val_token_type_ids_tensor,
-                val_labels_tensor,
+                val_token_ids_tensor, val_input_mask_tensor, val_token_type_ids_tensor, val_labels_tensor,
             )
 
         else:
 
             train_dataset = TensorDataset(token_ids_tensor, input_mask_tensor, labels_tensor)
 
-            val_dataset = TensorDataset(
-                val_token_ids_tensor, val_input_mask_tensor, val_labels_tensor
-            )
+            val_dataset = TensorDataset(val_token_ids_tensor, val_input_mask_tensor, val_labels_tensor)
 
         # define optimizer and model parameters
         param_optimizer = list(self.model.named_parameters())
@@ -155,10 +143,7 @@ class XLNetSequenceClassifier:
                 "params": [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)],
                 "weight_decay": self.weight_decay,
             },
-            {
-                "params": [p for n, p in param_optimizer if any(nd in n for nd in no_decay)],
-                "weight_decay": 0.0,
-            },
+            {"params": [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], "weight_decay": 0.0},
         ]
 
         val_sampler = RandomSampler(val_dataset)
@@ -181,9 +166,7 @@ class XLNetSequenceClassifier:
 
             train_sampler = RandomSampler(train_dataset)
 
-            train_dataloader = DataLoader(
-                train_dataset, sampler=train_sampler, batch_size=self.batch_size
-            )
+            train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=self.batch_size)
 
             tr_loss = 0.0
             logging_loss = 0.0
@@ -191,18 +174,13 @@ class XLNetSequenceClassifier:
 
             for i, batch in enumerate(tqdm(train_dataloader, desc="Iteration")):
                 if token_type_ids:
-                    x_batch, mask_batch, token_type_ids_batch, y_batch = tuple(
-                        t.to(device) for t in batch
-                    )
+                    x_batch, mask_batch, token_type_ids_batch, y_batch = tuple(t.to(device) for t in batch)
                 else:
                     token_type_ids_batch = None
                     x_batch, mask_batch, y_batch = tuple(t.to(device) for t in batch)
 
                 outputs = self.model(
-                    input_ids=x_batch,
-                    token_type_ids=token_type_ids_batch,
-                    attention_mask=mask_batch,
-                    labels=y_batch,
+                    input_ids=x_batch, token_type_ids=token_type_ids_batch, attention_mask=mask_batch, labels=y_batch,
                 )
 
                 loss = outputs[0]  # model outputs are always tuple in pytorch-transformers
@@ -220,9 +198,7 @@ class XLNetSequenceClassifier:
                 if logging_steps > 0 and global_step % logging_steps == 0:
                     mlflow.log_metric("learning rate", scheduler.get_lr()[0], step=global_step)
                     mlflow.log_metric(
-                        "training loss",
-                        (tr_loss - logging_loss) / (logging_steps * self.batch_size),
-                        step=global_step,
+                        "training loss", (tr_loss - logging_loss) / (logging_steps * self.batch_size), step=global_step,
                     )
                     logging_loss = tr_loss
                 # model checkpointing
@@ -245,9 +221,7 @@ class XLNetSequenceClassifier:
                             )
                         else:
                             token_type_ids_batch = None
-                            val_x_batch, val_mask_batch, val_y_batch = tuple(
-                                t.to(device) for t in val_batch
-                            )
+                            val_x_batch, val_mask_batch, val_y_batch = tuple(t.to(device) for t in val_batch)
                         val_outputs = self.model(
                             input_ids=val_x_batch,
                             token_type_ids=val_token_type_ids_batch,
@@ -256,9 +230,7 @@ class XLNetSequenceClassifier:
                         )
                         vloss = val_outputs[0]
                         val_loss += vloss.sum().item()
-                    mlflow.log_metric(
-                        "validation loss", val_loss / len(val_dataset), step=global_step
-                    )
+                    mlflow.log_metric("validation loss", val_loss / len(val_dataset), step=global_step)
                     self.model.train()
 
                 if verbose:
@@ -300,13 +272,7 @@ class XLNetSequenceClassifier:
         torch.cuda.empty_cache()
 
     def predict(
-        self,
-        token_ids,
-        input_mask,
-        token_type_ids=None,
-        num_gpus=None,
-        batch_size=8,
-        probabilities=False,
+        self, token_ids, input_mask, token_type_ids=None, num_gpus=None, batch_size=8, probabilities=False,
     ):
         """Scores the given dataset and returns the predicted classes.
 
@@ -330,7 +296,7 @@ class XLNetSequenceClassifier:
         """
 
         device, num_gpus = get_device(num_gpus)
-        self.model = move_to_device(self.model, device, num_gpus)
+        self.model = move_model_to_device(self.model, device, num_gpus)
 
         self.model.eval()
         preds = []
@@ -342,16 +308,11 @@ class XLNetSequenceClassifier:
                 x_batch = torch.tensor(token_ids[start:end], dtype=torch.long, device=device)
                 mask_batch = torch.tensor(input_mask[start:end], dtype=torch.long, device=device)
 
-                token_type_ids_batch = torch.tensor(
-                    token_type_ids[start:end], dtype=torch.long, device=device
-                )
+                token_type_ids_batch = torch.tensor(token_type_ids[start:end], dtype=torch.long, device=device)
 
                 with torch.no_grad():
                     pred_batch = self.model(
-                        input_ids=x_batch,
-                        token_type_ids=token_type_ids_batch,
-                        attention_mask=mask_batch,
-                        labels=None,
+                        input_ids=x_batch, token_type_ids=token_type_ids_batch, attention_mask=mask_batch, labels=None,
                     )
                     preds.append(pred_batch[0].cpu())
                     if i % batch_size == 0:

@@ -7,17 +7,18 @@
     https://github.com/juand-r/entity-recognition-datasets/tree/master/data/wikigold/CONLL-format/data
 """
 
-import random
-import os
-import pandas as pd
 import logging
-
+import os
+import random
 from tempfile import TemporaryDirectory
-from utils_nlp.dataset.url_utils import maybe_download
+
+import pandas as pd
+
+from utils_nlp.common.pytorch_utils import dataloader_from_dataset
 from utils_nlp.dataset.ner_utils import preprocess_conll
+from utils_nlp.dataset.url_utils import maybe_download
 from utils_nlp.models.transformers.common import MAX_SEQ_LEN
 from utils_nlp.models.transformers.named_entity_recognition import TokenClassificationProcessor
-
 
 URL = (
     "https://raw.githubusercontent.com/juand-r/entity-recognition-datasets"
@@ -91,7 +92,7 @@ def load_dataset(
     max_len=MAX_SEQ_LEN,
     trailing_piece_tag="X",
     batch_size=32,
-    num_gpus=None
+    num_gpus=None,
 ):
     """
     Load the wikigold dataset and split into training and testing datasets.
@@ -116,7 +117,7 @@ def load_dataset(
         cache_dir (str, optional): The default folder for saving cache files.
             Defaults to './temp'.
         max_len (int, optional): Maximum length of the list of tokens. Lists longer
-            than this are truncated and shorter ones are padded with "O"s. 
+            than this are truncated and shorter ones are padded with "O"s.
             Default value is BERT_MAX_LEN=512.
         trailing_piece_tag (str, optional): Tag used to label trailing word pieces.
             For example, "criticize" is broken into "critic" and "##ize", "critic"
@@ -129,16 +130,12 @@ def load_dataset(
 
     Returns:
         tuple. The tuple contains four elements.
-        train_dataload (DataLoader): a PyTorch DataLoader instance for training.
-
-        test_dataload (DataLoader): a PyTorch DataLoader instance for testing.
-        
-        label_map (dict): A dictionary object to map a label (str) to an ID (int). 
-
+        train_dataloader (DataLoader): a PyTorch DataLoader instance for training.
+        test_dataloader (DataLoader): a PyTorch DataLoader instance for testing.
+        label_map (dict): A dictionary object to map a label (str) to an ID (int).
         test_dataset (TensorDataset): A TensorDataset containing the following four tensors.
             1. input_ids_all: Tensor. Each sublist contains numerical values,
-                i.e. token ids, corresponding to the tokens in the input 
-                text data.
+                i.e. token ids, corresponding to the tokens in the input text data.
             2. input_mask_all: Tensor. Each sublist contains the attention
                 mask of the input token id list, 1 for input tokens and 0 for
                 padded tokens, so that padded tokens are not attended to.
@@ -155,9 +152,7 @@ def load_dataset(
     """
 
     train_df, test_df = load_train_test_dfs(
-        local_cache_path=local_path,
-        test_fraction=test_fraction,
-        random_seed=random_seed
+        local_cache_path=local_path, test_fraction=test_fraction, random_seed=random_seed
     )
 
     if train_sample_ratio > 1.0:
@@ -166,7 +161,7 @@ def load_dataset(
     elif train_sample_ratio < 0:
         logging.error("Invalid training sample ration: {}".format(train_sample_ratio))
         raise ValueError("Invalid training sample ration: {}".format(train_sample_ratio))
-    
+
     if test_sample_ratio > 1.0:
         test_sample_ratio = 1.0
         logging.warning("Setting the testing sample ratio to 1.0")
@@ -179,47 +174,34 @@ def load_dataset(
     if test_sample_ratio < 1.0:
         test_df = test_df.sample(frac=test_sample_ratio).reset_index(drop=True)
 
-    processor = TokenClassificationProcessor(
-        model_name=model_name,
-        to_lower=to_lower,
-        cache_dir=cache_dir
-    )
+    processor = TokenClassificationProcessor(model_name=model_name, to_lower=to_lower, cache_dir=cache_dir)
 
     label_map = TokenClassificationProcessor.create_label_map(
-        label_lists=train_df['labels'],
-        trailing_piece_tag=trailing_piece_tag
+        label_lists=train_df["labels"], trailing_piece_tag=trailing_piece_tag
     )
 
     train_dataset = processor.preprocess_for_bert(
-        text=train_df['sentence'],
+        text=train_df["sentence"],
         max_len=max_len,
-        labels=train_df['labels'],
+        labels=train_df["labels"],
         label_map=label_map,
-        trailing_piece_tag=trailing_piece_tag
+        trailing_piece_tag=trailing_piece_tag,
     )
 
     test_dataset = processor.preprocess_for_bert(
-        text=test_df['sentence'],
+        text=test_df["sentence"],
         max_len=max_len,
-        labels=test_df['labels'],
+        labels=test_df["labels"],
         label_map=label_map,
-        trailing_piece_tag=trailing_piece_tag
+        trailing_piece_tag=trailing_piece_tag,
     )
 
-    train_dataloader = processor.create_dataloader_from_dataset(
-        train_dataset,
-        shuffle=True,
-        batch_size=batch_size,
-        num_gpus=num_gpus,
-        distributed=False
+    train_dataloader = dataloader_from_dataset(
+        train_dataset, batch_size=batch_size, num_gpus=num_gpus, shuffle=True, distributed=False
     )
 
-    test_dataloader = processor.create_dataloader_from_dataset(
-        test_dataset,
-        shuffle=False,
-        batch_size=batch_size,
-        num_gpus=num_gpus,
-        distributed=False
+    test_dataloader = dataloader_from_dataset(
+        test_dataset, batch_size=batch_size, num_gpus=num_gpus, shuffle=False, distributed=False
     )
 
     return (train_dataloader, test_dataloader, label_map, test_dataset)

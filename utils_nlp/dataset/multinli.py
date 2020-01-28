@@ -7,18 +7,19 @@
     https://www.nyu.edu/projects/bowman/multinli/
 """
 
+import logging
 import os
+from tempfile import TemporaryDirectory
 
 import pandas as pd
-import logging
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
 
-from tempfile import TemporaryDirectory
+from utils_nlp.common.pytorch_utils import dataloader_from_dataset
 from utils_nlp.dataset.data_loaders import DaskJSONLoader
 from utils_nlp.dataset.url_utils import extract_zip, maybe_download
 from utils_nlp.models.transformers.common import MAX_SEQ_LEN
 from utils_nlp.models.transformers.sequence_classification import Processor
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import LabelEncoder
 
 URL = "http://www.nyu.edu/projects/bowman/multinli/multinli_1.0.zip"
 DATA_FILES = {
@@ -63,9 +64,7 @@ def load_pandas_df(local_cache_path=".", file_split="train"):
     return pd.read_json(os.path.join(local_cache_path, DATA_FILES[file_split]), lines=True)
 
 
-def get_generator(
-    local_cache_path=".", file_split="train", block_size=10e6, batch_size=10e6, num_batches=None
-):
+def get_generator(local_cache_path=".", file_split="train", block_size=10e6, batch_size=10e6, num_batches=None):
     """ Returns an extracted dataset as a random batch generator that
     yields pandas dataframes.
     Args:
@@ -85,9 +84,7 @@ def get_generator(
     except Exception as e:
         raise e
 
-    loader = DaskJSONLoader(
-        os.path.join(local_cache_path, DATA_FILES[file_split]), block_size=block_size
-    )
+    loader = DaskJSONLoader(os.path.join(local_cache_path, DATA_FILES[file_split]), block_size=block_size)
 
     return loader.get_sequential_batches(batch_size=int(batch_size), num_batches=num_batches)
 
@@ -103,7 +100,7 @@ def load_tc_dataset(
     cache_dir=TemporaryDirectory().name,
     max_len=MAX_SEQ_LEN,
     batch_size=32,
-    num_gpus=None
+    num_gpus=None,
 ):
     """
     Load the multinli dataset and split into training and testing datasets.
@@ -137,9 +134,9 @@ def load_tc_dataset(
 
     Returns:
         tuple. The tuple contains four elements:
-        train_dataload (DataLoader): a PyTorch DataLoader instance for training.
+        train_dataloader (DataLoader): a PyTorch DataLoader instance for training.
 
-        test_dataload (DataLoader): a PyTorch DataLoader instance for testing.
+        test_dataloader (DataLoader): a PyTorch DataLoader instance for testing.
         
         label_encoder (LabelEncoder): a sklearn LabelEncoder instance. The label values
             can be retrieved by calling the `inverse_transform` function.
@@ -150,10 +147,7 @@ def load_tc_dataset(
     """
 
     # download and load the original dataset
-    all_df = load_pandas_df(
-        local_cache_path=local_path,
-        file_split="train"
-    )
+    all_df = load_pandas_df(local_cache_path=local_path, file_split="train")
 
     # select the examples corresponding to one of the entailment labels (neutral
     # in this case) to avoid duplicate rows, as the sentences are not unique,
@@ -169,12 +163,8 @@ def load_tc_dataset(
     if test_fraction < 0 or test_fraction >= 1.0:
         logging.warning("Invalid test fraction value: {}, changed to 0.25".format(test_fraction))
         test_fraction = 0.25
-    
-    train_df, test_df = train_test_split(
-        all_df,
-        train_size=(1.0 - test_fraction),
-        random_state=random_seed
-    )
+
+    train_df, test_df = train_test_split(all_df, train_size=(1.0 - test_fraction), random_state=random_seed)
 
     if train_sample_ratio > 1.0:
         train_sample_ratio = 1.0
@@ -182,7 +172,7 @@ def load_tc_dataset(
     elif train_sample_ratio < 0:
         logging.error("Invalid training sample ration: {}".format(train_sample_ratio))
         raise ValueError("Invalid training sample ration: {}".format(train_sample_ratio))
-    
+
     if test_sample_ratio > 1.0:
         test_sample_ratio = 1.0
         logging.warning("Setting the testing sample ratio to 1.0")
@@ -200,35 +190,17 @@ def load_tc_dataset(
     test_labels = label_encoder.transform(test_df[label_col])
     test_df[label_col] = test_labels
 
-    processor = Processor(
-        model_name=model_name,
-        to_lower=to_lower,
-        cache_dir=cache_dir
-    )
+    processor = Processor(model_name=model_name, to_lower=to_lower, cache_dir=cache_dir)
 
-    train_dataloader = processor.create_dataloader_from_df(
-        df=train_df,
-        text_col=text_col,
-        label_col=label_col,
-        max_len=max_len,
-        text2_col=None,
-        batch_size=batch_size,
-        num_gpus=num_gpus,
-        shuffle=True,
-        distributed=False
+    train_dataset = processor.dataset_from_dataframe(
+        df=train_df, text_col=text_col, label_col=label_col, max_len=max_len,
     )
+    train_dataloader = dataloader_from_dataset(train_dataset, batch_size=batch_size, num_gpus=num_gpus, shuffle=True)
 
-    test_dataloader = processor.create_dataloader_from_df(
-        df=test_df,
-        text_col=text_col,
-        label_col=label_col,
-        max_len=max_len,
-        text2_col=None,
-        batch_size=batch_size,
-        num_gpus=num_gpus,
-        shuffle=False,
-        distributed=False
+    test_dataset = processor.dataset_from_dataframe(
+        df=test_df, text_col=text_col, label_col=label_col, max_len=max_len,
     )
+    test_dataloader = dataloader_from_dataset(test_dataset, batch_size=batch_size, num_gpus=num_gpus, shuffle=False)
 
     return (train_dataloader, test_dataloader, label_encoder, test_labels)
 
