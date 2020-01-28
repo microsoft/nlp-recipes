@@ -8,6 +8,7 @@ import itertools
 import logging
 import numpy as np
 import os
+import pickle
 import random
 import torch
 import torch.nn as nn
@@ -334,7 +335,7 @@ class ExtSumProcessedData:
         train_files, test_files = self._get_files(root)
         return (
             ExtSumProcessedIterableDataset(train_files, is_shuffle=True),
-            ExtSumProcessedDataset(test_files, is_shuffle=False),
+            ExtSumProcessedDataset(sorted(test_files), is_shuffle=False),
         )
 
 
@@ -735,29 +736,16 @@ class ExtractiveSummarizer(Transformer):
             # tuple_batch =  [list(col) for col in zip(*[d.values() for d in dict_list]
             if dict_list is None or len(dict_list) <= 0:
                 return None
-            is_labeled = False
-            if "labels" in dict_list[0]:
-                is_labeled = True
             tuple_batch = [list(d.values()) for d in dict_list]
             ## generate mask and mask_cls, and only select tensors for the model input
-            batch = Batch(tuple_batch, is_labeled=True)
-            if is_labeled:
-                return {
-                    "src": batch.src,
-                    "segs": batch.segs,
-                    "clss": batch.clss,
-                    "mask": batch.mask,
-                    "mask_cls": batch.mask_cls,
-                    "labels": batch.labels,
-                }
-            else:
-                return {
-                    "src": batch.src,
-                    "segs": batch.segs,
-                    "clss": batch.clss,
-                    "mask": batch.mask,
-                    "mask_cls": batch.mask_cls,
-                }
+            batch = Batch(tuple_batch, is_labeled=False)
+            return {
+                "src": batch.src,
+                "segs": batch.segs,
+                "clss": batch.clss,
+                "mask": batch.mask,
+                "mask_cls": batch.mask_cls,
+            }
 
         
         from torch.utils.data.distributed import DistributedSampler
@@ -826,15 +814,20 @@ class ExtractiveSummarizer(Transformer):
         )
         return preds
 
-    def save_model(self, name):
-        output_model_dir = os.path.join(self.cache_dir, "fine_tuned")
-
-        os.makedirs(self.cache_dir, exist_ok=True)
-        os.makedirs(output_model_dir, exist_ok=True)
-
-        full_name = os.path.join(output_model_dir, name)
+    def save_model(self, name, is_full_name=False):
+        if not is_full_name:
+            output_model_dir = os.path.join(self.cache_dir, "fine_tuned")
+            os.makedirs(self.cache_dir, exist_ok=True)
+            os.makedirs(output_model_dir, exist_ok=True)
+            full_name = os.path.join(output_model_dir, name)
+        else:
+            full_name = name
+            
         logger.info("Saving model checkpoint to %s", full_name)
         model_to_save = (
             self.model.module if hasattr(self.model, "module") else self.model
         )  # Take care of distributed/parallel training
-        torch.save(model_to_save, full_name)
+        try:
+            torch.save(model_to_save, full_name)
+        except:
+            pickle.dump(model_to_save, open(full_name, "wb" ) )
