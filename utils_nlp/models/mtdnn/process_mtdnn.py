@@ -6,15 +6,20 @@ import os
 import random
 from datetime import datetime
 
+import torch
 from tensorboardX import SummaryWriter
 from torch.utils.data import BatchSampler, DataLoader, Dataset
 
+from utils_nlp.models.mtdnn.common.glue.glue_utils import submit
 from utils_nlp.models.mtdnn.common.types import TaskType
+from utils_nlp.models.mtdnn.common.utils import MTDNNCommonUtils
 from utils_nlp.models.mtdnn.configuration_mtdnn import MTDNNConfig
-from utils_nlp.models.mtdnn.dataset_mtdnn import (MTDNNCollater,
-                                                  MTDNNMultiTaskBatchSampler,
-                                                  MTDNNMultiTaskDataset,
-                                                  MTDNNSingleTaskDataset)
+from utils_nlp.models.mtdnn.dataset_mtdnn import (
+    MTDNNCollater,
+    MTDNNMultiTaskBatchSampler,
+    MTDNNMultiTaskDataset,
+    MTDNNSingleTaskDataset,
+)
 from utils_nlp.models.mtdnn.modeling_mtdnn import MTDNNModel
 from utils_nlp.models.mtdnn.tasks.config import TaskDefs
 
@@ -28,8 +33,8 @@ class MTDNNDataPreprocess:
         task_defs: TaskDefs,
         batch_size: int,
         data_dir: str = "data/canonical_data/bert_uncased_lower",
-        train_datasets_list: str = ["mnli"],
-        test_datasets_list: str = ["mnli_mismatched,mnli_matched"],
+        train_datasets_list: list = ["mnli"],
+        test_datasets_list: list = ["mnli_mismatched,mnli_matched"],
         glue_format: bool = False,
         data_sort: bool = False,
     ):
@@ -228,23 +233,144 @@ class MTDNNPipelineProcess:
         config: MTDNNConfig,
         task_defs: TaskDefs,
         multi_task_train_data: DataLoader,
-        mulit_task_test_data: 
+        dev_data_list: list,  # list of dataloaders
+        test_data_list: list,  # list of dataloaders
+        test_datasets_list: list = ["mnli_mismatched", "mnli_matched"],
         output_dir: str = "checkpoint",
         log_dir: str = "tensorboard_logdir",
     ):
         """Pipeline process for MTDNN Training, Inference and Fine Tuning
         """
-        self.model = model 
+        assert multi_task_train_data, "DataLoader for multiple tasks cannot be None"
+        assert test_datasets_list, "Pass a list of test dataset prefixes"
+        self.model = model
         self.config = config
         self.task_defs = task_defs
-        self.log_dir = log_dir
-        self.output_dir = output_dir
-        self.tensor_board = SummaryWriter(log_dir=self.log_dir)
         self.multi_task_train_data = multi_task_train_data
-
+        self.dev_data_list = dev_data_list
+        self.test_data_list = test_data_list
+        self.test_datasets_list = test_datasets_list
+        self.output_dir = output_dir
+        self.log_dir = log_dir
+        self.tensor_board = SummaryWriter(log_dir=self.log_dir)
 
     def fit(self):
-        pass 
+        """ Fit model to training datasets """
+        for epoch in range(self.config.epochs):
+            logger.warning(f"At epoch {epoch}")
+            start = datetime.now()
+
+            # Create batches and train
+            for idx, (batch_meta, batch_data) in enumerate(self.multi_task_train_data):
+                batch_meta, batch_data = MTDNNCollater.patch_data(
+                    self.config.cuda, batch_meta, batch_data
+                )
+                task_id = batch_meta["task_id"]
+                self.model.update(batch_meta, batch_data)
+                if (
+                    self.model.local_updates == 1
+                    or (self.model.local_updates)
+                    % (self.config.log_per_updates * self.config.grad_accumulation_step)
+                    == 0
+                ):
+                    time_left = str(
+                        (datetime.now() - start)
+                        / (idx + 1)
+                        * (len(self.multi_task_train_data) - idx - 1)
+                    ).split(".")[0]
+                    logger.info(
+                        "Task [{0:2}] updates[{1:6}] train loss[{2:.5f}] remaining[{3}]".format(
+                            task_id, self.model.updates, self.model.train_loss.avg, time_left
+                        )
+                    )
+                    if self.config.use_tensor_board:
+                        self.tensor_board.add_scalar(
+                            "train/loss", self.model.train_loss.avg, global_step=self.model.updates
+                        )
+
+                if self.config.save_per_updates_on and (
+                    (self.model.local_updates)
+                    % (self.config.save_per_updates * self.config.grad_accumulation_step)
+                    == 0
+                ):
+                    model_file = os.path.join(
+                        output_dir, "model_{}_{}.pt".format(epoch, self.model.updates)
+                    )
+                    logger.info(f"Saving mt-dnn model to {model_file}")
+                    self.model.save(model_file)
 
     def predict(self):
-        pass 
+        """ Inference of model on test datasets """
+        for idx, dataset in enumerate(self.test_datasets_list):
+            prefix = dataset.split("_")[0]
+            label_dict = self.task_defs.global_map.get(prefix, None)
+            dev_data: DataLoader = self.dev_data_list[idx]
+            if dev_data is not None:
+                with torch.no_grad():
+                    dev_metrics, dev_predictions, scores, golds, dev_ids = self.model.eval_model(
+                        dev_data,
+                        metric_meta=task_defs.metric_meta_map[prefix],
+                        use_cuda=args.cuda,
+                        label_mapper=label_dict,
+                        task_type=task_defs.task_type_map[prefix],
+                    )
+                for key, val in dev_metrics.items():
+                    if self.config.use_tensor_board:
+                        self.tensor_board.add_scalar(f"dev/{dataset}/{key}", val, global_step=epoch)
+                    if isinstance(val, str):
+                        logger.warning(f"Task {dataset} -- epoch {epoch} -- Dev {key}:\n {val}")
+                    else:
+                        logger.warning(f"Task {dataset} -- epoch {epoch} -- Dev {key}: {val:.3f}")
+                score_file = os.path.join(output_dir, f"{dataset}_dev_scores_{epoch}.json")
+                results = {
+                    "metrics": dev_metrics,
+                    "predictions": dev_predictions,
+                    "uids": dev_ids,
+                    "scores": scores,
+                }
+
+                # Save results to file
+                MTDNNCommonUtils.dump(score_file, results)
+                if self.config.use_glue_format:
+                    official_score_file = os.path.join(
+                        output_dir, "{}_dev_scores_{}.tsv".format(dataset, epoch)
+                    )
+                    submit(official_score_file, results, label_dict)
+
+            # test eval
+            test_data = self.test_data_list[idx]
+            if test_data is not None:
+                with torch.no_grad():
+                    test_metrics, test_predictions, scores, golds, test_ids = self.model.eval_model(
+                        test_data,
+                        metric_meta=task_defs.metric_meta_map[prefix],
+                        use_cuda=args.cuda,
+                        with_label=False,
+                        label_mapper=label_dict,
+                        task_type=task_defs.task_type_map[prefix],
+                    )
+                score_file = os.path.join(output_dir, f"{dataset}_test_scores_{epoch}.json")
+                results = {
+                    "metrics": test_metrics,
+                    "predictions": test_predictions,
+                    "uids": test_ids,
+                    "scores": scores,
+                }
+                MTDNNCommonUtils.dump(score_file, results)
+                if args.glue_format_on:
+                    official_score_file = os.path.join(
+                        output_dir, f"{dataset}_test_scores_{epoch}.tsv"
+                    )
+                    submit(official_score_file, results, label_dict)
+                logger.info("[new test scores saved.]")
+
+        model_file = os.path.join(output_dir, f"model_{epoch}.pt")
+        self.model.save(model_file)
+
+        # Close tensorboard connection if opened
+        self.close_connections()
+
+    def close_connections(self):
+        # Close tensor board connection
+        if self.config.use_tensor_board:
+            self.tensor_board.close()
