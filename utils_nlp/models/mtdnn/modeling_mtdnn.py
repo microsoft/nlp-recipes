@@ -34,7 +34,7 @@ from utils_nlp.models.mtdnn.common.linear_pooler import LinearPooler
 from utils_nlp.models.mtdnn.common.loss import LOSS_REGISTRY
 from utils_nlp.models.mtdnn.common.metrics import calc_metrics
 from utils_nlp.models.mtdnn.common.san import SANBERTNetwork, SANClassifier
-from utils_nlp.models.mtdnn.common.squad_utils import extract_answer, squad_utils
+from utils_nlp.models.mtdnn.common.squad_utils import extract_answer, merge_answers, select_answers
 from utils_nlp.models.mtdnn.common.types import DataFormat, EncoderModelType, TaskType
 from utils_nlp.models.mtdnn.common.utils import MTDNNCommonUtils
 from utils_nlp.models.mtdnn.configuration_mtdnn import MTDNNConfig
@@ -78,6 +78,13 @@ class MTDNNModel(MTDNNPretrainedModel):
         self.config = config
         self.pooler = None
 
+        # Resume from model checkpoint
+        if self.config.resume and self.config.model_ckpt:
+            assert os.path.exists(self.config.model_ckpt), "Model checkpoint does not exist"
+            logger.info(f"loading model from {self.config.model_ckpt}")
+            self = self.load(self.config.model_ckpt)
+            return
+
         # Setup the baseline network
         # - Define the encoder based on config options
         # - Set state dictionary based on configuration setting
@@ -97,6 +104,7 @@ class MTDNNModel(MTDNNPretrainedModel):
                 self.bert_config = BertConfig.from_dict(self.config.to_dict())
                 self.bert_model = BertModel(self.bert_config)
                 self.state_dict = self.bert_model.state_dict()
+                self.config.hidden_size = self.bert_config.hidden_size
             if config.encoder_type == EncoderModelType.ROBERTA:
                 # Download and extract from PyTorch hub if not downloaded before
                 self.bert_model = torch.hub.load("pytorch/fairseq", config.init_checkpoint)
@@ -246,11 +254,10 @@ class MTDNNModel(MTDNNPretrainedModel):
             self.scheduler = None
 
     def _setup_lossmap(self):
-        loss_types = self.config.loss_types
         self.task_loss_criterion = []
-        for idx, cs in enumerate(loss_types):
-            assert cs, "Loss type must be defined."
-            lc = LOSS_REGISTRY[cs](name="Loss func of task {}: {}".format(idx, cs))
+        for idx, cs in enumerate(self.config.loss_types):
+            assert cs is not None, "Loss type must be defined."
+            lc = LOSS_REGISTRY[cs](name=f"Loss func of task {idx}: {cs}")
             self.task_loss_criterion.append(lc)
 
     def _setup_kd_lossmap(self):
@@ -365,8 +372,8 @@ class MTDNNModel(MTDNNPretrainedModel):
             ids.extend(batch_info["uids"])
 
         if task_type == TaskType.Span:
-            golds = squad_utils.merge_answers(ids, golds)
-            predictions, scores = squad_utils.select_answers(ids, predictions, scores)
+            golds = merge_answers(ids, golds)
+            predictions, scores = select_answers(ids, predictions, scores)
         if with_label:
             metrics = calc_metrics(metric_meta, golds, predictions, scores, label_mapper)
         return metrics, predictions, scores, golds, ids
