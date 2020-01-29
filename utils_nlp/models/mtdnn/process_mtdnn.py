@@ -1,5 +1,7 @@
 # coding=utf-8
 # Copyright (c) Microsoft. All rights reserved.
+import logging
+import os
 
 from torch.utils.data import BatchSampler, DataLoader, Dataset
 
@@ -12,6 +14,8 @@ from utils_nlp.models.mtdnn.dataset_mtdnn import (
     MTDNNSingleTaskDataset,
 )
 from utils_nlp.models.mtdnn.tasks.config import TaskDefs
+
+logger = logging.getLogger(__name__)
 
 
 class MTDNNDataPreprocess:
@@ -48,6 +52,9 @@ class MTDNNDataPreprocess:
         self.kd_loss_types = []
         self.train_data = self.process_train_datasets()
         self.dev_datasets_list, self.test_datasets_list = self.process_dev_test_datasets()
+        self.num_all_batches = (
+            self.config.epochs * len(self.train_data) // self.config.grad_accumulation_step
+        )
 
     def process_train_datasets(self):
         """Preprocess the training sets and generate decoding and task specific training options needed to update config object
@@ -57,6 +64,7 @@ class MTDNNDataPreprocess:
         """
         logger.info("Starting to process the training data sets")
 
+        train_datasets = []
         for dataset in self.train_datasets:
             prefix = dataset.split("_")[0]
             if prefix in self.tasks:
@@ -121,11 +129,11 @@ class MTDNNDataPreprocess:
             multi_task_train_dataset,
             batch_sampler=multi_task_batch_sampler,
             collate_fn=train_collater.collate_fn,
-            pin_memory=args.cuda,
+            pin_memory=self.config.cuda,
         )
 
         # Update class configuration with decoder opts
-        self.update_config()
+        self.config = self.update_config(self.config)
 
         return multi_task_train_data
 
@@ -199,12 +207,12 @@ class MTDNNDataPreprocess:
     def generate_decoder_opt(self, enable_san, max_opt):
         return max_opt if enable_san and max_opt < 3 else 0
 
-    def update_config(self):
+    def update_config(self, config: MTDNNConfig):
         # Update configurations with options obtained from preprocessing training data
-        setattr(self.config, "decoder_opts", self.decoder_opts)
-        setattr(self.config, "task_types", self.task_types)
-        setattr(self.config, "tasks_dropout_p", self.dropout_list)
-        setattr(self.config, "loss_types", self.loss_types)
-        setattr(self.config, "kd_loss_types", self.kd_loss_types)
-        setattr(self.config, "tasks_nclass_list", self.nclass_list)
-        return self.config
+        setattr(config, "decoder_opts", self.decoder_opts)
+        setattr(config, "task_types", self.task_types)
+        setattr(config, "tasks_dropout_p", self.dropout_list)
+        setattr(config, "loss_types", self.loss_types)
+        setattr(config, "kd_loss_types", self.kd_loss_types)
+        setattr(config, "tasks_nclass_list", self.nclass_list)
+        return config
