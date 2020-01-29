@@ -1,18 +1,21 @@
 # coding=utf-8
 # Copyright (c) Microsoft. All rights reserved.
+import json
 import logging
 import os
+import random
+from datetime import datetime
 
+from tensorboardX import SummaryWriter
 from torch.utils.data import BatchSampler, DataLoader, Dataset
 
 from utils_nlp.models.mtdnn.common.types import TaskType
 from utils_nlp.models.mtdnn.configuration_mtdnn import MTDNNConfig
-from utils_nlp.models.mtdnn.dataset_mtdnn import (
-    MTDNNCollater,
-    MTDNNMultiTaskBatchSampler,
-    MTDNNMultiTaskDataset,
-    MTDNNSingleTaskDataset,
-)
+from utils_nlp.models.mtdnn.dataset_mtdnn import (MTDNNCollater,
+                                                  MTDNNMultiTaskBatchSampler,
+                                                  MTDNNMultiTaskDataset,
+                                                  MTDNNSingleTaskDataset)
+from utils_nlp.models.mtdnn.modeling_mtdnn import MTDNNModel
 from utils_nlp.models.mtdnn.tasks.config import TaskDefs
 
 logger = logging.getLogger(__name__)
@@ -216,3 +219,32 @@ class MTDNNDataPreprocess:
         setattr(config, "kd_loss_types", self.kd_loss_types)
         setattr(config, "tasks_nclass_list", self.nclass_list)
         return config
+
+
+class MTDNNPipelineProcess:
+    def __init__(
+        self,
+        model: MTDNNModel,
+        config: MTDNNConfig,
+        task_defs: TaskDefs,
+        multi_task_train_data: DataLoader,
+        mulit_task_test_data: 
+        output_dir: str = "checkpoint",
+        log_dir: str = "tensorboard_logdir",
+    ):
+        """Pipeline process for MTDNN Training, Inference and Fine Tuning
+        """
+        self.model = model 
+        self.config = config
+        self.task_defs = task_defs
+        self.log_dir = log_dir
+        self.output_dir = output_dir
+        self.tensor_board = SummaryWriter(log_dir=self.log_dir)
+        self.multi_task_train_data = multi_task_train_data
+
+
+    def fit(self):
+        pass 
+
+    def predict(self):
+        pass 

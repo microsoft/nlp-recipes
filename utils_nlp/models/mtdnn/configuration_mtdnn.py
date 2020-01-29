@@ -82,6 +82,8 @@ class MTDNNConfig(PretrainedConfig):
         save_per_updates=10000,
         save_per_updates_on=False,
         epochs=5,
+        use_tensorboard=False,
+        tensorboard_logdir=
         batch_size=8,
         batch_size_eval=8,
         optimizer="adamax",
@@ -157,6 +159,7 @@ class MTDNNConfig(PretrainedConfig):
         self.save_per_updates = save_per_updates
         self.save_per_updates_on = save_per_updates_on
         self.epochs = epochs
+        self.use_tensor_board = use_tensor_board
         self.batch_size = batch_size
         self.batch_size_eval = batch_size_eval
         self.optimizer = optimizer
