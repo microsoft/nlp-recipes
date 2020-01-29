@@ -44,15 +44,15 @@ CONDA_BASE = {
     "pytorch": "pytorch-cpu>=1.0.0",
     "scipy": "scipy>=1.0.0",
     "h5py": "h5py>=2.8.0",
-    "tensorflow-hub": "tensorflow-hub==0.5.0",
+    "tensorflow": "tensorflow==1.15.0",
+    "tensorflow-hub": "tensorflow-hub==0.7.0",
     "dask": "dask[dataframe]==1.2.2",
     "papermill": "papermill>=1.0.1",
 }
 
 CONDA_GPU = {
     "numba": "numba>=0.38.1",
-    "pytorch": "pytorch>=1.0.0",
-    "cudatoolkit": "cudatoolkit==9.2",
+    "cudatoolkit": "cudatoolkit==10.2.89",
 }
 
 PIP_BASE = {
@@ -75,7 +75,7 @@ PIP_BASE = {
     "scikit-learn": "scikit-learn>=0.19.0,<=0.20.3",
     "seaborn": "seaborn>=0.9.0",
     "sklearn-crfsuite": "sklearn-crfsuite>=0.3.6",
-    "spacy": "spacy>=2.1.4",
+    "spacy": "spacy==2.1.8",
     "spacy-models": (
         "https://github.com/explosion/spacy-models/releases/download/"
         "en_core_web_sm-2.1.0/en_core_web_sm-2.1.0.tar.gz"
@@ -93,7 +93,9 @@ PIP_BASE = {
     "tensorboardX": "tensorboardX==1.8",
 }
 
-PIP_GPU = {}
+PIP_GPU = {
+    "torch": "torch==1.4.0",
+}
 
 PIP_DARWIN = {}
 PIP_DARWIN_GPU = {}

@@ -13,7 +13,7 @@ from pytorch_pretrained_bert.optimization import BertAdam
 from tqdm import tqdm
 
 from utils_nlp.models.bert.common import Language
-from utils_nlp.common.pytorch_utils import get_device, move_to_device
+from utils_nlp.common.pytorch_utils import get_device
 
 from cached_property import cached_property
 
@@ -91,7 +91,7 @@ class BERTSequenceClassifier:
 
         device, num_gpus = get_device(num_gpus)
 
-        self.model = move_to_device(self.model, device, num_gpus)
+        self.model = move_model_to_device(self.model, device, num_gpus)
 
         token_ids_tensor = torch.tensor(token_ids, dtype=torch.long)
         input_mask_tensor = torch.tensor(input_mask, dtype=torch.long)
@@ -211,7 +211,7 @@ class BERTSequenceClassifier:
                 (classes, probabilities) if probabilities is True.
         """
         device, num_gpus = get_device(num_gpus)
-        self.model = move_to_device(self.model, device, num_gpus)
+        self.model = move_model_to_device(self.model, device, num_gpus)
 
         # score
         self.model.eval()

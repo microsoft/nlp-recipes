@@ -14,7 +14,7 @@ from pytorch_pretrained_bert.modeling import BertForSequenceClassification
 from pytorch_pretrained_bert.optimization import BertAdam
 from tqdm import tqdm
 
-from utils_nlp.common.pytorch_utils import get_device, move_to_device
+from utils_nlp.common.pytorch_utils import get_device, move_model_to_device
 from utils_nlp.models.bert.common import Language
 
 try:
@@ -192,7 +192,7 @@ class BERTSequenceClassifier:
 
         device, num_gpus = get_device(num_gpus)
 
-        self.model = move_to_device(self.model, device, num_gpus)
+        self.model = move_model_to_device(self.model, device, num_gpus)
 
         if bert_optimizer is None:
             bert_optimizer = self.create_optimizer(
@@ -277,7 +277,7 @@ class BERTSequenceClassifier:
                 a dictionary with classes, target labels, probabilities) if probabilities is True.
         """
         device, num_gpus = get_device(num_gpus)
-        self.model = move_to_device(self.model, device, num_gpus)
+        self.model = move_model_to_device(self.model, device, num_gpus)
 
         # score
         self.model.eval()

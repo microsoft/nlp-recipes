@@ -16,7 +16,7 @@ For training at scale, operationalization or hyperparameter tuning, it is recomm
   * [Dependencies setup](#dependencies-setup)
   * [Register the conda environment in the DSVM JupyterHub](#register-conda-environment-in-dsvm-jupyterhub)
   * [Installing the Repo's Utils via PIP](#installing-the-repos-utils-via-pip)
-
+* [Setup guide for docker](#Set-up-guide-for-nvidia-docker)
 
 ## Compute Environments
 
@@ -123,3 +123,29 @@ Either command, from above, makes `utils_nlp` available in your conda virtual en
 
 The details of the versioning info can be found at [VERSIONING.md](VERSIONING.md).
 
+# Set up guide for (nvidia) docker
+
+## Pre-requisites
+In order to use the notebooks within a docker enviornment, you will need to have [nvidia docker drivers](https://github.com/NVIDIA/nvidia-docker) and [docker](https://docs.docker.com/install/linux/docker-ce/ubuntu/) installed on your computer.
+
+## Building docker image
+A docker file is provided within the [docker](docker/) folder. You can create the image using 
+```
+  cd docker
+  docker build -f . -t nlp-recipes
+```
+This will create a docker image containing all the dependencies and will name it as nlp-recipies:latest
+
+## Running the container
+You can run the notebook within the container environment using
+```
+  docker run --gpus all -p 8888:8888 nlp-recipes
+```
+This will map port 8888 of the local machine 
+
+## Trouble shooting
+* If you have permission issues with `docker build` or `docker run`, you might need to run docker with sudo permissions. 
+* If you are getting 'port already in use' errors, consider mapping a different port on the local machine to port 8888 on the container e.g.
+```
+docker run --gpus all -p 9000:8888 nlp-recipes
+```

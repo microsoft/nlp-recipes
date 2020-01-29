@@ -3,112 +3,29 @@
 
 # This script reuses some code from https://github.com/nlpyang/BertSum
 
-import gc
 import itertools
 import logging
-import numpy as np
 import os
-import pickle
 import random
+
+import numpy as np
 import torch
-import torch.nn as nn
-from torch.utils.data import Dataset, IterableDataset
-from torch.utils.data import DataLoader, SequentialSampler
+from torch.utils.data import DataLoader, Dataset, IterableDataset, SequentialSampler
 
 # from torch.utils.data.distributed import DistributedSampler
-from transformers import DistilBertModel, BertModel
+from transformers import BertModel, DistilBertModel
 
-from bertsum.models import model_builder, data_loader
-from bertsum.models.data_loader import Batch, DataIterator
+from bertsum.models import data_loader, model_builder
+from bertsum.models.data_loader import Batch
 from bertsum.models.model_builder import Summarizer
-
-from utils_nlp.common.pytorch_utils import get_device
-from utils_nlp.models.transformers.common import TOKENIZER_CLASS, Transformer
+from utils_nlp.common.pytorch_utils import compute_training_steps, get_device
 from utils_nlp.dataset.sentence_selection import combination_selection, greedy_selection
+from utils_nlp.models.transformers.common import TOKENIZER_CLASS, Transformer
 
 MODEL_CLASS = {"bert-base-uncased": BertModel, "distilbert-base-uncased": DistilBertModel}
 
 logger = logging.getLogger(__name__)
 
-# https://pytorch.org/docs/1.1.0/_modules/torch/utils/data/dataloader.html
-class IterableDistributedSampler(object):
-    def __init__(self, world_size=1, local_rank=-1):
-        self.world_size = world_size
-        self.local_rank = local_rank
-        
-    def iter(self, iterable):
-        if self.local_rank != -1:
-            return itertools.islice(iterable, self.local_rank, None, self.world_size)
-        else:
-            return iterable
-"""
-import sys
-sys.path.insert(0, "../../")
-from utils_nlp.models.transformers.extractive_summarization import test_sampler
-test_sampler()
-"""
-def test_sampler():
-    sampler = IterableDistributedSampler(1, -1)
-    for item in sampler.iter('abcdefg'):
-        print(item)
-    print("----------------------------")
-    sampler = IterableDistributedSampler(2, -1)
-    for item in sampler.iter('abcdefg'):
-        print(item)
-    print("----------------------------")
-    sampler = IterableDistributedSampler(4, 1)
-    for item in sampler.iter('abcdefg'):
-        print(item)
-    print("----------------------------")
-    sampler = IterableDistributedSampler(4, 2)
-    for item in sampler.iter('abcdefg'):
-        print(item)
-    print("----------------------------")
-    sampler = IterableDistributedSampler(4, 3)
-    for item in sampler.iter('abcdefg'):
-        print(item)
-    print("----------------------------")
-    
-class Dataloader(object):
-    def __init__(self, datasets,  batch_size,
-                 shuffle, is_labeled, sampler):
-        self.datasets = datasets
-        self.batch_size = batch_size
-        self.shuffle = shuffle
-        self.is_labeled = is_labeled
-        self.cur_iter = self._next_dataset_iterator(datasets)
-        assert self.cur_iter is not None
-        self.sampler = sampler
-        
-
-    def eachiter(self):
-        dataset_iter = (d for d in self.datasets)
-        while self.cur_iter is not None:
-            for batch in self.cur_iter:
-                yield batch
-            self.cur_iter = self._next_dataset_iterator(dataset_iter)
-            
-    def __iter__(self):
-        return self.sampler.iter(self.eachiter())
-
-
-    def _next_dataset_iterator(self, dataset_iter):
-        try:
-            # Drop the current dataset for decreasing memory
-            if hasattr(self, "cur_dataset"):
-                self.cur_dataset = None
-                gc.collect()
-                del self.cur_dataset
-                gc.collect()
-
-            self.cur_dataset = next(dataset_iter)
-        except StopIteration:
-            return None
-
-        return DataIterator(
-            dataset=self.cur_dataset,  batch_size=self.batch_size,
-            shuffle=self.shuffle, is_labeled=self.is_labeled)
-    
 
 class Bunch(object):
     """ Class which convert a dictionary to an object """
@@ -117,22 +34,21 @@ class Bunch(object):
         self.__dict__.update(adict)
 
 
-def get_dataloader(data_iter, shuffle=True, is_labeled=False, batch_size=3000, world_size=1, local_rank=-1):
+def get_dataloader(data_iter, shuffle=True, is_labeled=False, batch_size=3000):
     """
     Function to get data iterator over a list of data objects.
 
     Args:
         data_iter (generator): data generator.
-        shuffle (bool): whether the data is shuffled
-        is_labeled (bool): it specifies whether the data objects are labeled data.
+        shuffle (bool): whether the data is shuffled.
+        is_labeled (bool): specifies whether the data objects are labeled data.
         batch_size (int): number of tokens per batch.
 
     Returns:
         DataIterator
     """
-    sampler = IterableDistributedSampler(world_size, local_rank)
-    #return data_loader.Dataloader(data_iter, batch_size, shuffle=shuffle, is_labeled=is_labeled, sampler=sampler)
-    return Dataloader(data_iter, batch_size, shuffle=shuffle, is_labeled=is_labeled, sampler=sampler)
+
+    return data_loader.Dataloader(data_iter, batch_size, shuffle=shuffle, is_labeled=is_labeled)
 
 
 def get_dataset(file):
@@ -161,9 +77,7 @@ class ExtSumProcessedIterableDataset(IterableDataset):
         if self.is_shuffle:
             return itertools.chain.from_iterable(map(get_dataset, itertools.cycle(self.file_list)))
         else:
-            return itertools.chain.from_iterable(
-                map(get_dataset, itertools.cycle(random.shuffle(self.file_list)))
-            )
+            return itertools.chain.from_iterable(map(get_dataset, itertools.cycle(random.shuffle(self.file_list))))
 
     def __iter__(self):
         return self.get_stream()
@@ -196,9 +110,7 @@ class ExtSumProcessedDataset(Dataset):
         return self.data[idx]
 
 
-def get_pred(
-    example, sent_scores, cal_lead=False, sentence_separator="<q>", block_trigram=True, top_n=3
-):
+def get_pred(example, sent_scores, cal_lead=False, sentence_separator="<q>", block_trigram=True, top_n=3):
     """
         Get the summarization prediction for the paragraph example based on the scores
         returned by the transformer summarization model.
@@ -311,9 +223,7 @@ class ExtSumProcessedData:
     def _get_files(self, root):
         train_files = []
         test_files = []
-        files = [
-            os.path.join(root, f) for f in os.listdir(root) if os.path.isfile(os.path.join(root, f))
-        ]
+        files = [os.path.join(root, f) for f in os.listdir(root) if os.path.isfile(os.path.join(root, f))]
         for fname in files:
             if fname.find("train") != -1:
                 train_files.append(fname)
@@ -335,7 +245,7 @@ class ExtSumProcessedData:
         train_files, test_files = self._get_files(root)
         return (
             ExtSumProcessedIterableDataset(train_files, is_shuffle=True),
-            ExtSumProcessedDataset(sorted(test_files), is_shuffle=False),
+            ExtSumProcessedDataset(test_files, is_shuffle=False),
         )
 
 
@@ -406,7 +316,7 @@ class ExtSumProcessor:
         self._model_name = value
 
     @staticmethod
-    def get_inputs(batch, model_name, train_mode=True):
+    def get_inputs(batch, device, model_name, train_mode=True):
         """
         Creates an input dictionary given a model name.
 
@@ -414,6 +324,7 @@ class ExtSumProcessor:
             batch (object): A Batch containing input ids, segment ids, sentence class ids,
                 masks for the input ids, masks for  sentence class ids and source text.
                 If train_model is True, it also contains the labels and target text.
+            device (torch.device): A PyTorch device.
             model_name (bool, optional): Model name used to format the inputs.
             train_mode (bool, optional): Training mode flag.
                 Defaults to True.
@@ -426,6 +337,7 @@ class ExtSumProcessor:
 
         if model_name.split("-")[0] in ["bert", "distilbert"]:
             if train_mode:
+                batch = batch.to(device)
                 # labels must be the last
                 return {
                     "x": batch.src,
@@ -436,12 +348,13 @@ class ExtSumProcessor:
                     "labels": batch.labels,
                 }
             else:
+                batch = Bunch(batch)
                 return {
-                    "x": batch.src,
-                    "segs": batch.segs,
-                    "clss": batch.clss,
-                    "mask": batch.mask,
-                    "mask_cls": batch.mask_cls,
+                    "x": batch.src.to(device),
+                    "segs": batch.segs.to(device),
+                    "clss": batch.clss.to(device),
+                    "mask": batch.mask.to(device),
+                    "mask_cls": batch.mask_cls.to(device),
                 }
         else:
             raise ValueError("Model not supported: {}".format(model_name))
@@ -558,7 +471,7 @@ class ExtractiveSummarizer(Transformer):
         Args:
             model_name (str, optional): Transformer model name used in preprocessing.
                 check MODEL_CLASS for supported models. Defaults to "distilbert-base-uncased".
-            encoder (str, optional): Encoder algorithm used by summarization layer. 
+            encoder (str, optional): Encoder algorithm used by summarization layer.
                 There are four options:
                     - baseline: it used a smaller transformer model to replace the bert model
                       and with transformer summarization layer.
@@ -567,13 +480,11 @@ class ExtractiveSummarizer(Transformer):
                     - transformer: it uses pretrained BERT and fine-tune BERT with transformer
                       summarization layer.
                     - RNN: it uses pretrained BERT and fine-tune BERT with LSTM summarization layer.
-                Defaults to "transformer". 
+                Defaults to "transformer".
             cache_dir (str, optional): Directory to cache the tokenizer. Defaults to ".".
         """
 
-        super().__init__(
-            model_class=MODEL_CLASS, model_name=model_name, num_labels=0, cache_dir=cache_dir
-        )
+        super().__init__(model_class=MODEL_CLASS, model_name=model_name, num_labels=0, cache_dir=cache_dir)
         if model_name not in self.list_supported_models():
             raise ValueError(
                 "Model name {} is not supported by ExtractiveSummarizer. "
@@ -604,6 +515,7 @@ class ExtractiveSummarizer(Transformer):
         self,
         train_dataset,
         num_gpus=None,
+        gpu_ids=None,
         batch_size=3000,
         local_rank=-1,
         max_steps=5e5,
@@ -628,7 +540,10 @@ class ExtractiveSummarizer(Transformer):
             num_gpus (int, optional): The number of GPUs to use. If None, all available GPUs will
                 be used. If set to 0 or GPUs are not available, CPU device will
                 be used. Defaults to None.
-            batch_size (int, optional): Maximum number of tokens in each batch. 
+            gpu_ids (list): List of GPU IDs to be used.
+                If set to None, the first num_gpus GPUs will be used.
+                Defaults to None.
+            batch_size (int, optional): Maximum number of tokens in each batch.
             local_rank (int, optional): Local_rank for distributed training on GPUs. Defaults to
                 -1, which means non-distributed training.
             max_steps (int, optional): Maximum number of training steps. Defaults to 5e5.
@@ -653,16 +568,7 @@ class ExtractiveSummarizer(Transformer):
             seed (int, optional): Random seed used to improve reproducibility. Defaults to None.
         """
 
-        device, num_gpus = get_device(num_gpus=num_gpus, local_rank=local_rank)
-
-        def move_batch_to_device(batch, device):
-            return batch.to(device)
-
-        # if isinstance(self.model, nn.DataParallel):
-        #    self.model.module.to(device)
-        # else:
-        self.model.to(device)
-
+        # init optimizer
         optimizer = model_builder.build_optim(
             optimization_method,
             learning_rate,
@@ -676,32 +582,34 @@ class ExtractiveSummarizer(Transformer):
         )
 
         # batch_size is the number of tokens in a batch
-        train_dataloader = get_dataloader(
-            train_dataset.get_stream(), is_labeled=True, batch_size=batch_size, world_size=num_gpus, local_rank=local_rank
+        train_dataloader = get_dataloader(train_dataset.get_stream(), is_labeled=True, batch_size=batch_size)
+
+        # compute the max number of training steps
+        max_steps = compute_training_steps(
+            train_dataloader, max_steps=max_steps, gradient_accumulation_steps=gradient_accumulation_steps,
         )
 
         super().fine_tune(
             train_dataloader=train_dataloader,
             get_inputs=ExtSumProcessor.get_inputs,
-            move_batch_to_device=move_batch_to_device,
-            n_gpu=num_gpus,
-            num_train_epochs=-1,
+            num_gpus=num_gpus,
+            gpu_ids=gpu_ids,
             max_steps=max_steps,
-            optimizer=optimizer,
-            warmup_steps=warmup_steps,
+            max_grad_norm=max_grad_norm,
             gradient_accumulation_steps=gradient_accumulation_steps,
+            optimizer=optimizer,
+            scheduler=None,
             verbose=verbose,
             seed=seed,
             report_every=report_every,
             clip_grad_norm=False,
-            max_grad_norm=max_grad_norm,
         )
 
     def predict(
         self,
         test_dataset,
         num_gpus=1,
-        local_rank=-1,
+        gpu_ids=None,
         batch_size=16,
         sentence_separator="<q>",
         top_n=3,
@@ -715,6 +623,9 @@ class ExtractiveSummarizer(Transformer):
         Args:
             test_dataset (Dataset): Dataset for which the summary to be predicted
             num_gpus (int, optional): The number of GPUs used in prediction. Defaults to 1.
+            gpu_ids (list): List of GPU IDs to be used.
+                If set to None, the first num_gpus GPUs will be used.
+                Defaults to None.
             batch_size (int, optional): The number of test examples in each batch. Defaults to 16.
             sentence_separator (str, optional): String to be inserted between sentences in
                 the prediction. Defaults to '<q>'.
@@ -736,33 +647,37 @@ class ExtractiveSummarizer(Transformer):
             # tuple_batch =  [list(col) for col in zip(*[d.values() for d in dict_list]
             if dict_list is None or len(dict_list) <= 0:
                 return None
+            is_labeled = False
+            if "labels" in dict_list[0]:
+                is_labeled = True
             tuple_batch = [list(d.values()) for d in dict_list]
             ## generate mask and mask_cls, and only select tensors for the model input
-            batch = Batch(tuple_batch, is_labeled=False)
-            return {
-                "src": batch.src,
-                "segs": batch.segs,
-                "clss": batch.clss,
-                "mask": batch.mask,
-                "mask_cls": batch.mask_cls,
-            }
+            batch = Batch(tuple_batch, is_labeled=True)
+            if is_labeled:
+                return {
+                    "src": batch.src,
+                    "segs": batch.segs,
+                    "clss": batch.clss,
+                    "mask": batch.mask,
+                    "mask_cls": batch.mask_cls,
+                    "labels": batch.labels,
+                }
+            else:
+                return {
+                    "src": batch.src,
+                    "segs": batch.segs,
+                    "clss": batch.clss,
+                    "mask": batch.mask,
+                    "mask_cls": batch.mask_cls,
+                }
 
-        
-        from torch.utils.data.distributed import DistributedSampler
-        if local_rank == -1:
-            test_sampler = SequentialSampler(test_dataset)
-        else:
-            test_sampler = DistributedSampler(test_dataset, num_replicas=num_gpus, rank=local_rank, shuffle=False)
-        test_dataloader = DataLoader(
-            test_dataset, sampler=test_sampler, batch_size=batch_size, collate_fn=collate_fn
-        )
-        sent_scores = self.predict_scores(test_dataloader, num_gpus=num_gpus, local_rank=local_rank)
+        test_sampler = SequentialSampler(test_dataset)
+        test_dataloader = DataLoader(test_dataset, sampler=test_sampler, batch_size=batch_size, collate_fn=collate_fn)
+        sent_scores = self.predict_scores(test_dataloader, num_gpus=num_gpus, gpu_ids=gpu_ids)
         sent_scores_list = list(sent_scores)
         scores_list = []
         for i in sent_scores_list:
             scores_list.extend(i)
-        if local_rank != -1:
-            return scores_list
         prediction = []
         for i in range(len(test_dataset)):
             temp_pred = get_pred(
@@ -776,14 +691,17 @@ class ExtractiveSummarizer(Transformer):
             prediction.extend(temp_pred)
         return prediction
 
-    def predict_scores(self, eval_dataloader, num_gpus=1, local_rank=-1, verbose=True):
+    def predict_scores(self, test_dataloader, num_gpus=1, gpu_ids=None, verbose=True):
         """
         Scores a dataset using a fine-tuned model and a given dataloader.
 
         Args:
-            eval_dataloader (Dataloader): Dataloader for the evaluation data.
+            test_dataloader (Dataloader): Dataloader for scoring the data.
             num_gpus (int, optional): The number of GPUs to use. If None, all available GPUs will
                 be used. If set to 0 or GPUs are not available, CPU device will be used.
+                Defaults to None.
+            gpu_ids (list): List of GPU IDs to be used.
+                If set to None, the first num_gpus GPUs will be used.
                 Defaults to None.
             verbose (bool, optional): Whether to print out the training log. Defaults to True.
 
@@ -791,43 +709,25 @@ class ExtractiveSummarizer(Transformer):
             1darray: numpy array of predicted sentence scores.
         """
 
-        device, num_gpus = get_device(num_gpus=num_gpus, local_rank=local_rank)
-
-        def move_batch_to_device(batch, device):
-            batch["src"] = batch["src"].to(device)
-            batch["segs"] = batch["segs"].to(device)
-            batch["clss"] = batch["clss"].to(device)
-            batch["mask"] = batch["mask"].to(device)
-            batch["mask_cls"] = batch["mask_cls"].to(device)
-            if "labels" in batch:
-                batch["labels"] = batch["labels"].to(device)
-            return Bunch(batch)
+        device, num_gpus = get_device(num_gpus=num_gpus, local_rank=-1)
 
         preds = list(
             super().predict(
-                eval_dataloader=eval_dataloader,
+                eval_dataloader=test_dataloader,
                 get_inputs=ExtSumProcessor.get_inputs,
-                n_gpu=num_gpus,
+                num_gpus=num_gpus,
+                gpu_ids=gpu_ids,
                 verbose=verbose,
-                move_batch_to_device=move_batch_to_device,
             )
         )
         return preds
 
-    def save_model(self, name, is_full_name=False):
-        if not is_full_name:
-            output_model_dir = os.path.join(self.cache_dir, "fine_tuned")
-            os.makedirs(self.cache_dir, exist_ok=True)
-            os.makedirs(output_model_dir, exist_ok=True)
-            full_name = os.path.join(output_model_dir, name)
-        else:
-            full_name = name
-            
+    def save_model(self, name):
+        output_model_dir = os.path.join(self.cache_dir, "fine_tuned")
+
+        os.makedirs(self.cache_dir, exist_ok=True)
+        os.makedirs(output_model_dir, exist_ok=True)
+
+        full_name = os.path.join(output_model_dir, name)
         logger.info("Saving model checkpoint to %s", full_name)
-        model_to_save = (
-            self.model.module if hasattr(self.model, "module") else self.model
-        )  # Take care of distributed/parallel training
-        try:
-            torch.save(model_to_save, full_name)
-        except:
-            pickle.dump(model_to_save, open(full_name, "wb" ) )
+        torch.save(self.model, name)
