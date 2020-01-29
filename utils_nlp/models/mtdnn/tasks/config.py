@@ -35,19 +35,19 @@ class TaskConfig(object):
 
     def __init__(self, **kwargs: dict):
         """ Define a generic task configuration """
-        logger.info("Inside Task Config Init")
-        self.task_name = kwargs.pop("task_name", "")
-        self.data_format = kwargs.pop("data_format", "PremiseOnly")
-        self.encoder_type = kwargs.pop("encoder_type", "BERT")
-        self.enable_san = kwargs.pop("enable_san", False)
-        self.metric_meta = kwargs.pop("metric_meta", ["ACC"])
-        self.n_class = kwargs.pop("n_class", 2)
-        self.task_type = kwargs.pop("task_type", "Classification")
+        logger.info("Mapping Task attributes")
+
+        # Mapping attributes
+        for key, value in kwargs.items():
+            try:
+                setattr(self, key, value)
+            except AttributeError as err:
+                logger.error(f"[ERROR] - Unable to set {key} with value {value} for {self}")
+                raise err
 
     def to_dict(self):
         """Serializes this instance to a Python dictionary."""
-        output = copy.deepcopy(self.__dict__)
-        return output
+        return copy.deepcopy(self.__dict__)
 
 
 class COLATaskConfig(TaskConfig):
