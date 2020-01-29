@@ -100,6 +100,7 @@ class MTDNNConfig(PretrainedConfig):
         dropout_p=0.1,
         dropout_w=0.0,
         vb_dropout=True,
+        use_glue_format=False,
         # loading config
         model_ckpt="checkpoints/model_0.pt",
         resume=False,
@@ -176,6 +177,7 @@ class MTDNNConfig(PretrainedConfig):
         self.dropout_p = dropout_p
         self.dropout_w = dropout_w
         self.vb_dropout = vb_dropout
+        self.use_glue_format = use_glue_format
         self.model_ckpt = model_ckpt
         self.resume = resume
         self.have_lr_scheduler = have_lr_scheduler

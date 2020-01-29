@@ -17,25 +17,24 @@ import torch.optim as optim
 from fairseq.models.roberta import RobertaModel as FairseqRobertModel
 from torch import nn
 from torch.optim.lr_scheduler import *
-from transformers import (
-    BertConfig,
-    BertModel,
-    BertPreTrainedModel,
-    PretrainedConfig,
-    PreTrainedModel,
-    RobertaModel,
-)
+from torch.utils.data import DataLoader
+from transformers import (BertConfig, BertModel, BertPreTrainedModel,
+                          PretrainedConfig, PreTrainedModel, RobertaModel)
 
 from utils_nlp.dataset.url_utils import download_path, maybe_download
-from utils_nlp.models.mtdnn.common.archive_maps import PRETRAINED_MODEL_ARCHIVE_MAP
+from utils_nlp.models.mtdnn.common.archive_maps import \
+    PRETRAINED_MODEL_ARCHIVE_MAP
 from utils_nlp.models.mtdnn.common.average_meter import AverageMeter
 from utils_nlp.models.mtdnn.common.bert_optim import Adamax, RAdam
 from utils_nlp.models.mtdnn.common.linear_pooler import LinearPooler
 from utils_nlp.models.mtdnn.common.loss import LOSS_REGISTRY
 from utils_nlp.models.mtdnn.common.metrics import calc_metrics
 from utils_nlp.models.mtdnn.common.san import SANBERTNetwork, SANClassifier
-from utils_nlp.models.mtdnn.common.squad_utils import extract_answer, merge_answers, select_answers
-from utils_nlp.models.mtdnn.common.types import DataFormat, EncoderModelType, TaskType
+from utils_nlp.models.mtdnn.common.squad_utils import (extract_answer,
+                                                       merge_answers,
+                                                       select_answers)
+from utils_nlp.models.mtdnn.common.types import (DataFormat, EncoderModelType,
+                                                 TaskType)
 from utils_nlp.models.mtdnn.common.utils import MTDNNCommonUtils
 from utils_nlp.models.mtdnn.configuration_mtdnn import MTDNNConfig
 from utils_nlp.models.mtdnn.dataset_mtdnn import MTDNNCollater
@@ -345,9 +344,9 @@ class MTDNNModel(MTDNNPretrainedModel):
             self.optimizer.step()
             self.optimizer.zero_grad()
 
-    def eval(
+    def eval_mode(
         self,
-        data,
+        data: DataLoader,
         metric_meta,
         use_cuda=True,
         with_label=True,
