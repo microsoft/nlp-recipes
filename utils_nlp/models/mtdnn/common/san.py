@@ -1,6 +1,7 @@
 # coding=utf-8
 # Copyright (c) Microsoft. All rights reserved.
 import random
+from typing import Union
 
 import torch
 import torch.nn as nn
@@ -9,12 +10,11 @@ from fairseq.models.roberta import RobertaModel as FairseqRobertModel
 from pytorch_pretrained_bert.modeling import BertConfig, BertLayerNorm, BertModel
 from torch.nn.parameter import Parameter
 from torch.nn.utils import weight_norm
-from typing import Union
 
 from utils_nlp.models.mtdnn.common.dropout_wrapper import DropoutWrapper
 from utils_nlp.models.mtdnn.common.optimizer import weight_norm as WN
 from utils_nlp.models.mtdnn.common.similarity import FlatSimilarityWrapper, SelfAttnWrapper
-from utils_nlp.models.mtdnn.common.types import EncoderModelType
+from utils_nlp.models.mtdnn.common.types import EncoderModelType, TaskType
 from utils_nlp.models.mtdnn.configuration_mtdnn import MTDNNConfig
 
 SMALL_POS_NUM = 1.0e-30
@@ -145,6 +145,7 @@ class SANBERTNetwork(nn.Module):
         self.pooler = pooler
         self.dropout_list = nn.ModuleList()
         self.encoder_type = config.encoder_type
+        self.hidden_size = self.config.hidden_size
 
         # Dump other features if value is set to true
         if config.dump_feature:
@@ -166,7 +167,7 @@ class SANBERTNetwork(nn.Module):
 
         # TODO - Move to training
         # Generate tasks decoding and scoring lists
-        # self._generate_tasks_decoding_scoring_options()
+        self._generate_tasks_decoding_scoring_options()
 
         # Initialize weights
         self._my_init()
@@ -242,7 +243,9 @@ class SANBERTNetwork(nn.Module):
             print(f"idx: {idx}, number of task labels: {task_num_labels}")
             decoder_opt = self.decoder_opts[idx]
             task_type = self.task_types[idx]
-            dropout = DropoutWrapper(self.task_dropout_p[idx], config.enable_variational_dropout)
+            dropout = DropoutWrapper(
+                self.task_dropout_p[idx], self.config.enable_variational_dropout
+            )
             self.dropout_list.append(dropout)
             if task_type == TaskType.Span:
                 assert decoder_opt != 1
