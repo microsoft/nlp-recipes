@@ -6,6 +6,7 @@
 import itertools
 import logging
 import os
+import pickle
 import random
 
 import numpy as np
@@ -530,6 +531,7 @@ class ExtractiveSummarizer(Transformer):
         report_every=50,
         verbose=True,
         seed=None,
+        save_every=-1,
         **kwargs,
     ):
         """
@@ -603,6 +605,7 @@ class ExtractiveSummarizer(Transformer):
             seed=seed,
             report_every=report_every,
             clip_grad_norm=False,
+            save_every=save_every,
         )
 
     def predict(
@@ -722,12 +725,21 @@ class ExtractiveSummarizer(Transformer):
         )
         return preds
 
-    def save_model(self, name):
-        output_model_dir = os.path.join(self.cache_dir, "fine_tuned")
+    def save_model(self, name, is_full_name=False):
+        if is_full_name:
+            ## make sure that the path exists
+            full_name = name
+        else:
+            output_model_dir = os.path.join(self.cache_dir, "fine_tuned")
+            os.makedirs(self.cache_dir, exist_ok=True)
+            os.makedirs(output_model_dir, exist_ok=True)
+            full_name = os.path.join(output_model_dir, name)
 
-        os.makedirs(self.cache_dir, exist_ok=True)
-        os.makedirs(output_model_dir, exist_ok=True)
-
-        full_name = os.path.join(output_model_dir, name)
         logger.info("Saving model checkpoint to %s", full_name)
-        torch.save(self.model, name)
+        try:
+            torch.save(self.model, full_name)
+        except OSError:
+            pickle.dump(self.model, open(full_name, "wb"))
+        except:
+            return False
+        return True
