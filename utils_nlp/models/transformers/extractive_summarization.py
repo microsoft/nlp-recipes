@@ -97,7 +97,7 @@ class ExtSumProcessedDataset(Dataset):
                 files is shuffled when the dataset is loaded. Defaults to False.
         """
 
-        self.file_list = file_list
+        self.file_list = sorted(file_list)
         if is_shuffle:
             random.shuffle(file_list)
         self.data = []
@@ -650,29 +650,17 @@ class ExtractiveSummarizer(Transformer):
             # tuple_batch =  [list(col) for col in zip(*[d.values() for d in dict_list]
             if dict_list is None or len(dict_list) <= 0:
                 return None
-            is_labeled = False
-            if "labels" in dict_list[0]:
-                is_labeled = True
             tuple_batch = [list(d.values()) for d in dict_list]
             ## generate mask and mask_cls, and only select tensors for the model input
-            batch = Batch(tuple_batch, is_labeled=True)
-            if is_labeled:
-                return {
-                    "src": batch.src,
-                    "segs": batch.segs,
-                    "clss": batch.clss,
-                    "mask": batch.mask,
-                    "mask_cls": batch.mask_cls,
-                    "labels": batch.labels,
-                }
-            else:
-                return {
-                    "src": batch.src,
-                    "segs": batch.segs,
-                    "clss": batch.clss,
-                    "mask": batch.mask,
-                    "mask_cls": batch.mask_cls,
-                }
+            ## the labels was never used in prediction, set is_labeled as False
+            batch = Batch(tuple_batch, is_labeled=False)
+            return {
+                "src": batch.src,
+                "segs": batch.segs,
+                "clss": batch.clss,
+                "mask": batch.mask,
+                "mask_cls": batch.mask_cls,
+            }
 
         test_sampler = SequentialSampler(test_dataset)
         test_dataloader = DataLoader(test_dataset, sampler=test_sampler, batch_size=batch_size, collate_fn=collate_fn)
