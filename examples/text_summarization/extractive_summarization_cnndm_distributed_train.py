@@ -37,14 +37,10 @@ parser.add_argument("--cache_dir", type=str, default="./",
                     help="Directory to cache the tokenizer.")
 parser.add_argument("--data_dir", type=str, default="./",
                     help="Directory to download the preprocessed data.")
-#parser.add_argument("--raw_data_dir", type=str, default="./raw",
-#                    help="Directory to download data that needs preprocessing.")
 parser.add_argument("--output_dir", type=str, default="./",
                     help="Directory to save the output model and prediction results.")
 parser.add_argument("--quick_run", type=str.lower, default='false', choices=['true', 'false'],
                     help="Whether to have a quick run")
-#parser.add_argument("--use_preprocessed_data", type=str.lower, default='false', choices=['true', 'false'],
-#                    help="Whether to use the bertsum preprocessed data")
 parser.add_argument("--model_name", type=str, default="distilbert-base-uncased",
                     help="Transformer model used in the extractive summarization, only \
                         \"bert-uncased\" and \"distilbert-base-uncased\" are supported.")
@@ -81,7 +77,6 @@ def main():
     print("NCCL_IB_DISABLE: {}".format(os.getenv("NCCL_IB_DISABLE")))
     args = parser.parse_args()
     print("quick_run is {}".format(args.quick_run))
-    print("use_preprocessed_data is {}".format(args.use_preprocessed_data))
     print("output_dir is {}".format(args.output_dir))
     print("data_dir is {}".format(args.data_dir))
     print("cache_dir is {}".format(args.cache_dir))
@@ -115,7 +110,6 @@ def main_worker(local_rank, ngpus_per_node, summarizer, args):
         rank=rank,
     )
 
-    #if args.use_preprocessed_data.lower() == "true":
     train_dataset, test_dataset = ExtSumProcessedData().splits(root=args.data_dir)
     # total number of steps for training
     MAX_STEPS = 1e3
