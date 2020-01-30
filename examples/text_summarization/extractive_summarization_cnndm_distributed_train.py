@@ -48,6 +48,8 @@ parser.add_argument("--model_name", type=str, default="distilbert-base-uncased",
                         \"bert-uncased\" and \"distilbert-base-uncased\" are supported.")
 parser.add_argument("--learning_rate", type=float, default=1e-3,
                     help="Learning rate.")
+parser.add_argument("--batch_size", type=int, default=3000,
+                    help="batch size in terms of input token numbers in training")
 parser.add_argument("--max_steps", type=int, default=1e4,
                     help="Maximum number of training steps run in training. If quick_run is set,\
                         it's not used.")
@@ -62,8 +64,6 @@ parser.add_argument("--summary_file", type=str, default="generated_summaries.txt
 
 def cleanup():
     dist.destroy_process_group()
-
-BATCH_SIZE = 3000
 
 # Encoder name. Options are: 1. baseline, classifier, transformer, rnn.
 ENCODER = "transformer"
@@ -164,7 +164,7 @@ def main_worker(local_rank, ngpus_per_node, summarizer, args):
     summarizer.fit(
         train_dataset,
         num_gpus=world_size,
-        batch_size=BATCH_SIZE,
+        batch_size=args.batch_size,
         gradient_accumulation_steps=2,
         max_steps=MAX_STEPS / world_size,
         learning_rate=args.learning_rate,
