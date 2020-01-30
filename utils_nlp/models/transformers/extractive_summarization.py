@@ -27,6 +27,75 @@ MODEL_CLASS = {"bert-base-uncased": BertModel, "distilbert-base-uncased": Distil
 
 logger = logging.getLogger(__name__)
 
+# https://pytorch.org/docs/1.1.0/_modules/torch/utils/data/dataloader.html
+class IterableDistributedSampler(object):
+    """ Distributed sampler for iterable dataset.
+
+    Args:
+        world_size (int): Total number of GPUs that will be used. Defaults to 1.
+        rank (int): Rank of the current GPU. Defaults to 1.
+        
+    """
+    def __init__(self, world_size=1, rank=-1):
+        self.world_size = world_size
+        self.rank = rank
+
+    def iter(self, iterable):
+        if self.rank != -1:
+            return itertools.islice(iterable, self.rank, None, self.world_size)
+        else:
+            return iterable
+
+class ChunkDataLoader(object):
+    """ Data Loader for Chunked Dataset.
+
+    Args:
+        datasets (list): list of data item list.
+        batch_size (int): Number of tokens per batch.
+        shuffle (bool): Whether the data is shuffled.
+        is_labeled (bool): Whether the data is labeled.
+        sampler (obj): Data sampler.
+
+    """
+    def __init__(self, datasets,  batch_size,
+                 shuffle, is_labeled, sampler):
+        self.datasets = datasets
+        self.batch_size = batch_size
+        self.shuffle = shuffle
+        self.is_labeled = is_labeled
+        self.cur_iter = self._next_dataset_iterator(datasets)
+        assert self.cur_iter is not None
+        self.sampler = sampler
+
+
+    def eachiter(self):
+        dataset_iter = (d for d in self.datasets)
+        while self.cur_iter is not None:
+            for batch in self.cur_iter:
+                yield batch
+            self.cur_iter = self._next_dataset_iterator(dataset_iter)
+
+    def __iter__(self):
+        return self.sampler.iter(self.eachiter())
+
+
+    def _next_dataset_iterator(self, dataset_iter):
+        try:
+            # Drop the current dataset for decreasing memory
+            if hasattr(self, "cur_dataset"):
+                self.cur_dataset = None
+                gc.collect()
+                del self.cur_dataset
+                gc.collect()
+
+            self.cur_dataset = next(dataset_iter)
+        except StopIteration:
+            return None
+
+        return DataIterator(
+            dataset=self.cur_dataset,  batch_size=self.batch_size,
+            shuffle=self.shuffle, is_labeled=self.is_labeled)
+
 
 class Bunch(object):
     """ Class which convert a dictionary to an object """
@@ -35,21 +104,26 @@ class Bunch(object):
         self.__dict__.update(adict)
 
 
-def get_dataloader(data_iter, shuffle=True, is_labeled=False, batch_size=3000):
+def get_dataloader(data_iter, shuffle=True, is_labeled=False, batch_size=3000, world_size=1, rank=1):
     """
     Function to get data iterator over a list of data objects.
 
     Args:
-        data_iter (generator): data generator.
-        shuffle (bool): whether the data is shuffled.
-        is_labeled (bool): specifies whether the data objects are labeled data.
-        batch_size (int): number of tokens per batch.
+        data_iter (generator): Data generator.
+        shuffle (bool): Whether the data is shuffled. Defaults to True.
+        is_labeled (bool): Whether the data objects are labeled data.
+                            Defaults to False.
+        batch_size (int): Number of tokens per batch. Defaults to 3000.
+        world_size (int): Total number of GPUs that will be used. Defaults to 1.
+        rank (int): Rank of the current GPU. Defaults to 1.
 
     Returns:
         DataIterator
     """
+    sampler = IterableDistributedSampler(world_size, local_rank)
+    #return data_loader.Dataloader(data_iter, batch_size, shuffle=shuffle, is_labeled=is_labeled, sampler=sampler)
+    return ChunkDataLoader(data_iter, batch_size, shuffle=shuffle, is_labeled=is_labeled, sampler=sampler)
 
-    return data_loader.Dataloader(data_iter, batch_size, shuffle=shuffle, is_labeled=is_labeled)
 
 
 def get_dataset(file):
@@ -532,6 +606,7 @@ class ExtractiveSummarizer(Transformer):
         verbose=True,
         seed=None,
         save_every=-1,
+        world_size=1,
         **kwargs,
     ):
         """
@@ -584,7 +659,7 @@ class ExtractiveSummarizer(Transformer):
         )
 
         # batch_size is the number of tokens in a batch
-        train_dataloader = get_dataloader(train_dataset.get_stream(), is_labeled=True, batch_size=batch_size)
+        train_dataloader = get_dataloader(train_dataset.get_stream(), is_labeled=True, batch_size=batch_size, world_size=world_size, rank=local_rank)
 
         # compute the max number of training steps
         max_steps = compute_training_steps(
