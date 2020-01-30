@@ -36,7 +36,9 @@ parser.add_argument("--node_count", type=int, default=1,
 parser.add_argument("--cache_dir", type=str, default="./",
                     help="Directory to cache the tokenizer.")
 parser.add_argument("--data_dir", type=str, default="./",
-                    help="Directory to download and save the data")
+                    help="Directory to download the preprocessed data.")
+parser.add_argument("--raw_data_dir", type=str, default="./raw",
+                    help="Directory to download data that needs preprocessing.")
 parser.add_argument("--output_dir", type=str, default="./",
                     help="Directory to save the output model and prediction results.")
 parser.add_argument("--quick_run", type=str.lower, default='false', choices=['true', 'false'],
@@ -87,6 +89,7 @@ def main():
     #shutil.rmtree(args.output_dir)
     os.makedirs(args.output_dir, exist_ok=True)
     os.makedirs(args.cache_dir, exist_ok=True)
+    os.makedirs(args.raw_data_dir, exist_ok=True)
 
     ngpus_per_node = torch.cuda.device_count()
 
@@ -115,7 +118,7 @@ def main_worker(local_rank, ngpus_per_node, summarizer, args):
     if args.use_preprocessed_data.lower() == "true":
         train_dataset, test_dataset = ExtSumProcessedData().splits(root=args.data_dir)
     else:
-        save_path = os.path.join(args.data_dir, "processed")
+        save_path = os.path.join(args.raw_data_dir, "processed")
         if rank != 0:
             dist.barrier()
     
@@ -180,7 +183,8 @@ def main_worker(local_rank, ngpus_per_node, summarizer, args):
         report_every=REPORT_EVERY,
         clip_grad_norm=False,
         local_rank=rank,
-        save_every=save_every
+        save_every=save_every,
+        world_size=world_size
     )
 
     end = time.time()
