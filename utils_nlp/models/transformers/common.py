@@ -117,7 +117,7 @@ class Transformer:
         verbose=True,
         seed=None,
         report_every=10,
-        save_every=100,
+        save_every=-1,
         clip_grad_norm=True,
     ):
 
@@ -196,7 +196,7 @@ class Transformer:
                     if scheduler:
                         scheduler.step()
                     self.model.zero_grad()
-                    if global_step % save_every == 0 and verbose:
+                    if save_every != -1 and global_step % save_every == 0 and verbose:
                         self.save_model(os.path.join(self.cache_dir, f'{self.model_name}_step_{global_step}.pt'), is_full_name=True)
                 if global_step > max_steps:
                     epoch_iterator.close()
