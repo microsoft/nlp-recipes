@@ -3,6 +3,7 @@
 
 # This script reuses some code from https://github.com/nlpyang/BertSum
 
+import gc
 import itertools
 import logging
 import os
