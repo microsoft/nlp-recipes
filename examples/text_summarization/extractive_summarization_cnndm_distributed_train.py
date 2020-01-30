@@ -37,14 +37,14 @@ parser.add_argument("--cache_dir", type=str, default="./",
                     help="Directory to cache the tokenizer.")
 parser.add_argument("--data_dir", type=str, default="./",
                     help="Directory to download the preprocessed data.")
-parser.add_argument("--raw_data_dir", type=str, default="./raw",
-                    help="Directory to download data that needs preprocessing.")
+#parser.add_argument("--raw_data_dir", type=str, default="./raw",
+#                    help="Directory to download data that needs preprocessing.")
 parser.add_argument("--output_dir", type=str, default="./",
                     help="Directory to save the output model and prediction results.")
 parser.add_argument("--quick_run", type=str.lower, default='false', choices=['true', 'false'],
                     help="Whether to have a quick run")
-parser.add_argument("--use_preprocessed_data", type=str.lower, default='false', choices=['true', 'false'],
-                    help="Whether to use the bertsum preprocessed data")
+#parser.add_argument("--use_preprocessed_data", type=str.lower, default='false', choices=['true', 'false'],
+#                    help="Whether to use the bertsum preprocessed data")
 parser.add_argument("--model_name", type=str, default="distilbert-base-uncased",
                     help="Transformer model used in the extractive summarization, only \
                         \"bert-uncased\" and \"distilbert-base-uncased\" are supported.")
@@ -115,48 +115,8 @@ def main_worker(local_rank, ngpus_per_node, summarizer, args):
         rank=rank,
     )
 
-    if args.use_preprocessed_data.lower() == "true":
-        train_dataset, test_dataset = ExtSumProcessedData().splits(root=args.data_dir)
-    else:
-        save_path = os.path.join(args.raw_data_dir, "processed")
-        if rank != 0:
-            dist.barrier()
-    
-        DATA_PATH = args.data_dir
-        # The number of lines at the head of data file used for preprocessing.
-        # -1 means all the lines.
-        TOP_N = 1000
-        CHUNK_SIZE = 200
-        if args.quick_run.lower()=='false':
-            TOP_N = -1
-            CHUNK_SIZE = 2000
-        train_raw_dataset, test_raw_dataset = CNNDMSummarizationDataset(
-            top_n=TOP_N, local_cache_path=args.data_dir
-        )
-        processor = ExtSumProcessor(model_name=args.model_name)
-        ext_sum_train = processor.preprocess(
-            train_raw_dataset,
-            train_raw_dataset.get_target(),
-            oracle_mode="greedy",
-            selections=args.top_n,
-        )
-        ext_sum_test = processor.preprocess(
-            test_raw_dataset,
-            test_raw_dataset.get_target(),
-            oracle_mode="greedy",
-            selections=args.top_n,
-        )
-        ExtSumProcessedData.save_data(
-            ext_sum_train, is_test=False, save_path=save_path, chunk_size=CHUNK_SIZE
-        )
-        ExtSumProcessedData.save_data(
-            ext_sum_test, is_test=True, save_path=save_path, chunk_size=CHUNK_SIZE
-        )
-
-        if rank == 0:
-            dist.barrier()    
-        train_dataset, test_dataset = ExtSumProcessedData().splits(root=save_path)
-
+    #if args.use_preprocessed_data.lower() == "true":
+    train_dataset, test_dataset = ExtSumProcessedData().splits(root=args.data_dir)
     # total number of steps for training
     MAX_STEPS = 1e3
     # number of steps for warm up
