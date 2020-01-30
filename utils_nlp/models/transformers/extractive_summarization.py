@@ -17,7 +17,7 @@ from torch.utils.data import DataLoader, Dataset, IterableDataset, SequentialSam
 from transformers import BertModel, DistilBertModel
 
 from bertsum.models import data_loader, model_builder
-from bertsum.models.data_loader import Batch
+from bertsum.models.data_loader import Batch,DataIterator
 from bertsum.models.model_builder import Summarizer
 from utils_nlp.common.pytorch_utils import compute_training_steps, get_device
 from utils_nlp.dataset.sentence_selection import combination_selection, greedy_selection
@@ -120,7 +120,7 @@ def get_dataloader(data_iter, shuffle=True, is_labeled=False, batch_size=3000, w
     Returns:
         DataIterator
     """
-    sampler = IterableDistributedSampler(world_size, local_rank)
+    sampler = IterableDistributedSampler(world_size, rank)
     #return data_loader.Dataloader(data_iter, batch_size, shuffle=shuffle, is_labeled=is_labeled, sampler=sampler)
     return ChunkDataLoader(data_iter, batch_size, shuffle=shuffle, is_labeled=is_labeled, sampler=sampler)
 
@@ -173,10 +173,10 @@ class ExtSumProcessedDataset(Dataset):
 
         self.file_list = sorted(file_list)
         if is_shuffle:
-            random.shuffle(file_list)
+            random.shuffle(self.file_list)
         self.data = []
-        for file in file_list:
-            self.data.extend(torch.load(file))
+        for f in self.file_list:
+            self.data.extend(torch.load(f))
 
     def __len__(self):
         return len(self.data)
