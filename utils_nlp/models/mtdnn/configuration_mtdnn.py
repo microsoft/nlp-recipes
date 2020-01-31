@@ -77,13 +77,14 @@ class MTDNNConfig(PretrainedConfig):
         max_seq_len=512,
         # Training config
         cuda=torch.cuda.is_available(),
+        cuda_device=0,
         multi_gpu_on=False,
         log_per_updates=500,
         save_per_updates=10000,
         save_per_updates_on=False,
         epochs=5,
-        use_tensorboard=False,
-        tensorboard_logdir=
+        use_tensor_board=False,
+        tensorboard_logdir="tensorboard_logdir",
         batch_size=8,
         batch_size_eval=8,
         optimizer="adamax",
@@ -155,6 +156,7 @@ class MTDNNConfig(PretrainedConfig):
         self.mix_opt = mix_opt
         self.max_seq_len = max_seq_len
         self.cuda = cuda
+        self.cuda_device = cuda_device
         self.multi_gpu_on = multi_gpu_on
         self.log_per_updates = log_per_updates
         self.save_per_updates = save_per_updates

@@ -18,23 +18,25 @@ from fairseq.models.roberta import RobertaModel as FairseqRobertModel
 from torch import nn
 from torch.optim.lr_scheduler import *
 from torch.utils.data import DataLoader
-from transformers import (BertConfig, BertModel, BertPreTrainedModel,
-                          PretrainedConfig, PreTrainedModel, RobertaModel)
+from transformers import (
+    BertConfig,
+    BertModel,
+    BertPreTrainedModel,
+    PretrainedConfig,
+    PreTrainedModel,
+    RobertaModel,
+)
 
 from utils_nlp.dataset.url_utils import download_path, maybe_download
-from utils_nlp.models.mtdnn.common.archive_maps import \
-    PRETRAINED_MODEL_ARCHIVE_MAP
+from utils_nlp.models.mtdnn.common.archive_maps import PRETRAINED_MODEL_ARCHIVE_MAP
 from utils_nlp.models.mtdnn.common.average_meter import AverageMeter
 from utils_nlp.models.mtdnn.common.bert_optim import Adamax, RAdam
 from utils_nlp.models.mtdnn.common.linear_pooler import LinearPooler
 from utils_nlp.models.mtdnn.common.loss import LOSS_REGISTRY
 from utils_nlp.models.mtdnn.common.metrics import calc_metrics
 from utils_nlp.models.mtdnn.common.san import SANBERTNetwork, SANClassifier
-from utils_nlp.models.mtdnn.common.squad_utils import (extract_answer,
-                                                       merge_answers,
-                                                       select_answers)
-from utils_nlp.models.mtdnn.common.types import (DataFormat, EncoderModelType,
-                                                 TaskType)
+from utils_nlp.models.mtdnn.common.squad_utils import extract_answer, merge_answers, select_answers
+from utils_nlp.models.mtdnn.common.types import DataFormat, EncoderModelType, TaskType
 from utils_nlp.models.mtdnn.common.utils import MTDNNCommonUtils
 from utils_nlp.models.mtdnn.configuration_mtdnn import MTDNNConfig
 from utils_nlp.models.mtdnn.dataset_mtdnn import MTDNNCollater
@@ -137,7 +139,7 @@ class MTDNNModel(MTDNNPretrainedModel):
 
         # Move network to GPU if device available and flag set
         if self.config.cuda:
-            self.network.cuda()
+            self.network.cuda(device=self.config.cuda_device)
         self.optimizer_parameters = self._get_param_groups()
         self._setup_optim(self.optimizer_parameters, self.state_dict, num_train_step)
         self.para_swapped = False
@@ -269,15 +271,16 @@ class MTDNNModel(MTDNNPretrainedModel):
                 self.kd_task_loss_criterion.append(lc)
 
     def _to_cuda(self, tensor):
-        if not tensor:
+        # Set tensor to gpu (non-blocking) if a PyTorch tensor
+        if tensor is None:
             return tensor
 
         if isinstance(tensor, list) or isinstance(tensor, tuple):
-            y = [e.cuda(non_blocking=True) for e in tensor]
-            for e in y:
-                e.requires_grad = False
+            y = [e.cuda(device=self.config.cuda_device, non_blocking=True) for e in tensor]
+            for t in y:
+                t.requires_grad = False
         else:
-            y = tensor.cuda(non_blocking=True)
+            y = tensor.cuda(device=self.config.cuda_device, non_blocking=True)
             y.requires_grad = False
         return y
 
@@ -302,18 +305,20 @@ class MTDNNModel(MTDNNPretrainedModel):
         weight = None
         if self.config.weighted_on:
             if self.config.cuda:
-                weight = batch_data[batch_meta["factor"]].cuda(non_blocking=True)
+                weight = batch_data[batch_meta["factor"]].cuda(
+                    device=self.config.cuda_device, non_blocking=True
+                )
             else:
                 weight = batch_data[batch_meta["factor"]]
         logits = self.mnetwork(*inputs)
 
         # compute loss
         loss = 0
-        if self.task_loss_criterion[task_id] and (y is not None):
-            loss = self.task_loss_criterion[task_id](logits, y, weight, ignore_index=-1)
+        if self.task_loss_criterion[task_id] and (target is not None):
+            loss = self.task_loss_criterion[task_id](logits, target, weight, ignore_index=-1)
 
         # compute kd loss
-        if self.config.get("mkd_opt", 0) > 0 and ("soft_label" in batch_meta):
+        if self.config.mkd_opt > 0 and ("soft_label" in batch_meta):
             soft_labels = batch_meta["soft_label"]
             soft_labels = self._to_cuda(soft_labels) if self.config.cuda else soft_labels
             kd_lc = self.kd_task_loss_criterion[task_id]
@@ -322,7 +327,7 @@ class MTDNNModel(MTDNNPretrainedModel):
 
         self.train_loss.update(loss.item(), batch_data[batch_meta["token_id"]].size(0))
         # scale loss
-        loss = loss / self.config.get("grad_accumulation_step", 1)
+        loss = loss / (self.config.grad_accumulation_step or 1)
         if self.config.fp16:
             with amp.scale_loss(loss, self.optimizer) as scaled_loss:
                 scaled_loss.backward()
@@ -453,7 +458,7 @@ class MTDNNModel(MTDNNPretrainedModel):
         self.config.update(model_state_dict["config"])
 
     def cuda(self):
-        self.network.cuda()
+        self.network.cuda(device=self.config.cuda_device)
 
     def supported_init_checkpoints(self):
         """List of allowed check points
