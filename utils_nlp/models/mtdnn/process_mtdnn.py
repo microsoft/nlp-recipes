@@ -26,7 +26,7 @@ from utils_nlp.models.mtdnn.tasks.config import TaskDefs
 logger = logging.getLogger(__name__)
 
 
-class MTDNNDataPreprocess:
+class MTDNNDataProcess:
     def __init__(
         self,
         config: MTDNNConfig,
@@ -58,13 +58,15 @@ class MTDNNDataPreprocess:
         self.dropout_list = []
         self.loss_types = []
         self.kd_loss_types = []
-        self.train_data = self.process_train_datasets()
-        self.dev_datasets_list, self.test_datasets_list = self.process_dev_test_datasets()
-        self.num_all_batches = (
-            self.config.epochs * len(self.train_data) // self.config.grad_accumulation_step
+        self._multitask_train_dataloader = self._process_train_datasets()
+        self._dev_dataloaders_list, self._test_dataloaders_list = self._process_dev_test_datasets()
+        self._num_all_batches = (
+            self.config.epochs
+            * len(self._multitask_train_dataloader)
+            // self.config.grad_accumulation_step
         )
 
-    def process_train_datasets(self):
+    def _process_train_datasets(self):
         """Preprocess the training sets and generate decoding and task specific training options needed to update config object
         
         Returns:
@@ -129,13 +131,13 @@ class MTDNNDataPreprocess:
         train_collater = MTDNNCollater(
             dropout_w=self.config.dropout_w, encoder_type=self.config.encoder_type
         )
-        multi_task_train_dataset = MTDNNMultiTaskDataset(train_datasets)
-        multi_task_batch_sampler = MTDNNMultiTaskBatchSampler(
+        multitask_train_dataset = MTDNNMultiTaskDataset(train_datasets)
+        multitask_batch_sampler = MTDNNMultiTaskBatchSampler(
             train_datasets, self.config.batch_size, self.config.mix_opt, self.config.ratio
         )
-        multi_task_train_data = DataLoader(
-            multi_task_train_dataset,
-            batch_sampler=multi_task_batch_sampler,
+        multitask_train_data = DataLoader(
+            multitask_train_dataset,
+            batch_sampler=multitask_batch_sampler,
             collate_fn=train_collater.collate_fn,
             pin_memory=self.config.cuda,
         )
@@ -143,17 +145,17 @@ class MTDNNDataPreprocess:
         # Update class configuration with decoder opts
         self.config = self.update_config(self.config)
 
-        return multi_task_train_data
+        return multitask_train_data
 
-    def process_dev_test_datasets(self):
+    def _process_dev_test_datasets(self):
         """Preprocess the test sets 
         
         Returns:
             [List] -- Multiple tasks test data ready for inference
         """
         logger.info("Starting to process the testing data sets")
-        dev_data_list = []
-        test_data_list = []
+        dev_dataloaders_list = []
+        test_dataloaders_list = []
         test_collater = MTDNNCollater(is_train=False, encoder_type=self.config.encoder_type)
         for dataset in self.test_datasets:
             prefix = dataset.split("_")[0]
@@ -188,7 +190,7 @@ class MTDNNDataPreprocess:
                     collate_fn=test_collater.collate_fn,
                     pin_memory=self.config.cuda,
                 )
-            dev_data_list.append(dev_data)
+            dev_dataloaders_list.append(dev_data)
 
             test_path = os.path.join(self.data_dir, f"{dataset}_test.json")
             test_data = None
@@ -207,10 +209,34 @@ class MTDNNDataPreprocess:
                     collate_fn=test_collater.collate_fn,
                     pin_memory=self.config.cuda,
                 )
-            test_data_list.append(test_data)
+            test_dataloaders_list.append(test_data)
 
-        # Return tuple of dev and test data
-        return dev_data_list, test_data_list
+        # Return tuple of dev and test dataloaders
+        return dev_dataloaders_list, test_dataloaders_list
+
+    def get_train_dataloader(self) -> DataLoader:
+        """Returns a dataloader for mutliple tasks
+        
+        Returns:
+            DataLoader -- Multiple tasks batch dataloader
+        """
+        return self._multitask_train_dataloader
+
+    def get_dev_dataloaders(self) -> list:
+        """Returns a list of dev dataloaders for multiple tasks
+        
+        Returns:
+            list -- List of dev dataloaders
+        """
+        return self._dev_dataloaders_list
+
+    def get_test_dataloaders(self) -> list:
+        """Returns a list of test dataloaders for multiple tasks
+        
+        Returns:
+            list -- List of test dataloaders
+        """
+        return self._test_dataloaders_list
 
     def generate_decoder_opt(self, enable_san, max_opt):
         return max_opt if enable_san and max_opt < 3 else 0
@@ -232,52 +258,66 @@ class MTDNNPipelineProcess:
         model: MTDNNModel,
         config: MTDNNConfig,
         task_defs: TaskDefs,
-        multi_task_train_data: DataLoader,
-        dev_data_list: list,  # list of dataloaders
-        test_data_list: list,  # list of dataloaders
+        multitask_train_dataloader: DataLoader,
+        dev_dataloaders_list: list,  # list of dataloaders
+        test_dataloaders_list: list,  # list of dataloaders
         test_datasets_list: list = ["mnli_mismatched", "mnli_matched"],
         output_dir: str = "checkpoint",
         log_dir: str = "tensorboard_logdir",
     ):
         """Pipeline process for MTDNN Training, Inference and Fine Tuning
         """
-        assert multi_task_train_data, "DataLoader for multiple tasks cannot be None"
+        assert multitask_train_dataloader, "DataLoader for multiple tasks cannot be None"
         assert test_datasets_list, "Pass a list of test dataset prefixes"
         self.model = model
         self.config = config
         self.task_defs = task_defs
-        self.multi_task_train_data = multi_task_train_data
-        self.dev_data_list = dev_data_list
-        self.test_data_list = test_data_list
+        self.multitask_train_dataloader = multitask_train_dataloader
+        self.dev_dataloaders_list = dev_dataloaders_list
+        self.test_dataloaders_list = test_dataloaders_list
         self.test_datasets_list = test_datasets_list
         self.output_dir = output_dir
         self.log_dir = log_dir
         self.tensor_board = SummaryWriter(log_dir=self.log_dir)
 
-    def fit(self):
+    def fit(self, epochs=0):
         """ Fit model to training datasets """
-        for epoch in range(self.config.epochs):
-            logger.warning(f"At epoch {epoch}")
+        epochs = epochs or self.config.epochs
+        logger.info(f"Total number of params: {self.model.total_param}")
+        for epoch in range(epochs):
+            logger.info(f"At epoch {epoch}")
             start = datetime.now()
 
+            print(f"Length to go over: {len(self.multitask_train_dataloader)}")
             # Create batches and train
-            for idx, (batch_meta, batch_data) in enumerate(self.multi_task_train_data):
+            for idx, (batch_meta, batch_data) in enumerate(self.multitask_train_dataloader):
+                # print(f"Inside training loop idx: {idx} - Meta: {batch_meta} - Data: {batch_data}")
+                logger.info(
+                    f"Before calling patch_data\n Training batch: {idx}. \t\tBatch Metadata: {batch_meta}. \t\tBatch Data: {batch_data}"
+                )
                 batch_meta, batch_data = MTDNNCollater.patch_data(
                     self.config.cuda, batch_meta, batch_data
                 )
+                logger.info(
+                    f"After calling patch_data\nTraining batch: {idx}.\t\tBatch Metadata: {batch_meta}. \t\tBatch Data: {batch_data}"
+                )
                 task_id = batch_meta["task_id"]
+                # print(f"Before calling model.update with batch meta: {idx}")
                 self.model.update(batch_meta, batch_data)
+                # print(f"After calling model.update with batch meta: {idx}")
                 if (
                     self.model.local_updates == 1
                     or (self.model.local_updates)
                     % (self.config.log_per_updates * self.config.grad_accumulation_step)
                     == 0
                 ):
+
                     time_left = str(
                         (datetime.now() - start)
                         / (idx + 1)
-                        * (len(self.multi_task_train_data) - idx - 1)
+                        * (len(self.multitask_train_dataloader) - idx - 1)
                     ).split(".")[0]
+                    print("Inside time left: ", time_left)
                     logger.info(
                         "Task [{0:2}] updates[{1:6}] train loss[{2:.5f}] remaining[{3}]".format(
                             task_id, self.model.updates, self.model.train_loss.avg, time_left
@@ -304,7 +344,7 @@ class MTDNNPipelineProcess:
         for idx, dataset in enumerate(self.test_datasets_list):
             prefix = dataset.split("_")[0]
             label_dict = self.task_defs.global_map.get(prefix, None)
-            dev_data: DataLoader = self.dev_data_list[idx]
+            dev_data: DataLoader = self.dev_dataloaders_list[idx]
             if dev_data is not None:
                 with torch.no_grad():
                     dev_metrics, dev_predictions, scores, golds, dev_ids = self.model.eval_model(
@@ -338,7 +378,7 @@ class MTDNNPipelineProcess:
                     submit(official_score_file, results, label_dict)
 
             # test eval
-            test_data = self.test_data_list[idx]
+            test_data = self.test_dataloaders_list[idx]
             if test_data is not None:
                 with torch.no_grad():
                     test_metrics, test_predictions, scores, golds, test_ids = self.model.eval_model(
