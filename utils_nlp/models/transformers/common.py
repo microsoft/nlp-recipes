@@ -8,7 +8,6 @@ import logging
 import os
 import random
 import time
-from itertools import cycle
 
 import numpy as np
 import torch
@@ -38,7 +37,12 @@ logger = logging.getLogger(__name__)
 
 class Transformer:
     def __init__(
-        self, model_class, model_name="bert-base-cased", num_labels=2, cache_dir=".", load_model_from_dir=None,
+        self,
+        model_class,
+        model_name="bert-base-cased",
+        num_labels=2,
+        cache_dir=".",
+        load_model_from_dir=None,
     ):
 
         if model_name not in self.list_supported_models():
@@ -82,11 +86,15 @@ class Transformer:
         no_decay = ["bias", "LayerNorm.weight"]
         optimizer_grouped_parameters = [
             {
-                "params": [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)],
+                "params": [
+                    p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)
+                ],
                 "weight_decay": weight_decay,
             },
             {
-                "params": [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)],
+                "params": [
+                    p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)
+                ],
                 "weight_decay": 0.0,
             },
         ]
@@ -105,7 +113,6 @@ class Transformer:
         train_dataloader,
         get_inputs,
         num_gpus=None,
-        gpu_ids=None,
         max_steps=-1,
         max_grad_norm=1.0,
         gradient_accumulation_steps=1,
@@ -120,21 +127,8 @@ class Transformer:
         clip_grad_norm=True,
     ):
 
-        # get device
-        device, num_gpus = get_device(num_gpus=num_gpus, local_rank=local_rank)
-
         if seed is not None:
             Transformer.set_seed(seed, num_gpus > 0)
-
-        if fp16:
-            try:
-                from apex import amp
-            except ImportError:
-                raise ImportError("Please install apex from https://www.github.com/nvidia/apex")
-            self.model, optimizer = amp.initialize(self.model, optimizer, opt_level=fp16_opt_level)
-
-        # move model
-        self.model = move_model_to_device(self.model, device, num_gpus, gpu_ids, local_rank)
 
         # init training
         global_step = 0
@@ -146,11 +140,18 @@ class Transformer:
         # train
         start = time.time()
         while global_step < max_steps:
-            epoch_iterator = tqdm(train_dataloader, desc="Iteration", disable=local_rank not in [-1, 0] or not verbose)
+            epoch_iterator = tqdm(
+                train_dataloader, desc="Iteration", disable=local_rank not in [-1, 0] or not verbose
+            )
             for step, batch in enumerate(epoch_iterator):
                 inputs = get_inputs(batch, device, self.model_name)
                 outputs = self.model(**inputs)
-                loss = outputs[0]
+
+                if isinstance(outputs, tuple):
+                    loss = outputs[0]
+                else:
+                    # Accomondate models based on older versions of Transformers, e.g. UniLM
+                    loss = outputs
 
                 if num_gpus > 1:
                     loss = loss.mean()
@@ -171,15 +172,22 @@ class Transformer:
 
                     if clip_grad_norm:
                         if fp16:
-                            torch.nn.utils.clip_grad_norm_(amp.master_params(optimizer), max_grad_norm)
+                            torch.nn.utils.clip_grad_norm_(
+                                amp.master_params(optimizer), max_grad_norm
+                            )
                         else:
                             torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_grad_norm)
 
                     if global_step % report_every == 0 and verbose:
                         end = time.time()
                         print(
-                            "loss:{0:.6f}, time:{1:f}, examples:{2:.0f}, step:{3:.0f}/{4:.0f}".format(
-                                accum_loss / report_every, end - start, len(batch), global_step, max_steps,
+                            "loss:{0:.6f}, time:{1:f}, examples:{2:.0f}, "
+                            "step:{3:.0f}/{4:.0f}".format(
+                                accum_loss / report_every,
+                                end - start,
+                                len(batch),
+                                global_step,
+                                max_steps,
                             )
                         )
                         accum_loss = 0

@@ -1,6 +1,6 @@
 import os
 from datetime import datetime
-import json
+import jsonlines
 import logging
 from tqdm import tqdm
 
@@ -99,7 +99,7 @@ class S2SAbsSumProcessor:
     ):
 
         self.tokenizer = TOKENIZER_CLASS[model_name].from_pretrained(
-            self.model_name, do_lower_case=to_lower, cache_dir=cache_dir
+            model_name, do_lower_case=to_lower, cache_dir=cache_dir
         )
 
         self.cached_features_file = os.path.join(cache_dir, cached_features_file_name)
@@ -139,13 +139,9 @@ class S2SAbsSumProcessor:
             temp_dir, "train_file_" + datetime.now().strftime("%m%d%Y%H%M%S") + ".json"
         )
         try:
-            # with jsonlines.open(temp_train_file, mode="w") as writer:
-            #     for source, target in zip(sum_ds, sum_ds.get_target()):
-            #         writer.write({"src": source, "tgt": target})
-            with open(temp_train_file, "a") as outfile:
+            with jsonlines.open(temp_train_file, mode="w") as writer:
                 for source, target in zip(sum_ds, sum_ds.get_target()):
-                    json.dump({"src": source, "tgt": target}, outfile)
-                    outfile.write("\n")
+                    writer.write({"src": source, "tgt": target})
 
             train_dataset = self.train_dataset_from_file(
                 train_file=temp_train_file,
@@ -174,10 +170,10 @@ class S2SAbsSumProcessor:
             temp_dir, "train_file_" + datetime.now().strftime("%m%d%Y%H%M%S") + ".json"
         )
         try:
-            with open(temp_train_file, "a") as outfile:
+            with jsonlines.open(temp_train_file, mode="w") as writer:
                 for item in sum_ds:
-                    json.dump(item, outfile)
-                    outfile.write("\n")
+                    writer.write(item)
+
             train_dataset = self.train_dataset_from_file(
                 train_file=temp_train_file,
                 load_cached_features=load_cached_features,
@@ -193,7 +189,7 @@ class S2SAbsSumProcessor:
             torch.distributed.barrier()
         return train_dataset
 
-    def train_dataset_from_file(self, train_file, load_cached_features=True, local_rank=-1):
+    def train_dataset_from_file(self, train_file, load_cached_features=False, local_rank=-1):
         if not load_cached_features and os.path.exists(self.cached_features_file):
             logger.info("Deleting cached feature file {}".format(self.cached_features_file))
             os.remove(self.cached_features_file)
@@ -351,7 +347,7 @@ class S2SAbstractiveSummarizer(Transformer):
         max_source_seq_length=464,
         max_target_seq_length=48,
         learning_rate=5e-5,
-        batch_size=8,
+        per_gpu_batch_size=8,
         num_epochs=1,
         recover_step=-1,
         max_steps=-1,
@@ -365,47 +361,51 @@ class S2SAbstractiveSummarizer(Transformer):
         fp16=False,
         fp16_opt_level="O1",
         max_grad_norm=1.0,
+        save_model=True,
         verbose=True,
         seed=None,
         random_prob=0.1,
         keep_prob=0.1,
     ):
+        # Before we do anything with models, we want to ensure that we get fp16 execution
+        # of torch.einsum if args.fp16 is set. Otherwise it'll default to "promote" mode,
+        # and we'll get fp32 operations. Note that running `--fp16_opt_level="O2"` will
+        # remove the need for this code, but it is still valid.
+        if fp16:
+            try:
+                from apex import amp
 
-        if gpu_ids is not None:
-            per_node_train_batch_size = batch_size * len(gpu_ids)
-        elif num_gpus is not None:
-            per_node_train_batch_size = batch_size * num_gpus
-        else:
-            per_node_train_batch_size = batch_size * max(1, torch.cuda.device_count())
+                amp.register_half_function(torch, "einsum")
+            except ImportError:
+                raise ImportError("Please install apex from https://www.github.com/nvidia/apex")
 
-        per_node_train_batch_size = per_node_train_batch_size * gradient_accumulation_steps
-
-        batch_size = per_node_train_batch_size * (
-            torch.distributed.get_world_size() if local_rank != -1 else 1
-        )
-
-        # TODO: fix when max_steps=1
+        # max_steps is mainly used by the scheduler to determine the learning rate,
+        # together with global_step
         if max_steps == -1:
-            max_steps = num_epochs * len(train_dataset) // batch_size
+            max_steps = max(num_epochs * len(train_dataset) // batch_size, 1)
 
         # get device
-        device, num_gpus = get_device(num_gpus=num_gpus, local_rank=local_rank)
-        # move model
-        self.model = move_model_to_device(self.model, device, num_gpus, gpu_ids, local_rank)
+        device, num_gpus = get_device(num_gpus=num_gpus, gpu_ids=gpu_ids, local_rank=local_rank)
 
-        train_dataset = Seq2seqDatasetForBert(
-            features=train_dataset,
-            max_source_len=max_source_seq_length,
-            max_target_len=max_target_seq_length,
-            vocab_size=self.tokenizer.vocab_size,
-            cls_id=self.tokenizer.cls_token_id,
-            sep_id=self.tokenizer.sep_token_id,
-            pad_id=self.tokenizer.pad_token_id,
-            mask_id=self.tokenizer.mask_token_id,
-            random_prob=random_prob,
-            keep_prob=keep_prob,
-            num_training_instances=batch_size * max_steps,
-            offset=0,
+        # move model
+        self.model = move_model_to_device(model)
+
+        # if gpu_ids is not None:
+        #     per_node_train_batch_size = per_gpu_batch_size * len(gpu_ids)
+        # elif num_gpus is not None and torch.cuda.is_available():
+        #     per_node_train_batch_size = per_gpu_batch_size * min(
+        #         num_gpus, torch.cuda.device_count())
+        # else:
+        #     per_node_train_batch_size = per_gpu_batch_size * max(1, torch.cuda.device_count())
+        # per_node_train_batch_size = per_node_train_batch_size * gradient_accumulation_steps
+
+        per_node_train_batch_size = (
+            per_gpu_batch_size * max(1, num_gpus) * gradient_accumulation_steps
+        )
+
+        # actual batch size, i.e. number of samples between each parameter update
+        batch_size = per_node_train_batch_size * (
+            torch.distributed.get_world_size() if local_rank != -1 else 1
         )
 
         # init optimizer and scheduler
@@ -413,24 +413,11 @@ class S2SAbstractiveSummarizer(Transformer):
             self.model, weight_decay, learning_rate, adam_epsilon
         )
 
-        # TODO: Double check this part
-        train_sampler = (
-            SequentialSampler(train_dataset)
-            if local_rank == -1
-            else DistributedSampler(train_dataset, shuffle=False)
-        )
-        train_dataloader = DataLoader(
-            train_dataset,
-            sampler=train_sampler,
-            batch_size=batch_size // gradient_accumulation_steps,
-            collate_fn=batch_list_to_batch_tensors,
-        )
+        if fp16:
+            self.model, self.optimizer = amp.initialize(
+                self.model, self.optimizer, opt_level=fp16_opt_level
+            )
 
-        self.scheduler = Transformer.get_default_scheduler(
-            optimizer=self.optimizer, warmup_steps=warmup_steps, num_training_steps=max_steps
-        )
-
-        # TODO: fix amp after merging with staging
         global_step = 0
         if recover_step > 0:
             model_recover_checkpoint = os.path.join(
@@ -445,16 +432,55 @@ class S2SAbstractiveSummarizer(Transformer):
 
             self.optimizer.load_state_dict(checkpoint_state_dict["optimizer"])
             self.model.load_state_dict(model_state_dict)
-            self.scheduler.load_state_dict(checkpoint_state_dict["lr_scheduler"])
+
+            if fp16:
+                amp.load_state_dict(checkpoint_state_dict["amp"])
 
             global_step = recover_step
 
         if max_steps <= global_step:
             logger.info("Training is done. Please use a new dir or clean this dir!")
 
-        super().fine_tune(
+        self.scheduler = Transformer.get_default_scheduler(
+            optimizer=self.optimizer, warmup_steps=warmup_steps, num_training_steps=max_steps
+        )
+
+        if recover_step > 0:
+            self.scheduler.load_state_dict(checkpoint_state_dict["lr_scheduler"])
+
+        self.model = parallelize_model(self.model, device, num_gpus, gpu_ids, local_rank)
+
+        train_dataset = Seq2seqDatasetForBert(
+            features=train_dataset,
+            max_source_len=max_source_seq_length,
+            max_target_len=max_target_seq_length,
+            vocab_size=self.tokenizer.vocab_size,
+            cls_id=self.tokenizer.cls_token_id,
+            sep_id=self.tokenizer.sep_token_id,
+            pad_id=self.tokenizer.pad_token_id,
+            mask_id=self.tokenizer.mask_token_id,
+            random_prob=random_prob,
+            keep_prob=keep_prob,
+            num_training_instances=batch_size * max_steps,
+            offset=batch_size * global_step,
+        )
+
+        # The training features are shuffled
+        train_sampler = (
+            SequentialSampler(train_dataset)
+            if local_rank == -1
+            else DistributedSampler(train_dataset, shuffle=False)
+        )
+        # batch_size of the dataloader is the number of samples to load each iteration on each node
+        train_dataloader = DataLoader(
+            train_dataset,
+            sampler=train_sampler,
+            batch_size=per_node_train_batch_size // gradient_accumulation_steps,
+            collate_fn=batch_list_to_batch_tensors,
+        )
+
+        global_step, _ = super().fine_tune(
             train_dataloader=train_dataloader,
-            device=device,
             num_gpus=num_gpus,
             get_inputs=S2SAbsSumProcessor.get_inputs,
             max_steps=max_steps,
@@ -468,6 +494,9 @@ class S2SAbstractiveSummarizer(Transformer):
             verbose=verbose,
             seed=seed,
         )
+
+        if save_model:
+            self.save_model(global_step, fp16)
 
     def predict(
         self,

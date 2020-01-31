@@ -8,27 +8,37 @@ from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
 from torch.utils.data.distributed import DistributedSampler
 
 
-def get_device(
-    num_gpus=None,
-    local_rank=-1,
-    #    backend="nccl",
-    #    rank=0,
-    #    world_size=1,
-    #    init_method="file:///distributed",
-):
+def get_device(num_gpus=None, gpu_ids=None, local_rank=-1):
+    if gpu_ids is not None:
+        num_gpus = len(gpu_ids)
     if local_rank == -1:
-        num_gpus = min(num_gpus, torch.cuda.device_count()) if num_gpus is not None else torch.cuda.device_count()
+        num_gpus = (
+            min(num_gpus, torch.cuda.device_count())
+            if num_gpus is not None
+            else torch.cuda.device_count()
+        )
         device = torch.device("cuda" if torch.cuda.is_available() and num_gpus > 0 else "cpu")
     else:
         torch.cuda.set_device(local_rank)
         device = torch.device("cuda", local_rank)
-        # torch.distributed.init_process_group(backend="nccl")
-        # torch.distributed.init_process_group(backend=backend, rank=rank, world_size=world_size, init_method=init_method)
+        torch.distributed.init_process_group(backend="nccl")
         num_gpus = 1
     return device, num_gpus
 
 
-def move_model_to_device(model, device, num_gpus=None, gpu_ids=None, local_rank=-1):
+def move_model_to_device(model, device):
+    if not isinstance(device, torch.device):
+        raise ValueError("device must be of type torch.device.")
+
+    # unwrap model
+    if isinstance(model, torch.nn.DataParallel):
+        model = model.module
+
+    # move to device
+    return model.to(device)
+
+
+def parallelize_model(model, device, num_gpus=None, gpu_ids=None, local_rank=-1):
     """Moves a model to the specified device (cpu or gpu/s)
        and implements data parallelism when multiple gpus are specified.
 
@@ -58,8 +68,8 @@ def move_model_to_device(model, device, num_gpus=None, gpu_ids=None, local_rank=
         model = model.module
     # wrap in DataParallel or DistributedDataParallel
     if local_rank != -1:
-        self.model = torch.nn.parallel.DistributedDataParallel(
-            self.model, device_ids=[local_rank], output_device=local_rank, find_unused_parameters=True,
+        model = torch.nn.parallel.DistributedDataParallel(
+            model, device_ids=[local_rank], output_device=local_rank, find_unused_parameters=True
         )
     else:
         if device.type == "cuda":
@@ -74,8 +84,7 @@ def move_model_to_device(model, device, num_gpus=None, gpu_ids=None, local_rank=
                 gpu_ids = list(range(num_gpus))
             if len(gpu_ids) > 1:
                 model = torch.nn.DataParallel(model, device_ids=gpu_ids)
-    # move to device
-    return model.to(device)
+    return model
 
 
 def dataloader_from_dataset(ds, batch_size=32, num_gpus=None, shuffle=False, distributed=False):
@@ -115,8 +124,8 @@ def compute_training_steps(dataloader, num_epochs=1, max_steps=-1, gradient_accu
         num_epochs (int, optional): Number of training epochs. Defaults to 1.
         max_steps (int, optional): Total number of training steps.
             If set to a positive value, it overrides num_epochs.
-            Otherwise, it's determined by the dataset length, gradient_accumulation_steps, and num_epochs.
-            Defualts to -1.
+            Otherwise, it's determined by the dataset length, gradient_accumulation_steps,
+            and num_epochs. Defualts to -1.
         gradient_accumulation_steps (int, optional): Number of steps to accumulate
             before performing a backward/update pass.
             Default to 1.
