@@ -799,11 +799,19 @@ class ExtractiveSummarizer(Transformer):
             os.makedirs(output_model_dir, exist_ok=True)
             full_name = os.path.join(output_model_dir, name)
 
+        model_to_save = (
+            self.model.module if hasattr(self.model, "module") else self.model
+        )  # Take care of distributed/parallel training
         logger.info("Saving model checkpoint to %s", full_name)
         try:
-            torch.save(self.model, full_name)
+            print("saving through pytorch")
+            torch.save(model_to_save.state_dict(), full_name)
         except OSError:
-            pickle.dump(self.model, open(full_name, "wb"))
+            try:
+                print("saving as pickle")
+                pickle.dump(model_to_save.state_dict(), open(full_name, "wb"))
+            except:
+                raise
         except:
-            return False
-        return True
+            raise
+       
