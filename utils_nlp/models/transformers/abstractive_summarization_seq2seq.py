@@ -22,7 +22,7 @@ from transformers import (
 
 
 from utils_nlp.models.transformers.common import TOKENIZER_CLASS, Transformer
-from utils_nlp.common.pytorch_utils import get_device, move_model_to_device
+from utils_nlp.common.pytorch_utils import get_device, move_model_to_device, parallelize_model
 from s2s_ft.utils import load_and_cache_examples, Seq2seqDatasetForBert, batch_list_to_batch_tensors
 from s2s_ft.modeling import BertForSequenceToSequence
 from s2s_ft.modeling import UNILM_PRETRAINED_MODEL_ARCHIVE_MAP
@@ -116,7 +116,7 @@ class S2SAbsSumProcessor:
         )
 
     @classmethod
-    def get_inputs(cls, batch, device, model_name, train_model=True):
+    def get_inputs(cls, batch, device, model_name):
         batch = tuple(t.to(device) for t in batch)
         inputs = {
             "source_ids": batch[0],
@@ -378,17 +378,14 @@ class S2SAbstractiveSummarizer(Transformer):
                 amp.register_half_function(torch, "einsum")
             except ImportError:
                 raise ImportError("Please install apex from https://www.github.com/nvidia/apex")
-
-        # max_steps is mainly used by the scheduler to determine the learning rate,
-        # together with global_step
-        if max_steps == -1:
-            max_steps = max(num_epochs * len(train_dataset) // batch_size, 1)
+        else:
+            amp = None
 
         # get device
         device, num_gpus = get_device(num_gpus=num_gpus, gpu_ids=gpu_ids, local_rank=local_rank)
 
         # move model
-        self.model = move_model_to_device(model)
+        self.model = move_model_to_device(model=self.model, device=device)
 
         # if gpu_ids is not None:
         #     per_node_train_batch_size = per_gpu_batch_size * len(gpu_ids)
@@ -407,6 +404,11 @@ class S2SAbstractiveSummarizer(Transformer):
         batch_size = per_node_train_batch_size * (
             torch.distributed.get_world_size() if local_rank != -1 else 1
         )
+
+        # max_steps is mainly used by the scheduler to determine the learning rate,
+        # together with global_step
+        if max_steps == -1:
+            max_steps = max(num_epochs * len(train_dataset) // batch_size, 1)
 
         # init optimizer and scheduler
         self.optimizer = Transformer.get_default_optimizer(
@@ -448,7 +450,13 @@ class S2SAbstractiveSummarizer(Transformer):
         if recover_step > 0:
             self.scheduler.load_state_dict(checkpoint_state_dict["lr_scheduler"])
 
-        self.model = parallelize_model(self.model, device, num_gpus, gpu_ids, local_rank)
+        self.model = parallelize_model(
+            model=self.model,
+            device=device,
+            num_gpus=num_gpus,
+            gpu_ids=gpu_ids,
+            local_rank=local_rank,
+        )
 
         train_dataset = Seq2seqDatasetForBert(
             features=train_dataset,
@@ -481,15 +489,18 @@ class S2SAbstractiveSummarizer(Transformer):
 
         global_step, _ = super().fine_tune(
             train_dataloader=train_dataloader,
+            device=device,
             num_gpus=num_gpus,
             get_inputs=S2SAbsSumProcessor.get_inputs,
             max_steps=max_steps,
+            global_step=global_step,
             gradient_accumulation_steps=gradient_accumulation_steps,
             optimizer=self.optimizer,
             scheduler=self.scheduler,
             local_rank=local_rank,
             fp16=fp16,
             fp16_opt_level=fp16_opt_level,
+            amp=amp,
             max_grad_norm=max_grad_norm,
             verbose=verbose,
             seed=seed,
@@ -519,11 +530,6 @@ class S2SAbstractiveSummarizer(Transformer):
             raise ValueError("Score trace is only available for beam search with beam size > 1.")
         if max_tgt_length >= self.max_seq_length - 2:
             raise ValueError("Maximum tgt length exceeds max seq length - 2.")
-
-        if num_gpus is None:
-            num_gpus = torch.cuda.device_count()
-
-        batch_size = batch_size * max(1, num_gpus)
 
         if self._model_type == "roberta":
             is_roberta = True
@@ -627,9 +633,15 @@ class S2SAbstractiveSummarizer(Transformer):
         if fp16:
             model.half()
         # get device
-        device, num_gpus = get_device(num_gpus=num_gpus, local_rank=local_rank)
+        device, num_gpus = get_device(num_gpus=num_gpus, gpu_ids=gpu_ids, local_rank=local_rank)
         # move model
-        model = move_model_to_device(model, device, num_gpus, gpu_ids, local_rank)
+        model = move_model_to_device(model=model, device=device)
+
+        batch_size = batch_size * max(1, num_gpus)
+
+        model = parallelize_model(
+            model=model, device=device, num_gpus=num_gpus, gpu_ids=gpu_ids, local_rank=local_rank
+        )
 
         torch.cuda.empty_cache()
         model.eval()

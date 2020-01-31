@@ -112,14 +112,17 @@ class Transformer:
         self,
         train_dataloader,
         get_inputs,
+        device,
         num_gpus=None,
         max_steps=-1,
+        global_step=0,
         max_grad_norm=1.0,
         gradient_accumulation_steps=1,
         optimizer=None,
         scheduler=None,
         fp16=False,
         fp16_opt_level="O1",
+        amp=None,
         local_rank=-1,
         verbose=True,
         seed=None,
@@ -131,7 +134,6 @@ class Transformer:
             Transformer.set_seed(seed, num_gpus > 0)
 
         # init training
-        global_step = 0
         tr_loss = 0.0
         accum_loss = 0
         self.model.train()
@@ -139,9 +141,13 @@ class Transformer:
 
         # train
         start = time.time()
+        # TODO: Is this while necessary???
         while global_step < max_steps:
             epoch_iterator = tqdm(
-                train_dataloader, desc="Iteration", disable=local_rank not in [-1, 0] or not verbose
+                train_dataloader,
+                initial=global_step,
+                desc="Iteration",
+                disable=local_rank not in [-1, 0] or not verbose,
             )
             for step, batch in enumerate(epoch_iterator):
                 inputs = get_inputs(batch, device, self.model_name)
@@ -155,6 +161,7 @@ class Transformer:
 
                 if num_gpus > 1:
                     loss = loss.mean()
+
                 if gradient_accumulation_steps > 1:
                     loss = loss / gradient_accumulation_steps
 
@@ -201,7 +208,8 @@ class Transformer:
                 if global_step > max_steps:
                     epoch_iterator.close()
                     break
-
+        if fp16:
+            self.amp_state_dict = amp.state_dict()
         return global_step, tr_loss / global_step
 
     def predict(self, eval_dataloader, get_inputs, num_gpus, gpu_ids, verbose=True):
