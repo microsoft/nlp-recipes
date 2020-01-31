@@ -84,7 +84,6 @@ def main():
     #shutil.rmtree(args.output_dir)
     os.makedirs(args.output_dir, exist_ok=True)
     os.makedirs(args.cache_dir, exist_ok=True)
-    os.makedirs(args.raw_data_dir, exist_ok=True)
 
     ngpus_per_node = torch.cuda.device_count()
 
@@ -115,10 +114,12 @@ def main_worker(local_rank, ngpus_per_node, summarizer, args):
     MAX_STEPS = 1e3
     # number of steps for warm up
     WARMUP_STEPS = 5e2
-    if not args.quick_run:
+    if args.quick_run.lower() == "false":
         MAX_STEPS = args.max_steps
         WARMUP_STEPS = args.warmup_steps
-
+    
+    print("max steps is {}".format(MAX_STEPS))
+    print("warmup steps is {}".format(WARMUP_STEPS))
     start = time.time()
 
     if rank not in [-1, 0]:
