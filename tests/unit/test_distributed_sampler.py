@@ -1,8 +1,7 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
-#import sys
-#sys.path.insert(0, "../../")
+import pytest
 from utils_nlp.models.transformers.extractive_summarization import IterableDistributedSampler
 
 @pytest.mark.cpu
