@@ -197,7 +197,7 @@ class Transformer:
                         scheduler.step()
                     self.model.zero_grad()
                     if save_every != -1 and global_step % save_every == 0 and verbose:
-                        self.save_model(os.path.join(self.cache_dir, f'{self.model_name}_step_{global_step}.pt'), is_full_name=True)
+                        self.save_model(os.path.join(self.cache_dir, f'{self.model_name}_step_{global_step}.pt'))
                 if global_step > max_steps:
                     epoch_iterator.close()
                     break
@@ -220,16 +220,20 @@ class Transformer:
                 logits = outputs[0]
             yield logits.detach().cpu().numpy()
 
-    def save_model(self, full_name, is_full_name=False):
-        output_model_dir = os.path.join(self.cache_dir, "fine_tuned")
-
-        os.makedirs(self.cache_dir, exist_ok=True)
-        os.makedirs(output_model_dir, exist_ok=True)
-
-        logger.info("Saving model checkpoint to %s", output_model_dir)
+    def save_model(self, full_name=None):
         # Save a trained model, configuration and tokenizer using `save_pretrained()`.
         # They can then be reloaded using `from_pretrained()`
         model_to_save = (
             self.model.module if hasattr(self.model, "module") else self.model
         )  # Take care of distributed/parallel training
-        model_to_save.save_pretrained(output_model_dir)
+
+        if full_name:
+            torch.save(model_to_save.state_dict(), full_name)
+        else:
+            output_model_dir = os.path.join(self.cache_dir, "fine_tuned")
+
+            os.makedirs(self.cache_dir, exist_ok=True)
+            os.makedirs(output_model_dir, exist_ok=True)
+
+            logger.info("Saving model checkpoint to %s", output_model_dir)
+            model_to_save.save_pretrained(output_model_dir)
