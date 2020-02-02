@@ -136,7 +136,7 @@ class S2SAbsSumProcessor:
 
         temp_dir = "./"
         temp_train_file = os.path.join(
-            temp_dir, "train_file_" + datetime.now().strftime("%m%d%Y%H%M%S") + ".json"
+            temp_dir, "train_file_" + datetime.now().strftime("%m%d%Y%H%M%S") + ".jsonl"
         )
         try:
             with jsonlines.open(temp_train_file, mode="w") as writer:
@@ -167,7 +167,7 @@ class S2SAbsSumProcessor:
 
         temp_dir = "./"
         temp_train_file = os.path.join(
-            temp_dir, "train_file_" + datetime.now().strftime("%m%d%Y%H%M%S") + ".json"
+            temp_dir, "train_file_" + datetime.now().strftime("%m%d%Y%H%M%S") + ".jsonl"
         )
         try:
             with jsonlines.open(temp_train_file, mode="w") as writer:
@@ -205,7 +205,13 @@ class S2SAbsSumProcessor:
         return S2SAbsSumDataset(train_features)
 
     def test_dataset_from_iterable_sum_ds():
-        pass
+        input_lines = []
+        for src in sum_ds:
+            example = {"src": src}
+            input_lines.append(self._preprocess_test_src(example))
+
+        input_lines = sorted(list(enumerate(input_lines)), key=lambda x: -len(x[1]))
+        return S2SAbsSumDataset(input_lines)
 
     def test_dataset_from_sum_ds(self, sum_ds):
         input_lines = []
@@ -271,6 +277,17 @@ class S2SConfig:
         self.ffn_type = ffn_type
         self.num_qkv = num_qkv
         self.seg_emb = seg_emb
+
+    def save_to_json(self, json_file):
+        with open(json_file, "w") as f:
+            json.dump(self.__dict__, f)
+
+    @classmethod
+    def load_from_json(cls, json_file):
+        config = cls()
+        with open(json_file, "r") as f:
+            config.__dict__ = json.load(f)
+        return config
 
 
 class S2SAbstractiveSummarizer(Transformer):
