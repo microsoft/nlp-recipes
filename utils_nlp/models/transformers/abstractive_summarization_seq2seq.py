@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT License.
+
 import os
 from datetime import datetime
 import jsonlines
@@ -31,7 +34,7 @@ from s2s_ft.config import BertForSeq2SeqConfig
 import s2s_ft.s2s_loader as seq2seq_loader
 from s2s_ft.modeling_decoding import BertForSeq2SeqDecoder
 
-# ROBERTA and XLM_ROBERTA were converted to BERT format by BertForSequenceToSequence.from_pretrained
+# ROBERTA and XLM_ROBERTA are converted to BERT format by BertForSequenceToSequence.from_pretrained
 MODEL_CLASS = {}
 MODEL_CLASS.update({k: BertForSequenceToSequence for k in BERT_PRETRAINED_MODEL_ARCHIVE_MAP})
 MODEL_CLASS.update({k: BertForSequenceToSequence for k in ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP})
@@ -500,7 +503,7 @@ class S2SAbstractiveSummarizer(Transformer):
     def predict(
         self,
         test_dataset,
-        batch_size=4,
+        per_gpu_batch_size=4,
         max_tgt_length=128,
         beam_size=1,
         need_score_traces=False,
@@ -519,6 +522,7 @@ class S2SAbstractiveSummarizer(Transformer):
         if max_tgt_length >= self.max_seq_length - 2:
             raise ValueError("Maximum tgt length exceeds max seq length - 2.")
 
+        # preprocessing pipeline
         if self._model_type == "roberta":
             is_roberta = True
             no_segment_embedding = True
@@ -567,6 +571,7 @@ class S2SAbstractiveSummarizer(Transformer):
 
             return (batch, buf_id)
 
+        # prepare decoder
         pair_num_relation = 0
         cls_num_labels = 2
         type_vocab_size = (
@@ -578,7 +583,7 @@ class S2SAbstractiveSummarizer(Transformer):
         forbid_ignore_set = None
         if s2s_config.forbid_ignore_word:
             w_list = []
-            for w in args.forbid_ignore_word.split("|"):
+            for w in s2s_config.forbid_ignore_word.split("|"):
                 if w.startswith("[") and w.endswith("]"):
                     w_list.append(w.upper())
                 else:
@@ -625,7 +630,7 @@ class S2SAbstractiveSummarizer(Transformer):
         # move model
         model = move_model_to_device(model=model, device=device)
 
-        batch_size = batch_size * max(1, num_gpus)
+        batch_size = per_gpu_batch_size * max(1, num_gpus)
 
         model = parallelize_model(
             model=model, device=device, num_gpus=num_gpus, gpu_ids=gpu_ids, local_rank=local_rank
@@ -661,8 +666,7 @@ class S2SAbstractiveSummarizer(Transformer):
                     output_ids = traces["pred_seq"]
                 else:
                     output_ids = traces.tolist()
-                print(len(output_ids))
-                print(len(batch[0]))
+
                 for i in range(len(batch[0])):
                     w_ids = output_ids[i]
                     output_buf = self.decode_tokenizer.convert_ids_to_tokens(w_ids)
