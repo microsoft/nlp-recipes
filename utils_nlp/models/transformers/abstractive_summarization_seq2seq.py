@@ -249,12 +249,15 @@ class S2SAbsSumProcessor:
 
 
 class S2SConfig:
+    """This class contains some default decoding settings that the users usually
+       don't need to change.
+       Will add more detailed docstrings for each option.
+    """
+
     def __init__(
         self,
         new_segment_ids=False,
         new_pos_ids=False,
-        forbid_duplicate_ngrams=False,
-        forbid_ignore_word=None,
         min_len=1,
         ngram_size=3,
         mode="s2s",
@@ -268,11 +271,9 @@ class S2SConfig:
     ):
 
         self.new_segment_ids = new_segment_ids
-        self.new_segment_ids = new_pos_ids
-        self.forbid_duplicate_ngrams = forbid_duplicate_ngrams
-        self.forbid_ignore_word = forbid_ignore_word
+        self.new_pos_ids = new_pos_ids
         self.min_len = min_len
-        self.ngram_size = ngram_size
+        self.forbid_ngram_size = forbid_ngram_size
         self.mode = mode
         self.s2s_special_token = s2s_special_token
         self.s2s_add_segment = s2s_add_segment
@@ -508,13 +509,13 @@ class S2SAbstractiveSummarizer(Transformer):
         beam_size=1,
         need_score_traces=False,
         length_penalty=0,
+        forbid_duplicate_ngrams=True,
+        forbid_ignore_word=".",
         s2s_config=S2SConfig(),
         num_gpus=None,
         gpu_ids=None,
         local_rank=-1,
         fp16=False,
-        amp=False,
-        seed=None,
         verbose=True,
     ):
         if need_score_traces and beam_size <= 1:
@@ -581,9 +582,9 @@ class S2SAbstractiveSummarizer(Transformer):
             [mask_token, sep_token, sep_token]
         )
         forbid_ignore_set = None
-        if s2s_config.forbid_ignore_word:
+        if forbid_ignore_word:
             w_list = []
-            for w in s2s_config.forbid_ignore_word.split("|"):
+            for w in forbid_ignore_word.split("|"):
                 if w.startswith("[") and w.endswith("]"):
                     w_list.append(w.upper())
                 else:
@@ -607,9 +608,9 @@ class S2SAbstractiveSummarizer(Transformer):
             length_penalty=length_penalty,
             eos_id=eos_word_ids,
             sos_id=sos_word_id,
-            forbid_duplicate_ngrams=s2s_config.forbid_duplicate_ngrams,
+            forbid_duplicate_ngrams=forbid_duplicate_ngrams,
             forbid_ignore_set=forbid_ignore_set,
-            ngram_size=s2s_config.ngram_size,
+            ngram_size=s2s_config.forbid_ngram_size,
             min_len=s2s_config.min_len,
             mode=s2s_config.mode,
             max_position_embeddings=self.max_seq_length,
