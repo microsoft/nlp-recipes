@@ -143,3 +143,21 @@ def compute_training_steps(dataloader, num_epochs=1, max_steps=-1, gradient_accu
     if max_steps <= 0:
         raise Exception("Max steps cannot be determined.")
     return max_steps
+
+
+def get_amp(fp16):
+    # Before we do anything with models, we want to ensure that we get fp16 execution
+    # of torch.einsum if args.fp16 is set. Otherwise it'll default to "promote" mode,
+    # and we'll get fp32 operations. Note that running `--fp16_opt_level="O2"` will
+    # remove the need for this code, but it is still valid.
+    if fp16:
+        try:
+            from apex import amp
+
+            amp.register_half_function(torch, "einsum")
+        except ImportError:
+            raise ImportError("Please install apex from https://www.github.com/nvidia/apex")
+    else:
+        amp = None
+
+    return amp

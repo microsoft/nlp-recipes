@@ -12,11 +12,10 @@ from transformers import BertTokenizer, RobertaTokenizer
 from transformers.modeling_roberta import ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP
 from transformers.modeling_bert import BERT_PRETRAINED_MODEL_ARCHIVE_MAP
 from transformers.modeling_xlm_roberta import XLM_ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP
-from transformers import RobertaConfig, BertConfig, DistilBertConfig, XLMRobertaConfig
+from transformers import RobertaConfig, BertConfig, XLMRobertaConfig
 from transformers import (
     BERT_PRETRAINED_CONFIG_ARCHIVE_MAP,
     ROBERTA_PRETRAINED_CONFIG_ARCHIVE_MAP,
-    DISTILBERT_PRETRAINED_CONFIG_ARCHIVE_MAP,
     XLM_ROBERTA_PRETRAINED_CONFIG_ARCHIVE_MAP,
 )
 
@@ -32,18 +31,19 @@ from s2s_ft.config import BertForSeq2SeqConfig
 import s2s_ft.s2s_loader as seq2seq_loader
 from s2s_ft.modeling_decoding import BertForSeq2SeqDecoder
 
+# ROBERTA and XLM_ROBERTA were converted to BERT format by BertForSequenceToSequence.from_pretrained
 MODEL_CLASS = {}
 MODEL_CLASS.update({k: BertForSequenceToSequence for k in BERT_PRETRAINED_MODEL_ARCHIVE_MAP})
 MODEL_CLASS.update({k: BertForSequenceToSequence for k in ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP})
 MODEL_CLASS.update({k: BertForSequenceToSequence for k in XLM_ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP})
 MODEL_CLASS.update({k: BertForSequenceToSequence for k in UNILM_PRETRAINED_MODEL_ARCHIVE_MAP})
 
+
 TOKENIZER_CLASS.update({k: UnilmTokenizer for k in UNILM_PRETRAINED_CONFIG_ARCHIVE_MAP})
 
 CONFIG_CLASS = {}
 CONFIG_CLASS.update({k: BertConfig for k in BERT_PRETRAINED_CONFIG_ARCHIVE_MAP})
 CONFIG_CLASS.update({k: RobertaConfig for k in ROBERTA_PRETRAINED_CONFIG_ARCHIVE_MAP})
-CONFIG_CLASS.update({k: DistilBertConfig for k in DISTILBERT_PRETRAINED_CONFIG_ARCHIVE_MAP})
 CONFIG_CLASS.update({k: XLMRobertaConfig for k in XLM_ROBERTA_PRETRAINED_CONFIG_ARCHIVE_MAP})
 CONFIG_CLASS.update({k: UnilmConfig for k in UNILM_PRETRAINED_CONFIG_ARCHIVE_MAP})
 
@@ -57,6 +57,7 @@ def _get_model_type(model_name):
         return model_name.split("-")[0]
 
 
+# TODO: check with MSRA about this part
 def _get_decode_tokenizer(model_type, bert_model_name, to_lower, max_seq_len):
     if model_type == "roberta":
         decode_tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
@@ -300,8 +301,6 @@ class S2SAbstractiveSummarizer(Transformer):
         model_file_name=None,
         label_smoothing=0.1,
         max_seq_len=512,
-        *model_args,
-        **kwargs
     ):
 
         if model_name not in self.list_supported_models():
@@ -326,14 +325,24 @@ class S2SAbstractiveSummarizer(Transformer):
         if load_model_from_dir is None:
             model_to_load = self._model_name
         elif model_file_name is None:
+            # Assume model was saved by `:func:`~transformers.PreTrainedModel.save_pretrained``,
+            # The load_model_from_dir should contain pytorch_model.bin and config.json
+            # and can be loaded by `:func:`~transformers.PreTrainedModel.from_pretrained``.
             logger.info("Loading cached model from {}".format(load_model_from_dir))
             model_to_load = load_model_from_dir
         else:
+            # Assume model was saved by S2SAbstractiveSummarizer.save_model
             model_to_load = os.path.join(load_model_from_dir, model_file_name)
             logger.info("Loading cached model from {}".format(model_to_load))
 
         # TODO: double check
-        model_config = config_class.from_pretrained(self._model_name, cache_dir=cache_dir)
+        if load_model_from_dir is not None and model_file_name is None:
+            # Assume config.json is in load_model_from_dir
+            model_config = config_class.from_pretrained(load_model_from_dir, cache_dir=cache_dir)
+        else:
+            model_config = config_class.from_pretrained(self._model_name, cache_dir=cache_dir)
+
+        # Convert regular model config to sequence to sequence config
         config = BertForSeq2SeqConfig.from_exist_config(
             config=model_config, label_smoothing=label_smoothing
         )
@@ -384,34 +393,33 @@ class S2SAbstractiveSummarizer(Transformer):
         random_prob=0.1,
         keep_prob=0.1,
     ):
-        # Before we do anything with models, we want to ensure that we get fp16 execution
-        # of torch.einsum if args.fp16 is set. Otherwise it'll default to "promote" mode,
-        # and we'll get fp32 operations. Note that running `--fp16_opt_level="O2"` will
-        # remove the need for this code, but it is still valid.
-        if fp16:
-            try:
-                from apex import amp
+        global_step = 0
+        if recover_step > 0:
+            model_recover_checkpoint = os.path.join(
+                self.load_model_from_dir, "model.{}.bin".format(recover_step)
+            )
+            logger.info(" ** Recover model checkpoint in %s ** ", model_recover_checkpoint)
+            model_state_dict = torch.load(model_recover_checkpoint, map_location="cpu")
+            optimizer_recover_checkpoint = os.path.join(
+                args.output_dir, "optim.{}.bin".format(recover_step)
+            )
+            checkpoint_state_dict = torch.load(optimizer_recover_checkpoint, map_location="cpu")
 
-                amp.register_half_function(torch, "einsum")
-            except ImportError:
-                raise ImportError("Please install apex from https://www.github.com/nvidia/apex")
+            checkpoint_state_dict["model"] = model_state_dict
+            global_step = recover_step
         else:
-            amp = None
+            checkpoint_state_dict = None
 
-        # get device
-        device, num_gpus = get_device(num_gpus=num_gpus, gpu_ids=gpu_ids, local_rank=local_rank)
-
-        # move model
-        self.model = move_model_to_device(model=self.model, device=device)
-
-        # if gpu_ids is not None:
-        #     per_node_train_batch_size = per_gpu_batch_size * len(gpu_ids)
-        # elif num_gpus is not None and torch.cuda.is_available():
-        #     per_node_train_batch_size = per_gpu_batch_size * min(
-        #         num_gpus, torch.cuda.device_count())
-        # else:
-        #     per_node_train_batch_size = per_gpu_batch_size * max(1, torch.cuda.device_count())
-        # per_node_train_batch_size = per_node_train_batch_size * gradient_accumulation_steps
+        device, num_gpus, amp = self.prepare_model_and_optimizer(
+            num_gpus=num_gpus,
+            gpu_ids=gpu_ids,
+            local_rank=local_rank,
+            fp16=fp16,
+            weight_decay=weight_decay,
+            learning_rate=learning_rate,
+            adam_epsilon=adam_epsilon,
+            checkpoint_state_dict=checkpoint_state_dict,
+        )
 
         per_node_train_batch_size = (
             per_gpu_batch_size * max(1, num_gpus) * gradient_accumulation_steps
@@ -427,53 +435,16 @@ class S2SAbstractiveSummarizer(Transformer):
         if max_steps == -1:
             max_steps = max(num_epochs * len(train_dataset) // batch_size, 1)
 
-        # init optimizer and scheduler
-        self.optimizer = Transformer.get_default_optimizer(
-            self.model, weight_decay, learning_rate, adam_epsilon
-        )
-
-        if fp16:
-            self.model, self.optimizer = amp.initialize(
-                self.model, self.optimizer, opt_level=fp16_opt_level
-            )
-
-        global_step = 0
-        if recover_step > 0:
-            model_recover_checkpoint = os.path.join(
-                self.load_model_from_dir, "model.{}.bin".format(recover_step)
-            )
-            logger.info(" ** Recover model checkpoint in %s ** ", model_recover_checkpoint)
-            model_state_dict = torch.load(model_recover_checkpoint, map_location="cpu")
-            optimizer_recover_checkpoint = os.path.join(
-                args.output_dir, "optim.{}.bin".format(recover_step)
-            )
-            checkpoint_state_dict = torch.load(optimizer_recover_checkpoint, map_location="cpu")
-
-            self.optimizer.load_state_dict(checkpoint_state_dict["optimizer"])
-            self.model.load_state_dict(model_state_dict)
-
-            if fp16:
-                amp.load_state_dict(checkpoint_state_dict["amp"])
-
-            global_step = recover_step
-
         if max_steps <= global_step:
             logger.info("Training is done. Please use a new dir or clean this dir!")
+
+            return
 
         self.scheduler = Transformer.get_default_scheduler(
             optimizer=self.optimizer, warmup_steps=warmup_steps, num_training_steps=max_steps
         )
-
         if recover_step > 0:
             self.scheduler.load_state_dict(checkpoint_state_dict["lr_scheduler"])
-
-        self.model = parallelize_model(
-            model=self.model,
-            device=device,
-            num_gpus=num_gpus,
-            gpu_ids=gpu_ids,
-            local_rank=local_rank,
-        )
 
         train_dataset = Seq2seqDatasetForBert(
             features=train_dataset,

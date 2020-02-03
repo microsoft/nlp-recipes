@@ -22,7 +22,12 @@ from transformers.tokenization_distilbert import DistilBertTokenizer
 from transformers.tokenization_roberta import RobertaTokenizer
 from transformers.tokenization_xlnet import XLNetTokenizer
 
-from utils_nlp.common.pytorch_utils import get_device, move_model_to_device
+from utils_nlp.common.pytorch_utils import (
+    get_device,
+    move_model_to_device,
+    get_amp,
+    parallelize_model,
+)
 
 TOKENIZER_CLASS = {}
 TOKENIZER_CLASS.update({k: BertTokenizer for k in BERT_PRETRAINED_MODEL_ARCHIVE_MAP})
@@ -107,6 +112,64 @@ class Transformer:
             optimizer, num_warmup_steps=warmup_steps, num_training_steps=num_training_steps
         )
         return scheduler
+
+    def prepare_model_and_optimizer(
+        self,
+        num_gpus,
+        gpu_ids,
+        local_rank,
+        fp16,
+        weight_decay,
+        learning_rate,
+        adam_epsilon,
+        checkpoint_state_dict=None,
+    ):
+
+        ## Correct order of doing things
+        # 1. Move model to device
+        # 2. Create optimizer (must be done after moving model to device)
+        # 3. Initialize amp (must be done after creating optimizer because it requires
+        #    the optimizer as an input)
+        # 4. Parallelize model (must be done after initializing amp)
+        # This function can be used by most child classes as it is before calling fine_tune
+        # Child classes that require custom optimizer can not use this function, but can use
+        # the order of the operations in this function as a reference. This is also why this
+        # function can not be merged with fine_tune
+
+        amp = get_amp(fp16)
+
+        # get device
+        device, num_gpus = get_device(num_gpus=num_gpus, gpu_ids=gpu_ids, local_rank=local_rank)
+
+        # move model
+        self.model = move_model_to_device(model=self.model, device=device)
+
+        # init optimizer and scheduler
+        self.optimizer = Transformer.get_default_optimizer(
+            self.model, weight_decay, learning_rate, adam_epsilon
+        )
+
+        if fp16:
+            self.model, self.optimizer = amp.initialize(
+                self.model, self.optimizer, opt_level=fp16_opt_level
+            )
+
+        if checkpoint_state_dict:
+            self.optimizer.load_state_dict(checkpoint_state_dict["optimizer"])
+            self.model.load_state_dict(checkpoint_state_dict["model"])
+
+            if fp16:
+                amp.load_state_dict(checkpoint_state_dict["amp"])
+
+        self.model = parallelize_model(
+            model=self.model,
+            device=device,
+            num_gpus=num_gpus,
+            gpu_ids=gpu_ids,
+            local_rank=local_rank,
+        )
+
+        return device, num_gpus, amp
 
     def fine_tune(
         self,
