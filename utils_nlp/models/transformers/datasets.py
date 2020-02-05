@@ -240,6 +240,8 @@ def _preprocess(param):
     sentences, preprocess_pipeline, word_tokenize = param
     for function in preprocess_pipeline:
         sentences = function(sentences)
+    if not word_tokenize:
+        return [sentences]
     return [word_tokenize(sentence) for sentence in sentences]
 
 
@@ -300,5 +302,18 @@ class SummarizationDataset(IterableDataset):
         for x in self._source:
             yield x
 
+    def get_source(self):
+        return self._source
+
     def get_target(self):
         return self._target
+    
+from torch.utils.data import Dataset
+class SummarizationNonIterableDataset(Dataset):
+    def __init__(self, source, target=None):
+        self.source = source
+        self.target = target
+    def __len__(self):
+        return len(self.source)
+    def __getitem__(self, idx):
+        return self.source[idx], self.target[idx]

@@ -58,7 +58,7 @@ def CNNDMSummarizationDataset(*args, **kwargs):
     URLS = ["https://s3.amazonaws.com/opennmt-models/Summary/cnndm.tar.gz"]
     
 
-    def _setup_datasets(url, top_n=-1, local_cache_path=".data"):
+    def _setup_datasets(url, top_n=-1, local_cache_path=".data", tokenize_sentence=True):
         FILE_NAME = "cnndm.tar.gz"
         maybe_download(url, FILE_NAME, local_cache_path)
         dataset_tar = os.path.join(local_cache_path, FILE_NAME)
@@ -79,7 +79,7 @@ def CNNDMSummarizationDataset(*args, **kwargs):
                 train_target_file,
                 [_clean, tokenize.sent_tokenize],
                 [_clean, _remove_ttags, _target_sentence_tokenization],
-                nltk.word_tokenize,
+                nltk.word_tokenize if tokenize_sentence else None,
                 top_n,
             ),
             SummarizationDataset(
@@ -87,7 +87,7 @@ def CNNDMSummarizationDataset(*args, **kwargs):
                 test_target_file,
                 [_clean, tokenize.sent_tokenize],
                 [_clean, _remove_ttags, _target_sentence_tokenization],
-                nltk.word_tokenize,
+                nltk.word_tokenize if tokenize_sentence else None,
                 top_n,
             ),
         )

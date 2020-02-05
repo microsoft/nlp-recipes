@@ -118,6 +118,7 @@ class Transformer:
         seed=None,
         report_every=10,
         clip_grad_norm=True,
+        loss_function=None,
     ):
 
         # get device
@@ -146,12 +147,18 @@ class Transformer:
         # train
         start = time.time()
         while global_step < max_steps:
-            epoch_iterator = tqdm(train_dataloader, desc="Iteration", disable=local_rank not in [-1, 0] or not verbose)
+            epoch_iterator = tqdm(train_dataloader, desc="Iteration", disable=local_rank not in [-1, 0] or  verbose)
             for step, batch in enumerate(epoch_iterator):
                 inputs = get_inputs(batch, device, self.model_name)
                 outputs = self.model(**inputs)
-                loss = outputs[0]
-
+                
+                
+                if loss_function:
+                    # check if backward is already done by loss_function
+                    loss = loss_function(batch, outputs)
+                else:
+                    loss = outputs[0]
+                    
                 if num_gpus > 1:
                     loss = loss.mean()
                 if gradient_accumulation_steps > 1:
@@ -167,6 +174,7 @@ class Transformer:
                 accum_loss += loss.item()
 
                 if (step + 1) % gradient_accumulation_steps == 0:
+                    
                     global_step += 1
 
                     if clip_grad_norm:
@@ -184,8 +192,11 @@ class Transformer:
                         )
                         accum_loss = 0
                         start = end
-
-                    optimizer.step()
+                    if type(optimizer)==list:
+                        for o in optimizer:
+                            o.step()
+                    else:
+                        optimizer.step()
                     if scheduler:
                         scheduler.step()
                     self.model.zero_grad()
@@ -193,6 +204,8 @@ class Transformer:
                 if global_step > max_steps:
                     epoch_iterator.close()
                     break
+                #del batch
+                #torch.cuda.empty_cache()
 
         return global_step, tr_loss / global_step
 
