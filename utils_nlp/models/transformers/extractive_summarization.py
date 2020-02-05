@@ -17,8 +17,8 @@ from torch.utils.data import DataLoader, Dataset, IterableDataset, SequentialSam
 # from torch.utils.data.distributed import DistributedSampler
 from transformers import BertModel, DistilBertModel
 
-from bertsum.models import data_loader, model_builder
-from bertsum.models.data_loader import Batch,DataIterator
+from bertsum.models import model_builder
+from bertsum.models.data_loader import Batch, DataIterator
 from bertsum.models.model_builder import Summarizer
 from utils_nlp.common.pytorch_utils import compute_training_steps, get_device
 from utils_nlp.dataset.sentence_selection import combination_selection, greedy_selection
@@ -28,15 +28,17 @@ MODEL_CLASS = {"bert-base-uncased": BertModel, "distilbert-base-uncased": Distil
 
 logger = logging.getLogger(__name__)
 
+
 # https://pytorch.org/docs/1.1.0/_modules/torch/utils/data/dataloader.html
 class IterableDistributedSampler(object):
     """ Distributed sampler for iterable dataset.
 
     Args:
         world_size (int): Total number of GPUs that will be used. Defaults to 1.
-        rank (int): Rank of the current GPU. Defaults to 1.
-        
+        rank (int): Rank of the current GPU. Defaults to -1.
+
     """
+
     def __init__(self, world_size=1, rank=-1):
         self.world_size = world_size
         self.rank = rank
@@ -46,6 +48,7 @@ class IterableDistributedSampler(object):
             return itertools.islice(iterable, self.rank, None, self.world_size)
         else:
             return iterable
+
 
 class ChunkDataLoader(object):
     """ Data Loader for Chunked Dataset.
@@ -58,8 +61,8 @@ class ChunkDataLoader(object):
         sampler (obj): Data sampler.
 
     """
-    def __init__(self, datasets,  batch_size,
-                 shuffle, is_labeled, sampler):
+
+    def __init__(self, datasets, batch_size, shuffle, is_labeled, sampler):
         self.datasets = datasets
         self.batch_size = batch_size
         self.shuffle = shuffle
@@ -67,7 +70,6 @@ class ChunkDataLoader(object):
         self.cur_iter = self._next_dataset_iterator(datasets)
         assert self.cur_iter is not None
         self.sampler = sampler
-
 
     def eachiter(self):
         dataset_iter = (d for d in self.datasets)
@@ -78,7 +80,6 @@ class ChunkDataLoader(object):
 
     def __iter__(self):
         return self.sampler.iter(self.eachiter())
-
 
     def _next_dataset_iterator(self, dataset_iter):
         try:
@@ -94,8 +95,11 @@ class ChunkDataLoader(object):
             return None
 
         return DataIterator(
-            dataset=self.cur_dataset,  batch_size=self.batch_size,
-            shuffle=self.shuffle, is_labeled=self.is_labeled)
+            dataset=self.cur_dataset,
+            batch_size=self.batch_size,
+            shuffle=self.shuffle,
+            is_labeled=self.is_labeled,
+        )
 
 
 class Bunch(object):
@@ -105,7 +109,9 @@ class Bunch(object):
         self.__dict__.update(adict)
 
 
-def get_dataloader(data_iter, shuffle=True, is_labeled=False, batch_size=3000, world_size=1, rank=1):
+def get_dataloader(
+    data_iter, shuffle=True, is_labeled=False, batch_size=3000, world_size=1, rank=-1
+):
     """
     Function to get data iterator over a list of data objects.
 
@@ -116,15 +122,15 @@ def get_dataloader(data_iter, shuffle=True, is_labeled=False, batch_size=3000, w
                             Defaults to False.
         batch_size (int): Number of tokens per batch. Defaults to 3000.
         world_size (int): Total number of GPUs that will be used. Defaults to 1.
-        rank (int): Rank of the current GPU. Defaults to 1.
+        rank (int): Rank of the current GPU. Defaults to -1.
 
     Returns:
         DataIterator
     """
     sampler = IterableDistributedSampler(world_size, rank)
-    #return data_loader.Dataloader(data_iter, batch_size, shuffle=shuffle, is_labeled=is_labeled, sampler=sampler)
-    return ChunkDataLoader(data_iter, batch_size, shuffle=shuffle, is_labeled=is_labeled, sampler=sampler)
-
+    return ChunkDataLoader(
+        data_iter, batch_size, shuffle=shuffle, is_labeled=is_labeled, sampler=sampler
+    )
 
 
 def get_dataset(file):
@@ -153,7 +159,9 @@ class ExtSumProcessedIterableDataset(IterableDataset):
         if self.is_shuffle:
             return itertools.chain.from_iterable(map(get_dataset, itertools.cycle(self.file_list)))
         else:
-            return itertools.chain.from_iterable(map(get_dataset, itertools.cycle(random.shuffle(self.file_list))))
+            return itertools.chain.from_iterable(
+                map(get_dataset, itertools.cycle(random.shuffle(self.file_list)))
+            )
 
     def __iter__(self):
         return self.get_stream()
@@ -186,7 +194,9 @@ class ExtSumProcessedDataset(Dataset):
         return self.data[idx]
 
 
-def get_pred(example, sent_scores, cal_lead=False, sentence_separator="<q>", block_trigram=True, top_n=3):
+def get_pred(
+    example, sent_scores, cal_lead=False, sentence_separator="<q>", block_trigram=True, top_n=3
+):
     """
         Get the summarization prediction for the paragraph example based on the scores
         returned by the transformer summarization model.
@@ -299,7 +309,9 @@ class ExtSumProcessedData:
     def _get_files(self, root):
         train_files = []
         test_files = []
-        files = [os.path.join(root, f) for f in os.listdir(root) if os.path.isfile(os.path.join(root, f))]
+        files = [
+            os.path.join(root, f) for f in os.listdir(root) if os.path.isfile(os.path.join(root, f))
+        ]
         for fname in files:
             if fname.find("train") != -1:
                 train_files.append(fname)
@@ -560,7 +572,9 @@ class ExtractiveSummarizer(Transformer):
             cache_dir (str, optional): Directory to cache the tokenizer. Defaults to ".".
         """
 
-        super().__init__(model_class=MODEL_CLASS, model_name=model_name, num_labels=0, cache_dir=cache_dir)
+        super().__init__(
+            model_class=MODEL_CLASS, model_name=model_name, num_labels=0, cache_dir=cache_dir
+        )
         if model_name not in self.list_supported_models():
             raise ValueError(
                 "Model name {} is not supported by ExtractiveSummarizer. "
@@ -660,11 +674,19 @@ class ExtractiveSummarizer(Transformer):
         )
 
         # batch_size is the number of tokens in a batch
-        train_dataloader = get_dataloader(train_dataset.get_stream(), is_labeled=True, batch_size=batch_size, world_size=world_size, rank=local_rank)
+        train_dataloader = get_dataloader(
+            train_dataset.get_stream(),
+            is_labeled=True,
+            batch_size=batch_size,
+            world_size=world_size,
+            rank=local_rank,
+        )
 
         # compute the max number of training steps
         max_steps = compute_training_steps(
-            train_dataloader, max_steps=max_steps, gradient_accumulation_steps=gradient_accumulation_steps,
+            train_dataloader,
+            max_steps=max_steps,
+            gradient_accumulation_steps=gradient_accumulation_steps,
         )
 
         super().fine_tune(
@@ -739,7 +761,9 @@ class ExtractiveSummarizer(Transformer):
             }
 
         test_sampler = SequentialSampler(test_dataset)
-        test_dataloader = DataLoader(test_dataset, sampler=test_sampler, batch_size=batch_size, collate_fn=collate_fn)
+        test_dataloader = DataLoader(
+            test_dataset, sampler=test_sampler, batch_size=batch_size, collate_fn=collate_fn
+        )
         sent_scores = self.predict_scores(test_dataloader, num_gpus=num_gpus, gpu_ids=gpu_ids)
         sent_scores_list = list(sent_scores)
         scores_list = []
@@ -789,19 +813,25 @@ class ExtractiveSummarizer(Transformer):
         )
         return preds
 
-    def save_model(self, name, is_full_name=False):
-        if is_full_name:
-            ## make sure that the path exists
-            full_name = name
-        else:
+    def save_model(self, full_name=None):
+        """
+        save the trained model.
+
+        Args:
+            full_name (str, optional): File name to save the model's `state_dict()`. If it's None,
+                the model is going to be saved under "fine_tuned" folder of the cached directory
+                of the object. Defaults to None.
+        """
+        model_to_save = (
+            self.model.module if hasattr(self.model, "module") else self.model
+        )  # Take care of distributed/parallel training
+
+        if full_name is None:
             output_model_dir = os.path.join(self.cache_dir, "fine_tuned")
             os.makedirs(self.cache_dir, exist_ok=True)
             os.makedirs(output_model_dir, exist_ok=True)
             full_name = os.path.join(output_model_dir, name)
 
-        model_to_save = (
-            self.model.module if hasattr(self.model, "module") else self.model
-        )  # Take care of distributed/parallel training
         logger.info("Saving model checkpoint to %s", full_name)
         try:
             print("saving through pytorch")
@@ -810,8 +840,7 @@ class ExtractiveSummarizer(Transformer):
             try:
                 print("saving as pickle")
                 pickle.dump(model_to_save.state_dict(), open(full_name, "wb"))
-            except:
+            except Exception:
                 raise
-        except:
+        except Exception:
             raise
-       
