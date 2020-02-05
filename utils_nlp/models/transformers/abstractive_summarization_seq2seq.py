@@ -38,7 +38,6 @@ from s2s_ft.modeling_decoding import BertForSeq2SeqDecoder
 MODEL_CLASS = {}
 MODEL_CLASS.update({k: BertForSequenceToSequence for k in BERT_PRETRAINED_MODEL_ARCHIVE_MAP})
 MODEL_CLASS.update({k: BertForSequenceToSequence for k in ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP})
-MODEL_CLASS.update({k: BertForSequenceToSequence for k in XLM_ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP})
 MODEL_CLASS.update({k: BertForSequenceToSequence for k in UNILM_PRETRAINED_MODEL_ARCHIVE_MAP})
 
 
@@ -47,8 +46,13 @@ TOKENIZER_CLASS.update({k: UnilmTokenizer for k in UNILM_PRETRAINED_CONFIG_ARCHI
 CONFIG_CLASS = {}
 CONFIG_CLASS.update({k: BertConfig for k in BERT_PRETRAINED_CONFIG_ARCHIVE_MAP})
 CONFIG_CLASS.update({k: RobertaConfig for k in ROBERTA_PRETRAINED_CONFIG_ARCHIVE_MAP})
-CONFIG_CLASS.update({k: XLMRobertaConfig for k in XLM_ROBERTA_PRETRAINED_CONFIG_ARCHIVE_MAP})
 CONFIG_CLASS.update({k: UnilmConfig for k in UNILM_PRETRAINED_CONFIG_ARCHIVE_MAP})
+
+# XLM_ROBERTA is for multilingual and is WIP in s2s-ft. 
+# We can add it when it's finished and validated
+# MODEL_CLASS.update({k: BertForSequenceToSequence for k in XLM_ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP})
+# CONFIG_CLASS.update({k: XLMRobertaConfig for k in XLM_ROBERTA_PRETRAINED_CONFIG_ARCHIVE_MAP})
+
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +64,8 @@ def _get_model_type(model_name):
         return model_name.split("-")[0]
 
 
-# TODO: check with MSRA about this part
+# TODO: Remove this after verifyingthe same tokenizer can be used for fine-tuning
+# and decoding
 def _get_decode_tokenizer(model_type, bert_model_name, to_lower, max_seq_len):
     if model_type == "roberta":
         decode_tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
@@ -112,12 +117,16 @@ class S2SAbsSumProcessor:
         self._bert_model_name = self._model_name.replace("unilm", "bert")
         self._model_type = _get_model_type(self._model_name)
 
-        self.decode_tokenizer = _get_decode_tokenizer(
-            model_type=self._model_type,
-            bert_model_name=self._bert_model_name,
-            to_lower=to_lower,
-            max_seq_len=max_seq_len,
-        )
+        # TODO: Remove this after verifyingthe same tokenizer can be used for fine-tuning
+        # and decoding
+        # self.decode_tokenizer = _get_decode_tokenizer(
+        #     model_type=self._model_type,
+        #     bert_model_name=self._bert_model_name,
+        #     to_lower=to_lower,
+        #     max_seq_len=max_seq_len,
+        # )
+
+        self.decode_tokenizer = self.tokenizer
 
     @classmethod
     def get_inputs(cls, batch, device, model_name):
@@ -273,7 +282,7 @@ class S2SConfig:
         self.new_segment_ids = new_segment_ids
         self.new_pos_ids = new_pos_ids
         self.min_len = min_len
-        self.forbid_ngram_size = forbid_ngram_size
+        self.forbid_ngram_size = ngram_size
         self.mode = mode
         self.s2s_special_token = s2s_special_token
         self.s2s_add_segment = s2s_add_segment
@@ -360,12 +369,17 @@ class S2SAbstractiveSummarizer(Transformer):
             self._model_name, do_lower_case=to_lower, cache_dir=cache_dir, output_loading_info=False
         )
 
-        self.decode_tokenizer = _get_decode_tokenizer(
-            model_type=self._model_type,
-            bert_model_name=self._bert_model_name,
-            to_lower=to_lower,
-            max_seq_len=max_seq_len,
-        )
+        # TODO: Remove this after verifyingthe same tokenizer can be used for fine-tuning
+        # and decoding
+        # self.decode_tokenizer = _get_decode_tokenizer(
+        #     model_type=self._model_type,
+        #     bert_model_name=self._bert_model_name,
+        #     to_lower=to_lower,
+        #     max_seq_len=max_seq_len,
+        # )
+
+        self.decode_tokenizer = self.tokenizer
+
 
     @staticmethod
     def list_supported_models():
@@ -598,6 +612,7 @@ class S2SAbstractiveSummarizer(Transformer):
 
         model = BertForSeq2SeqDecoder.from_pretrained(
             self._bert_model_name,
+            # self.model_name,
             state_dict=state_dict,
             num_labels=cls_num_labels,
             num_rel=pair_num_relation,
