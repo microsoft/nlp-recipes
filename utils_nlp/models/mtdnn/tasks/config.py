@@ -608,7 +608,7 @@ class MTDNNTaskConfig:
     #     logger.info("Configuration saved in {}".format(output_config_file))
 
 
-class TaskDefs:
+class MTDNNTaskDefs:
     """Definition of single or multiple tasks to train. Can take a single task name or a definition yaml or json file
         
         Arguments:

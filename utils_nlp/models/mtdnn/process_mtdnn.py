@@ -21,16 +21,17 @@ from utils_nlp.models.mtdnn.dataset_mtdnn import (
     MTDNNSingleTaskDataset,
 )
 from utils_nlp.models.mtdnn.modeling_mtdnn import MTDNNModel
-from utils_nlp.models.mtdnn.tasks.config import TaskDefs
+from utils_nlp.models.mtdnn.tasks.config import MTDNNTaskDefs
 
-logger = logging.getLogger(__name__)
+
+logger = MTDNNCommonUtils.setup_logging()
 
 
 class MTDNNDataProcess:
     def __init__(
         self,
         config: MTDNNConfig,
-        task_defs: TaskDefs,
+        task_defs: MTDNNTaskDefs,
         batch_size: int,
         data_dir: str = "data/canonical_data/bert_uncased_lower",
         train_datasets_list: list = ["mnli"],
@@ -79,8 +80,12 @@ class MTDNNDataProcess:
             prefix = dataset.split("_")[0]
             if prefix in self.tasks:
                 continue
-            assert prefix in self.task_defs.n_class_map
-            assert prefix in self.task_defs.data_type_map
+            assert (
+                prefix in self.task_defs.n_class_map
+            ), f"[ERROR] - {prefix} does not exist in {self.task_defs.n_class_map}"
+            assert (
+                prefix in self.task_defs.data_type_map
+            ), f"[ERROR] - {prefix} does not exist in {self.task_defs.data_type_map}"
             data_type = self.task_defs.data_type_map[prefix]
             nclass = self.task_defs.n_class_map[prefix]
             task_id = len(self.tasks)
@@ -118,6 +123,7 @@ class MTDNNDataProcess:
             self.dropout_list.append(dropout_p)
 
             train_path = os.path.join(self.data_dir, f"{dataset}_train.json")
+            assert os.path.exists(train_path), f"[ERROR] - Training dataset does not exist"
             logger.info(f"Loading {train_path} as task {task_id}")
             train_data_set = MTDNNSingleTaskDataset(
                 train_path,
@@ -174,6 +180,7 @@ class MTDNNDataProcess:
             data_type = self.task_defs.data_type_map[prefix]
 
             dev_path = os.path.join(self.data_dir, f"{dataset}_dev.json")
+            assert os.path.exists(dev_path), f"[ERROR] - Dev dataset does not exist: {dev_path}"
             dev_data = None
             if os.path.exists(dev_path):
                 dev_data_set = MTDNNSingleTaskDataset(
@@ -257,7 +264,7 @@ class MTDNNPipelineProcess:
         self,
         model: MTDNNModel,
         config: MTDNNConfig,
-        task_defs: TaskDefs,
+        task_defs: TMTDNNTaskDefsaskDefs,
         multitask_train_dataloader: DataLoader,
         dev_dataloaders_list: list,  # list of dataloaders
         test_dataloaders_list: list,  # list of dataloaders
@@ -286,25 +293,18 @@ class MTDNNPipelineProcess:
         logger.info(f"Total number of params: {self.model.total_param}")
         for epoch in range(epochs):
             logger.info(f"At epoch {epoch}")
-            start = datetime.now()
+            logger.info(f"Amount of data to go over: {len(self.multitask_train_dataloader)}")
 
-            print(f"Length to go over: {len(self.multitask_train_dataloader)}")
+            start = datetime.now()
             # Create batches and train
             for idx, (batch_meta, batch_data) in enumerate(self.multitask_train_dataloader):
-                # print(f"Inside training loop idx: {idx} - Meta: {batch_meta} - Data: {batch_data}")
-                logger.info(
-                    f"Before calling patch_data\n Training batch: {idx}. \t\tBatch Metadata: {batch_meta}. \t\tBatch Data: {batch_data}"
-                )
+
                 batch_meta, batch_data = MTDNNCollater.patch_data(
                     self.config.cuda, batch_meta, batch_data
                 )
-                logger.info(
-                    f"After calling patch_data\nTraining batch: {idx}.\t\tBatch Metadata: {batch_meta}. \t\tBatch Data: {batch_data}"
-                )
+
                 task_id = batch_meta["task_id"]
-                # print(f"Before calling model.update with batch meta: {idx}")
                 self.model.update(batch_meta, batch_data)
-                # print(f"After calling model.update with batch meta: {idx}")
                 if (
                     self.model.local_updates == 1
                     or (self.model.local_updates)
@@ -317,9 +317,8 @@ class MTDNNPipelineProcess:
                         / (idx + 1)
                         * (len(self.multitask_train_dataloader) - idx - 1)
                     ).split(".")[0]
-                    print("Inside time left: ", time_left)
                     logger.info(
-                        "Task [{0:2}] updates[{1:6}] train loss[{2:.5f}] remaining[{3}]".format(
+                        "Task - [{0:2}] Updates - [{1:6}] Training Loss - [{2:.5f}] Time Remaining - [{3}]".format(
                             task_id, self.model.updates, self.model.train_loss.avg, time_left
                         )
                     )
@@ -358,9 +357,9 @@ class MTDNNPipelineProcess:
                     if self.config.use_tensor_board:
                         self.tensor_board.add_scalar(f"dev/{dataset}/{key}", val, global_step=epoch)
                     if isinstance(val, str):
-                        logger.warning(f"Task {dataset} -- epoch {epoch} -- Dev {key}:\n {val}")
+                        logger.info(f"Task {dataset} -- epoch {epoch} -- Dev {key}:\n {val}")
                     else:
-                        logger.warning(f"Task {dataset} -- epoch {epoch} -- Dev {key}: {val:.3f}")
+                        logger.info(f"Task {dataset} -- epoch {epoch} -- Dev {key}: {val:.3f}")
                 score_file = os.path.join(output_dir, f"{dataset}_dev_scores_{epoch}.json")
                 results = {
                     "metrics": dev_metrics,

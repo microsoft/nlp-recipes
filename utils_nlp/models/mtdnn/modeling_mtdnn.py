@@ -40,9 +40,9 @@ from utils_nlp.models.mtdnn.common.types import DataFormat, EncoderModelType, Ta
 from utils_nlp.models.mtdnn.common.utils import MTDNNCommonUtils
 from utils_nlp.models.mtdnn.configuration_mtdnn import MTDNNConfig
 from utils_nlp.models.mtdnn.dataset_mtdnn import MTDNNCollater
-from utils_nlp.models.mtdnn.tasks.config import TaskDefs
+from utils_nlp.models.mtdnn.tasks.config import MTDNNTaskDefs
 
-logger = logging.getLogger(__name__)
+logger = MTDNNCommonUtils.setup_logging()
 
 
 class MTDNNPretrainedModel(nn.Module):
@@ -97,8 +97,8 @@ class MTDNNModel(MTDNNPretrainedModel):
                 self.local_model_path = maybe_download(
                     url=self.pretrained_model_archive_map[pretrained_model_name]
                 )
-            self.mtdnn_model = MTDNNCommonUtils.load_pytorch_model(self.local_model_path)
-            self.state_dict = self.mtdnn_model["state"]
+            self.bert_model = MTDNNCommonUtils.load_pytorch_model(self.local_model_path)
+            self.state_dict = self.bert_model["state"]
         else:
             # Set the config base on encoder type set for initial checkpoint
             if config.encoder_type == EncoderModelType.BERT:

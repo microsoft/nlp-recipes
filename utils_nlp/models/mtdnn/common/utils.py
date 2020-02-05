@@ -1,8 +1,11 @@
 # coding=utf-8
 # Copyright (c) Microsoft. All rights reserved.
+import logging
 import os
-import torch
 import subprocess
+from logging import Logger
+
+import torch
 
 
 class MTDNNCommonUtils:
@@ -54,3 +57,12 @@ class MTDNNCommonUtils:
             opt_v = max_opt
         return opt_v
 
+    @staticmethod
+    def setup_logging(filename="run.log", mode="a") -> Logger:
+        logger = logging.getLogger(__name__)
+        log_file_handler = logging.FileHandler(filename="run.log", mode="a")
+        log_formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+        log_file_handler.setFormatter(log_formatter)
+        logger.addHandler(log_file_handler)
+        logger.setLevel(logging.DEBUG)
+        return logger
