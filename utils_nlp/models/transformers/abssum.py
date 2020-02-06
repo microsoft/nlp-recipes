@@ -37,6 +37,7 @@ import sys
 from utils_nlp.models.transformers.bertabs import model_builder
 from utils_nlp.models.transformers.bertabs.model_builder import AbsSummarizer
 from utils_nlp.models.transformers.bertabs.loss import abs_loss
+from utils_nlp.models.transformers.bertabs.predictor import build_predictor
 
 def fit_to_block_size(sequence, block_size, pad_token_id):
     """ Adapt the source and target sequences' lengths to the block size.
@@ -193,7 +194,8 @@ class AbsSumProcessor:
         data = [x for x in data if not len(x[1]) == 0]  # remove empty_files
         #print("data is {}".format(data[0]))
         #names = [name for name, _, _ in data]
-        summaries = [' '.join(summary[0]) for story, summary in data]
+        stories = [' '.join(story[0]) for story, _ in data]
+        summaries = [' '.join(summary[0]) for _, summary in data]
         #print("data is {}".format(summaries[0]))
       
 
@@ -217,22 +219,23 @@ class AbsSumProcessor:
             summary_num_tokens = [ encoded_summary.ne(self.tokenizer.pad_token_id).sum() for encoded_summary in encoded_summaries] 
             #print(summary_num_tokens)       
                 
-            Batch = namedtuple("Batch", [ "src", "segs", "mask_src", "tgt", "tgt_num_tokens",  "tgt_str"])
+            Batch = namedtuple("Batch", ["batch_size", "src", "segs", "mask_src", "tgt", "tgt_num_tokens", "src_str", "tgt_str"])
             batch = Batch(
                 #document_names=None,
-                #batch_size=len(encoded_stories),
+                batch_size=len(encoded_stories),
                 src=encoded_stories.to(device),
                 segs=encoder_token_type_ids.to(device),
                 mask_src=encoder_mask.to(device),
                 tgt_num_tokens=torch.stack(summary_num_tokens).to(device),
                 tgt=encoded_summaries.to(device),
+                src_str=stories,
                 tgt_str=summaries,
             )
         else:
-             Batch = namedtuple("Batch", [ "src", "segs", "mask_src"])
+             Batch = namedtuple("Batch", [ "batch_size", "src", "segs", "mask_src"])
              batch = Batch(
                 #document_names=None,
-                #batch_size=len(encoded_stories),
+                batch_size=len(encoded_stories),
                 src=encoded_stories.to(device),
                 segs=encoder_token_type_ids.to(device),
                 mask_src=encoder_mask.to(device),
@@ -506,36 +509,8 @@ class AbsSum(Transformer):
 
         """
 
-        def collate_fn(dict_list):
-            # tuple_batch =  [list(col) for col in zip(*[d.values() for d in dict_list]
-            if dict_list is None or len(dict_list) <= 0:
-                return None
-            is_labeled = False
-            if "labels" in dict_list[0]:
-                is_labeled = True
-            tuple_batch = [list(d.values()) for d in dict_list]
-            ## generate mask and mask_cls, and only select tensors for the model input
-            batch = Batch(tuple_batch, is_labeled=True)
-            if is_labeled:
-                return {
-                    "src": batch.src,
-                    "segs": batch.segs,
-                    "clss": batch.clss,
-                    "mask": batch.mask,
-                    "mask_cls": batch.mask_cls,
-                    "labels": batch.labels,
-                }
-            else:
-                return {
-                    "src": batch.src,
-                    "segs": batch.segs,
-                    "clss": batch.clss,
-                    "mask": batch.mask,
-                    "mask_cls": batch.mask_cls,
-                }
-
         test_sampler = SequentialSampler(test_dataset)
-        test_dataloader = DataLoader(test_dataset, sampler=test_sampler, batch_size=batch_size, collate_fn=collate_fn)
+        test_dataloader = DataLoader(test_dataset, sampler=test_sampler, batch_size=batch_size, collate_fn=self.processor.collate_fn)
         sent_scores = self.predict_scores(test_dataloader, num_gpus=num_gpus, gpu_ids=gpu_ids)
         sent_scores_list = list(sent_scores)
         scores_list = []

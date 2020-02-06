@@ -1,6 +1,6 @@
 from __future__ import division
 import torch
-import penalties
+from .penalties import PenaltyBuilder
 
 
 class Beam(object):
@@ -191,7 +191,7 @@ class GNMTGlobalScorer(object):
 
     def __init__(self, alpha,   length_penalty):
         self.alpha = alpha
-        penalty_builder = penalties.PenaltyBuilder(length_penalty)
+        penalty_builder = PenaltyBuilder(length_penalty)
         # Term will be subtracted from probability
         # Probability will be divided by this
         self.length_penalty = penalty_builder.length_penalty()

@@ -10,14 +10,37 @@ import torch
 from tensorboardX import SummaryWriter
 
 #from others.utils import rouge_results_to_str, test_rouge, tile
-from ..beam import GNMTGlobalScorer
+from .beam import GNMTGlobalScorer
 
 
-def build_predictor(args, tokenizer, symbols, model, logger=None):
-    scorer = GNMTGlobalScorer(args.alpha,length_penalty='wu')
 
-    translator = Translator(args, model, tokenizer, symbols, global_scorer=scorer, logger=logger)
+def build_predictor(tokenizer, symbols, model, alpha=0.6, beam_size=5, min_length=15, max_length=150,logger=None):
+    scorer = GNMTGlobalScorer(alpha,length_penalty='wu')
+
+    translator = Translator(beam_size,min_length, max_length,  model, tokenizer, symbols, global_scorer=scorer, logger=logger)
     return translator
+
+
+def tile(x, count, dim=0):
+    """
+    Tiles x on dimension dim count times.
+    """
+    perm = list(range(len(x.size())))
+    if dim != 0:
+        perm[0], perm[dim] = perm[dim], perm[0]
+        x = x.permute(perm).contiguous()
+    out_size = list(x.size())
+    out_size[0] *= count
+    batch = x.size(0)
+    x = x.view(batch, -1) \
+         .transpose(0, 1) \
+         .repeat(count, 1) \
+         .transpose(0, 1) \
+         .contiguous() \
+         .view(*out_size)
+    if dim != 0:
+        x = x.permute(perm).contiguous()
+    return x
 
 
 class Translator(object):
@@ -41,17 +64,21 @@ class Translator(object):
     """
 
     def __init__(self,
-                 args,
+                 #args,
+                 beam_size,
+                 min_length,
+                 max_length,
                  model,
                  vocab,
                  symbols,
+                 block_trigram=True,
                  global_scorer=None,
                  logger=None,
                  dump_beam=""):
         self.logger = logger
-        self.cuda = args.visible_gpus != '-1'
+        self.cuda = 0 #args.visible_gpus != '-1'
 
-        self.args = args
+        #self.args = args
         self.model = model
         self.generator = self.model.generator
         self.vocab = vocab
@@ -60,9 +87,10 @@ class Translator(object):
         self.end_token = symbols['EOS']
 
         self.global_scorer = global_scorer
-        self.beam_size = args.beam_size
-        self.min_length = args.min_length
-        self.max_length = args.max_length
+        self.beam_size = beam_size
+        self.min_length = min_length
+        self.max_length = max_length
+        self.block_trigram = block_trigram
 
         self.dump_beam = dump_beam
 
@@ -70,9 +98,9 @@ class Translator(object):
         self.beam_trace = self.dump_beam != ""
         self.beam_accum = None
 
-        tensorboard_log_dir = args.model_path
+        #tensorboard_log_dir = args.model_path
 
-        self.tensorboard_writer = SummaryWriter(tensorboard_log_dir, comment="Unmt")
+        #self.tensorboard_writer = SummaryWriter(tensorboard_log_dir, comment="Unmt")
 
         if self.beam_trace:
             self.beam_accum = {
@@ -121,81 +149,20 @@ class Translator(object):
         return translations
 
     def translate(self,
-                  data_iter, step,
+                  batch,
                   attn_debug=False):
 
         self.model.eval()
-        gold_path = self.args.result_path + '.%d.gold' % step
-        can_path = self.args.result_path + '.%d.candidate' % step
-        self.gold_out_file = codecs.open(gold_path, 'w', 'utf-8')
-        self.can_out_file = codecs.open(can_path, 'w', 'utf-8')
-
-        # raw_gold_path = self.args.result_path + '.%d.raw_gold' % step
-        # raw_can_path = self.args.result_path + '.%d.raw_candidate' % step
-        self.gold_out_file = codecs.open(gold_path, 'w', 'utf-8')
-        self.can_out_file = codecs.open(can_path, 'w', 'utf-8')
-
-        raw_src_path = self.args.result_path + '.%d.raw_src' % step
-        self.src_out_file = codecs.open(raw_src_path, 'w', 'utf-8')
-
         # pred_results, gold_results = [], []
-        ct = 0
         with torch.no_grad():
-            for batch in data_iter:
-                if(self.args.recall_eval):
-                    gold_tgt_len = batch.tgt.size(1)
-                    self.min_length = gold_tgt_len + 20
-                    self.max_length = gold_tgt_len + 60
-                batch_data = self.translate_batch(batch)
-                translations = self.from_batch(batch_data)
+            batch_data = self.translate_batch(batch)
+            translations = self.from_batch(batch_data)
 
-                for trans in translations:
-                    pred, gold, src = trans
-                    pred_str = pred.replace('[unused0]', '').replace('[unused3]', '').replace('[PAD]', '').replace('[unused1]', '').replace(r' +', ' ').replace(' [unused2] ', '<q>').replace('[unused2]', '').strip()
-                    gold_str = gold.strip()
-                    if(self.args.recall_eval):
-                        _pred_str = ''
-                        gap = 1e3
-                        for sent in pred_str.split('<q>'):
-                            can_pred_str = _pred_str+ '<q>'+sent.strip()
-                            can_gap = math.fabs(len(_pred_str.split())-len(gold_str.split()))
-                            # if(can_gap>=gap):
-                            if(len(can_pred_str.split())>=len(gold_str.split())+10):
-                                pred_str = _pred_str
-                                break
-                            else:
-                                gap = can_gap
-                                _pred_str = can_pred_str
-
-
-
-                        # pred_str = ' '.join(pred_str.split()[:len(gold_str.split())])
-                    # self.raw_can_out_file.write(' '.join(pred).strip() + '\n')
-                    # self.raw_gold_out_file.write(' '.join(gold).strip() + '\n')
-                    self.can_out_file.write(pred_str + '\n')
-                    self.gold_out_file.write(gold_str + '\n')
-                    self.src_out_file.write(src.strip() + '\n')
-                    ct += 1
-                self.can_out_file.flush()
-                self.gold_out_file.flush()
-                self.src_out_file.flush()
-
-        self.can_out_file.close()
-        self.gold_out_file.close()
-        self.src_out_file.close()
-
-        if (step != -1):
-            rouges = self._report_rouge(gold_path, can_path)
-            self.logger.info('Rouges at step %d \n%s' % (step, rouge_results_to_str(rouges)))
-            if self.tensorboard_writer is not None:
-                self.tensorboard_writer.add_scalar('test/rouge1-F', rouges['rouge_1_f_score'], step)
-                self.tensorboard_writer.add_scalar('test/rouge2-F', rouges['rouge_2_f_score'], step)
-                self.tensorboard_writer.add_scalar('test/rougeL-F', rouges['rouge_l_f_score'], step)
-
-    def _report_rouge(self, gold_path, can_path):
-        self.logger.info("Calculating Rouge")
-        results_dict = test_rouge(self.args.temp_dir, can_path, gold_path)
-        return results_dict
+            #for trans in translations:
+            #    pred, gold, src = trans
+            #    pred_str = pred.replace('[unused0]', '').replace('[unused3]', '').replace('[PAD]', '').replace('[unused1]', '').replace(r' +', ' ').replace(' [unused2] ', '<q>').replace('[unused2]', '').strip()
+            #    gold_str = gold.strip()
+        return translations  
 
     def translate_batch(self, batch, fast=False):
         """
@@ -293,7 +260,7 @@ class Translator(object):
             # Flatten probs into a list of possibilities.
             curr_scores = log_probs / length_penalty
 
-            if(self.args.block_trigram):
+            if(self.block_trigram):
                 cur_len = alive_seq.size(1)
                 if(cur_len>3):
                     for i in range(alive_seq.size(0)):
