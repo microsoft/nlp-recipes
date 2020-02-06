@@ -20,8 +20,10 @@ from utils_nlp.models.mtdnn.common.loss import LossCriterion
 from utils_nlp.models.mtdnn.common.metrics import Metric
 from utils_nlp.models.mtdnn.common.types import DataFormat, EncoderModelType, TaskType
 from utils_nlp.models.mtdnn.common.vocab import Vocabulary
+from utils_nlp.models.mtdnn.common.utils import MTDNNCommonUtils
 
-logger = logging.getLogger(__name__)
+
+logger = MTDNNCommonUtils.setup_logging()
 
 
 class TaskConfig(object):
@@ -733,6 +735,10 @@ class MTDNNTaskDefs:
 
             # Track configured tasks for downstream
             self._configured_tasks.append(task.to_dict())
+
+        logger.info(
+            f"Configured task definitions - {[obj['task_name'] for obj in self.get_configured_tasks()]}"
+        )
 
         assert len(uniq_encoderType) == 1, "The shared encoder has to be the same."
         self.global_map = global_map
