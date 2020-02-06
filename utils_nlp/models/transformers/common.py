@@ -4,11 +4,11 @@
 # This script reuses some code from
 # https://github.com/huggingface/pytorch-transformers/blob/master/examples/run_glue.py
 
+import datetime
 import logging
 import os
 import random
 import time
-from itertools import cycle
 
 import numpy as np
 import torch
@@ -38,7 +38,12 @@ logger = logging.getLogger(__name__)
 
 class Transformer:
     def __init__(
-        self, model_class, model_name="bert-base-cased", num_labels=2, cache_dir=".", load_model_from_dir=None,
+        self,
+        model_class,
+        model_name="bert-base-cased",
+        num_labels=2,
+        cache_dir=".",
+        load_model_from_dir=None,
     ):
 
         if model_name not in self.list_supported_models():
@@ -82,11 +87,15 @@ class Transformer:
         no_decay = ["bias", "LayerNorm.weight"]
         optimizer_grouped_parameters = [
             {
-                "params": [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)],
+                "params": [
+                    p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)
+                ],
                 "weight_decay": weight_decay,
             },
             {
-                "params": [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)],
+                "params": [
+                    p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)
+                ],
                 "weight_decay": 0.0,
             },
         ]
@@ -117,6 +126,7 @@ class Transformer:
         verbose=True,
         seed=None,
         report_every=10,
+        save_every=-1,
         clip_grad_norm=True,
     ):
 
@@ -146,7 +156,9 @@ class Transformer:
         # train
         start = time.time()
         while global_step < max_steps:
-            epoch_iterator = tqdm(train_dataloader, desc="Iteration", disable=local_rank not in [-1, 0] or not verbose)
+            epoch_iterator = tqdm(
+                train_dataloader, desc="Iteration", disable=local_rank not in [-1, 0] or not verbose
+            )
             for step, batch in enumerate(epoch_iterator):
                 inputs = get_inputs(batch, device, self.model_name)
                 outputs = self.model(**inputs)
@@ -171,15 +183,27 @@ class Transformer:
 
                     if clip_grad_norm:
                         if fp16:
-                            torch.nn.utils.clip_grad_norm_(amp.master_params(optimizer), max_grad_norm)
+                            torch.nn.utils.clip_grad_norm_(
+                                amp.master_params(optimizer), max_grad_norm
+                            )
                         else:
                             torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_grad_norm)
 
                     if global_step % report_every == 0 and verbose:
                         end = time.time()
+                        endtime_string = datetime.datetime.fromtimestamp(end).strftime(
+                            "%d/%m/%Y %H:%M:%S"
+                        )
                         print(
-                            "loss:{0:.6f}, time:{1:f}, examples:{2:.0f}, step:{3:.0f}/{4:.0f}".format(
-                                accum_loss / report_every, end - start, len(batch), global_step, max_steps,
+                            """timestamp: {0:s}, loss: {1:.6f}, time duration: {2:f},
+                            number of examples in current step: {3:.0f}, step {4:.0f}
+                            out of total {5:.0f}""".format(
+                                endtime_string,
+                                accum_loss / report_every,
+                                end - start,
+                                len(batch),
+                                global_step,
+                                max_steps,
                             )
                         )
                         accum_loss = 0
@@ -189,7 +213,10 @@ class Transformer:
                     if scheduler:
                         scheduler.step()
                     self.model.zero_grad()
-
+                    if save_every != -1 and global_step % save_every == 0 and verbose:
+                        self.save_model(
+                            os.path.join(self.cache_dir, f"{self.model_name}_step_{global_step}.pt")
+                        )
                 if global_step > max_steps:
                     epoch_iterator.close()
                     break
@@ -212,16 +239,31 @@ class Transformer:
                 logits = outputs[0]
             yield logits.detach().cpu().numpy()
 
-    def save_model(self):
-        output_model_dir = os.path.join(self.cache_dir, "fine_tuned")
+    def save_model(self, full_name=None):
+        """
+        save the trained model.
 
-        os.makedirs(self.cache_dir, exist_ok=True)
-        os.makedirs(output_model_dir, exist_ok=True)
+        Args:
+            full_name (str, optional): File name to save the model's `state_dict()` and can
+                be loaded by torch.load(). If it's None, the trained model, configuration
+                and tokenizer using `save_pretrained()`; and the file is going to be saved
+                under "fine_tuned" folder of the cached directory of the object. Defaults to None.
+        """
 
-        logger.info("Saving model checkpoint to %s", output_model_dir)
         # Save a trained model, configuration and tokenizer using `save_pretrained()`.
         # They can then be reloaded using `from_pretrained()`
         model_to_save = (
             self.model.module if hasattr(self.model, "module") else self.model
         )  # Take care of distributed/parallel training
-        model_to_save.save_pretrained(output_model_dir)
+
+        if full_name:
+            logger.info("Saving model checkpoint to %s", full_name)
+            torch.save(model_to_save.state_dict(), full_name)
+        else:
+            output_model_dir = os.path.join(self.cache_dir, "fine_tuned")
+
+            os.makedirs(self.cache_dir, exist_ok=True)
+            os.makedirs(output_model_dir, exist_ok=True)
+
+            logger.info("Saving model checkpoint to %s", output_model_dir)
+            model_to_save.save_pretrained(output_model_dir)
