@@ -1,25 +1,14 @@
 from utils_nlp.models.mtdnn.common.types import EncoderModelType
 from utils_nlp.models.mtdnn.configuration_mtdnn import MTDNNConfig
 from utils_nlp.models.mtdnn.modeling_mtdnn import MTDNNModel
-from utils_nlp.models.mtdnn.process_mtdnn import MTDNNDataPreprocess
-from utils_nlp.models.mtdnn.tasks.config import TaskDefs
+from utils_nlp.models.mtdnn.process_mtdnn import MTDNNDataProcess, MTDNNPipelineProcess
+from utils_nlp.models.mtdnn.tasks.config import MTDNNTaskDefs
 
 if __name__ == "__main__":
     config = MTDNNConfig()
 
     # Define task parameters
-    cola_opts = {
-        # "cola": {
-        #     "data_format": "PremiseOnly",
-        #     "encoder_type": "BERT",
-        #     "dropout_p": 0.05,
-        #     "enable_san": False,
-        #     "metric_meta": ["ACC", "MCC"],
-        #     "loss": "CeCriterion",
-        #     "kd_loss": "MseCriterion",
-        #     "n_class": 2,
-        #     "task_type": "Classification",
-        # },
+    tasks_params = {
         "mnli": {
             "data_format": "PremiseAndOneHypothesis",
             "encoder_type": "BERT",
@@ -40,10 +29,12 @@ if __name__ == "__main__":
             "task_type": "Classification",
         },
     }
-    task_defs = TaskDefs(cola_opts)
+
+    # Define the tasks
+    task_defs = MTDNNTaskDefs(tasks_params)
 
     # Make the Data Preprocess step and update the config with training data updates
-    processor = MTDNNDataPreprocess(
+    data_processor = MTDNNDataProcess(
         config=config,
         task_defs=task_defs,
         batch_size=8,
@@ -52,10 +43,30 @@ if __name__ == "__main__":
         test_datasets_list=["mnli_mismatched, mnli_matched"],
     )
 
+    multitask_train_dataloader = data_processor.get_train_dataloader()
+    dev_dataloaders_list = data_processor.get_dev_dataloaders()
+    test_dataloaders_list = data_processor.get_test_dataloaders()
+
     # Update config with data preprocess params
-    config = processor.update_config(config)
+    config = data_processor.update_config(config)
+
+    # Instantiate model
     model = MTDNNModel(config)
     print("Network: ", model.network)
+
+    # Create a process pipeline for training and inference
+    pipeline_process = MTDNNPipelineProcess(
+        model=model,
+        config=config,
+        task_defs=task_defs,
+        multitask_train_dataloader=multitask_train_dataloader,
+        dev_dataloaders_list=dev_dataloaders_list,
+        test_dataloaders_list=test_dataloaders_list,
+    )
+
+    # Fit training data to model
+    pipeline_process.fit(1)
+
     # print("Config Class: ", b.config_class)
     # print("Config: ", b.config)
     # print("Pooler: ", b.pooler)
