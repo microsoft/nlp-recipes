@@ -1,5 +1,6 @@
 # coding=utf-8
 # Copyright (c) Microsoft. All rights reserved.
+import json
 import logging
 import os
 import subprocess
@@ -66,3 +67,7 @@ class MTDNNCommonUtils:
         logger.addHandler(log_file_handler)
         logger.setLevel(logging.DEBUG)
         return logger
+
+    @staticmethod
+    def create_directory_if_not_exists(dir_path: str):
+        os.makedirs(dir_path, exist_ok=True)
