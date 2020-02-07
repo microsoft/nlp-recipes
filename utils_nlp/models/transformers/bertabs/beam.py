@@ -17,13 +17,20 @@ class Beam(object):
        global_scorer (:obj:`GlobalScorer`)
     """
 
-    def __init__(self, size, pad, bos, eos,
-                 n_best=1, cuda=False,
-                 global_scorer=None,
-                 min_length=0,
-                 stepwise_penalty=False,
-                 block_ngram_repeat=0,
-                 exclusion_tokens=set()):
+    def __init__(
+        self,
+        size,
+        pad,
+        bos,
+        eos,
+        n_best=1,
+        cuda=False,
+        global_scorer=None,
+        min_length=0,
+        stepwise_penalty=False,
+        block_ngram_repeat=0,
+        exclusion_tokens=set(),
+    ):
 
         self.size = size
         self.tt = torch.cuda if cuda else torch
@@ -36,8 +43,7 @@ class Beam(object):
         self.prev_ks = []
 
         # The outputs at each time-step.
-        self.next_ys = [self.tt.LongTensor(size)
-                        .fill_(pad)]
+        self.next_ys = [self.tt.LongTensor(size).fill_(pad)]
         self.next_ys[0][0] = bos
 
         # Has EOS topped the beam yet.
@@ -93,8 +99,7 @@ class Beam(object):
                 word_probs[k][self._eos] = -1e20
         # Sum the previous scores.
         if len(self.prev_ks) > 0:
-            beam_scores = word_probs + \
-                self.scores.unsqueeze(1).expand_as(word_probs)
+            beam_scores = word_probs + self.scores.unsqueeze(1).expand_as(word_probs)
             # Don't let EOS have children.
             for i in range(self.next_ys[-1].size(0)):
                 if self.next_ys[-1][i] == self._eos:
@@ -111,8 +116,7 @@ class Beam(object):
                     gram = []
                     for i in range(le - 1):
                         # Last n tokens, n = block_ngram_repeat
-                        gram = (gram +
-                                [hyp[i].item()])[-self.block_ngram_repeat:]
+                        gram = (gram + [hyp[i].item()])[-self.block_ngram_repeat :]
                         # Skip the blocking if it is in the exclusion list
                         if set(gram) & self.exclusion_tokens:
                             continue
@@ -124,8 +128,7 @@ class Beam(object):
         else:
             beam_scores = word_probs[0]
         flat_beam_scores = beam_scores.view(-1)
-        best_scores, best_scores_id = flat_beam_scores.topk(self.size, 0,
-                                                            True, True)
+        best_scores, best_scores_id = flat_beam_scores.topk(self.size, 0, True, True)
 
         self.all_scores.append(self.scores)
         self.scores = best_scores
@@ -189,7 +192,7 @@ class GNMTGlobalScorer(object):
        beta (float):  coverage parameter
     """
 
-    def __init__(self, alpha,   length_penalty):
+    def __init__(self, alpha, length_penalty):
         self.alpha = alpha
         penalty_builder = PenaltyBuilder(length_penalty)
         # Term will be subtracted from probability
@@ -200,9 +203,6 @@ class GNMTGlobalScorer(object):
         """
         Rescores a prediction based on penalty functions
         """
-        normalized_probs = self.length_penalty(beam,
-                                               logprobs,
-                                               self.alpha)
+        normalized_probs = self.length_penalty(beam, logprobs, self.alpha)
 
         return normalized_probs
-

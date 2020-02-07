@@ -32,12 +32,14 @@ MODEL_CLASS = {"bert-base-uncased": BertModel, "distilbert-base-uncased": Distil
 logger = logging.getLogger(__name__)
 
 import sys
-#sys.path.insert(0, "/dadendev/PreSumm2/PreSumm/src")
-#sys.path.insert(0, "/dadendev/PreSumm2/PreSumm/src/models")
+
+# sys.path.insert(0, "/dadendev/PreSumm2/PreSumm/src")
+# sys.path.insert(0, "/dadendev/PreSumm2/PreSumm/src/models")
 from utils_nlp.models.transformers.bertabs import model_builder
 from utils_nlp.models.transformers.bertabs.model_builder import AbsSummarizer
 from utils_nlp.models.transformers.bertabs.loss import abs_loss
 from utils_nlp.models.transformers.bertabs.predictor import build_predictor
+
 
 def fit_to_block_size(sequence, block_size, pad_token_id):
     """ Adapt the source and target sequences' lengths to the block size.
@@ -49,7 +51,6 @@ def fit_to_block_size(sequence, block_size, pad_token_id):
         sequence.extend([pad_token_id] * (block_size - len(sequence)))
         return sequence
 
-    
 
 def build_mask(sequence, pad_token_id):
     """ Builds the mask. The attention mechanism will only attend to positions
@@ -58,6 +59,7 @@ def build_mask(sequence, pad_token_id):
     idx_pad_tokens = sequence == pad_token_id
     mask[idx_pad_tokens] = 0
     return mask
+
 
 def compute_token_type_ids(batch, separator_token_id):
     """ Segment embeddings as described in [1]
@@ -87,11 +89,7 @@ class AbsSumProcessor:
     """Class for preprocessing extractive summarization data."""
 
     def __init__(
-        self,
-        model_name="bert-base-uncased",
-        to_lower=False,
-        cache_dir=".",
-        max_len=512,
+        self, model_name="bert-base-uncased", to_lower=False, cache_dir=".", max_len=512,
     ):
         """ Initialize the preprocessor.
 
@@ -110,15 +108,19 @@ class AbsSumProcessor:
         self.tokenizer = TOKENIZER_CLASS[self.model_name].from_pretrained(
             self.model_name, do_lower_case=to_lower, cache_dir=cache_dir
         )
-        
-        self.symbols = {'BOS': self.tokenizer.vocab['[unused0]'], 'EOS': self.tokenizer.vocab['[unused1]'],
-               'PAD': self.tokenizer.vocab['[PAD]'], 'EOQ': self.tokenizer.vocab['[unused2]']}
-        
-        self.sep_token = '[SEP]'
-        self.cls_token = '[CLS]'
-        self.pad_token = '[PAD]'
-        self.tgt_bos = '[unused0]'
-        self.tgt_eos = '[unused1]'
+
+        self.symbols = {
+            "BOS": self.tokenizer.vocab["[unused0]"],
+            "EOS": self.tokenizer.vocab["[unused1]"],
+            "PAD": self.tokenizer.vocab["[PAD]"],
+            "EOQ": self.tokenizer.vocab["[unused2]"],
+        }
+
+        self.sep_token = "[SEP]"
+        self.cls_token = "[CLS]"
+        self.pad_token = "[PAD]"
+        self.tgt_bos = "[unused0]"
+        self.tgt_eos = "[unused1]"
 
         self.sep_vid = self.tokenizer.vocab[self.sep_token]
         self.cls_vid = self.tokenizer.vocab[self.cls_token]
@@ -168,13 +170,13 @@ class AbsSumProcessor:
         if model_name.split("-")[0] in ["bert", "distilbert"]:
             if train_mode:
                 # labels must be the last
-                
+
                 return {
                     "src": batch.src,
                     "segs": batch.segs,
                     "mask_src": batch.mask_src,
                     "tgt": batch.tgt,
-                    #"tgt_num_tokens": batch.tgt_num_tokens
+                    # "tgt_num_tokens": batch.tgt_num_tokens
                 }
             else:
                 return {
@@ -192,36 +194,56 @@ class AbsSumProcessor:
         API.
         """
         data = [x for x in data if not len(x[1]) == 0]  # remove empty_files
-        #print("data is {}".format(data[0]))
-        #names = [name for name, _, _ in data]
-        stories = [' '.join(story[0]) for story, _ in data]
-        summaries = [' '.join(summary[0]) for _, summary in data]
-        #print("data is {}".format(summaries[0]))
-      
+        # print("data is {}".format(data[0]))
+        # names = [name for name, _, _ in data]
+        stories = [" ".join(story[0]) for story, _ in data]
+        summaries = [" ".join(summary[0]) for _, summary in data]
+        # print("data is {}".format(summaries[0]))
 
         encoded_text = [self.preprocess(story[0], summary[0]) for story, summary in data]
-        #print(encoded_text[0])
-        
-        
-        #""""""
+        # print(encoded_text[0])
+
+        # """"""
         encoded_stories = torch.tensor(
-            [fit_to_block_size(story, block_size, self.tokenizer.pad_token_id) for story, _ in encoded_text]
+            [
+                fit_to_block_size(story, block_size, self.tokenizer.pad_token_id)
+                for story, _ in encoded_text
+            ]
         )
-        encoder_token_type_ids = compute_token_type_ids(encoded_stories, self.tokenizer.cls_token_id)
+        encoder_token_type_ids = compute_token_type_ids(
+            encoded_stories, self.tokenizer.cls_token_id
+        )
         encoder_mask = build_mask(encoded_stories, self.tokenizer.pad_token_id)
-        #"""
-        
-        
+        # """
+
         if train_mode:
-            encoded_summaries= torch.tensor(
-            [fit_to_block_size(summary, block_size, self.tokenizer.pad_token_id) for _, summary in encoded_text]
-             )
-            summary_num_tokens = [ encoded_summary.ne(self.tokenizer.pad_token_id).sum() for encoded_summary in encoded_summaries] 
-            #print(summary_num_tokens)       
-                
-            Batch = namedtuple("Batch", ["batch_size", "src", "segs", "mask_src", "tgt", "tgt_num_tokens", "src_str", "tgt_str"])
+            encoded_summaries = torch.tensor(
+                [
+                    fit_to_block_size(summary, block_size, self.tokenizer.pad_token_id)
+                    for _, summary in encoded_text
+                ]
+            )
+            summary_num_tokens = [
+                encoded_summary.ne(self.tokenizer.pad_token_id).sum()
+                for encoded_summary in encoded_summaries
+            ]
+            # print(summary_num_tokens)
+
+            Batch = namedtuple(
+                "Batch",
+                [
+                    "batch_size",
+                    "src",
+                    "segs",
+                    "mask_src",
+                    "tgt",
+                    "tgt_num_tokens",
+                    "src_str",
+                    "tgt_str",
+                ],
+            )
             batch = Batch(
-                #document_names=None,
+                # document_names=None,
                 batch_size=len(encoded_stories),
                 src=encoded_stories.to(device),
                 segs=encoder_token_type_ids.to(device),
@@ -232,9 +254,9 @@ class AbsSumProcessor:
                 tgt_str=summaries,
             )
         else:
-             Batch = namedtuple("Batch", [ "batch_size", "src", "segs", "mask_src"])
-             batch = Batch(
-                #document_names=None,
+            Batch = namedtuple("Batch", ["batch_size", "src", "segs", "mask_src"])
+            batch = Batch(
+                # document_names=None,
                 batch_size=len(encoded_stories),
                 src=encoded_stories.to(device),
                 segs=encoder_token_type_ids.to(device),
@@ -242,6 +264,7 @@ class AbsSumProcessor:
             )
 
         return batch
+
     def preprocess(self, story_lines, summary_lines=None):
         """preprocess multiple data points
 
@@ -256,7 +279,7 @@ class AbsSumProcessor:
                 labels, source text and target text. If targets is None, the label and target text
                 are None.
         """
-        #story_lines_token_ids = [self.tokenizer.encode(line, max_length=self.max_len) for line in story_lines]
+        # story_lines_token_ids = [self.tokenizer.encode(line, max_length=self.max_len) for line in story_lines]
         story_lines_token_ids = []
         for line in story_lines:
             try:
@@ -273,21 +296,26 @@ class AbsSumProcessor:
                 try:
                     if len(line) <= 0:
                         continue
-                    summary_lines_token_ids.append(self.tokenizer.encode(line, max_length=self.max_len)) 
+                    summary_lines_token_ids.append(
+                        self.tokenizer.encode(line, max_length=self.max_len)
+                    )
                 except:
                     print(line)
                     raise
-            summary_token_ids = [token for sentence in summary_lines_token_ids for token in sentence]
+            summary_token_ids = [
+                token for sentence in summary_lines_token_ids for token in sentence
+            ]
             return story_token_ids, summary_token_ids
         else:
             return story_token_ids
 
-    
 
 class AbsSum(Transformer):
     """class which performs extractive summarization fine tuning and prediction """
 
-    def __init__(self, processor, model_name="bert-base-uncased", encoder="transformer", cache_dir="."):
+    def __init__(
+        self, processor, model_name="bert-base-uncased", encoder="transformer", cache_dir="."
+    ):
         """Initialize a ExtractiveSummarizer.
 
         Args:
@@ -306,7 +334,9 @@ class AbsSum(Transformer):
             cache_dir (str, optional): Directory to cache the tokenizer. Defaults to ".".
         """
 
-        super().__init__(model_class=MODEL_CLASS, model_name=model_name, num_labels=0, cache_dir=cache_dir)
+        super().__init__(
+            model_class=MODEL_CLASS, model_name=model_name, num_labels=0, cache_dir=cache_dir
+        )
         if model_name not in self.list_supported_models():
             raise ValueError(
                 "Model name {} is not supported by ExtractiveSummarizer. "
@@ -332,21 +362,29 @@ class AbsSum(Transformer):
             "enc_ff_size": 512,
             "enc_dropout": 0.2,
             "enc_layers": 6,
-            "label_smoothing":0.1
+            "label_smoothing": 0.1,
         }
-        
 
         from utils_nlp.common.pytorch_utils import get_device
+
         device, num_gpus = get_device(num_gpus=4, local_rank=-1)
         args = Bunch(default_abs_summarizer_layer_parameters)
         self.model = AbsSummarizer(args, device)
         self.device = device
         self.processor = processor
-        self.train_loss = abs_loss(self.model.generator, self.processor.symbols, self.model.vocab_size, device, train=True,
-                          label_smoothing=args.label_smoothing)
+        self.train_loss = abs_loss(
+            self.model.generator,
+            self.processor.symbols,
+            self.model.vocab_size,
+            device,
+            train=True,
+            label_smoothing=args.label_smoothing,
+        )
+
         def loss(inputs, outputs):
-            #return  self.train_loss.sharded_compute_loss(inputs, outputs, Bunch({"generator_shard_size":32}), normalization)
+            # return  self.train_loss.sharded_compute_loss(inputs, outputs, Bunch({"generator_shard_size":32}), normalization)
             return self.train_loss.monolithic_compute_loss(inputs, outputs)
+
         self.loss_function = loss
 
     @staticmethod
@@ -412,7 +450,7 @@ class AbsSum(Transformer):
         """
 
         # init optimizer
-        
+
         args_opt = Bunch(
             {
                 "param_init": 0,
@@ -430,28 +468,34 @@ class AbsSum(Transformer):
         optim_bert = model_builder.build_optim_bert(args_opt, self.model, None)
         optim_dec = model_builder.build_optim_dec(args_opt, self.model, None)
         optim = [optim_bert, optim_dec]
-        
+
         from torch.utils.data import SequentialSampler, RandomSampler, DataLoader
-        def build_data_iterator(collate, dataset, batch_size=16, device='cuda'):
+
+        def build_data_iterator(collate, dataset, batch_size=16, device="cuda"):
 
             sampler = RandomSampler(dataset)
 
             def collate_fn(data):
                 return collate(data, block_size=512, device=device)
 
-            iterator = DataLoader(dataset, sampler=sampler, batch_size=batch_size, collate_fn=collate_fn,)
+            iterator = DataLoader(
+                dataset, sampler=sampler, batch_size=batch_size, collate_fn=collate_fn,
+            )
 
             return iterator
+
         # batch_size is the number of tokens in a batch
-        #train_dataloader = get_dataloader(train_dataset.get_stream(), is_labeled=True, batch_size=batch_size)
-        train_dataloader = build_data_iterator(self.processor.collate, train_dataset, batch_size=batch_size, device=self.device)
-        
+        # train_dataloader = get_dataloader(train_dataset.get_stream(), is_labeled=True, batch_size=batch_size)
+        train_dataloader = build_data_iterator(
+            self.processor.collate, train_dataset, batch_size=batch_size, device=self.device
+        )
 
         # compute the max number of training steps
         max_steps = compute_training_steps(
-            train_dataloader, max_steps=max_steps, gradient_accumulation_steps=gradient_accumulation_steps,
+            train_dataloader,
+            max_steps=max_steps,
+            gradient_accumulation_steps=gradient_accumulation_steps,
         )
-        
 
         super().fine_tune(
             train_dataloader=train_dataloader,
@@ -468,7 +512,7 @@ class AbsSum(Transformer):
             clip_grad_norm=False,
             optimizer=optim,
             loss_function=self.loss_function,
-            fp16=fp16
+            fp16=fp16,
         )
 
     def predict(
@@ -510,7 +554,12 @@ class AbsSum(Transformer):
         """
 
         test_sampler = SequentialSampler(test_dataset)
-        test_dataloader = DataLoader(test_dataset, sampler=test_sampler, batch_size=batch_size, collate_fn=self.processor.collate_fn)
+        test_dataloader = DataLoader(
+            test_dataset,
+            sampler=test_sampler,
+            batch_size=batch_size,
+            collate_fn=self.processor.collate_fn,
+        )
         sent_scores = self.predict_scores(test_dataloader, num_gpus=num_gpus, gpu_ids=gpu_ids)
         sent_scores_list = list(sent_scores)
         scores_list = []

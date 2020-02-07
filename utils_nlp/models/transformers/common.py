@@ -34,7 +34,9 @@ TOKENIZER_CLASS.update({k: DistilBertTokenizer for k in DISTILBERT_PRETRAINED_MO
 MAX_SEQ_LEN = 512
 
 logger = logging.getLogger(__name__)
-
+fh = logging.FileHandler('abssum_train.log')
+logger.addHandler(fh)
+logger.setLevel(logging.INFO)
 
 class Transformer:
     def __init__(
@@ -185,11 +187,11 @@ class Transformer:
 
                     if global_step % report_every == 0 and verbose:
                         end = time.time()
-                        print(
-                            "loss:{0:.6f}, time:{1:f}, examples:{2:.0f}, step:{3:.0f}/{4:.0f}".format(
+                        log_line = "loss:{0:.6f}, time:{1:f}, examples:{2:.0f}, step:{3:.0f}/{4:.0f}".format(
                                 accum_loss / report_every, end - start, len(batch), global_step, max_steps,
                             )
-                        )
+                        logger.info(log_line)
+                        print(log_line)
                         accum_loss = 0
                         start = end
                     if type(optimizer)==list:
