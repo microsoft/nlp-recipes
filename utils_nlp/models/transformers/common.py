@@ -23,7 +23,12 @@ from transformers.tokenization_distilbert import DistilBertTokenizer
 from transformers.tokenization_roberta import RobertaTokenizer
 from transformers.tokenization_xlnet import XLNetTokenizer
 
-from utils_nlp.common.pytorch_utils import get_device, move_model_to_device
+from utils_nlp.common.pytorch_utils import (
+    get_device,
+    move_model_to_device,
+    get_amp,
+    parallelize_model,
+)
 
 TOKENIZER_CLASS = {}
 TOKENIZER_CLASS.update({k: BertTokenizer for k in BERT_PRETRAINED_MODEL_ARCHIVE_MAP})
@@ -109,19 +114,79 @@ class Transformer:
         )
         return scheduler
 
+    def prepare_model_and_optimizer_default(
+        self,
+        num_gpus,
+        gpu_ids,
+        local_rank,
+        weight_decay,
+        learning_rate,
+        adam_epsilon,
+        fp16=False,
+        fp16_opt_level="O1",
+        checkpoint_state_dict=None,
+    ):
+
+        ## Correct order of doing things
+        # 1. Move model to device
+        # 2. Create optimizer (must be done after moving model to device)
+        # 3. Initialize amp (must be done after creating optimizer because it requires
+        #    the optimizer as an input)
+        # 4. Parallelize model (must be done after initializing amp)
+        # This function can be used by most child classes as it is before calling fine_tune
+        # Child classes that require custom optimizer can not use this function, but can use
+        # the order of the operations in this function as a reference. This is also why this
+        # function can not be merged with fine_tune
+
+        amp = get_amp(fp16)
+
+        # get device
+        device, num_gpus = get_device(num_gpus=num_gpus, gpu_ids=gpu_ids, local_rank=local_rank)
+
+        # move model
+        self.model = move_model_to_device(model=self.model, device=device)
+
+        # init optimizer and scheduler
+        self.optimizer = Transformer.get_default_optimizer(
+            self.model, weight_decay, learning_rate, adam_epsilon
+        )
+
+        if fp16:
+            self.model, self.optimizer = amp.initialize(
+                self.model, self.optimizer, opt_level=fp16_opt_level
+            )
+
+        if checkpoint_state_dict:
+            self.optimizer.load_state_dict(checkpoint_state_dict["optimizer"])
+            self.model.load_state_dict(checkpoint_state_dict["model"])
+
+            if fp16:
+                amp.load_state_dict(checkpoint_state_dict["amp"])
+
+        self.model = parallelize_model(
+            model=self.model,
+            device=device,
+            num_gpus=num_gpus,
+            gpu_ids=gpu_ids,
+            local_rank=local_rank,
+        )
+
+        return device, num_gpus, amp
+
     def fine_tune(
         self,
         train_dataloader,
         get_inputs,
+        device,
         num_gpus=None,
-        gpu_ids=None,
         max_steps=-1,
+        global_step=0,
         max_grad_norm=1.0,
         gradient_accumulation_steps=1,
         optimizer=None,
         scheduler=None,
         fp16=False,
-        fp16_opt_level="O1",
+        amp=None,
         local_rank=-1,
         verbose=True,
         seed=None,
@@ -130,24 +195,10 @@ class Transformer:
         clip_grad_norm=True,
     ):
 
-        # get device
-        device, num_gpus = get_device(num_gpus=num_gpus, local_rank=local_rank)
-
         if seed is not None:
             Transformer.set_seed(seed, num_gpus > 0)
 
-        if fp16:
-            try:
-                from apex import amp
-            except ImportError:
-                raise ImportError("Please install apex from https://www.github.com/nvidia/apex")
-            self.model, optimizer = amp.initialize(self.model, optimizer, opt_level=fp16_opt_level)
-
-        # move model
-        self.model = move_model_to_device(self.model, device, num_gpus, gpu_ids, local_rank)
-
         # init training
-        global_step = 0
         tr_loss = 0.0
         accum_loss = 0
         self.model.train()
