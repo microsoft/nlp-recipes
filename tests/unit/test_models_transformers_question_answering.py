@@ -65,22 +65,18 @@ def qa_test_data(qa_test_df, tmp_module):
         qa_id_col=qa_test_df["qa_id_col"],
     )
 
+    # bert
     qa_processor_bert = QAProcessor(cache_dir=tmp_module)
     train_features_bert = qa_processor_bert.preprocess(
         train_dataset,
-        batch_size=BATCH_SIZE,
-        num_gpus=NUM_GPUS,
         is_training=True,
         max_question_length=16,
         max_seq_length=64,
         doc_stride=32,
         feature_cache_dir=tmp_module,
     )
-
     test_features_bert = qa_processor_bert.preprocess(
         test_dataset,
-        batch_size=BATCH_SIZE,
-        num_gpus=NUM_GPUS,
         is_training=False,
         max_question_length=16,
         max_seq_length=64,
@@ -88,22 +84,18 @@ def qa_test_data(qa_test_df, tmp_module):
         feature_cache_dir=tmp_module,
     )
 
+    # xlnet
     qa_processor_xlnet = QAProcessor(model_name="xlnet-base-cased", cache_dir=tmp_module)
     train_features_xlnet = qa_processor_xlnet.preprocess(
         train_dataset,
-        batch_size=BATCH_SIZE,
-        num_gpus=NUM_GPUS,
         is_training=True,
         max_question_length=16,
         max_seq_length=64,
         doc_stride=32,
         feature_cache_dir=tmp_module,
     )
-
     test_features_xlnet = qa_processor_xlnet.preprocess(
         test_dataset,
-        batch_size=BATCH_SIZE,
-        num_gpus=NUM_GPUS,
         is_training=False,
         max_question_length=16,
         max_seq_length=64,
@@ -111,22 +103,20 @@ def qa_test_data(qa_test_df, tmp_module):
         feature_cache_dir=tmp_module,
     )
 
-    qa_processor_distilbert = QAProcessor(model_name="distilbert-base-uncased", cache_dir=tmp_module)
+    # distilbert
+    qa_processor_distilbert = QAProcessor(
+        model_name="distilbert-base-uncased", cache_dir=tmp_module
+    )
     train_features_distilbert = qa_processor_distilbert.preprocess(
         train_dataset,
-        batch_size=BATCH_SIZE,
-        num_gpus=NUM_GPUS,
         is_training=True,
         max_question_length=16,
         max_seq_length=64,
         doc_stride=32,
         feature_cache_dir=tmp_module,
     )
-
     test_features_distilbert = qa_processor_distilbert.preprocess(
         test_dataset,
-        batch_size=BATCH_SIZE,
-        num_gpus=NUM_GPUS,
         is_training=False,
         max_question_length=16,
         max_seq_length=64,
@@ -151,11 +141,21 @@ def qa_test_data(qa_test_df, tmp_module):
 
 @pytest.mark.gpu
 def test_QAProcessor(qa_test_data, tmp_module):
-    for model_name in ["bert-base-cased", "xlnet-base-cased", "distilbert-base-uncased"]:
+    for model_name in [
+        "bert-base-cased",
+        "xlnet-base-cased",
+        "distilbert-base-uncased",
+    ]:
         qa_processor = QAProcessor(model_name=model_name, cache_dir=tmp_module)
-        qa_processor.preprocess(qa_test_data["train_dataset"], is_training=True, feature_cache_dir=tmp_module)
-        qa_processor.preprocess(qa_test_data["train_dataset_list"], is_training=True, feature_cache_dir=tmp_module)
-        qa_processor.preprocess(qa_test_data["test_dataset"], is_training=False, feature_cache_dir=tmp_module)
+        qa_processor.preprocess(
+            qa_test_data["train_dataset"], is_training=True, feature_cache_dir=tmp_module,
+        )
+        qa_processor.preprocess(
+            qa_test_data["train_dataset_list"], is_training=True, feature_cache_dir=tmp_module,
+        )
+        qa_processor.preprocess(
+            qa_test_data["test_dataset"], is_training=False, feature_cache_dir=tmp_module,
+        )
 
     # test unsupported model type
     with pytest.raises(ValueError):
@@ -163,18 +163,24 @@ def test_QAProcessor(qa_test_data, tmp_module):
 
     # test training data has no ground truth exception
     with pytest.raises(Exception):
-        qa_processor.preprocess(qa_test_data["test_dataset"], is_training=True, feature_cache_dir=tmp_module)
+        qa_processor.preprocess(
+            qa_test_data["test_dataset"], is_training=True, feature_cache_dir=tmp_module
+        )
 
     # test when answer start is a list, but answer text is not
     with pytest.raises(Exception):
         qa_processor.preprocess(
-            qa_test_data["train_dataset_start_text_mismatch"], is_training=True, feature_cache_dir=tmp_module,
+            qa_test_data["train_dataset_start_text_mismatch"],
+            is_training=True,
+            feature_cache_dir=tmp_module,
         )
 
     # test when training data has multiple answers
     with pytest.raises(Exception):
         qa_processor.preprocess(
-            qa_test_data["train_dataset_multi_answers"], is_training=True, feature_cache_dir=tmp_module,
+            qa_test_data["train_dataset_multi_answers"],
+            is_training=True,
+            feature_cache_dir=tmp_module,
         )
 
 
@@ -190,7 +196,9 @@ def test_AnswerExtractor(qa_test_data, tmp_module):
     assert os.path.exists(os.path.join(model_output_dir, "pytorch_model.bin"))
     assert os.path.exists(os.path.join(model_output_dir, "config.json"))
 
-    qa_extractor_from_cache = AnswerExtractor(cache_dir=tmp_module, load_model_from_dir=model_output_dir)
+    qa_extractor_from_cache = AnswerExtractor(
+        cache_dir=tmp_module, load_model_from_dir=model_output_dir
+    )
     qa_extractor_from_cache.predict(test_loader_bert, verbose=False)
 
     # xlnet
@@ -202,8 +210,12 @@ def test_AnswerExtractor(qa_test_data, tmp_module):
 
     # distilbert
     train_loader_xlnet = dataloader_from_dataset(qa_test_data["train_features_distilbert"])
-    test_loader_xlnet = dataloader_from_dataset(qa_test_data["test_features_distilbert"], shuffle=False)
-    qa_extractor_distilbert = AnswerExtractor(model_name="distilbert-base-uncased", cache_dir=tmp_module)
+    test_loader_xlnet = dataloader_from_dataset(
+        qa_test_data["test_features_distilbert"], shuffle=False
+    )
+    qa_extractor_distilbert = AnswerExtractor(
+        model_name="distilbert-base-uncased", cache_dir=tmp_module
+    )
     qa_extractor_distilbert.fit(train_loader_xlnet, verbose=False, cache_model=False)
     qa_extractor_distilbert.predict(test_loader_xlnet, verbose=False)
 
