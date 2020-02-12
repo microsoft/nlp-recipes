@@ -56,7 +56,8 @@ def parallelize_model(model, device, num_gpus=None, gpu_ids=None, local_rank=-1)
             Defaults to -1.
     Returns:
         Module, DataParallel, DistributedDataParallel: A PyTorch Module or
-            a DataParallel/DistributedDataParallel wrapper (when multiple gpus are used).
+            a DataParallel/DistributedDataParallel wrapper,
+            when multiple gpus are used.
     """
     if not isinstance(device, torch.device):
         raise ValueError("device must be of type torch.device.")
@@ -67,7 +68,7 @@ def parallelize_model(model, device, num_gpus=None, gpu_ids=None, local_rank=-1)
     # wrap in DataParallel or DistributedDataParallel
     if local_rank != -1:
         model = torch.nn.parallel.DistributedDataParallel(
-            model, device_ids=[local_rank], output_device=local_rank, find_unused_parameters=True
+            model, device_ids=[local_rank], output_device=local_rank, find_unused_parameters=True,
         )
     else:
         if device.type == "cuda":
@@ -95,7 +96,8 @@ def dataloader_from_dataset(ds, batch_size=32, num_gpus=None, shuffle=False, dis
             Defaults to 32.
         num_gpus (int, optional): The number of GPUs to be used. Defaults to None.
         shuffle (bool, optional): If True, a RandomSampler is used. Defaults to False.
-        distributed (book, optional): If True, a DistributedSampler is used. Defaults to False.
+        distributed (book, optional): If True, a DistributedSampler is used.
+        Defaults to False.
 
     Returns:
         Module, DataParallel: A PyTorch Module or
@@ -122,8 +124,8 @@ def compute_training_steps(dataloader, num_epochs=1, max_steps=-1, gradient_accu
         num_epochs (int, optional): Number of training epochs. Defaults to 1.
         max_steps (int, optional): Total number of training steps.
             If set to a positive value, it overrides num_epochs.
-            Otherwise, it's determined by the dataset length, gradient_accumulation_steps,
-            and num_epochs.
+            Otherwise, it's determined by the dataset length,
+            gradient_accumulation_steps, and num_epochs.
             Defaults to -1.
         gradient_accumulation_steps (int, optional): Number of steps to accumulate
             before performing a backward/update pass.
@@ -142,3 +144,22 @@ def compute_training_steps(dataloader, num_epochs=1, max_steps=-1, gradient_accu
     if max_steps <= 0:
         raise Exception("Max steps cannot be determined.")
     return max_steps
+
+
+def get_amp(fp16):
+    """This function ensures that fp16 execution of torch.einsum is enabled
+        if args.fp16 is set. Otherwise, it'll default to "promote" mode,
+        where the operations are in fp32.
+        Note that running `--fp16_opt_level="O2"` will remove the need for this code.
+    """
+    # Before we do anything with models, we want to
+    if fp16:
+        try:
+            from apex import amp
+
+            amp.register_half_function(torch, "einsum")
+        except ImportError:
+            raise ImportError("Please install apex from https://www.github.com/nvidia/apex")
+    else:
+        amp = None
+    return amp

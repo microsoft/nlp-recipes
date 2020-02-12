@@ -2,25 +2,47 @@
 # Licensed under the MIT License.
 
 import numpy as np
-from transformers.modeling_albert import ALBERT_PRETRAINED_MODEL_ARCHIVE_MAP, AlbertForSequenceClassification
-from transformers.modeling_bert import BERT_PRETRAINED_MODEL_ARCHIVE_MAP, BertForSequenceClassification
+from transformers.modeling_albert import (
+    ALBERT_PRETRAINED_MODEL_ARCHIVE_MAP,
+    AlbertForSequenceClassification,
+)
+from transformers.modeling_bert import (
+    BERT_PRETRAINED_MODEL_ARCHIVE_MAP,
+    BertForSequenceClassification,
+)
 from transformers.modeling_distilbert import (
     DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP,
     DistilBertForSequenceClassification,
 )
-from transformers.modeling_roberta import ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP, RobertaForSequenceClassification
-from transformers.modeling_xlnet import XLNET_PRETRAINED_MODEL_ARCHIVE_MAP, XLNetForSequenceClassification
+from transformers.modeling_roberta import (
+    ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP,
+    RobertaForSequenceClassification,
+)
+from transformers.modeling_xlnet import (
+    XLNET_PRETRAINED_MODEL_ARCHIVE_MAP,
+    XLNetForSequenceClassification,
+)
 
 from utils_nlp.common.pytorch_utils import compute_training_steps
-from utils_nlp.models.transformers.common import MAX_SEQ_LEN, TOKENIZER_CLASS, Transformer
+from utils_nlp.models.transformers.common import (
+    MAX_SEQ_LEN,
+    TOKENIZER_CLASS,
+    Transformer,
+)
 from utils_nlp.models.transformers.datasets import SCDataSet, SPCDataSet
 
 MODEL_CLASS = {}
 MODEL_CLASS.update({k: BertForSequenceClassification for k in BERT_PRETRAINED_MODEL_ARCHIVE_MAP})
-MODEL_CLASS.update({k: RobertaForSequenceClassification for k in ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP})
+MODEL_CLASS.update(
+    {k: RobertaForSequenceClassification for k in ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP}
+)
 MODEL_CLASS.update({k: XLNetForSequenceClassification for k in XLNET_PRETRAINED_MODEL_ARCHIVE_MAP})
-MODEL_CLASS.update({k: DistilBertForSequenceClassification for k in DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP})
-MODEL_CLASS.update({k: AlbertForSequenceClassification for k in ALBERT_PRETRAINED_MODEL_ARCHIVE_MAP})
+MODEL_CLASS.update(
+    {k: DistilBertForSequenceClassification for k in DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP}
+)
+MODEL_CLASS.update(
+    {k: AlbertForSequenceClassification for k in ALBERT_PRETRAINED_MODEL_ARCHIVE_MAP}
+)
 
 
 class Processor:
@@ -32,15 +54,15 @@ class Processor:
             Call SequenceClassifier.list_supported_models() to get all supported models.
             Defaults to "bert-base-cased".
         to_lower (bool, optional): Whether to convert all letters to lower case during
-            tokenization. This is determined by if a cased model is used. Defaults to False,
-            which corresponds to a cased model.
+            tokenization. This is determined by if a cased model is used.
+            Defaults to False, which corresponds to a cased model.
         cache_dir (str, optional): Directory to cache the tokenizer. Defaults to ".".
         output_loading_info (bool, optional): Display tokenizer loading info if True.
     """
 
     def __init__(self, model_name="bert-base-cased", to_lower=False, cache_dir="."):
         self.tokenizer = TOKENIZER_CLASS[model_name].from_pretrained(
-            model_name, do_lower_case=to_lower, cache_dir=cache_dir, output_loading_info=False
+            model_name, do_lower_case=to_lower, cache_dir=cache_dir, output_loading_info=False,
         )
 
     @staticmethod
@@ -61,9 +83,19 @@ class Processor:
                 Labels are only returned when train_mode is True.
         """
         batch = tuple(t.to(device) for t in batch)
-        if model_name.split("-")[0] in ["bert", "xlnet", "roberta", "distilbert", "albert"]:
+        if model_name.split("-")[0] in [
+            "bert",
+            "xlnet",
+            "roberta",
+            "distilbert",
+            "albert",
+        ]:
             if train_mode:
-                inputs = {"input_ids": batch[0], "attention_mask": batch[1], "labels": batch[3]}
+                inputs = {
+                    "input_ids": batch[0],
+                    "attention_mask": batch[1],
+                    "labels": batch[3],
+                }
             else:
                 inputs = {"input_ids": batch[0], "attention_mask": batch[1]}
 
@@ -93,7 +125,11 @@ class Processor:
             print("setting max_len to max allowed sequence length: {}".format(MAX_SEQ_LEN))
             max_len = MAX_SEQ_LEN
         # truncate and add CLS & SEP markers
-        tokens = [tokenizer.cls_token] + tokenizer.tokenize(text)[0 : max_len - 2] + [tokenizer.sep_token]
+        tokens = (
+            [tokenizer.cls_token]
+            + tokenizer.tokenize(text)[0 : max_len - 2]
+            + [tokenizer.sep_token]
+        )
         # get input ids
         input_ids = tokenizer.convert_tokens_to_ids(tokens)
         # pad sequence
@@ -174,10 +210,17 @@ class Processor:
 
         return input_ids, attention_mask, token_type_ids
 
-    def dataset_from_dataframe(self, df, text_col, label_col=None, text2_col=None, max_len=MAX_SEQ_LEN):
+    def dataset_from_dataframe(
+        self, df, text_col, label_col=None, text2_col=None, max_len=MAX_SEQ_LEN
+    ):
         if text2_col is None:
             return SCDataSet(
-                df, text_col, label_col, transform=Processor.text_transform, tokenizer=self.tokenizer, max_len=max_len,
+                df,
+                text_col,
+                label_col,
+                transform=Processor.text_transform,
+                tokenizer=self.tokenizer,
+                max_len=max_len,
             )
         else:
             return SPCDataSet(
@@ -194,7 +237,10 @@ class Processor:
 class SequenceClassifier(Transformer):
     def __init__(self, model_name="bert-base-cased", num_labels=2, cache_dir="."):
         super().__init__(
-            model_class=MODEL_CLASS, model_name=model_name, num_labels=num_labels, cache_dir=cache_dir,
+            model_class=MODEL_CLASS,
+            model_name=model_name,
+            num_labels=num_labels,
+            cache_dir=cache_dir,
         )
 
     @staticmethod
@@ -214,6 +260,9 @@ class SequenceClassifier(Transformer):
         learning_rate=5e-5,
         adam_epsilon=1e-8,
         warmup_steps=0,
+        fp16=False,
+        fp16_opt_level="O1",
+        checkpoint_state_dict=None,
         verbose=True,
         seed=None,
     ):
@@ -225,36 +274,62 @@ class SequenceClassifier(Transformer):
             num_epochs (int, optional): Number of training epochs. Defaults to 1.
             max_steps (int, optional): Total number of training steps.
                 If set to a positive value, it overrides num_epochs.
-                Otherwise, it's determined by the dataset length, gradient_accumulation_steps, and num_epochs.
+                Otherwise, it's determined by the dataset length,
+                gradient_accumulation_steps, and num_epochs.
                 Defualts to -1.
             gradient_accumulation_steps (int, optional): Number of steps to accumulate
                 before performing a backward/update pass.
                 Default to 1.
-            num_gpus (int, optional): The number of GPUs to use. If None, all available GPUs will
-                be used. If set to 0 or GPUs are not available, CPU device will be used.
+            num_gpus (int, optional): The number of GPUs to use.
+                If None, all available GPUs will be used.
+                If set to 0 or GPUs are not available, CPU device will be used.
                 Defaults to None.
             gpu_ids (list): List of GPU IDs to be used.
                 If set to None, the first num_gpus GPUs will be used.
                 Defaults to None.
-            local_rank (int, optional): Local_rank for distributed training on GPUs. Defaults to
-                -1, which means non-distributed training.
-            weight_decay (float, optional): Weight decay to apply after each parameter update.
+            local_rank (int, optional): Local_rank for distributed training on GPUs.
+                Defaults to -1, which means non-distributed training.
+            weight_decay (float, optional): Weight decay to apply after each
+                parameter update.
                 Defaults to 0.0.
-            learning_rate (float, optional):  Learning rate of the AdamW optimizer. Defaults to
-                5e-5.
-            adam_epsilon (float, optional): Epsilon of the AdamW optimizer. Defaults to 1e-8.
-            warmup_steps (int, optional): Number of steps taken to increase learning rate from 0
-                to `learning rate`. Defaults to 0.
-            verbose (bool, optional): Whether to print out the training log. Defaults to True.
-            seed (int, optional): Random seed used to improve reproducibility. Defaults to None.
+            learning_rate (float, optional):  Learning rate of the AdamW optimizer.
+                Defaults to 5e-5.
+            adam_epsilon (float, optional): Epsilon of the AdamW optimizer.
+                Defaults to 1e-8.
+            warmup_steps (int, optional): Number of steps taken to increase learning
+                rate from 0 to `learning rate`. Defaults to 0.
+            fp16 (bool): Whether to use 16-bit mixed precision through Apex
+                Defaults to False
+            fp16_opt_level (str): Apex AMP optimization level for fp16.
+                One of in ['O0', 'O1', 'O2', and 'O3']
+                See https://nvidia.github.io/apex/amp.html"
+                Defaults to "01"
+            checkpoint_state_dict (dict): Checkpoint states of model and optimizer.
+                If specified, the model and optimizer's parameters are loaded using
+                checkpoint_state_dict["model"] and checkpoint_state_dict["optimizer"]
+                Defaults to None,
+            verbose (bool, optional): Whether to print out the training log.
+                Defaults to True.
+            seed (int, optional): Random seed used to improve reproducibility.
+                Defaults to None.
         """
 
-        # init optimizer
-        optimizer = Transformer.get_default_optimizer(self.model, weight_decay, learning_rate, adam_epsilon)
+        # init device and optimizer
+        device, num_gpus, optimizer, amp = self.prepare_model_and_optimizer(
+            num_gpus=num_gpus,
+            gpu_ids=gpu_ids,
+            local_rank=local_rank,
+            weight_decay=weight_decay,
+            learning_rate=learning_rate,
+            adam_epsilon=adam_epsilon,
+            fp16=fp16,
+            fp16_opt_level=fp16_opt_level,
+            checkpoint_state_dict=checkpoint_state_dict,
+        )
 
         # compute the max number of training steps
         max_steps = compute_training_steps(
-            train_dataloader,
+            dataloader=train_dataloader,
             num_epochs=num_epochs,
             max_steps=max_steps,
             gradient_accumulation_steps=gradient_accumulation_steps,
@@ -262,19 +337,21 @@ class SequenceClassifier(Transformer):
 
         # init scheduler
         scheduler = Transformer.get_default_scheduler(
-            optimizer=optimizer, warmup_steps=warmup_steps, num_training_steps=max_steps,
+            optimizer=optimizer, warmup_steps=warmup_steps, num_training_steps=max_steps
         )
 
         # fine tune
         super().fine_tune(
             train_dataloader=train_dataloader,
             get_inputs=Processor.get_inputs,
+            device=device,
             num_gpus=num_gpus,
-            gpu_ids=gpu_ids,
             max_steps=max_steps,
             gradient_accumulation_steps=gradient_accumulation_steps,
             optimizer=optimizer,
             scheduler=scheduler,
+            fp16=fp16,
+            amp=amp,
             local_rank=local_rank,
             verbose=verbose,
             seed=seed,
@@ -286,13 +363,15 @@ class SequenceClassifier(Transformer):
 
         Args:
             test_dataloader (DataLoader): DataLoader for scoring the data.
-            num_gpus (int, optional): The number of GPUs to use. If None, all available GPUs will
-                be used. If set to 0 or GPUs are not available, CPU device will be used.
+            num_gpus (int, optional): The number of GPUs to use.
+                If None, all available GPUs will be used. If set to 0 or GPUs are
+                not available, CPU device will be used.
                 Defaults to None.
             gpu_ids (list): List of GPU IDs to be used.
                 If set to None, the first num_gpus GPUs will be used.
                 Defaults to None.
-            verbose (bool, optional): Whether to print out the training log. Defaults to True.
+            verbose (bool, optional): Whether to print out the training log.
+                Defaults to True.
 
         Returns
             1darray: numpy array of predicted label indices.
