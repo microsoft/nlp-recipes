@@ -32,9 +32,13 @@ from utils_nlp.common.pytorch_utils import (
 
 TOKENIZER_CLASS = {}
 TOKENIZER_CLASS.update({k: BertTokenizer for k in BERT_PRETRAINED_MODEL_ARCHIVE_MAP})
-TOKENIZER_CLASS.update({k: RobertaTokenizer for k in ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP})
+TOKENIZER_CLASS.update(
+    {k: RobertaTokenizer for k in ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP}
+)
 TOKENIZER_CLASS.update({k: XLNetTokenizer for k in XLNET_PRETRAINED_MODEL_ARCHIVE_MAP})
-TOKENIZER_CLASS.update({k: DistilBertTokenizer for k in DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP})
+TOKENIZER_CLASS.update(
+    {k: DistilBertTokenizer for k in DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP}
+)
 
 MAX_SEQ_LEN = 512
 
@@ -63,7 +67,10 @@ class Transformer:
         self.load_model_from_dir = load_model_from_dir
         if load_model_from_dir is None:
             self.model = model_class[model_name].from_pretrained(
-                model_name, cache_dir=cache_dir, num_labels=num_labels, output_loading_info=False,
+                model_name,
+                cache_dir=cache_dir,
+                num_labels=num_labels,
+                output_loading_info=False,
             )
         else:
             logger.info("Loading cached model from {}".format(load_model_from_dir))
@@ -93,24 +100,32 @@ class Transformer:
         optimizer_grouped_parameters = [
             {
                 "params": [
-                    p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)
+                    p
+                    for n, p in model.named_parameters()
+                    if not any(nd in n for nd in no_decay)
                 ],
                 "weight_decay": weight_decay,
             },
             {
                 "params": [
-                    p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)
+                    p
+                    for n, p in model.named_parameters()
+                    if any(nd in n for nd in no_decay)
                 ],
                 "weight_decay": 0.0,
             },
         ]
-        optimizer = AdamW(optimizer_grouped_parameters, lr=learning_rate, eps=adam_epsilon)
+        optimizer = AdamW(
+            optimizer_grouped_parameters, lr=learning_rate, eps=adam_epsilon
+        )
         return optimizer
 
     @staticmethod
     def get_default_scheduler(optimizer, warmup_steps, num_training_steps):
         scheduler = get_linear_schedule_with_warmup(
-            optimizer, num_warmup_steps=warmup_steps, num_training_steps=num_training_steps,
+            optimizer,
+            num_warmup_steps=warmup_steps,
+            num_training_steps=num_training_steps,
         )
         return scheduler
 
@@ -143,12 +158,14 @@ class Transformer:
         amp = get_amp(fp16)
 
         # get device
-        device, num_gpus = get_device(num_gpus=num_gpus, gpu_ids=gpu_ids, local_rank=local_rank)
+        device, num_gpus = get_device(
+            num_gpus=num_gpus, gpu_ids=gpu_ids, local_rank=local_rank
+        )
 
         # move model
         self.model = move_model_to_device(model=self.model, device=device)
 
-        # init optimizer and scheduler
+        # init optimizer
         optimizer = Transformer.get_default_optimizer(
             self.model, weight_decay, learning_rate, adam_epsilon
         )
@@ -242,7 +259,9 @@ class Transformer:
                                 amp.master_params(optimizer), max_grad_norm
                             )
                         else:
-                            torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_grad_norm)
+                            torch.nn.utils.clip_grad_norm_(
+                                self.model.parameters(), max_grad_norm
+                            )
 
                     if global_step % report_every == 0 and verbose:
                         end = time.time()
@@ -271,7 +290,8 @@ class Transformer:
                     if save_every != -1 and global_step % save_every == 0 and verbose:
                         self.save_model(
                             os.path.join(
-                                self.cache_dir, f"{self.model_name}_step_{global_step}.pt",
+                                self.cache_dir,
+                                f"{self.model_name}_step_{global_step}.pt",
                             )
                         )
                 if global_step > max_steps:
@@ -289,7 +309,11 @@ class Transformer:
 
         # parallelize model
         self.model = parallelize_model(
-            model=self.model, device=device, num_gpus=num_gpus, gpu_ids=gpu_ids, local_rank=-1,
+            model=self.model,
+            device=device,
+            num_gpus=num_gpus,
+            gpu_ids=gpu_ids,
+            local_rank=-1,
         )
 
         # predict

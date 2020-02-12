@@ -4,7 +4,6 @@
 import os
 
 import nltk
-nltk.download("punkt")
 import pytest
 from nltk import tokenize
 
@@ -15,7 +14,7 @@ from utils_nlp.models.transformers.extractive_summarization import (
     ExtSumProcessor,
 )
 
-
+nltk.download("punkt")
 
 
 # @pytest.fixture()
@@ -29,7 +28,11 @@ def source_data():
 
 # @pytest.fixture()
 def target_data():
-    return "welcome to microsoft/nlp." "Welcome to text summarization." "Welcome to Microsoft NERD."
+    return (
+        "welcome to microsoft/nlp."
+        "Welcome to text summarization."
+        "Welcome to Microsoft NERD."
+    )
 
 
 MODEL_NAME = "distilbert-base-uncased"
@@ -49,10 +52,18 @@ def data_to_file(tmp_module):
     f.write(target)
     f.close()
     train_dataset = SummarizationDataset(
-        source_file, target_file, [tokenize.sent_tokenize], [tokenize.sent_tokenize], nltk.word_tokenize,
+        source_file,
+        target_file,
+        [tokenize.sent_tokenize],
+        [tokenize.sent_tokenize],
+        nltk.word_tokenize,
     )
     test_dataset = SummarizationDataset(
-        source_file, target_file, [tokenize.sent_tokenize], [tokenize.sent_tokenize], nltk.word_tokenize,
+        source_file,
+        target_file,
+        [tokenize.sent_tokenize],
+        [tokenize.sent_tokenize],
+        nltk.word_tokenize,
     )
 
     processor = ExtSumProcessor(
@@ -63,12 +74,20 @@ def data_to_file(tmp_module):
         min_nsents=0,
         min_src_ntokens=1,
     )
-    ext_sum_train = processor.preprocess(train_dataset, train_dataset.get_target(), oracle_mode="greedy")
-    ext_sum_test = processor.preprocess(test_dataset, test_dataset.get_target(), oracle_mode="greedy")
+    ext_sum_train = processor.preprocess(
+        train_dataset, train_dataset.get_target(), oracle_mode="greedy"
+    )
+    ext_sum_test = processor.preprocess(
+        test_dataset, test_dataset.get_target(), oracle_mode="greedy"
+    )
 
     save_path = os.path.join(tmp_module, "processed")
-    train_files = ExtSumProcessedData.save_data(ext_sum_train, is_test=False, save_path=save_path, chunk_size=2000)
-    test_files = ExtSumProcessedData.save_data(ext_sum_test, is_test=True, save_path=save_path, chunk_size=2000)
+    train_files = ExtSumProcessedData.save_data(
+        ext_sum_train, is_test=False, save_path=save_path, chunk_size=2000
+    )
+    test_files = ExtSumProcessedData.save_data(
+        ext_sum_test, is_test=True, save_path=save_path, chunk_size=2000
+    )
     print(train_files)
     print(test_files)
     assert os.path.exists(train_files[0])
@@ -87,7 +106,6 @@ def test_bert_training(data_to_file, tmp_module):
     MAX_STEPS = 2e2
     WARMUP_STEPS = 1e2
     DATA_SAVED_PATH = data_to_file
-    result_base_path = "./results"
 
     train_dataset, test_dataset = ExtSumProcessedData().splits(root=DATA_SAVED_PATH)
     summarizer = ExtractiveSummarizer(MODEL_NAME, ENCODER, CACHE_DIR)
@@ -104,6 +122,6 @@ def test_bert_training(data_to_file, tmp_module):
         clip_grad_norm=False,
     )
 
-    target = [i["tgt_txt"] for i in test_dataset]
+    _ = [i["tgt_txt"] for i in test_dataset]
     prediction = summarizer.predict(test_dataset, num_gpus=NUM_GPUS, batch_size=128)
     assert len(prediction) == 1
