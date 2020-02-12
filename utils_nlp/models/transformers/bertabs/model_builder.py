@@ -156,10 +156,10 @@ def build_optim_dec(
     return optim
 
 
-def get_generator(vocab_size, dec_hidden_size, device):
+def get_generator(vocab_size, dec_hidden_size):
     gen_func = nn.LogSoftmax(dim=-1)
     generator = nn.Sequential(nn.Linear(dec_hidden_size, vocab_size), gen_func)
-    generator.to(device)
+    #generator.to(device)
 
     return generator
 
@@ -187,7 +187,6 @@ class Bert(nn.Module):
 class AbsSummarizer(nn.Module):
     def __init__(
         self,
-        device,
         large=False,
         temp_dir="./",
         finetune_bert=True,
@@ -209,7 +208,6 @@ class AbsSummarizer(nn.Module):
         bert_from_extractive=None,
     ):
         super(AbsSummarizer, self).__init__()
-        self.device = device
         self.bert = Bert(large, temp_dir, finetune_bert)
 
         if bert_from_extractive is not None:
@@ -263,7 +261,7 @@ class AbsSummarizer(nn.Module):
             embeddings=tgt_embeddings,
         )
 
-        self.generator = get_generator(self.vocab_size, dec_hidden_size, device)
+        self.generator = get_generator(self.vocab_size, dec_hidden_size)
         self.generator[0].weight = self.decoder.embeddings.weight
 
         if checkpoint is not None:
@@ -292,7 +290,12 @@ class AbsSummarizer(nn.Module):
                 self.decoder.embeddings = tgt_embeddings
                 self.generator[0].weight = self.decoder.embeddings.weight
 
-        self.to(device)
+    def move_to_device(self, device, move_to_device_fn):
+        #self.to(device)
+        #self.generator = move_to_device_fn(self.generator, device)
+        self = move_to_device_fn(self, device)
+        return self
+
 
     # def forward(self, src, tgt, segs, clss, mask_src, mask_tgt, mask_cls):
     def forward(self, src, segs, mask_src, tgt):  # , mask_tgt, mask_cls):

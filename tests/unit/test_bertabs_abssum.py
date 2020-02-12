@@ -16,7 +16,7 @@ from utils_nlp.models.transformers.datasets import (
     SummarizationDataset,
     SummarizationNonIterableDataset,
 )
-from utils_nlp.models.transformers.abssum import AbsSum, AbsSumProcessor, validation
+from utils_nlp.models.transformers.abssum import AbsSum, AbsSumProcessor, validate
 
 from utils_nlp.dataset.cnndm import CNNDMBertSumProcessedData, CNNDMSummarizationDataset
 from utils_nlp.models.transformers.datasets import SummarizationNonIterableDataset
@@ -75,9 +75,12 @@ def shorten_dataset(dataset, top_n=-1):
 def pretrained_model():
     return torch.load(os.path.join(MODEL_PATH, "model_step_148000_torch1.4.0.pt"))
 
-
-def test_train_model():
-    if TOP_N != -1:
+def preprocess_cnndm_abs():
+    #TOP_N = -1
+    train_data_path = os.path.join(DATA_PATH, "train_abssum_dataset_full.pt")
+    test_data_path = os.path.join(DATA_PATH, "test_abssum_dataset_full.pt")
+    if False:
+        print("processing data")
         train_dataset, test_dataset = CNNDMSummarizationDataset(
             top_n=TOP_N, local_cache_path=DATA_PATH, prepare_extractive=False
         )
@@ -88,32 +91,39 @@ def test_train_model():
         source = [x[0] for x in list(train_dataset.get_source())]
         target = [x[0] for x in list(train_dataset.get_target())]
         train_sum_dataset = SummarizationNonIterableDataset(source, target)
+        
+        if TOP_N == -1:
+            torch.save(train_sum_dataset, train_data_path)
+            torch.save(test_sum_dataset, test_data_path)
 
     else:
-        train_sum_dataset = torch.load(
-            os.path.join(DATA_PATH, "train_abssum_dataset_full.pt")
-        )
-        test_sum_dataset = torch.load(
-            os.path.join(DATA_PATH, "test_abssum_dataset_full.pt")
-        )
+        train_sum_dataset = torch.load(train_data_path)
+        test_sum_dataset = torch.load(test_data_path)
+    return train_sum_dataset, test_sum_dataset
 
+def test_train_model():
+   
+    train_sum_dataset, test_sum_dataset = preprocess_cnndm_abs()
     processor = AbsSumProcessor(cache_dir=CACHE_PATH)
-    checkpoint=torch.load(os.path.join(MODEL_PATH, "summarizer_step10000pt"))
+    #checkpoint=torch.load(os.path.join(MODEL_PATH, "summarizer_step10000pt"))
     summarizer = AbsSum(
         processor, checkpoint=None, cache_dir=CACHE_PATH
     )
+    
+    def this_validate(saved_model_path):
+        return validate(saved_model_path, os.path.join(DATA_PATH, "test_abssum_dataset_full.pt"), CACHE_PATH)
     summarizer.fit(
         train_sum_dataset,
         batch_size=5,
-        max_steps=40000,
+        max_steps=20000,
         warmup_steps_bert=20000,
         warmup_steps_dec=10000,
-        num_gpus=4,
-        save_every=1000,
+        num_gpus=2,
+        save_every=100,
         report_every=100,
-        validation_function=validation,
+        validation_function=this_validate,
     )
-    saved_model_path = os.path.join(MODEL_PATH, "summarizer_step50000pt")
+    saved_model_path = os.path.join(MODEL_PATH, "summarizer_step20000pt")
     summarizer.save_model(saved_model_path)
 
     summarizer = AbsSum(
@@ -143,25 +153,21 @@ def test_train_model():
 
 
 def test_pretrained_model():
-    train_dataset, test_dataset = CNNDMSummarizationDataset(
-        top_n=TOP_N, local_cache_path=DATA_PATH, prepare_extractive=False
-    )
-    source = [x[0] for x in list(test_dataset.get_source())]
-    target = [x[0] for x in list(test_dataset.get_target())]
-    test_sum_dataset = SummarizationNonIterableDataset(source, target)
-
+    train_sum_dataset, test_sum_dataset = preprocess_cnndm_abs()
+    
     processor = AbsSumProcessor(cache_dir=CACHE_PATH)
     summarizer = AbsSum(
         processor,
         checkpoint=torch.load(os.path.join(MODEL_PATH, "model_step_148000_torch1.4.0.pt")),
         cache_dir=CACHE_PATH,
     )
-
-    src = test_sum_dataset.source[0:TOP_N]
-    reference_summaries = ["".join(t).rstrip("\n") for t in test_sum_dataset.target[0:TOP_N]]
+    
+    top_n = 10
+    src = test_sum_dataset.source[0:top_n]
+    reference_summaries = ["".join(t).rstrip("\n") for t in test_sum_dataset.target[0:top_n]]
     print("start prediction")
     generated_summaries = summarizer.predict(
-        shorten_dataset(test_sum_dataset, top_n=TOP_N), batch_size=8
+        shorten_dataset(test_sum_dataset, top_n=top_n), batch_size=8, num_gpus=2
     )
     assert len(generated_summaries) == len(reference_summaries)
     RESULT_DIR = TemporaryDirectory().name
@@ -170,6 +176,7 @@ def test_pretrained_model():
     assert rouge_score["rouge_2_f_score"] > 0.17
 
 
-test_preprocessing()
+#test_preprocessing()
+#preprocess_cnndm_abs()
 #test_train_model()
 test_pretrained_model()

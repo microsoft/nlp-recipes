@@ -94,7 +94,10 @@ class Translator(object):
 
         # self.args = args
         self.model = model
-        self.generator = self.model.generator
+        self.generator = model.generator
+        self.decoder = model.decoder
+        self.bert = model.bert
+
         self.vocab = vocab
         self.symbols = symbols
         self.start_token = symbols["BOS"]
@@ -123,6 +126,22 @@ class Translator(object):
                 "scores": [],
                 "log_probs": [],
             }
+
+    def move_to_device(self, device, move_to_device_fn):
+        #self.to(device)
+        #self.generator = move_to_device_fn(self.generator, device)
+        self.move_to_device_fn = move_to_device_fn
+        self.model = move_to_device_fn(self.model, device)
+        self.generator = move_to_device_fn(self.generator, device)
+        self.decoder = move_to_device_fn(self.decoder, device)
+        self.bert = move_to_device_fn(self.bert, device)
+        return self
+
+    def eval(self):
+        self.model.eval()
+        self.generator.eval()
+        self.decoder.eval()
+        self.bert.eval()
 
     def _build_target_tokens(self, pred):
         # vocab = self.fields["tgt"].vocab
@@ -180,7 +199,8 @@ class Translator(object):
 
     def translate(self, batch, attn_debug=False):
 
-        self.model.eval()
+        #self.model.eval()
+        self.eval()
         # pred_results, gold_results = [], []
         with torch.no_grad():
             batch_data = self.translate_batch(batch)
@@ -221,8 +241,9 @@ class Translator(object):
         segs = batch.segs
         mask_src = batch.mask_src
 
-        src_features = self.model.bert(src, segs, mask_src)
-        dec_states = self.model.decoder.init_decoder_state(src, src_features, with_cache=True)
+        src_features = self.bert(src, segs, mask_src)
+        dec_states = self.decoder.init_decoder_state(src, src_features, with_cache=True)
+        
         device = src_features.device
 
         # Tile states and memory beam_size times.
@@ -256,7 +277,7 @@ class Translator(object):
             # Decoder forward.
             decoder_input = decoder_input.transpose(0, 1)
 
-            dec_out, dec_states = self.model.decoder(
+            dec_out, dec_states = self.decoder(
                 decoder_input, src_features, dec_states, step=step
             )
 

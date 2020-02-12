@@ -25,6 +25,7 @@ from utils_nlp.common.pytorch_utils import compute_training_steps, get_device
 from utils_nlp.dataset.sentence_selection import combination_selection, greedy_selection
 from utils_nlp.models.transformers.common import TOKENIZER_CLASS, Transformer
 
+from utils_nlp.common.pytorch_utils import move_model_to_device
 from .extractive_summarization import Bunch
 
 from torch.utils.data import SequentialSampler, RandomSampler, DataLoader
@@ -48,43 +49,13 @@ from utils_nlp.eval.evaluate_summarization import get_rouge
 
 from tempfile import TemporaryDirectory
 
+from utils_nlp.common.pytorch_utils import get_device
 
 def shorten_dataset(dataset, top_n=-1):
     if top_n == -1:
         return dataset
     return SummarizationNonIterableDataset(dataset.source[0:top_n], dataset.target[0:top_n])
 
-
-def validation(saved_model_path):
-    TOP_N = 10
-    processor = AbsSumProcessor(cache_dir="/dadendev/nlp/examples/text_summarization/")
-    test_sum_dataset = torch.load(
-        "/dadendev/nlp/examples/text_summarization/test_abssum_dataset_full.pt"
-    )
-    summarizer = AbsSum(
-        processor,
-        checkpoint=torch.load(saved_model_path),
-        cache_dir="/dadendev/nlp/examples/text_summarization/",
-    )
-
-    src = test_sum_dataset.source[0:TOP_N]
-    reference_summaries = ["".join(t).rstrip("\n") for t in test_sum_dataset.target[0:TOP_N]]
-    generated_summaries = summarizer.predict(
-        shorten_dataset(test_sum_dataset, top_n=TOP_N), batch_size=8
-    )
-    assert len(generated_summaries) == len(reference_summaries)
-    for i in generated_summaries[0:1]:
-        print(i)
-        print("\n")
-        print("###################")
-
-    for i in reference_summaries[0:1]:
-        print(i)
-        print("\n")
-
-    RESULT_DIR = TemporaryDirectory().name
-    rouge_score = get_rouge(generated_summaries, reference_summaries, RESULT_DIR)
-    return "rouge score: {}".format(rouge_score)
 
 
 def fit_to_block_size(sequence, block_size, pad_token_id):
@@ -358,6 +329,35 @@ class AbsSumProcessor:
         else:
             return story_token_ids
 
+def validate(saved_model_path, validate_data_path, cache_dir):
+    TOP_N = 10
+    processor = AbsSumProcessor(cache_dir=cache_dir)
+    test_sum_dataset = torch.load(validate_data_path)
+    summarizer = AbsSum(
+        processor,
+        checkpoint=torch.load(saved_model_path),
+        cache_dir=cache_dir,
+    )
+
+    src = test_sum_dataset.source[0:TOP_N]
+    reference_summaries = ["".join(t).rstrip("\n") for t in test_sum_dataset.target[0:TOP_N]]
+    generated_summaries = summarizer.predict(
+        shorten_dataset(test_sum_dataset, top_n=TOP_N), batch_size=8
+    )
+    assert len(generated_summaries) == len(reference_summaries)
+    for i in generated_summaries[0:1]:
+        print(i)
+        print("\n")
+        print("###################")
+
+    for i in reference_summaries[0:1]:
+        print(i)
+        print("\n")
+
+    RESULT_DIR = TemporaryDirectory().name
+    rouge_score = get_rouge(generated_summaries, reference_summaries, RESULT_DIR)
+    return "rouge score: {}".format(rouge_score)
+
 
 class AbsSum(Transformer):
     """class which performs extractive summarization fine tuning and prediction """
@@ -368,7 +368,6 @@ class AbsSum(Transformer):
         model_name="bert-base-uncased",
         encoder="encoder",
         finetune_bert=True,
-        label_smoothing=0.1,
         cache_dir=".",
         checkpoint=None,
     ):
@@ -402,33 +401,25 @@ class AbsSum(Transformer):
 
         self.model_class = MODEL_CLASS[model_name]
         self.checkpoint = checkpoint
-        from utils_nlp.common.pytorch_utils import get_device
+        self.cache_dir = cache_dir
 
-        device, num_gpus = get_device(num_gpus=4, local_rank=-1)
         self.model = AbsSummarizer(
-            device,
             temp_dir=cache_dir,
             encoder=encoder,
             finetune_bert=finetune_bert,
             checkpoint=checkpoint,
         )
-        self.device = device
         self.processor = processor
         self.optim_bert = None
         self.optim_dec = None
 
-        self.train_loss = abs_loss(
-            self.model.generator,
-            self.processor.symbols,
-            self.model.vocab_size,
-            device,
-            train=True,
-            label_smoothing=label_smoothing,
-        )
+        
 
     @staticmethod
     def list_supported_models():
         return list(MODEL_CLASS.keys())
+
+
 
     def fit(
         self,
@@ -454,6 +445,7 @@ class AbsSum(Transformer):
         seed=None,
         fp16=False,
         validation_function=None,
+        label_smoothing=0.1,
         **kwargs,
     ):
         """
@@ -491,24 +483,41 @@ class AbsSum(Transformer):
             verbose (bool, optional): Whether to print out the training log. Defaults to True.
             seed (int, optional): Random seed used to improve reproducibility. Defaults to None.
         """
+        self.train_loss = abs_loss(
+                self.model.generator,
+                self.processor.symbols,
+                self.model.vocab_size,
+                train=True,
+                label_smoothing=label_smoothing,
+            )
 
+        # get device
+        device, num_gpus = get_device(num_gpus=num_gpus, local_rank=local_rank)
+
+        # move model to devices
+        def this_model_move_callback(model, device):
+            return move_model_to_device(model, device, num_gpus=num_gpus, gpu_ids=None, local_rank=local_rank)
+        #self.model = move_model_to_device(self.model, device, num_gpus=num_gpus, None, local_rank=local_rank)
+        self.model = self.model.move_to_device(device, this_model_move_callback)
         # init optimizer
 
         self.optim_bert = model_builder.build_optim_bert(
             self.model,
-            visible_gpus="0,1,2,3",
+            visible_gpus=",".join([str(i) for i in range(num_gpus)]), #"0,1,2,3",
             lr_bert=learning_rate_bert,
             warmup_steps_bert=warmup_steps_bert,
             checkpoint=self.checkpoint,
         )
         self.optim_dec = model_builder.build_optim_dec(
             self.model,
-            visible_gpus="0,1,2,3",
+            visible_gpus=",".join([str(i) for i in range(num_gpus)]), #"0,1,2,3"
             lr_dec=learning_rate_dec,
             warmup_steps_dec=warmup_steps_dec,
             checkpoint=self.checkpoint,
         )
         optim = [self.optim_bert, self.optim_dec]
+
+        self.train_loss = move_model_to_device(self.train_loss, device, num_gpus=num_gpus, gpu_ids=None, local_rank=local_rank)
 
         def build_data_iterator(collate, dataset, batch_size=16, device="cuda"):
 
@@ -526,7 +535,7 @@ class AbsSum(Transformer):
         # batch_size is the number of tokens in a batch
         # train_dataloader = get_dataloader(train_dataset.get_stream(), is_labeled=True, batch_size=batch_size)
         train_dataloader = build_data_iterator(
-            self.processor.collate, train_dataset, batch_size=batch_size, device=self.device
+            self.processor.collate, train_dataset, batch_size=batch_size, device=device
         )
 
         # compute the max number of training steps
@@ -538,7 +547,7 @@ class AbsSum(Transformer):
 
         def loss(inputs, outputs):
             # return  self.train_loss.sharded_compute_loss(inputs, outputs, Bunch({"generator_shard_size":32}), normalization)
-            return self.train_loss.monolithic_compute_loss(inputs, outputs)
+            return self.train_loss.module.monolithic_compute_loss(inputs, outputs)
 
         super().fine_tune(
             train_dataloader=train_dataloader,
@@ -598,6 +607,12 @@ class AbsSum(Transformer):
             List of strings which are the summaries
 
         """
+        num_gpus = 1 
+        device, num_gpus = get_device(num_gpus=num_gpus, local_rank=-1)
+         # move model to devices
+        def this_model_move_callback(model, device):
+            return move_model_to_device(model, device, num_gpus=num_gpus, gpu_ids=None, local_rank=-1)
+        #self.model = move_model_to_device(self.model, device, num_gpus=num_gpus, None, local_rank=local_rank)
 
         def format_summary(translation):
             """ Transforms the output of the `from_batch` function
@@ -620,7 +635,7 @@ class AbsSum(Transformer):
         test_sampler = SequentialSampler(test_dataset)
 
         def collate_fn(data):
-            return self.processor.collate(data, 512, self.device, train_mode=False)
+            return self.processor.collate(data, 512, device, train_mode=False)
 
         test_dataloader = DataLoader(
             test_dataset, sampler=test_sampler, batch_size=batch_size, collate_fn=collate_fn,
@@ -634,6 +649,9 @@ class AbsSum(Transformer):
             min_length=min_length,
             max_length=max_length,
         )
+        self.model = self.model.move_to_device(device, this_model_move_callback)
+
+        predictor = predictor.move_to_device(device, this_model_move_callback)
 
         generated_summaries = []
         from tqdm import tqdm
