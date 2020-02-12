@@ -12,7 +12,7 @@
 import glob
 import nltk
 
-nltk.download("punkt")
+# nltk.download("punkt")
 from nltk import tokenize
 import os
 import sys
@@ -28,21 +28,24 @@ from utils_nlp.models.transformers.datasets import SummarizationDataset
 from utils_nlp.models.transformers.extractive_summarization import get_dataset, get_dataloader
 
 
-
-
-
 def CNNDMSummarizationDataset(*args, **kwargs):
     """Load the CNN/Daily Mail dataset preprocessed by harvardnlp group."""
 
-    REMAP = {"-lrb-": "(", "-rrb-": ")", "-lcb-": "{", "-rcb-": "}",
-         "-lsb-": "[", "-rsb-": "]", "``": '"', "''": '"'}
+    REMAP = {
+        "-lrb-": "(",
+        "-rrb-": ")",
+        "-lcb-": "{",
+        "-rcb-": "}",
+        "-lsb-": "[",
+        "-rsb-": "]",
+        "``": '"',
+        "''": '"',
+    }
 
-    
     def _clean(x):
         return re.sub(
-            r"-lrb-|-rrb-|-lcb-|-rcb-|-lsb-|-rsb-|``|''",
-            lambda m: REMAP.get(m.group()), x)
-
+            r"-lrb-|-rrb-|-lcb-|-rcb-|-lsb-|-rsb-|``|''", lambda m: REMAP.get(m.group()), x
+        )
 
     def _remove_ttags(line):
         line = re.sub(r"<t>", "", line)
@@ -51,14 +54,15 @@ def CNNDMSummarizationDataset(*args, **kwargs):
         line = re.sub(r"</t>", "<q>", line)
         return line
 
-
     def _target_sentence_tokenization(line):
         return line.split("<q>")
 
-    URLS = ["https://s3.amazonaws.com/opennmt-models/Summary/cnndm.tar.gz"]
-    
+    def join(sentences):
+        return " ".join(sentences)
 
-    def _setup_datasets(url, top_n=-1, local_cache_path=".data", tokenize_sentence=True):
+    URLS = ["https://s3.amazonaws.com/opennmt-models/Summary/cnndm.tar.gz"]
+
+    def _setup_datasets(url, top_n=-1, local_cache_path=".data", prepare_extractive=True):
         FILE_NAME = "cnndm.tar.gz"
         maybe_download(url, FILE_NAME, local_cache_path)
         dataset_tar = os.path.join(local_cache_path, FILE_NAME)
@@ -73,28 +77,49 @@ def CNNDMSummarizationDataset(*args, **kwargs):
             if fname.endswith("test.txt.tgt.tagged"):
                 test_target_file = fname
 
-        return (
-            SummarizationDataset(
-                train_source_file,
-                train_target_file,
-                [_clean, tokenize.sent_tokenize],
-                [_clean, _remove_ttags, _target_sentence_tokenization],
-                nltk.word_tokenize if tokenize_sentence else None,
-                top_n,
-            ),
-            SummarizationDataset(
-                test_source_file,
-                test_target_file,
-                [_clean, tokenize.sent_tokenize],
-                [_clean, _remove_ttags, _target_sentence_tokenization],
-                nltk.word_tokenize if tokenize_sentence else None,
-                top_n,
-            ),
-        )
+        if prepare_extractive:
+
+            return (
+                SummarizationDataset(
+                    train_source_file,
+                    train_target_file,
+                    [_clean, tokenize.sent_tokenize],
+                    [_clean, _remove_ttags, _target_sentence_tokenization],
+                    nltk.word_tokenize,
+                    top_n,
+                ),
+                SummarizationDataset(
+                    test_source_file,
+                    test_target_file,
+                    [_clean, tokenize.sent_tokenize],
+                    [_clean, _remove_ttags, _target_sentence_tokenization],
+                    nltk.word_tokenize,
+                    top_n,
+                ),
+            )
+        else:
+            return (
+                SummarizationDataset(
+                    train_source_file,
+                    train_target_file,
+                    [_clean, tokenize.sent_tokenize],
+                    [_clean, _remove_ttags, _target_sentence_tokenization],
+                    None,
+                    top_n,
+                ),
+                SummarizationDataset(
+                    test_source_file,
+                    test_target_file,
+                    [_clean, tokenize.sent_tokenize],
+                    [_clean, _remove_ttags, _target_sentence_tokenization],
+                    None,
+                    top_n,
+                ),
+            )
 
     return _setup_datasets(*((URLS[0],) + args), **kwargs)
-    
-    
+
+
 class CNNDMBertSumProcessedData:
     """Class to load dataset preprocessed by BertSum paper at 
         https://github.com/nlpyang/BertSum
@@ -116,5 +141,3 @@ class CNNDMBertSumProcessedData:
 
         downloaded_zipfile.extractall(local_path)
         return local_path
-
-    

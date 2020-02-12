@@ -82,7 +82,7 @@ class Translator(object):
         min_length,
         max_length,
         model,
-        tokenizer,
+        vocab,
         symbols,
         block_trigram=True,
         global_scorer=None,
@@ -95,7 +95,7 @@ class Translator(object):
         # self.args = args
         self.model = model
         self.generator = self.model.generator
-        self.tokenizer = tokenizer
+        self.vocab = vocab
         self.symbols = symbols
         self.start_token = symbols["BOS"]
         self.end_token = symbols["EOS"]
@@ -139,30 +139,31 @@ class Translator(object):
 
     def from_batch(self, translation_batch):
         batch = translation_batch["batch"]
-        assert len(translation_batch["gold_score"]) == len(translation_batch["predictions"])
+        # assert len(translation_batch["gold_score"]) == len(translation_batch["predictions"])
         batch_size = batch.batch_size
 
-        preds, pred_score, gold_score, tgt_str, src = (
+        # preds, pred_score, gold_score, tgt_str, src = (
+        preds, pred_score, src = (
             translation_batch["predictions"],
             translation_batch["scores"],
-            translation_batch["gold_score"],
-            batch.tgt_str,
+            # translation_batch["gold_score"],
+            # batch.tgt_str,
             batch.src,
         )
-        #print(preds)
-        #print(pred_score)
-        #print(batch.tgt_str)
-        #print(batch.src)
+        # print(preds)
+        # print(pred_score)
+        # print(batch.tgt_str)
+        # print(batch.src)
 
         translations = []
         for b in range(batch_size):
-            
+
             if len(preds[b]) < 1:
                 pred_sents = ""
             else:
                 pred_sents = self.vocab.convert_ids_to_tokens([int(n) for n in preds[b][0]])
                 pred_sents = " ".join(pred_sents).replace(" ##", "")
-            gold_sent = " ".join(tgt_str[b].split())
+            # gold_sent = " ".join(tgt_str[b].split())
             # translation = Translation(fname[b],src[:, b] if src is not None else None,
             #                           src_raw, pred_sents,
             #                           attn[b], pred_score[b], gold_sent,
@@ -170,7 +171,8 @@ class Translator(object):
             # src = self.spm.DecodeIds([int(t) for t in translation_batch['batch'].src[0][5] if int(t) != len(self.spm)])
             raw_src = [self.vocab.ids_to_tokens[int(t)] for t in src[b]][:500]
             raw_src = " ".join(raw_src)
-            translation = (pred_sents, gold_sent, raw_src)
+            # translation = (pred_sents, gold_sent, raw_src)
+            translation = (pred_sents, raw_src)
             # translation = (pred_sents[0], gold_sent)
             translations.append(translation)
 
@@ -245,7 +247,7 @@ class Translator(object):
         results = {}
         results["predictions"] = [[] for _ in range(batch_size)]  # noqa: F812
         results["scores"] = [[] for _ in range(batch_size)]  # noqa: F812
-        results["gold_score"] = [0] * batch_size
+        # results["gold_score"] = [0] * batch_size
         results["batch"] = batch
 
         for step in range(max_length):
@@ -301,11 +303,13 @@ class Translator(object):
 
             # Resolve beam origin and true word ids.
             topk_beam_index = topk_ids.div(vocab_size)
+            # print("topk_beam_index.shape {}".format( topk_beam_index.size()))
             topk_ids = topk_ids.fmod(vocab_size)
 
             # Map beam_index to batch_index in the flat representation.
             batch_index = topk_beam_index + beam_offset[: topk_beam_index.size(0)].unsqueeze(1)
             select_indices = batch_index.view(-1)
+            # print("select_indices {}".format(select_indices))
 
             # Append last prediction.
             alive_seq = torch.cat(
@@ -313,16 +317,25 @@ class Translator(object):
             )
 
             is_finished = topk_ids.eq(self.end_token)
+            # print("is_finished {}".format(is_finished))
+            # print("is_finished size {}".format(is_finished.size()))
             if step + 1 == max_length:
-                is_finished.fill_(1)
+                # print("reached max_length {} at step {}".format(max_length, step))
+                is_finished.fill_(True)
+                # print("is_finished {}".format(is_finished))
             # End condition is top beam is finished.
-            end_condition = is_finished[:, 0].eq(1)
+            end_condition = is_finished[:, 0].eq(True)
+            # print("end_condition {}".format(end_condition))
+            if step + 1 == max_length:
+                assert not any(end_condition.eq(False))
+
             # Save finished hypotheses.
             if is_finished.any():
                 predictions = alive_seq.view(-1, beam_size, alive_seq.size(-1))
                 for i in range(is_finished.size(0)):
                     b = batch_offset[i]
                     if end_condition[i]:
+                        # print("batch offset {} finished".format(b))
                         is_finished[i].fill_(1)
                     finished_hyp = is_finished[i].nonzero().view(-1)
                     # Store finished hypotheses for this batch.
@@ -332,6 +345,8 @@ class Translator(object):
                     if end_condition[i]:
                         best_hyp = sorted(hypotheses[b], key=lambda x: x[0], reverse=True)
                         score, pred = best_hyp[0]
+                        # if len(pred) == 0:
+                        #    print("batch offset {} finished with empty prediction {}".format(b, pred))
 
                         results["scores"][b].append(score)
                         results["predictions"][b].append(pred)
@@ -349,6 +364,13 @@ class Translator(object):
             src_features = src_features.index_select(0, select_indices)
             dec_states.map_batch_fn(lambda state, dim: state.index_select(dim, select_indices))
 
+        empty_output = [len(results["predictions"][b]) <= 0 for b in batch_offset]
+        if any(empty_output):
+            print("there is empty output {}".format(empty_output))
+            print(batch_offset)
+            print(results)
+
+        # print("###########################################")
         return results
 
 
@@ -368,7 +390,9 @@ class Translation(object):
 
     """
 
-    def __init__(self, fname, src, src_raw, pred_sents, attn, pred_scores, tgt_sent, gold_score):
+    def __init__(
+        self, fname, src, src_raw, pred_sents, attn, pred_scores, tgt_sent=None, gold_score=0
+    ):
         self.fname = fname
         self.src = src
         self.src_raw = src_raw

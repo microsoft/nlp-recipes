@@ -27,6 +27,8 @@ from utils_nlp.models.transformers.common import TOKENIZER_CLASS, Transformer
 
 from .extractive_summarization import Bunch
 
+from torch.utils.data import SequentialSampler, RandomSampler, DataLoader
+
 MODEL_CLASS = {"bert-base-uncased": BertModel, "distilbert-base-uncased": DistilBertModel}
 
 logger = logging.getLogger(__name__)
@@ -39,6 +41,50 @@ from utils_nlp.models.transformers.bertabs import model_builder
 from utils_nlp.models.transformers.bertabs.model_builder import AbsSummarizer
 from utils_nlp.models.transformers.bertabs.loss import abs_loss
 from utils_nlp.models.transformers.bertabs.predictor import build_predictor
+
+from utils_nlp.dataset.cnndm import CNNDMBertSumProcessedData, CNNDMSummarizationDataset
+from utils_nlp.models.transformers.datasets import SummarizationNonIterableDataset
+from utils_nlp.eval.evaluate_summarization import get_rouge
+
+from tempfile import TemporaryDirectory
+
+
+def shorten_dataset(dataset, top_n=-1):
+    if top_n == -1:
+        return dataset
+    return SummarizationNonIterableDataset(dataset.source[0:top_n], dataset.target[0:top_n])
+
+
+def validation(saved_model_path):
+    TOP_N = 10
+    processor = AbsSumProcessor(cache_dir="/dadendev/nlp/examples/text_summarization/")
+    test_sum_dataset = torch.load(
+        "/dadendev/nlp/examples/text_summarization/test_abssum_dataset_full.pt"
+    )
+    summarizer = AbsSum(
+        processor,
+        checkpoint=torch.load(saved_model_path),
+        cache_dir="/dadendev/nlp/examples/text_summarization/",
+    )
+
+    src = test_sum_dataset.source[0:TOP_N]
+    reference_summaries = ["".join(t).rstrip("\n") for t in test_sum_dataset.target[0:TOP_N]]
+    generated_summaries = summarizer.predict(
+        shorten_dataset(test_sum_dataset, top_n=TOP_N), batch_size=8
+    )
+    assert len(generated_summaries) == len(reference_summaries)
+    for i in generated_summaries[0:1]:
+        print(i)
+        print("\n")
+        print("###################")
+
+    for i in reference_summaries[0:1]:
+        print(i)
+        print("\n")
+
+    RESULT_DIR = TemporaryDirectory().name
+    rouge_score = get_rouge(generated_summaries, reference_summaries, RESULT_DIR)
+    return "rouge score: {}".format(rouge_score)
 
 
 def fit_to_block_size(sequence, block_size, pad_token_id):
@@ -89,7 +135,12 @@ class AbsSumProcessor:
     """Class for preprocessing extractive summarization data."""
 
     def __init__(
-        self, model_name="bert-base-uncased", to_lower=False, cache_dir=".", max_len=512,
+        self,
+        model_name="bert-base-uncased",
+        to_lower=False,
+        cache_dir=".",
+        max_len=512,
+        max_target_len=140,
     ):
         """ Initialize the preprocessor.
 
@@ -127,6 +178,7 @@ class AbsSumProcessor:
         self.pad_vid = self.tokenizer.vocab[self.pad_token]
 
         self.max_len = max_len
+        self.max_target_len = max_target_len
 
     @staticmethod
     def list_supported_models():
@@ -194,13 +246,10 @@ class AbsSumProcessor:
         API.
         """
         data = [x for x in data if not len(x[1]) == 0]  # remove empty_files
-        # print("data is {}".format(data[0]))
-        # names = [name for name, _, _ in data]
-        stories = [" ".join(story[0]) for story, _ in data]
-        summaries = [" ".join(summary[0]) for _, summary in data]
-        # print("data is {}".format(summaries[0]))
+        stories = [" ".join(story) for story, _ in data]
+        summaries = [" ".join(summary) for _, summary in data]
 
-        encoded_text = [self.preprocess(story[0], summary[0]) for story, summary in data]
+        encoded_text = [self.preprocess(story, summary) for story, summary in data]
         # print(encoded_text[0])
 
         # """"""
@@ -297,7 +346,7 @@ class AbsSumProcessor:
                     if len(line) <= 0:
                         continue
                     summary_lines_token_ids.append(
-                        self.tokenizer.encode(line, max_length=self.max_len)
+                        self.tokenizer.encode(line, max_length=self.max_target_len)
                     )
                 except:
                     print(line)
@@ -314,7 +363,14 @@ class AbsSum(Transformer):
     """class which performs extractive summarization fine tuning and prediction """
 
     def __init__(
-        self, processor, model_name="bert-base-uncased", encoder="transformer", cache_dir="."
+        self,
+        processor,
+        model_name="bert-base-uncased",
+        encoder="encoder",
+        finetune_bert=True,
+        label_smoothing=0.1,
+        cache_dir=".",
+        checkpoint=None,
     ):
         """Initialize a ExtractiveSummarizer.
 
@@ -345,47 +401,30 @@ class AbsSum(Transformer):
             )
 
         self.model_class = MODEL_CLASS[model_name]
-        default_abs_summarizer_layer_parameters = {
-            "large": False,
-            "temp_dir": "./abstemp",
-            "finetune_bert": True,
-            "encoder": "bert",
-            "max_pos": processor.max_len,
-            "use_bert_emb": True,
-            "share_emb": False,
-            "dec_dropout": 0.2,
-            "dec_layers": 6,
-            "dec_hidden_size": 768,
-            "dec_heads": 8,
-            "dec_ff_size": 2048,
-            "enc_hidden_size": 512,
-            "enc_ff_size": 512,
-            "enc_dropout": 0.2,
-            "enc_layers": 6,
-            "label_smoothing": 0.1,
-        }
-
+        self.checkpoint = checkpoint
         from utils_nlp.common.pytorch_utils import get_device
 
         device, num_gpus = get_device(num_gpus=4, local_rank=-1)
-        args = Bunch(default_abs_summarizer_layer_parameters)
-        self.model = AbsSummarizer(args, device)
+        self.model = AbsSummarizer(
+            device,
+            temp_dir=cache_dir,
+            encoder=encoder,
+            finetune_bert=finetune_bert,
+            checkpoint=checkpoint,
+        )
         self.device = device
         self.processor = processor
+        self.optim_bert = None
+        self.optim_dec = None
+
         self.train_loss = abs_loss(
             self.model.generator,
             self.processor.symbols,
             self.model.vocab_size,
             device,
             train=True,
-            label_smoothing=args.label_smoothing,
+            label_smoothing=label_smoothing,
         )
-
-        def loss(inputs, outputs):
-            # return  self.train_loss.sharded_compute_loss(inputs, outputs, Bunch({"generator_shard_size":32}), normalization)
-            return self.train_loss.monolithic_compute_loss(inputs, outputs)
-
-        self.loss_function = loss
 
     @staticmethod
     def list_supported_models():
@@ -399,8 +438,10 @@ class AbsSum(Transformer):
         batch_size=140,
         local_rank=-1,
         max_steps=5e5,
-        warmup_steps=1e5,
-        learning_rate=2e-3,
+        warmup_steps_bert=8000,
+        warmup_steps_dec=8000,
+        learning_rate_bert=0.002,
+        learning_rate_dec=0.2,
         optimization_method="adam",
         max_grad_norm=0,
         beta1=0.9,
@@ -408,9 +449,11 @@ class AbsSum(Transformer):
         decay_method="noam",
         gradient_accumulation_steps=2,
         report_every=10,
+        save_every=100,
         verbose=True,
         seed=None,
         fp16=False,
+        validation_function=None,
         **kwargs,
     ):
         """
@@ -451,25 +494,21 @@ class AbsSum(Transformer):
 
         # init optimizer
 
-        args_opt = Bunch(
-            {
-                "param_init": 0,
-                "param_init_glorot": True,
-                "optim": "adam",
-                "max_grad_norm": 0,
-                "beta1": 0.9,
-                "beta2": 0.999,
-                "warmup_steps_bert": 8000,
-                "lr_bert": 0.002,
-                "lr_dec": 0.2,
-                "warmup_steps_dec": 8000,
-            }
+        self.optim_bert = model_builder.build_optim_bert(
+            self.model,
+            visible_gpus="0,1,2,3",
+            lr_bert=learning_rate_bert,
+            warmup_steps_bert=warmup_steps_bert,
+            checkpoint=self.checkpoint,
         )
-        optim_bert = model_builder.build_optim_bert(args_opt, self.model, None)
-        optim_dec = model_builder.build_optim_dec(args_opt, self.model, None)
-        optim = [optim_bert, optim_dec]
-
-        from torch.utils.data import SequentialSampler, RandomSampler, DataLoader
+        self.optim_dec = model_builder.build_optim_dec(
+            self.model,
+            visible_gpus="0,1,2,3",
+            lr_dec=learning_rate_dec,
+            warmup_steps_dec=warmup_steps_dec,
+            checkpoint=self.checkpoint,
+        )
+        optim = [self.optim_bert, self.optim_dec]
 
         def build_data_iterator(collate, dataset, batch_size=16, device="cuda"):
 
@@ -497,6 +536,10 @@ class AbsSum(Transformer):
             gradient_accumulation_steps=gradient_accumulation_steps,
         )
 
+        def loss(inputs, outputs):
+            # return  self.train_loss.sharded_compute_loss(inputs, outputs, Bunch({"generator_shard_size":32}), normalization)
+            return self.train_loss.monolithic_compute_loss(inputs, outputs)
+
         super().fine_tune(
             train_dataloader=train_dataloader,
             get_inputs=AbsSumProcessor.get_inputs,
@@ -509,10 +552,12 @@ class AbsSum(Transformer):
             verbose=verbose,
             seed=seed,
             report_every=report_every,
+            save_every=save_every,
             clip_grad_norm=False,
             optimizer=optim,
-            loss_function=self.loss_function,
+            loss_function=loss,
             fp16=fp16,
+            validation_function=validation_function,
         )
 
     def predict(
@@ -521,10 +566,11 @@ class AbsSum(Transformer):
         num_gpus=1,
         gpu_ids=None,
         batch_size=16,
-        sentence_separator="<q>",
-        top_n=3,
-        block_trigram=True,
-        cal_lead=False,
+        # sentence_separator="<q>",
+        alpha=0.6,
+        beam_size=5,
+        min_length=15,
+        max_length=150,
         verbose=True,
     ):
         """
@@ -553,68 +599,82 @@ class AbsSum(Transformer):
 
         """
 
-        test_sampler = SequentialSampler(test_dataset)
-        test_dataloader = DataLoader(
-            test_dataset,
-            sampler=test_sampler,
-            batch_size=batch_size,
-            collate_fn=self.processor.collate_fn,
-        )
-        sent_scores = self.predict_scores(test_dataloader, num_gpus=num_gpus, gpu_ids=gpu_ids)
-        sent_scores_list = list(sent_scores)
-        scores_list = []
-        for i in sent_scores_list:
-            scores_list.extend(i)
-        prediction = []
-        for i in range(len(test_dataset)):
-            temp_pred = get_pred(
-                test_dataset[i],
-                scores_list[i],
-                cal_lead=cal_lead,
-                sentence_separator=sentence_separator,
-                block_trigram=block_trigram,
-                top_n=top_n,
+        def format_summary(translation):
+            """ Transforms the output of the `from_batch` function
+            into nicely formatted summaries.
+            """
+            raw_summary, _, = translation
+            summary = (
+                raw_summary.replace("[unused0]", "")
+                .replace("[unused3]", "")
+                .replace("[PAD]", "")
+                .replace("[unused1]", "")
+                .replace(r" +", " ")
+                .replace(" [unused2] ", ". ")
+                .replace("[unused2]", "")
+                .strip()
             )
-            prediction.extend(temp_pred)
-        return prediction
 
-    def predict_scores(self, test_dataloader, num_gpus=1, gpu_ids=None, verbose=True):
+            return summary
+
+        test_sampler = SequentialSampler(test_dataset)
+
+        def collate_fn(data):
+            return self.processor.collate(data, 512, self.device, train_mode=False)
+
+        test_dataloader = DataLoader(
+            test_dataset, sampler=test_sampler, batch_size=batch_size, collate_fn=collate_fn,
+        )
+        predictor = build_predictor(
+            self.processor.tokenizer,
+            self.processor.symbols,
+            self.model,
+            alpha=alpha,
+            beam_size=beam_size,
+            min_length=min_length,
+            max_length=max_length,
+        )
+
+        generated_summaries = []
+        from tqdm import tqdm
+
+        for batch in tqdm(test_dataloader):
+            batch_data = predictor.translate_batch(batch)
+            translations = predictor.from_batch(batch_data)
+            summaries = [format_summary(t) for t in translations]
+            generated_summaries += summaries
+        return generated_summaries
+
+    def save_model(self, full_name=None):
         """
-        Scores a dataset using a fine-tuned model and a given dataloader.
+        save the trained model.
 
         Args:
-            test_dataloader (Dataloader): Dataloader for scoring the data.
-            num_gpus (int, optional): The number of GPUs to use. If None, all available GPUs will
-                be used. If set to 0 or GPUs are not available, CPU device will be used.
-                Defaults to None.
-            gpu_ids (list): List of GPU IDs to be used.
-                If set to None, the first num_gpus GPUs will be used.
-                Defaults to None.
-            verbose (bool, optional): Whether to print out the training log. Defaults to True.
-
-        Returns
-            1darray: numpy array of predicted sentence scores.
+            full_name (str, optional): File name to save the model's `state_dict()`. If it's None,
+                the model is going to be saved under "fine_tuned" folder of the cached directory
+                of the object. Defaults to None.
         """
+        save_obj = {"optims": [self.optim_bert, self.optim_dec]}
+        model_to_save = (
+            self.model.module if hasattr(self.model, "module") else self.model
+        )  # Take care of distributed/parallel training
 
-        device, num_gpus = get_device(num_gpus=num_gpus, local_rank=-1)
+        if full_name is None:
+            output_model_dir = os.path.join(self.cache_dir, "fine_tuned")
+            os.makedirs(self.cache_dir, exist_ok=True)
+            os.makedirs(output_model_dir, exist_ok=True)
+            full_name = os.path.join(output_model_dir, name)
 
-        preds = list(
-            super().predict(
-                eval_dataloader=test_dataloader,
-                get_inputs=AbsSumProcessor.get_inputs,
-                num_gpus=num_gpus,
-                gpu_ids=gpu_ids,
-                verbose=verbose,
-            )
-        )
-        return preds
-
-    def save_model(self, name):
-        output_model_dir = os.path.join(self.cache_dir, "fine_tuned")
-
-        os.makedirs(self.cache_dir, exist_ok=True)
-        os.makedirs(output_model_dir, exist_ok=True)
-
-        full_name = os.path.join(output_model_dir, name)
+        save_obj["model"] = model_to_save.state_dict()
         logger.info("Saving model checkpoint to %s", full_name)
-        torch.save(self.model, name)
+        try:
+            print("saving through pytorch")
+            torch.save(save_obj, full_name)
+        except OSError:
+            try:
+                print("saving as pickle")
+                pickle.dump(save_obj, open(full_name, "wb"))
+            except Exception:
+                raise
+        except Exception:
+            raise
