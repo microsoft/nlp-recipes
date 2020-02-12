@@ -307,7 +307,7 @@ class SequenceClassifier(Transformer):
             checkpoint_state_dict (dict): Checkpoint states of model and optimizer.
                 If specified, the model and optimizer's parameters are loaded using
                 checkpoint_state_dict["model"] and checkpoint_state_dict["optimizer"]
-                Defaults to None,
+                Defaults to None.
             verbose (bool, optional): Whether to print out the training log.
                 Defaults to True.
             seed (int, optional): Random seed used to improve reproducibility.
