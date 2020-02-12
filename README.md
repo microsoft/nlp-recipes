@@ -87,7 +87,7 @@ The following is a list of related repositories that we like and think are usefu
 |[MASS](https://github.com/microsoft/MASS)|MASS: Masked Sequence to Sequence Pre-training for Language Generation.|
 |[MT-DNN](https://github.com/namisan/mt-dnn)|Multi-Task Deep Neural Networks for Natural Language Understanding.|
 |[UniLM](https://github.com/microsoft/unilm)|Unified Language Model Pre-training.|
-
+|[DialoGPT](https://github.com/microsoft/DialoGPT)|DialoGPT: Large-Scale Generative Pre-training for Conversational Response Generation|
 
 
 ## Build Status
