@@ -32,13 +32,20 @@ from utils_nlp.models.transformers.common import (
 from utils_nlp.models.transformers.datasets import SCDataSet, SPCDataSet
 
 MODEL_CLASS = {}
-MODEL_CLASS.update({k: BertForSequenceClassification for k in BERT_PRETRAINED_MODEL_ARCHIVE_MAP})
+MODEL_CLASS.update(
+    {k: BertForSequenceClassification for k in BERT_PRETRAINED_MODEL_ARCHIVE_MAP}
+)
 MODEL_CLASS.update(
     {k: RobertaForSequenceClassification for k in ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP}
 )
-MODEL_CLASS.update({k: XLNetForSequenceClassification for k in XLNET_PRETRAINED_MODEL_ARCHIVE_MAP})
 MODEL_CLASS.update(
-    {k: DistilBertForSequenceClassification for k in DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP}
+    {k: XLNetForSequenceClassification for k in XLNET_PRETRAINED_MODEL_ARCHIVE_MAP}
+)
+MODEL_CLASS.update(
+    {
+        k: DistilBertForSequenceClassification
+        for k in DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP
+    }
 )
 MODEL_CLASS.update(
     {k: AlbertForSequenceClassification for k in ALBERT_PRETRAINED_MODEL_ARCHIVE_MAP}
@@ -62,7 +69,10 @@ class Processor:
 
     def __init__(self, model_name="bert-base-cased", to_lower=False, cache_dir="."):
         self.tokenizer = TOKENIZER_CLASS[model_name].from_pretrained(
-            model_name, do_lower_case=to_lower, cache_dir=cache_dir, output_loading_info=False,
+            model_name,
+            do_lower_case=to_lower,
+            cache_dir=cache_dir,
+            output_loading_info=False,
         )
 
     @staticmethod
@@ -122,14 +132,12 @@ class Processor:
             tuple: Tuple containing input ids, attention masks, and segment ids.
         """
         if max_len > MAX_SEQ_LEN:
-            print("setting max_len to max allowed sequence length: {}".format(MAX_SEQ_LEN))
+            print("setting max_len to max allowed seq length: {}".format(MAX_SEQ_LEN))
             max_len = MAX_SEQ_LEN
         # truncate and add CLS & SEP markers
-        tokens = (
-            [tokenizer.cls_token]
-            + tokenizer.tokenize(text)[0 : max_len - 2]
-            + [tokenizer.sep_token]
-        )
+        tokens = tokenizer.tokenize(text)[0 : max_len - 2]
+        tokens = [tokenizer.cls_token] + tokens + [tokenizer.sep_token]
+
         # get input ids
         input_ids = tokenizer.convert_tokens_to_ids(tokens)
         # pad sequence
