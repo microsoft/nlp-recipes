@@ -17,7 +17,9 @@ def get_device(num_gpus=None, gpu_ids=None, local_rank=-1):
             if num_gpus is not None
             else torch.cuda.device_count()
         )
-        device = torch.device("cuda" if torch.cuda.is_available() and num_gpus > 0 else "cpu")
+        device = torch.device(
+            "cuda" if torch.cuda.is_available() and num_gpus > 0 else "cpu"
+        )
     else:
         torch.cuda.set_device(local_rank)
         device = torch.device("cuda", local_rank)
@@ -68,7 +70,10 @@ def parallelize_model(model, device, num_gpus=None, gpu_ids=None, local_rank=-1)
     # wrap in DataParallel or DistributedDataParallel
     if local_rank != -1:
         model = torch.nn.parallel.DistributedDataParallel(
-            model, device_ids=[local_rank], output_device=local_rank, find_unused_parameters=True,
+            model,
+            device_ids=[local_rank],
+            output_device=local_rank,
+            find_unused_parameters=True,
         )
     else:
         if device.type == "cuda":
@@ -79,14 +84,20 @@ def parallelize_model(model, device, num_gpus=None, gpu_ids=None, local_rank=-1)
             if num_cuda_devices < 1:
                 raise Exception("CUDA devices are not available.")
             if gpu_ids is None:
-                num_gpus = num_cuda_devices if num_gpus is None else min(num_gpus, num_cuda_devices)
+                num_gpus = (
+                    num_cuda_devices
+                    if num_gpus is None
+                    else min(num_gpus, num_cuda_devices)
+                )
                 gpu_ids = list(range(num_gpus))
             if len(gpu_ids) > 1:
                 model = torch.nn.DataParallel(model, device_ids=gpu_ids)
     return model
 
 
-def dataloader_from_dataset(ds, batch_size=32, num_gpus=None, shuffle=False, distributed=False):
+def dataloader_from_dataset(
+    ds, batch_size=32, num_gpus=None, shuffle=False, distributed=False
+):
     """Creates a PyTorch DataLoader given a Dataset object.
 
     Args:
@@ -116,7 +127,9 @@ def dataloader_from_dataset(ds, batch_size=32, num_gpus=None, shuffle=False, dis
     return DataLoader(ds, sampler=sampler, batch_size=batch_size)
 
 
-def compute_training_steps(dataloader, num_epochs=1, max_steps=-1, gradient_accumulation_steps=1):
+def compute_training_steps(
+    dataloader, num_epochs=1, max_steps=-1, gradient_accumulation_steps=1
+):
     """Computes the max training steps given a dataloader.
 
     Args:
@@ -159,7 +172,9 @@ def get_amp(fp16):
 
             amp.register_half_function(torch, "einsum")
         except ImportError:
-            raise ImportError("Please install apex from https://www.github.com/nvidia/apex")
+            raise ImportError(
+                "Please install apex from https://www.github.com/nvidia/apex"
+            )
     else:
         amp = None
     return amp
