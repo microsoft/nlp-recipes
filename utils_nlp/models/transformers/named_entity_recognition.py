@@ -376,7 +376,7 @@ class TokenClassifier(Transformer):
         """
 
         # init device and optimizer
-        device, num_gpus, optimizer, amp = self.prepare_model_and_optimizer(
+        device, num_gpus, amp = self.prepare_model_and_optimizer(
             num_gpus=num_gpus,
             gpu_ids=gpu_ids,
             local_rank=local_rank,
@@ -398,7 +398,7 @@ class TokenClassifier(Transformer):
 
         # init scheduler
         scheduler = Transformer.get_default_scheduler(
-            optimizer=optimizer, warmup_steps=warmup_steps, num_training_steps=max_steps
+            optimizer=self.optimizer, warmup_steps=warmup_steps, num_training_steps=max_steps
         )
 
         # fine tune
@@ -409,7 +409,7 @@ class TokenClassifier(Transformer):
             num_gpus=num_gpus,
             max_steps=max_steps,
             gradient_accumulation_steps=gradient_accumulation_steps,
-            optimizer=optimizer,
+            optimizer=self.optimizer,
             scheduler=scheduler,
             fp16=fp16,
             amp=amp,
