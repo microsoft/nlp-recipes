@@ -88,7 +88,6 @@ def extract_zip(file_path, dest_path="."):
 def download_path(path=None):
     tmp_dir = TemporaryDirectory()
     if not path:
-        print("==> Using a temp directory")
         path = tmp_dir.name
     else:
         path = os.path.realpath(path)
