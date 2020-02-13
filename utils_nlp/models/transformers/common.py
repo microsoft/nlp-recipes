@@ -4,6 +4,7 @@
 # This script reuses some code from
 # https://github.com/huggingface/pytorch-transformers/blob/master/examples/run_glue.py
 
+import datetime
 import logging
 import os
 import random
@@ -191,6 +192,7 @@ class Transformer:
         verbose=True,
         seed=None,
         report_every=10,
+        save_every=-1,
         clip_grad_norm=True,
     ):
 
@@ -251,9 +253,14 @@ class Transformer:
 
                     if global_step % report_every == 0 and verbose:
                         end = time.time()
+                        endtime_string = datetime.datetime.fromtimestamp(end).strftime(
+                            "%d/%m/%Y %H:%M:%S"
+                        )
                         print(
-                            "loss:{0:.6f}, time:{1:f}, examples:{2:.0f}, "
-                            "step:{3:.0f}/{4:.0f}".format(
+                            """timestamp: {0:s}, loss: {1:.6f}, time duration: {2:f},
+                            number of examples in current step: {3:.0f}, step {4:.0f}
+                            out of total {5:.0f}""".format(
+                                endtime_string,
                                 accum_loss / report_every,
                                 end - start,
                                 len(batch),
@@ -268,7 +275,10 @@ class Transformer:
                     if scheduler:
                         scheduler.step()
                     self.model.zero_grad()
-
+                    if save_every != -1 and global_step % save_every == 0 and verbose:
+                        self.save_model(
+                            os.path.join(self.cache_dir, f"{self.model_name}_step_{global_step}.pt")
+                        )
                 if global_step > max_steps:
                     epoch_iterator.close()
                     break
@@ -292,16 +302,31 @@ class Transformer:
                 logits = outputs[0]
             yield logits.detach().cpu().numpy()
 
-    def save_model(self):
-        output_model_dir = os.path.join(self.cache_dir, "fine_tuned")
+    def save_model(self, full_name=None):
+        """
+        save the trained model.
 
-        os.makedirs(self.cache_dir, exist_ok=True)
-        os.makedirs(output_model_dir, exist_ok=True)
+        Args:
+            full_name (str, optional): File name to save the model's `state_dict()` and can
+                be loaded by torch.load(). If it's None, the trained model, configuration
+                and tokenizer using `save_pretrained()`; and the file is going to be saved
+                under "fine_tuned" folder of the cached directory of the object. Defaults to None.
+        """
 
-        logger.info("Saving model checkpoint to %s", output_model_dir)
         # Save a trained model, configuration and tokenizer using `save_pretrained()`.
         # They can then be reloaded using `from_pretrained()`
         model_to_save = (
             self.model.module if hasattr(self.model, "module") else self.model
         )  # Take care of distributed/parallel training
-        model_to_save.save_pretrained(output_model_dir)
+
+        if full_name:
+            logger.info("Saving model checkpoint to %s", full_name)
+            torch.save(model_to_save.state_dict(), full_name)
+        else:
+            output_model_dir = os.path.join(self.cache_dir, "fine_tuned")
+
+            os.makedirs(self.cache_dir, exist_ok=True)
+            os.makedirs(output_model_dir, exist_ok=True)
+
+            logger.info("Saving model checkpoint to %s", output_model_dir)
+            model_to_save.save_pretrained(output_model_dir)
