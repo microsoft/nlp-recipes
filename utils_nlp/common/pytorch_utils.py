@@ -23,7 +23,6 @@ def get_device(num_gpus=None, gpu_ids=None, local_rank=-1):
     else:
         torch.cuda.set_device(local_rank)
         device = torch.device("cuda", local_rank)
-        torch.distributed.init_process_group(backend="nccl")
         num_gpus = 1
     return device, num_gpus
 
