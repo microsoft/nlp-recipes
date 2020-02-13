@@ -12,16 +12,7 @@ from torch.utils.data import DataLoader, SequentialSampler, Dataset
 from torch.utils.data.distributed import DistributedSampler
 
 from transformers import BertTokenizer, RobertaTokenizer
-from transformers.modeling_roberta import ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP
-from transformers.modeling_bert import BERT_PRETRAINED_MODEL_ARCHIVE_MAP
-from transformers.modeling_xlm_roberta import XLM_ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP
-from transformers import RobertaConfig, BertConfig, XLMRobertaConfig
-from transformers import (
-    BERT_PRETRAINED_CONFIG_ARCHIVE_MAP,
-    ROBERTA_PRETRAINED_CONFIG_ARCHIVE_MAP,
-    XLM_ROBERTA_PRETRAINED_CONFIG_ARCHIVE_MAP,
-)
-
+from transformers import RobertaConfig, BertConfig
 
 from utils_nlp.models.transformers.common import TOKENIZER_CLASS, Transformer
 from utils_nlp.common.pytorch_utils import get_device, move_model_to_device, parallelize_model
@@ -34,23 +25,28 @@ from s2s_ft.config import BertForSeq2SeqConfig
 import s2s_ft.s2s_loader as seq2seq_loader
 from s2s_ft.modeling_decoding import BertForSeq2SeqDecoder
 
+SUPPORTED_BERT_MODELS = ["bert-large-uncased", "bert-base-cased", "bert-large-cased"]
+SUPPORTED_ROBERTA_MODELS = ["roberta-base", "roberta-large"]
+
 # ROBERTA and XLM_ROBERTA are converted to BERT format by BertForSequenceToSequence.from_pretrained
 MODEL_CLASS = {}
-MODEL_CLASS.update({k: BertForSequenceToSequence for k in BERT_PRETRAINED_MODEL_ARCHIVE_MAP})
-MODEL_CLASS.update({k: BertForSequenceToSequence for k in ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP})
+MODEL_CLASS.update({k: BertForSequenceToSequence for k in SUPPORTED_BERT_MODELS})
+MODEL_CLASS.update({k: BertForSequenceToSequence for k in SUPPORTED_ROBERTA_MODELS})
 MODEL_CLASS.update({k: BertForSequenceToSequence for k in UNILM_PRETRAINED_MODEL_ARCHIVE_MAP})
 
 
 TOKENIZER_CLASS.update({k: UnilmTokenizer for k in UNILM_PRETRAINED_CONFIG_ARCHIVE_MAP})
 
 CONFIG_CLASS = {}
-CONFIG_CLASS.update({k: BertConfig for k in BERT_PRETRAINED_CONFIG_ARCHIVE_MAP})
-CONFIG_CLASS.update({k: RobertaConfig for k in ROBERTA_PRETRAINED_CONFIG_ARCHIVE_MAP})
+CONFIG_CLASS.update({k: BertConfig for k in SUPPORTED_BERT_MODELS})
+CONFIG_CLASS.update({k: RobertaConfig for k in SUPPORTED_ROBERTA_MODELS})
 CONFIG_CLASS.update({k: UnilmConfig for k in UNILM_PRETRAINED_CONFIG_ARCHIVE_MAP})
 
-# XLM_ROBERTA is for multilingual and is WIP in s2s-ft. 
+# XLM_ROBERTA is for multilingual and is WIP in s2s-ft.
 # We can add it when it's finished and validated
-# MODEL_CLASS.update({k: BertForSequenceToSequence for k in XLM_ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP})
+# from transformers.modeling_xlm_roberta import XLM_ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP
+# MODEL_CLASS.update({k: BertForSequenceToSequence for k
+# in XLM_ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP})
 # CONFIG_CLASS.update({k: XLMRobertaConfig for k in XLM_ROBERTA_PRETRAINED_CONFIG_ARCHIVE_MAP})
 
 
@@ -60,6 +56,8 @@ logger = logging.getLogger(__name__)
 def _get_model_type(model_name):
     if "-".join(model_name.split("-")[:2]) == "xlm-roberta":
         return "xlm-roberta"
+    elif model_name.startswith("unilm"):
+        return "unilm"
     else:
         return model_name.split("-")[0]
 
@@ -114,8 +112,16 @@ class S2SAbsSumProcessor:
         self.cached_features_file = os.path.join(cache_dir, cached_features_file_name)
 
         self._model_name = model_name
-        self._bert_model_name = self._model_name.replace("unilm", "bert")
         self._model_type = _get_model_type(self._model_name)
+
+        # self._bert_model_name is needed for BertForSeq2SeqDecoder
+        if self._model_type != "bert":
+            if self._model_type == "roberta":
+                self._bert_model_name = self._model_name.replace("roberta", "bert") + "-cased"
+            else:
+                self._bert_model_name = "bert-" + self._model_name.split("-", 1)[-1]
+        else:
+            self._bert_model_name = self._model_name
 
         # TODO: Remove this after verifyingthe same tokenizer can be used for fine-tuning
         # and decoding
@@ -217,32 +223,83 @@ class S2SAbsSumProcessor:
 
         return S2SAbsSumDataset(train_features)
 
-    def test_dataset_from_iterable_sum_ds():
-        input_lines = []
-        for src in sum_ds:
-            example = {"src": src}
-            input_lines.append(self._preprocess_test_src(example))
+    def test_dataset_from_iterable_sum_ds(self, sum_ds, keep_test_file=False):
+        temp_dir = "./"
+        temp_test_file = os.path.join(
+            temp_dir, "test_file_" + datetime.now().strftime("%m%d%Y%H%M%S") + ".jsonl"
+        )
+        try:
+            with jsonlines.open(temp_test_file, mode="w") as writer:
+                for source, target in zip(sum_ds, sum_ds.get_target()):
+                    writer.write({"src": source, "tgt": target})
+            test_dataset = self.test_dataset_from_file(test_file=temp_test_file)
 
-        input_lines = sorted(list(enumerate(input_lines)), key=lambda x: -len(x[1]))
-        return S2SAbsSumDataset(input_lines)
+        finally:
+            if not keep_test_file and os.path.exists(temp_test_file):
+                os.remove(temp_test_file)
 
-    def test_dataset_from_sum_ds(self, sum_ds):
-        input_lines = []
-        for example in sum_ds:
-            input_lines.append(self._preprocess_test_src(example))
+        return test_dataset
 
-        input_lines = sorted(list(enumerate(input_lines)), key=lambda x: -len(x[1]))
-        return S2SAbsSumDataset(input_lines)
+    def test_dataset_from_sum_ds(self, sum_ds, keep_test_file=False):
+        temp_dir = "./"
+        temp_test_file = os.path.join(
+            temp_dir, "test_file_" + datetime.now().strftime("%m%d%Y%H%M%S") + ".jsonl"
+        )
+        try:
+            with jsonlines.open(temp_test_file, mode="w") as writer:
+                for item in sum_ds:
+                    writer.write(item)
+
+            test_dataset = self.test_dataset_from_file(test_file=temp_test_file)
+
+        finally:
+            if not keep_test_file and os.path.exists(temp_test_file):
+                os.remove(temp_test_file)
+
+        return test_dataset
 
     def test_dataset_from_file(self, test_file):
-        with open(test_file, encoding="utf-8", mode="r") as fin:
-            input_lines = []
-            for line in fin:
-                example = json.loads(line)
-                input_lines.append(self._preprocess_test_src(example))
+        to_pred = load_and_cache_examples(
+            test_file,
+            self.decode_tokenizer,
+            local_rank=-1,
+            cached_features_file=None,
+            shuffle=False,
+        )
+
+        input_lines = [
+            self.decode_tokenizer.convert_ids_to_tokens(line["source_ids"]) for line in to_pred
+        ]
 
         input_lines = sorted(list(enumerate(input_lines)), key=lambda x: -len(x[1]))
         return S2SAbsSumDataset(input_lines)
+
+    # def test_dataset_from_iterable_sum_ds():
+    #     input_lines = []
+    #     for src in sum_ds:
+    #         example = {"src": src}
+    #         input_lines.append(self._preprocess_test_src(example))
+
+    #     input_lines = sorted(list(enumerate(input_lines)), key=lambda x: -len(x[1]))
+    #     return S2SAbsSumDataset(input_lines)
+
+    # def test_dataset_from_sum_ds(self, sum_ds):
+    #     input_lines = []
+    #     for example in sum_ds:
+    #         input_lines.append(self._preprocess_test_src(example))
+
+    #     input_lines = sorted(list(enumerate(input_lines)), key=lambda x: -len(x[1]))
+    #     return S2SAbsSumDataset(input_lines)
+
+    # def test_dataset_from_file(self, test_file):
+    #     with open(test_file, encoding="utf-8", mode="r") as fin:
+    #         input_lines = []
+    #         for line in fin:
+    #             example = json.loads(line)
+    #             input_lines.append(self._preprocess_test_src(example))
+
+    #     input_lines = sorted(list(enumerate(input_lines)), key=lambda x: -len(x[1]))
+    #     return S2SAbsSumDataset(input_lines)
 
     def _preprocess_test_src(self, example):
         if isinstance(example["src"], list):
@@ -265,7 +322,6 @@ class S2SConfig:
 
     def __init__(
         self,
-        new_segment_ids=False,
         new_pos_ids=False,
         min_len=1,
         ngram_size=3,
@@ -279,7 +335,6 @@ class S2SConfig:
         seg_emb=False,
     ):
 
-        self.new_segment_ids = new_segment_ids
         self.new_pos_ids = new_pos_ids
         self.min_len = min_len
         self.forbid_ngram_size = ngram_size
@@ -314,6 +369,8 @@ class S2SAbstractiveSummarizer(Transformer):
         model_file_name=None,
         label_smoothing=0.1,
         max_seq_len=512,
+        max_source_seq_length=464,
+        max_target_seq_length=48,
     ):
 
         if model_name not in self.list_supported_models():
@@ -332,6 +389,8 @@ class S2SAbstractiveSummarizer(Transformer):
         self.load_model_from_dir = load_model_from_dir
         self.do_lower_case = to_lower
         self.max_seq_length = max_seq_len
+        self.max_source_seq_length = max_source_seq_length
+        self.max_target_seq_length = max_target_seq_length
 
         self._model_type = _get_model_type(model_name)
 
@@ -357,12 +416,18 @@ class S2SAbstractiveSummarizer(Transformer):
 
         # Convert regular model config to sequence to sequence config
         config = BertForSeq2SeqConfig.from_exist_config(
-            config=model_config, label_smoothing=label_smoothing
+            config=model_config,
+            label_smoothing=label_smoothing,
+            max_position_embeddings=self.max_source_seq_length + self.max_target_seq_length,
         )
         logger.info("Model config for seq2seq: %s", str(config))
 
         self.model = model_class.from_pretrained(
-            model_to_load, config=config, model_type=self._model_type, cache_dir=cache_dir
+            model_to_load,
+            config=config,
+            model_type=self._model_type,
+            cache_dir=cache_dir,
+            reuse_position_embedding=True,
         )
 
         self.tokenizer = TOKENIZER_CLASS[model_name].from_pretrained(
@@ -380,7 +445,6 @@ class S2SAbstractiveSummarizer(Transformer):
 
         self.decode_tokenizer = self.tokenizer
 
-
     @staticmethod
     def list_supported_models():
         return list(MODEL_CLASS)
@@ -388,8 +452,6 @@ class S2SAbstractiveSummarizer(Transformer):
     def fit(
         self,
         train_dataset,
-        max_source_seq_length=464,
-        max_target_seq_length=48,
         learning_rate=5e-5,
         per_gpu_batch_size=8,
         num_epochs=1,
@@ -433,6 +495,7 @@ class S2SAbstractiveSummarizer(Transformer):
             gpu_ids=gpu_ids,
             local_rank=local_rank,
             fp16=fp16,
+            fp16_opt_level=fp16_opt_level,
             weight_decay=weight_decay,
             learning_rate=learning_rate,
             adam_epsilon=adam_epsilon,
@@ -466,8 +529,8 @@ class S2SAbstractiveSummarizer(Transformer):
 
         train_dataset = Seq2seqDatasetForBert(
             features=train_dataset,
-            max_source_len=max_source_seq_length,
-            max_target_len=max_target_seq_length,
+            max_source_len=self.max_source_seq_length,
+            max_target_len=self.max_target_seq_length,
             vocab_size=self.tokenizer.vocab_size,
             cls_id=self.tokenizer.cls_token_id,
             sep_id=self.tokenizer.sep_token_id,
@@ -547,6 +610,11 @@ class S2SAbstractiveSummarizer(Transformer):
             no_segment_embedding = False
             vocab = self.decode_tokenizer.vocab
 
+        if self._model_type in ("unilm", "unilm1"):
+            new_segment_ids = True
+        else:
+            new_segment_ids = False
+
         cls_token = "<s>" if is_roberta else "[CLS]"
         sep_token = "</s>" if is_roberta else "[SEP]"
         pad_token = "<pad>" if is_roberta else "[PAD]"
@@ -560,7 +628,7 @@ class S2SAbstractiveSummarizer(Transformer):
                 self.decode_tokenizer.convert_tokens_to_ids,
                 self.max_seq_length,
                 max_tgt_length=max_tgt_length,
-                new_segment_ids=s2s_config.new_segment_ids,
+                new_segment_ids=new_segment_ids,
                 mode=s2s_config.mode,
                 num_qkv=s2s_config.num_qkv,
                 s2s_special_token=s2s_config.s2s_special_token,
@@ -589,9 +657,7 @@ class S2SAbstractiveSummarizer(Transformer):
         # prepare decoder
         pair_num_relation = 0
         cls_num_labels = 2
-        type_vocab_size = (
-            6 + (1 if s2s_config.s2s_add_segment else 0) if s2s_config.new_segment_ids else 2
-        )
+        type_vocab_size = 6 + (1 if s2s_config.s2s_add_segment else 0) if new_segment_ids else 2
         mask_word_id, eos_word_ids, sos_word_id = self.decode_tokenizer.convert_tokens_to_ids(
             [mask_token, sep_token, sep_token]
         )
@@ -612,7 +678,6 @@ class S2SAbstractiveSummarizer(Transformer):
 
         model = BertForSeq2SeqDecoder.from_pretrained(
             self._bert_model_name,
-            # self.model_name,
             state_dict=state_dict,
             num_labels=cls_num_labels,
             num_rel=pair_num_relation,

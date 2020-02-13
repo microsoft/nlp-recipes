@@ -119,6 +119,7 @@ class Transformer:
         gpu_ids,
         local_rank,
         fp16,
+        fp16_opt_level,
         weight_decay,
         learning_rate,
         adam_epsilon,

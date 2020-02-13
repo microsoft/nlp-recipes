@@ -259,7 +259,7 @@ class IterableSummarizationDataset(IterableDataset):
     def __init__(
         self,
         source_file,
-        target_file,
+        target_file=None,
         source_preprocessing=None,
         target_preprocessing=None,
         word_tokenization=None,
@@ -289,19 +289,23 @@ class IterableSummarizationDataset(IterableDataset):
         """
 
         source_iter = _line_iter(source_file)
-        target_iter = _line_iter(target_file)
 
         if top_n != -1:
             source_iter = itertools.islice(source_iter, top_n)
-            target_iter = itertools.islice(target_iter, top_n)
 
         self._source = _create_data_from_iterator(
             source_iter, source_preprocessing, word_tokenization
         )
 
-        self._target = _create_data_from_iterator(
-            target_iter, target_preprocessing, word_tokenization
-        )
+        if target_file:
+            target_iter = _line_iter(target_file)
+            if top_n != -1:
+                target_iter = itertools.islice(target_iter, top_n)
+            self._target = _create_data_from_iterator(
+                target_iter, target_preprocessing, word_tokenization
+            )
+        else:
+            self._target = None
 
     def __iter__(self):
         for x in self._source:
