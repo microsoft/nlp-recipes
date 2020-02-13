@@ -170,6 +170,7 @@ class SANBERTNetwork(nn.Module):
         self._generate_tasks_decoding_scoring_options()
 
         # Initialize weights
+
         # self._my_init()
 
     def _my_init(self):

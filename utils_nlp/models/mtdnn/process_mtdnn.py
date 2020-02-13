@@ -256,6 +256,31 @@ class MTDNNDataProcess:
         setattr(config, "tasks_nclass_list", self.nclass_list)
         return config
 
+    # # Property Getters
+    # @property
+    # def decoder_opts(self):
+    #     return self.decoder_opts
+
+    # @property
+    # def task_types(self):
+    #     return self.task_types
+
+    # @property
+    # def tasks_dropout_p(self):
+    #     return self.tasks_dropout_p
+
+    # @property
+    # def loss_types(self):
+    #     return self.loss_types
+
+    # @property
+    # def kd_loss_types(self):
+    #     return self.kd_loss_types
+
+    # @property
+    # def nclass_list(Self):
+    #     return self.nclass_list
+
 
 class MTDNNPipelineProcess:
     def __init__(

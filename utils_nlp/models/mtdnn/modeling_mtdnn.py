@@ -103,7 +103,7 @@ class MTDNNModel(MTDNNPretrainedModel):
             # Set the config base on encoder type set for initial checkpoint
             if config.encoder_type == EncoderModelType.BERT:
                 self.bert_config = BertConfig.from_dict(self.config.to_dict())
-                self.bert_model = BertModel(self.bert_config)
+                self.bert_model = BertModel.from_pretrained(self.config.init_checkpoint)
                 self.state_dict = self.bert_model.state_dict()
                 self.config.hidden_size = self.bert_config.hidden_size
             if config.encoder_type == EncoderModelType.ROBERTA:
