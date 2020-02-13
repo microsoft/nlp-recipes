@@ -34,13 +34,23 @@ if __name__ == "__main__":
     task_defs = MTDNNTaskDefs(tasks_params)
 
     # Make the Data Preprocess step and update the config with training data updates
+    # data_processor = MTDNNDataProcess(
+    #     config=config,
+    #     task_defs=task_defs,
+    #     batch_size=8,
+    #     data_dir="/home/useradmin/sources/mt-dnn/data/canonical_data/bert_uncased_lower",
+    #     train_datasets_list=["mnli"],
+    #     test_datasets_list=["mnli_mismatched, mnli_matched"],
+    # )
+
+    # Make the Data Preprocess step and update the config with training data updates
     data_processor = MTDNNDataProcess(
         config=config,
         task_defs=task_defs,
         batch_size=8,
         data_dir="/home/useradmin/sources/mt-dnn/data/canonical_data/bert_uncased_lower",
         train_datasets_list=["mnli"],
-        test_datasets_list=["mnli_mismatched, mnli_matched"],
+        test_datasets_list=["mnli_mismatched", "mnli_matched"],
     )
 
     multitask_train_dataloader = data_processor.get_train_dataloader()
