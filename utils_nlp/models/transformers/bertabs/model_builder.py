@@ -6,7 +6,7 @@ import copy
 
 import torch
 import torch.nn as nn
-from pytorch_transformers import BertModel, BertConfig
+from transformers import BertModel, BertConfig
 from torch.nn.init import xavier_uniform_
 
 from .decoder import TransformerDecoder
@@ -176,11 +176,12 @@ class Bert(nn.Module):
 
     def forward(self, x, segs, mask):
         if self.finetune:
-            top_vec, _ = self.model(x, segs, attention_mask=mask)
+            outputs = self.model(x, attention_mask=mask)
         else:
             self.eval()
             with torch.no_grad():
-                top_vec, _ = self.model(x, segs, attention_mask=mask)
+                outputs = self.model(x, attention_mask=mask)
+        top_vec = outputs[0]
         return top_vec
 
 

@@ -128,20 +128,14 @@ class Translator(object):
             }
 
     def move_to_device(self, device, move_to_device_fn):
-        #self.to(device)
-        #self.generator = move_to_device_fn(self.generator, device)
         self.move_to_device_fn = move_to_device_fn
         self.model = move_to_device_fn(self.model, device)
         self.generator = move_to_device_fn(self.generator, device)
-        self.decoder = move_to_device_fn(self.decoder, device)
-        self.bert = move_to_device_fn(self.bert, device)
         return self
 
     def eval(self):
         self.model.eval()
         self.generator.eval()
-        self.decoder.eval()
-        self.bert.eval()
 
     def _build_target_tokens(self, pred):
         # vocab = self.fields["tgt"].vocab
