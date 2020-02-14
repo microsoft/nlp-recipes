@@ -233,7 +233,7 @@ class Transformer:
                         )
                         self.save_model(saved_model_path)
                         if validation_function:
-                            validation_log = validation_function(saved_model_path)
+                            validation_log = validation_function(self)
                             logger.info(validation_log)
                             print(validation_log)
                 if global_step > max_steps:

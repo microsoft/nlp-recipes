@@ -329,15 +329,15 @@ class AbsSumProcessor:
         else:
             return story_token_ids
 
-def validate(saved_model_path, validate_data_path, cache_dir):
+def validate(summarizer, validate_data_path, cache_dir):
     TOP_N = 10
-    processor = AbsSumProcessor(cache_dir=cache_dir)
+    #processor = AbsSumProcessor(cache_dir=cache_dir)
     test_sum_dataset = torch.load(validate_data_path)
-    summarizer = AbsSum(
-        processor,
-        checkpoint=torch.load(saved_model_path),
-        cache_dir=cache_dir,
-    )
+    #summarizer = AbsSum(
+    #    processor,
+    #    checkpoint=torch.load(saved_model_path),
+    #    cache_dir=cache_dir,
+    #)
 
     src = test_sum_dataset.source[0:TOP_N]
     reference_summaries = ["".join(t).rstrip("\n") for t in test_sum_dataset.target[0:TOP_N]]
@@ -607,11 +607,12 @@ class AbsSum(Transformer):
             List of strings which are the summaries
 
         """
-        num_gpus = 1 
+        #num_gpus = 2
+        
         device, num_gpus = get_device(num_gpus=num_gpus, local_rank=-1)
          # move model to devices
         def this_model_move_callback(model, device):
-            return move_model_to_device(model, device, num_gpus=num_gpus, gpu_ids=None, local_rank=-1)
+            return  move_model_to_device(model, device, num_gpus=num_gpus, gpu_ids=None, local_rank=-1)
         #self.model = move_model_to_device(self.model, device, num_gpus=num_gpus, None, local_rank=local_rank)
 
         def format_summary(translation):
@@ -649,7 +650,7 @@ class AbsSum(Transformer):
             min_length=min_length,
             max_length=max_length,
         )
-        self.model = self.model.move_to_device(device, this_model_move_callback)
+        #self.model = self.model.move_to_device(device, this_model_move_callback)
 
         predictor = predictor.move_to_device(device, this_model_move_callback)
 

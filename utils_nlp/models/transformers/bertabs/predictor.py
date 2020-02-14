@@ -93,10 +93,10 @@ class Translator(object):
         self.cuda = 0  # args.visible_gpus != '-1'
 
         # self.args = args
-        self.model = model
-        self.generator = model.generator
-        self.decoder = model.decoder
-        self.bert = model.bert
+        self.model = model.module if hasattr(model, "module") else model
+        self.generator = self.model.generator
+        self.decoder = self.model.decoder
+        self.bert =  self.model.bert
 
         self.vocab = vocab
         self.symbols = symbols
@@ -130,11 +130,14 @@ class Translator(object):
     def move_to_device(self, device, move_to_device_fn):
         self.move_to_device_fn = move_to_device_fn
         self.model = move_to_device_fn(self.model, device)
+        self.bert = move_to_device_fn(self.bert, device)
         self.generator = move_to_device_fn(self.generator, device)
         return self
 
     def eval(self):
         self.model.eval()
+        self.bert.eval()
+        self.decoder.eval()
         self.generator.eval()
 
     def _build_target_tokens(self, pred):
