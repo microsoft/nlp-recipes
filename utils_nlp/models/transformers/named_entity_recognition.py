@@ -448,7 +448,7 @@ class TokenClassifier(Transformer):
             )
         )
         preds = np.concatenate(preds)
-        return np.argmax(preds, axis=1)
+        return preds
 
     def get_predicted_token_labels(self, predictions, label_map, dataset):
         """
