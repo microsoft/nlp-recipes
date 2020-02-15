@@ -166,7 +166,7 @@ class Transformer:
         self.model = move_model_to_device(model=self.model, device=device)
 
         # init optimizer
-        optimizer = Transformer.get_default_optimizer(
+        self.optimizer = Transformer.get_default_optimizer(
             self.model, weight_decay, learning_rate, adam_epsilon
         )
 
@@ -190,7 +190,7 @@ class Transformer:
             local_rank=local_rank,
         )
 
-        return device, num_gpus, optimizer, amp
+        return device, num_gpus, amp
 
     def fine_tune(
         self,

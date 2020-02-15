@@ -122,6 +122,5 @@ def test_bert_training(data_to_file, tmp_module):
         clip_grad_norm=False,
     )
 
-    _ = [i["tgt_txt"] for i in test_dataset]
     prediction = summarizer.predict(test_dataset, num_gpus=NUM_GPUS, batch_size=128)
     assert len(prediction) == 1
