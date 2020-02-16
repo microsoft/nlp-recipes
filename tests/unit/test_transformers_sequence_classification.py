@@ -4,7 +4,10 @@
 import pytest
 import pandas as pd
 
-from utils_nlp.models.transformers.sequence_classification import SequenceClassifier, Processor
+from utils_nlp.models.transformers.sequence_classification import (
+    SequenceClassifier,
+    Processor,
+)
 from utils_nlp.common.pytorch_utils import dataloader_from_dataset
 
 
