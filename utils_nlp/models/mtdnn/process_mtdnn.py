@@ -323,7 +323,6 @@ class MTDNNPipelineProcess:
             start = datetime.now()
             # Create batches and train
             for idx, (batch_meta, batch_data) in enumerate(self.multitask_train_dataloader):
-
                 batch_meta, batch_data = MTDNNCollater.patch_data(
                     self.config.cuda, batch_meta, batch_data
                 )
@@ -363,89 +362,98 @@ class MTDNNPipelineProcess:
                     logger.info(f"Saving mt-dnn model to {model_file}")
                     self.model.save(model_file)
 
-    def predict(self, epochs=0):
+            """Xiaodl: I move the save model func here since it makes more senses
+            that is save each checkpoint after the model training.
+            I further move the save function in prediction.
+            Alternatively, we need to refactor save function.
+            """
+            model_file = os.path.join(
+                self.output_dir, "model_{}.pt".format(epoch)
+            )
+            logger.info(f"Saving mt-dnn model to {model_file}")
+            self.model.save(model_file)
+
+    def predict(self, epoch=0):
         """ Inference of model on test datasets """
         """ Fit model to training datasets """
-        epochs = epochs or self.config.epochs
-        for epoch in range(epochs):
-            logger.info(f"At epoch {epoch}")
-            start = datetime.now()
-            # Create batches and train
-            for idx, dataset in enumerate(self.test_datasets_list):
-                prefix = dataset.split("_")[0]
-                label_dict = self.task_defs.global_map.get(prefix, None)
-                dev_data: DataLoader = self.dev_dataloaders_list[idx]
-                if dev_data is not None:
-                    with torch.no_grad():
-                        dev_metrics, dev_predictions, scores, golds, dev_ids = self.model.eval_mode(
-                            dev_data,
-                            metric_meta=self.task_defs.metric_meta_map[prefix],
-                            use_cuda=self.config.cuda,
-                            label_mapper=label_dict,
-                            task_type=self.task_defs.task_type_map[prefix],
-                        )
-                    for key, val in dev_metrics.items():
-                        if self.config.use_tensor_board:
-                            self.tensor_board.add_scalar(
-                                f"dev/{dataset}/{key}", val, global_step=epoch
-                            )
-                        if isinstance(val, str):
-                            logger.info(f"Task {dataset} -- epoch {epoch} -- Dev {key}:\n {val}")
-                        else:
-                            logger.info(f"Task {dataset} -- epoch {epoch} -- Dev {key}: {val:.3f}")
-                    score_file = os.path.join(self.output_dir, f"{dataset}_dev_scores_{epoch}.json")
-                    results = {
-                        "metrics": dev_metrics,
-                        "predictions": dev_predictions,
-                        "uids": dev_ids,
-                        "scores": scores,
-                    }
-
-                    # Save results to file
-                    MTDNNCommonUtils.dump(score_file, results)
-                    if self.config.use_glue_format:
-                        official_score_file = os.path.join(
-                            self.output_dir, "{}_dev_scores_{}.tsv".format(dataset, epoch)
-                        )
-                        submit(official_score_file, results, label_dict)
-
-                # test eval
-                test_data: DataLoader = self.test_dataloaders_list[idx]
-                if test_data is not None:
-                    with torch.no_grad():
-                        (
-                            test_metrics,
-                            test_predictions,
-                            scores,
-                            golds,
-                            test_ids,
-                        ) = self.model.eval_mode(
-                            test_data,
-                            metric_meta=self.task_defs.metric_meta_map[prefix],
-                            use_cuda=self.config.cuda,
-                            with_label=False,
-                            label_mapper=label_dict,
-                            task_type=self.task_defs.task_type_map[prefix],
-                        )
-                    score_file = os.path.join(
-                        self.output_dir, f"{dataset}_test_scores_{epoch}.json"
+        """Xiaodl: prediction don't need the epochs args
+        We may need to del it.
+        """
+        logger.info(f"At epoch {epoch}")
+        start = datetime.now()
+        # Create batches and train
+        for idx, dataset in enumerate(self.test_datasets_list):
+            prefix = dataset.split("_")[0]
+            label_dict = self.task_defs.global_map.get(prefix, None)
+            dev_data: DataLoader = self.dev_dataloaders_list[idx]
+            if dev_data is not None:
+                with torch.no_grad():
+                    dev_metrics, dev_predictions, scores, golds, dev_ids = self.model.eval_mode(
+                        dev_data,
+                        metric_meta=self.task_defs.metric_meta_map[prefix],
+                        use_cuda=self.config.cuda,
+                        label_mapper=label_dict,
+                        task_type=self.task_defs.task_type_map[prefix],
                     )
-                    results = {
-                        "metrics": test_metrics,
-                        "predictions": test_predictions,
-                        "uids": test_ids,
-                        "scores": scores,
-                    }
-                    MTDNNCommonUtils.dump(score_file, results)
-                    if self.config.use_glue_format:
-                        official_score_file = os.path.join(
-                            self.output_dir, f"{dataset}_test_scores_{epoch}.tsv"
+                for key, val in dev_metrics.items():
+                    if self.config.use_tensor_board:
+                        self.tensor_board.add_scalar(
+                            f"dev/{dataset}/{key}", val, global_step=epoch
                         )
-                        submit(official_score_file, results, label_dict)
-                    logger.info("[new test scores saved.]")
+                    if isinstance(val, str):
+                        logger.info(f"Task {dataset} -- epoch {epoch} -- Dev {key}:\n {val}")
+                    else:
+                        logger.info(f"Task {dataset} -- epoch {epoch} -- Dev {key}: {val:.3f}")
+                score_file = os.path.join(self.output_dir, f"{dataset}_dev_scores_{epoch}.json")
+                results = {
+                    "metrics": dev_metrics,
+                    "predictions": dev_predictions,
+                    "uids": dev_ids,
+                    "scores": scores,
+                }
 
-            model_file = os.path.join(self.output_dir, f"model_{epoch}.pt")
-            self.model.save(model_file)
+                # Save results to file
+                MTDNNCommonUtils.dump(score_file, results)
+                if self.config.use_glue_format:
+                    official_score_file = os.path.join(
+                        self.output_dir, "{}_dev_scores_{}.tsv".format(dataset, epoch)
+                    )
+                    submit(official_score_file, results, label_dict)
+
+            # test eval
+            test_data: DataLoader = self.test_dataloaders_list[idx]
+            if test_data is not None:
+                with torch.no_grad():
+                    (
+                        test_metrics,
+                        test_predictions,
+                        scores,
+                        golds,
+                        test_ids,
+                    ) = self.model.eval_mode(
+                        test_data,
+                        metric_meta=self.task_defs.metric_meta_map[prefix],
+                        use_cuda=self.config.cuda,
+                        with_label=False,
+                        label_mapper=label_dict,
+                        task_type=self.task_defs.task_type_map[prefix],
+                    )
+                score_file = os.path.join(
+                    self.output_dir, f"{dataset}_test_scores_{epoch}.json"
+                )
+                results = {
+                    "metrics": test_metrics,
+                    "predictions": test_predictions,
+                    "uids": test_ids,
+                    "scores": scores,
+                }
+                MTDNNCommonUtils.dump(score_file, results)
+                if self.config.use_glue_format:
+                    official_score_file = os.path.join(
+                        self.output_dir, f"{dataset}_test_scores_{epoch}.tsv"
+                    )
+                    submit(official_score_file, results, label_dict)
+                logger.info("[new test scores saved.]")
 
         # Close tensorboard connection if opened
         self.close_connections()

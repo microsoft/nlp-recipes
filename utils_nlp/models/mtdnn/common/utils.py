@@ -64,7 +64,12 @@ class MTDNNCommonUtils:
         log_file_handler = logging.FileHandler(filename="run.log", mode="a")
         log_formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
         log_file_handler.setFormatter(log_formatter)
-        logger.addHandler(log_file_handler)
+        do_add_handler = True
+        for handler in logger.handlers:
+            if isinstance(handler, logging.FileHandler):
+                do_add_handler = False
+        if do_add_handler:
+            logger.addHandler(log_file_handler)
         logger.setLevel(logging.DEBUG)
         return logger
 
