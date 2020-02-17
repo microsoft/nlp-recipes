@@ -23,7 +23,7 @@ from utils_nlp.models.transformers.sequence_classification import Processor
 
 URL = (
     "https://data.mendeley.com/datasets/v524p5dhpj/2"
-    "/files/91cb8398-9451-43af-88fc-041a0956ae2d/"
+    "/files/72c2e306-9538-4c74-a28f-558fbe87c382/"
     "arabic_dataset_classifiction.csv.zip"
 )
 
