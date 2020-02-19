@@ -121,7 +121,7 @@ def main():
     processor = AbsSumProcessor(cache_dir=CACHE_PATH)
     checkpoint = torch.load(os.path.join(MODEL_PATH, "summarizer_step20000.pt"))
     #checkpoint = torch.load(os.path.join(MODEL_PATH, "bert-base-uncased_step_2900.pt"))
-    checkpoint = None
+    #checkpoint = None
     summarizer = AbsSum(
         processor, checkpoint=checkpoint, cache_dir=CACHE_PATH
     )
@@ -148,14 +148,14 @@ def main_worker(local_rank, ngpus_per_node, summarizer, args):
         save_every = -1
         this_validate = None
     else:
-        save_every = 100
+        save_every = 10
 
     summarizer.fit(
         train_sum_dataset,
         world_size=world_size,
         num_gpus=args.node_count,
         local_rank=rank,
-        batch_size=2,
+        batch_size=4,
         max_steps=30000,
         learning_rate_bert=0.002,
         warmup_steps_bert=20000,
@@ -163,7 +163,7 @@ def main_worker(local_rank, ngpus_per_node, summarizer, args):
         save_every=save_every,
         report_every=10,
         validation_function=this_validate,
-        fp16=False
+        fp16=True
     )
 
     dist.destroy_process_group()
@@ -174,6 +174,7 @@ def test_train_model():
     processor = AbsSumProcessor(cache_dir=CACHE_PATH)
     checkpoint = torch.load(os.path.join(MODEL_PATH, "summarizer_step20000.pt"))
     #checkpoint = torch.load(os.path.join(MODEL_PATH, "bert-base-uncased_step_2900.pt"))
+    checkpoint = None
     summarizer = AbsSum(
         processor, checkpoint=checkpoint, cache_dir=CACHE_PATH
     )
@@ -194,7 +195,7 @@ def test_train_model():
         save_every=100,
         report_every=10,
         validation_function=this_validate,
-        fp16=True
+        fp16=False
     )
     saved_model_path = os.path.join(MODEL_PATH, "summarizer_step50000.pt")
     summarizer.save_model(saved_model_path)

@@ -183,8 +183,6 @@ class Transformer:
                 if fp16:
                     with amp.scale_loss(loss, optimizer) as scaled_loss:
                         scaled_loss.backward()
-                        if amp_handle:
-                            amp_handle._clear_cache()
                 else:
                     loss.backward()
 

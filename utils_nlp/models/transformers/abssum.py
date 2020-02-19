@@ -201,7 +201,7 @@ class AbsSumProcessor:
                     "segs": batch.segs,
                     "mask_src": batch.mask_src,
                     "tgt": batch.tgt,
-                    # "tgt_num_tokens": batch.tgt_num_tokens
+                    "tgt_num_tokens": batch.tgt_num_tokens
                 }
             else:
                 return {
@@ -372,6 +372,7 @@ class AbsSum(Transformer):
         finetune_bert=True,
         cache_dir=".",
         checkpoint=None,
+        label_smoothing=0.1,
     ):
         """Initialize a ExtractiveSummarizer.
 
@@ -410,6 +411,8 @@ class AbsSum(Transformer):
             encoder=encoder,
             finetune_bert=finetune_bert,
             checkpoint=checkpoint,
+            label_smoothing=label_smoothing,
+            symbols=processor.symbols,
         )
         self.processor = processor
         self.optim_bert = None
@@ -448,7 +451,6 @@ class AbsSum(Transformer):
         seed=None,
         fp16=True,
         validation_function=None,
-        label_smoothing=0.1,
         **kwargs,
     ):
         """
@@ -486,13 +488,6 @@ class AbsSum(Transformer):
             verbose (bool, optional): Whether to print out the training log. Defaults to True.
             seed (int, optional): Random seed used to improve reproducibility. Defaults to None.
         """
-        self.train_loss = abs_loss(
-                self.model.generator,
-                self.processor.symbols,
-                self.model.vocab_size,
-                train=True,
-                label_smoothing=label_smoothing,
-            )
 
         # get device
         device, num_gpus = get_device(num_gpus=num_gpus, local_rank=local_rank)
@@ -528,10 +523,9 @@ class AbsSum(Transformer):
             except ImportError:
                 raise ImportError("Please install apex from https://www.github.com/nvidia/apex")
             amp.register_half_function(torch, "einsum") 
-            self.model, optim = amp.initialize(self.model, optim, opt_level="O1")
+            self.model, optim = amp.initialize(self.model, optim, opt_level="O2")
         self.model = parallelize_model(self.model, device, num_gpus=num_gpus, gpu_ids=None, local_rank=local_rank)
 
-        self.train_loss = move_model_to_device(self.train_loss, device)
 
 
         def build_data_iterator(collate, dataset, batch_size=16, device="cuda"):
@@ -563,10 +557,6 @@ class AbsSum(Transformer):
             gradient_accumulation_steps=gradient_accumulation_steps,
         )
 
-        def loss(inputs, outputs):
-            # return  self.train_loss.sharded_compute_loss(inputs, outputs, Bunch({"generator_shard_size":32}), normalization)
-            return self.train_loss.monolithic_compute_loss(inputs, outputs)
-
         super().fine_tune(
             train_dataloader=train_dataloader,
             get_inputs=AbsSumProcessor.get_inputs,
@@ -582,7 +572,7 @@ class AbsSum(Transformer):
             save_every=save_every,
             clip_grad_norm=False,
             optimizer=optim,
-            loss_function=loss,
+            loss_function=None,
             fp16=fp16,
             amp_handle=None,
             validation_function=validation_function,

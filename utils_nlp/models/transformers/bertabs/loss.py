@@ -75,7 +75,7 @@ class LossComputeBase(nn.Module):
         """
         return NotImplementedError
 
-    def monolithic_compute_loss(self, batch, output):
+    def monolithic_compute_loss(self, output, target, number_tokens):
         """
         Compute the forward loss for the batch.
 
@@ -89,9 +89,9 @@ class LossComputeBase(nn.Module):
         Returns:
             :obj:`onmt.utils.Statistics`: loss statistics
         """
-        shard_state = self._make_shard_state(batch, output)
-        loss, batch_stats = self._compute_loss(batch, **shard_state)
-        normalization = shard_state['number_tokens'].sum()
+        #shard_state = self._make_shard_state(output, target)
+        loss, batch_stats = self._compute_loss(output, target)
+        normalization = number_tokens.sum()
         
         return loss.div(float(normalization))
 
@@ -208,15 +208,14 @@ class NMTLossCompute(LossComputeBase):
                 ignore_index=self.padding_idx, reduction='sum'
             )
 
-    def _make_shard_state(self, batch, output):
+    def _make_shard_state(self, target, tgt_num_tokens, output):
         return {
             "output": output,
-            "target": batch.tgt[:,1:],
-            #"target": batch.tgt,
-            "number_tokens": batch.tgt_num_tokens,
+            "target": target,
+            "number_tokens": tgt_num_tokens,
         }
 
-    def _compute_loss(self, batch, output, target, **kwargs):
+    def _compute_loss(self, output, target, **kwargs):
         bottled_output = self._bottle(output)
         scores = self.generator(bottled_output)
         gtruth = target.contiguous().view(-1)

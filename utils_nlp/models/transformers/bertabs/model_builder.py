@@ -12,7 +12,7 @@ from torch.nn.init import xavier_uniform_
 from .decoder import TransformerDecoder
 from .encoder import Classifier, ExtTransformerEncoder
 from .optimizers import Optimizer
-
+from .loss import abs_loss
 
 def build_optim(
     model,
@@ -189,6 +189,7 @@ class AbsSummarizer(nn.Module):
     def __init__(
         self,
         large=False,
+        symbols=None,
         temp_dir="./",
         finetune_bert=True,
         encoder="bert",
@@ -291,6 +292,15 @@ class AbsSummarizer(nn.Module):
                 self.decoder.embeddings = tgt_embeddings
                 self.generator[0].weight = self.decoder.embeddings.weight
 
+        self.train_loss = abs_loss(
+                self.generator,
+                symbols,
+                self.vocab_size,
+                train=True,
+                label_smoothing=label_smoothing,
+            )
+
+
     def move_to_device(self, device, move_to_device_fn):
         #self.to(device)
         #self.generator = move_to_device_fn(self.generator, device)
@@ -299,8 +309,9 @@ class AbsSummarizer(nn.Module):
 
 
     # def forward(self, src, tgt, segs, clss, mask_src, mask_tgt, mask_cls):
-    def forward(self, src, segs, mask_src, tgt):  # , mask_tgt, mask_cls):
+    def forward(self, src, segs, mask_src, tgt, tgt_num_tokens):  # , mask_tgt, mask_cls):
         top_vec = self.bert(src, segs, mask_src)
         dec_state = self.decoder.init_decoder_state(src, top_vec)
         decoder_outputs, state = self.decoder(tgt[:, :-1], top_vec, dec_state)
-        return decoder_outputs
+        loss = self.train_loss.monolithic_compute_loss(decoder_outputs, tgt[:,:-1], tgt_num_tokens)
+        return loss, decoder_outputs

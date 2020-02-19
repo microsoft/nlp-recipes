@@ -171,6 +171,7 @@ class Optimizer(object):
             raise RuntimeError("Invalid optim method: " + self.method)
 
         self.param_groups = self.optimizer.param_groups
+        self.state = self.optimizer.state
 
     def _set_rate(self, learning_rate):
         self.learning_rate = learning_rate
@@ -264,4 +265,4 @@ class Optimizer(object):
         """ ? """
         self.optimizer.zero_grad()
 
-
+    

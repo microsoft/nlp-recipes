@@ -283,7 +283,7 @@ class Translator(object):
             vocab_size = log_probs.size(-1)
 
             if step < min_length:
-                log_probs[:, self.end_token] = -1e20
+                log_probs[:, self.end_token] = torch.Tensor([-1e20]) 
 
             # Multiply probs by the beam probability.
             log_probs += topk_log_probs.view(-1).unsqueeze(1)
@@ -311,7 +311,7 @@ class Translator(object):
                         if trigram in trigrams[:-1]:
                             fail = True
                         if fail:
-                            curr_scores[i] = -10e20
+                            curr_scores[i] = torch.Tensor([-10e20])
 
             curr_scores = curr_scores.reshape(-1, beam_size * vocab_size)
             topk_scores, topk_ids = curr_scores.topk(beam_size, dim=-1)
