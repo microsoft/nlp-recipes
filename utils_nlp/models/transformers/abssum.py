@@ -27,7 +27,7 @@ from utils_nlp.common.pytorch_utils import compute_training_steps, get_device
 from utils_nlp.dataset.sentence_selection import combination_selection, greedy_selection
 from utils_nlp.models.transformers.common import TOKENIZER_CLASS, Transformer
 
-from utils_nlp.common.pytorch_utils import move_model_to_device, parallelize_model
+from utils_nlp.common.pytorch_utils import get_amp, move_model_to_device, parallelize_model
 from .extractive_summarization import Bunch
 
 from torch.utils.data import SequentialSampler, RandomSampler, DataLoader
@@ -410,7 +410,7 @@ class AbsSum(Transformer):
             temp_dir=cache_dir,
             encoder=encoder,
             finetune_bert=finetune_bert,
-            checkpoint=checkpoint,
+            checkpoint=None,
             label_smoothing=label_smoothing,
             symbols=processor.symbols,
         )
@@ -430,7 +430,6 @@ class AbsSum(Transformer):
         self,
         train_dataset,
         num_gpus=None,
-        world_size=1,
         gpu_ids=None,
         batch_size=140,
         local_rank=-1,
@@ -450,7 +449,11 @@ class AbsSum(Transformer):
         verbose=True,
         seed=None,
         fp16=True,
+        fp16_opt_level="O2",
+        world_size=1,
+        rank=0,
         validation_function=None,
+        checkpoint=None,
         **kwargs,
     ):
         """
@@ -490,64 +493,62 @@ class AbsSum(Transformer):
         """
 
         # get device
-        device, num_gpus = get_device(num_gpus=num_gpus, local_rank=local_rank)
-
+        device, num_gpus = get_device(num_gpus=num_gpus, gpu_ids=gpu_ids, local_rank=local_rank)
         # move model to devices
-        def this_model_move_callback(model, device):
-            model = move_model_to_device(model, device)
-            return model
-        
-        self.model = self.model.move_to_device(device, this_model_move_callback)
+        print("device is {}".format(device)) 
+        self.model = move_model_to_device(model=self.model, device=device)
 
         # init optimizer
 
         self.optim_bert = model_builder.build_optim_bert(
             self.model,
-            visible_gpus=",".join([str(i) for i in range(num_gpus)]), #"0,1,2,3",
+            visible_gpus=None, #",".join([str(i) for i in range(num_gpus)]), #"0,1,2,3",
             lr_bert=learning_rate_bert,
             warmup_steps_bert=warmup_steps_bert,
-            checkpoint=self.checkpoint,
+            checkpoint=None,
         )
         self.optim_dec = model_builder.build_optim_dec(
             self.model,
-            visible_gpus=",".join([str(i) for i in range(num_gpus)]), #"0,1,2,3"
+            visible_gpus=None, #",".join([str(i) for i in range(num_gpus)]), #"0,1,2,3"
             lr_dec=learning_rate_dec,
             warmup_steps_dec=warmup_steps_dec,
-            checkpoint=self.checkpoint,
         )
-        optim = [self.optim_bert, self.optim_dec]
+        optimizers = [self.optim_bert, self.optim_dec]
 
-        if fp16:
-            try:
-                from apex import amp
-            except ImportError:
-                raise ImportError("Please install apex from https://www.github.com/nvidia/apex")
-            amp.register_half_function(torch, "einsum") 
-            self.model, optim = amp.initialize(self.model, optim, opt_level="O2")
-        self.model = parallelize_model(self.model, device, num_gpus=num_gpus, gpu_ids=None, local_rank=local_rank)
+        self.amp = get_amp(fp16)
+        if self.amp:
+            self.model, optim = amp.initialize(self.model, optimizers, opt_level=opt_level)
+        if self.checkpoint:
+            self.model.load_checkpoint(self.checkpoint['model'])
+            for i in range(len(optimizers)):
+                model_builder.load_optimizer_checkpoint(optimizers[i], self.checkpoint['optimizers'][i])
+            if self.amp and self.checkpoint.has_key('amp'):
+                self.amp.load_state_dict(self.checkpoint['amp'])
+
+        self.model = parallelize_model(
+            model=self.model, 
+            device=device, 
+            num_gpus=num_gpus, 
+            gpu_ids=gpu_ids, 
+            local_rank=local_rank,
+        )
 
 
 
-        def build_data_iterator(collate, dataset, batch_size=16, device="cuda"):
             
-            if local_rank == -1:
-                sampler = RandomSampler(dataset)
-            else:
-                sampler = DistributedSampler(dataset, num_replicas=world_size, rank=local_rank)
+        if local_rank == -1:
+            sampler = RandomSampler(train_dataset)
+        else:
+            sampler = DistributedSampler(train_dataset, num_replicas=world_size, rank=rank)
 
-            def collate_fn(data):
-                return collate(data, block_size=512, device=device)
+        def collate_fn(data):
+            return self.processor.collate(data, block_size=512, device=device)
 
-            iterator = DataLoader(
-                dataset, sampler=sampler, batch_size=batch_size, collate_fn=collate_fn,
-            )
-
-            return iterator
-
-        # batch_size is the number of tokens in a batch
-        # train_dataloader = get_dataloader(train_dataset.get_stream(), is_labeled=True, batch_size=batch_size)
-        train_dataloader = build_data_iterator(
-            self.processor.collate, train_dataset, batch_size=batch_size, device=device
+        train_dataloader = DataLoader(
+            train_dataset, 
+            sampler=sampler, 
+            batch_size=batch_size, 
+            collate_fn=collate_fn,
         )
 
         # compute the max number of training steps
@@ -560,8 +561,8 @@ class AbsSum(Transformer):
         super().fine_tune(
             train_dataloader=train_dataloader,
             get_inputs=AbsSumProcessor.get_inputs,
+            device=device,
             num_gpus=num_gpus,
-            gpu_ids=gpu_ids,
             max_steps=max_steps,
             max_grad_norm=max_grad_norm,
             gradient_accumulation_steps=gradient_accumulation_steps,
@@ -571,10 +572,10 @@ class AbsSum(Transformer):
             report_every=report_every,
             save_every=save_every,
             clip_grad_norm=False,
-            optimizer=optim,
+            optimizer=optimizers,
             loss_function=None,
             fp16=fp16,
-            amp_handle=None,
+            amp=self.amp,
             validation_function=validation_function,
         )
 
@@ -685,7 +686,6 @@ class AbsSum(Transformer):
                 the model is going to be saved under "fine_tuned" folder of the cached directory
                 of the object. Defaults to None.
         """
-        save_obj = {"optims": [self.optim_bert.state_dict(), self.optim_dec.state_dict()]}
         model_to_save = (
             self.model.module if hasattr(self.model, "module") else self.model
         )  # Take care of distributed/parallel training
@@ -695,16 +695,20 @@ class AbsSum(Transformer):
             os.makedirs(self.cache_dir, exist_ok=True)
             os.makedirs(output_model_dir, exist_ok=True)
             full_name = os.path.join(output_model_dir, name)
+        checkpoint = {
+            "optimizers": [self.optim_bert.state_dict(), self.optim_dec.state_dict()],
+            "model": model_to_save.state_dict(),
+            "amp": self.amp.state_dict() if self.amp else None,
+        }
 
-        save_obj["model"] = model_to_save.state_dict()
         logger.info("Saving model checkpoint to %s", full_name)
         try:
             print("saving through pytorch")
-            torch.save(save_obj, full_name)
+            torch.save(checkpoint, full_name)
         except OSError:
             try:
                 print("saving as pickle")
-                pickle.dump(save_obj, open(full_name, "wb"))
+                pickle.dump(checkpoint, open(full_name, "wb"))
             except Exception:
                 raise
         except Exception:

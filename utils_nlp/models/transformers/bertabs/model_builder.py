@@ -14,6 +14,16 @@ from .encoder import Classifier, ExtTransformerEncoder
 from .optimizers import Optimizer
 from .loss import abs_loss
 
+def load_optimizer_checkpoint(optimizer, checkpoint):
+    if checkpoint is not None:
+        saved_optimizer_state_dict = checkpoint.state_dict()
+        optimizer.optimizer.load_state_dict(saved_optimizer_state_dict)
+        if (optimizer.method == "adam") and (len(optimizer.optimizer.state) < 1):
+            raise RuntimeError(
+                "Error: loaded Adam optimizer from existing model" + " but optimizer state is empty"
+            )
+
+
 def build_optim(
     model,
     visible_gpus="-1",
@@ -23,35 +33,18 @@ def build_optim(
     beta1=0.9,
     beta2=0.999,
     warmup_steps=8000,
-    checkpoint=None,
+    #checkpoint=None,
 ):
     """ Build optimizer """
-
-    if checkpoint is not None:
-        optim = checkpoint["optim"][0]
-        saved_optimizer_state_dict = optim.optimizer.state_dict()
-        optim.optimizer.load_state_dict(saved_optimizer_state_dict)
-        if args.visible_gpus != "-1":
-            for state in optim.optimizer.state.values():
-                for k, v in state.items():
-                    if torch.is_tensor(v):
-                        state[k] = v.cuda()
-
-        if (optim.method == "adam") and (len(optim.optimizer.state) < 1):
-            raise RuntimeError(
-                "Error: loaded Adam optimizer from existing model" + " but optimizer state is empty"
-            )
-
-    else:
-        optim = Optimizer(
-            optim,
-            lr,
-            max_grad_norm,
-            beta1=beta1,
-            beta2=beta2,
-            decay_method="noam",
-            warmup_steps=warmup_steps,
-        )
+    optim = Optimizer(
+        optim,
+        lr,
+        max_grad_norm,
+        beta1=beta1,
+        beta2=beta2,
+        decay_method="noam",
+        warmup_steps=warmup_steps,
+    )
 
     optim.set_parameters(list(model.named_parameters()))
 
@@ -69,33 +62,16 @@ def build_optim_bert(
     warmup_steps_bert=8000,
     checkpoint=None,
 ):
-    """ Build optimizer """
 
-    if checkpoint is not None:
-        optim = checkpoint["optims"][0]
-        saved_optimizer_state_dict = optim.optimizer.state_dict()
-        optim.optimizer.load_state_dict(saved_optimizer_state_dict)
-        if visible_gpus != "-1":
-            for state in optim.optimizer.state.values():
-                for k, v in state.items():
-                    if torch.is_tensor(v):
-                        state[k] = v.cuda()
-
-        if (optim.method == "adam") and (len(optim.optimizer.state) < 1):
-            raise RuntimeError(
-                "Error: loaded Adam optimizer from existing model" + " but optimizer state is empty"
-            )
-
-    else:
-        optim = Optimizer(
-            optim,
-            lr_bert,
-            max_grad_norm,
-            beta1=beta1,
-            beta2=beta2,
-            decay_method="noam",
-            warmup_steps=warmup_steps_bert,
-        )
+    optim = Optimizer(
+        optim,
+        lr_bert,
+        max_grad_norm,
+        beta1=beta1,
+        beta2=beta2,
+        decay_method="noam",
+        warmup_steps=warmup_steps_bert,
+    )
 
     params = [
         (n, p)
@@ -118,33 +94,15 @@ def build_optim_dec(
     warmup_steps_dec=8000,
     checkpoint=None,
 ):
-    """ Build optimizer """
-
-    if checkpoint is not None:
-        optim = checkpoint["optims"][1]
-        saved_optimizer_state_dict = optim.optimizer.state_dict()
-        optim.optimizer.load_state_dict(saved_optimizer_state_dict)
-        if visible_gpus != "-1":
-            for state in optim.optimizer.state.values():
-                for k, v in state.items():
-                    if torch.is_tensor(v):
-                        state[k] = v.cuda()
-
-        if (optim.method == "adam") and (len(optim.optimizer.state) < 1):
-            raise RuntimeError(
-                "Error: loaded Adam optimizer from existing model" + " but optimizer state is empty"
-            )
-
-    else:
-        optim = Optimizer(
-            optim,
-            lr_dec,
-            max_grad_norm,
-            beta1=beta1,
-            beta2=beta2,
-            decay_method="noam",
-            warmup_steps=warmup_steps_dec,
-        )
+    optim = Optimizer(
+        optim,
+        lr_dec,
+        max_grad_norm,
+        beta1=beta1,
+        beta2=beta2,
+        decay_method="noam",
+        warmup_steps=warmup_steps_dec,
+    )
 
     params = [
         (n, p)
@@ -266,46 +224,49 @@ class AbsSummarizer(nn.Module):
         self.generator = get_generator(self.vocab_size, dec_hidden_size)
         self.generator[0].weight = self.decoder.embeddings.weight
 
+        for module in self.decoder.modules():
+            if isinstance(module, (nn.Linear, nn.Embedding)):
+                module.weight.data.normal_(mean=0.0, std=0.02)
+            elif isinstance(module, nn.LayerNorm):
+                module.bias.data.zero_()
+                module.weight.data.fill_(1.0)
+            if isinstance(module, nn.Linear) and module.bias is not None:
+                module.bias.data.zero_()
+        for p in self.generator.parameters():
+            if p.dim() > 1:
+                xavier_uniform_(p)
+            else:
+                p.data.zero_()
+        if use_bert_emb:
+            tgt_embeddings = nn.Embedding(
+                self.vocab_size, self.bert.model.config.hidden_size, padding_idx=0
+            )
+            tgt_embeddings.weight = copy.deepcopy(
+                self.bert.model.embeddings.word_embeddings.weight
+            )
+            self.decoder.embeddings = tgt_embeddings
+            self.generator[0].weight = self.decoder.embeddings.weight
+        self.symbols = symbols
+        self.label_smoothing = label_smoothing
+
+    def load_checkpoint(self, checkpoint):
         if checkpoint is not None:
-            self.load_state_dict(checkpoint["model"], strict=True)
-        else:
-            for module in self.decoder.modules():
-                if isinstance(module, (nn.Linear, nn.Embedding)):
-                    module.weight.data.normal_(mean=0.0, std=0.02)
-                elif isinstance(module, nn.LayerNorm):
-                    module.bias.data.zero_()
-                    module.weight.data.fill_(1.0)
-                if isinstance(module, nn.Linear) and module.bias is not None:
-                    module.bias.data.zero_()
-            for p in self.generator.parameters():
-                if p.dim() > 1:
-                    xavier_uniform_(p)
-                else:
-                    p.data.zero_()
-            if use_bert_emb:
-                tgt_embeddings = nn.Embedding(
-                    self.vocab_size, self.bert.model.config.hidden_size, padding_idx=0
-                )
-                tgt_embeddings.weight = copy.deepcopy(
-                    self.bert.model.embeddings.word_embeddings.weight
-                )
-                self.decoder.embeddings = tgt_embeddings
-                self.generator[0].weight = self.decoder.embeddings.weight
+            self.load_state_dict(checkpoint, strict=True)
 
         self.train_loss = abs_loss(
                 self.generator,
-                symbols,
+                self.symbols,
                 self.vocab_size,
                 train=True,
-                label_smoothing=label_smoothing,
+                label_smoothing=self.label_smoothing,
             )
 
 
-    def move_to_device(self, device, move_to_device_fn):
+    #def move_to_device(self, device, move_to_device_fn):
         #self.to(device)
         #self.generator = move_to_device_fn(self.generator, device)
-        self = move_to_device_fn(self, device)
-        return self
+    #    self = move_to_device_fn(self, device)
+    #    return self
 
 
     # def forward(self, src, tgt, segs, clss, mask_src, mask_tgt, mask_cls):
