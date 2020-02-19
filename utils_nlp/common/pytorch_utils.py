@@ -8,25 +8,23 @@ from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
 from torch.utils.data.distributed import DistributedSampler
 
 
-def get_device(
-    num_gpus=None,
-    local_rank=-1,
-    #    backend="nccl",
-    #    rank=0,
-    #    world_size=1,
-    #    init_method="file:///distributed",
-):
+def get_device(num_gpus=None, gpu_ids=None, local_rank=-1):
+    if gpu_ids is not None:
+        num_gpus = len(gpu_ids)
     if local_rank == -1:
-        num_gpus = min(num_gpus, torch.cuda.device_count()) if num_gpus is not None else torch.cuda.device_count()
-        device = torch.device("cuda" if torch.cuda.is_available() and num_gpus > 0 else "cpu")
+        num_gpus = (
+            min(num_gpus, torch.cuda.device_count())
+            if num_gpus is not None
+            else torch.cuda.device_count()
+        )
+        device = torch.device(
+            "cuda" if torch.cuda.is_available() and num_gpus > 0 else "cpu"
+        )
     else:
         torch.cuda.set_device(local_rank)
         device = torch.device("cuda", local_rank)
-        # torch.distributed.init_process_group(backend="nccl")
-        # torch.distributed.init_process_group(backend=backend, rank=rank, world_size=world_size, init_method=init_method)
         num_gpus = 1
     return device, num_gpus
-
 
 def move_model_to_device(model, device):
     if not isinstance(device, torch.device):
@@ -150,3 +148,23 @@ def compute_training_steps(dataloader, num_epochs=1, max_steps=-1, gradient_accu
     if max_steps <= 0:
         raise Exception("Max steps cannot be determined.")
     return max_steps
+
+def get_amp(fp16):
+    """This function ensures that fp16 execution of torch.einsum is enabled
+        if args.fp16 is set. Otherwise, it'll default to "promote" mode,
+        where the operations are in fp32.
+        Note that running `--fp16_opt_level="O2"` will remove the need for this code.
+    """
+    # Before we do anything with models, we want to
+    if fp16:
+        try:
+            from apex import amp
+
+            amp.register_half_function(torch, "einsum")
+        except ImportError:
+            raise ImportError(
+                "Please install apex from https://www.github.com/nvidia/apex"
+            )
+    else:
+        amp = None
+    return amp
