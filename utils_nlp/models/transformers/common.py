@@ -116,16 +116,16 @@ class Transformer:
         self,
         train_dataloader,
         get_inputs,
+        device,
         num_gpus=None,
-        gpu_ids=None,
         max_steps=-1,
+        global_step=0,
         max_grad_norm=1.0,
         gradient_accumulation_steps=1,
         optimizer=None,
         scheduler=None,
         fp16=False,
-        fp16_opt_level="O1",
-        amp_handle=None,
+        amp=None,
         local_rank=-1,
         verbose=True,
         seed=None,
@@ -136,24 +136,11 @@ class Transformer:
         validation_function=None,
     ):
 
-        # get device
-        device, num_gpus = get_device(num_gpus=num_gpus, local_rank=local_rank)
 
         if seed is not None:
             Transformer.set_seed(seed, num_gpus > 0)
 
-        if fp16:
-            try:
-                from apex import amp
-            except ImportError:
-                raise ImportError("Please install apex from https://www.github.com/nvidia/apex")
-            #self.model, optimizer = amp.initialize(self.model, optimizer, opt_level=fp16_opt_level)
-
-        # move model
-        #self.model = move_model_to_device(self.model, device, num_gpus, gpu_ids, local_rank)
-
         # init training
-        global_step = 0
         tr_loss = 0.0
         accum_loss = 0
         self.model.train()
@@ -163,7 +150,9 @@ class Transformer:
         start = time.time()
         while global_step < max_steps:
             epoch_iterator = tqdm(
-                train_dataloader, desc="Iteration", disable=local_rank not in [-1, 0] or verbose
+                train_dataloader, 
+                desc="Iteration",
+                disable=local_rank not in [-1, 0] or verbose
             )
             for step, batch in enumerate(epoch_iterator):
                 inputs = get_inputs(batch, device, self.model_name)
@@ -228,6 +217,7 @@ class Transformer:
                     if scheduler:
                         scheduler.step()
                     self.model.zero_grad()
+
                     if save_every != -1 and global_step % save_every == 0 and verbose:
                         saved_model_path = os.path.join(
                             self.cache_dir, f"{self.model_name}_step_{global_step}.pt"
