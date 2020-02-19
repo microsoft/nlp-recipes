@@ -26,7 +26,8 @@ def build_optim(model, opt, checkpoint):
         # the method optim.set_parameters(model.parameters()) will overwrite
         # optim.optimizer, and with ith the values stored in
         # optim.optimizer.state_dict()
-        saved_optimizer_state_dict = optim.optimizer.state_dict()
+        #saved_optimizer_state_dict = optim.optimizer.state_dict()
+        saved_optimizer_state_dict = optim
     else:
         optim = Optimizer(
             opt.optim, opt.learning_rate, opt.max_grad_norm,
@@ -169,6 +170,8 @@ class Optimizer(object):
         else:
             raise RuntimeError("Invalid optim method: " + self.method)
 
+        self.param_groups = self.optimizer.param_groups
+
     def _set_rate(self, learning_rate):
         self.learning_rate = learning_rate
         if self.method != 'sparseadam':
@@ -251,3 +254,14 @@ class Optimizer(object):
                 raise ValueError("some parameters appear in more than one parameter group")
 
             self.param_groups.append(param_group)
+    def load_state_dict(self, state_dict):
+        self.optimizer.load_state_dict(state_dict)
+    def state_dict(self):
+        """ ? """
+        return self.optimizer.state_dict() 
+
+    def zero_grad(self):
+        """ ? """
+        self.optimizer.zero_grad()
+
+

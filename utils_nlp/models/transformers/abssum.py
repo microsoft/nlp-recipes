@@ -13,6 +13,8 @@ import random
 
 import numpy as np
 import torch
+from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.utils.data.distributed import DistributedSampler
 from torch.utils.data import DataLoader, Dataset, IterableDataset, SequentialSampler
 
 # from torch.utils.data.distributed import DistributedSampler
@@ -25,7 +27,7 @@ from utils_nlp.common.pytorch_utils import compute_training_steps, get_device
 from utils_nlp.dataset.sentence_selection import combination_selection, greedy_selection
 from utils_nlp.models.transformers.common import TOKENIZER_CLASS, Transformer
 
-from utils_nlp.common.pytorch_utils import move_model_to_device
+from utils_nlp.common.pytorch_utils import move_model_to_device, parallelize_model
 from .extractive_summarization import Bunch
 
 from torch.utils.data import SequentialSampler, RandomSampler, DataLoader
@@ -425,6 +427,7 @@ class AbsSum(Transformer):
         self,
         train_dataset,
         num_gpus=None,
+        world_size=1,
         gpu_ids=None,
         batch_size=140,
         local_rank=-1,
@@ -443,7 +446,7 @@ class AbsSum(Transformer):
         save_every=100,
         verbose=True,
         seed=None,
-        fp16=False,
+        fp16=True,
         validation_function=None,
         label_smoothing=0.1,
         **kwargs,
@@ -496,9 +499,11 @@ class AbsSum(Transformer):
 
         # move model to devices
         def this_model_move_callback(model, device):
-            return move_model_to_device(model, device, num_gpus=num_gpus, gpu_ids=None, local_rank=local_rank)
-        #self.model = move_model_to_device(self.model, device, num_gpus=num_gpus, None, local_rank=local_rank)
+            model = move_model_to_device(model, device)
+            return model
+        
         self.model = self.model.move_to_device(device, this_model_move_callback)
+
         # init optimizer
 
         self.optim_bert = model_builder.build_optim_bert(
@@ -517,11 +522,24 @@ class AbsSum(Transformer):
         )
         optim = [self.optim_bert, self.optim_dec]
 
-        self.train_loss = move_model_to_device(self.train_loss, device, num_gpus=num_gpus, gpu_ids=None, local_rank=local_rank)
+        if fp16:
+            try:
+                from apex import amp
+            except ImportError:
+                raise ImportError("Please install apex from https://www.github.com/nvidia/apex")
+            amp.register_half_function(torch, "einsum") 
+            self.model, optim = amp.initialize(self.model, optim, opt_level="O1")
+        self.model = parallelize_model(self.model, device, num_gpus=num_gpus, gpu_ids=None, local_rank=local_rank)
+
+        self.train_loss = move_model_to_device(self.train_loss, device)
+
 
         def build_data_iterator(collate, dataset, batch_size=16, device="cuda"):
-
-            sampler = RandomSampler(dataset)
+            
+            if local_rank == -1:
+                sampler = RandomSampler(dataset)
+            else:
+                sampler = DistributedSampler(dataset, num_replicas=world_size, rank=local_rank)
 
             def collate_fn(data):
                 return collate(data, block_size=512, device=device)
@@ -547,7 +565,7 @@ class AbsSum(Transformer):
 
         def loss(inputs, outputs):
             # return  self.train_loss.sharded_compute_loss(inputs, outputs, Bunch({"generator_shard_size":32}), normalization)
-            return self.train_loss.module.monolithic_compute_loss(inputs, outputs)
+            return self.train_loss.monolithic_compute_loss(inputs, outputs)
 
         super().fine_tune(
             train_dataloader=train_dataloader,
@@ -566,6 +584,7 @@ class AbsSum(Transformer):
             optimizer=optim,
             loss_function=loss,
             fp16=fp16,
+            amp_handle=None,
             validation_function=validation_function,
         )
 
@@ -612,7 +631,8 @@ class AbsSum(Transformer):
         device, num_gpus = get_device(num_gpus=num_gpus, local_rank=-1)
          # move model to devices
         def this_model_move_callback(model, device):
-            return  move_model_to_device(model, device, num_gpus=num_gpus, gpu_ids=None, local_rank=-1)
+            model =  move_model_to_device(model, device)
+            return parallelize_model(model, device, num_gpus=num_gpus, gpu_ids=None, local_rank=-1)
         #self.model = move_model_to_device(self.model, device, num_gpus=num_gpus, None, local_rank=local_rank)
 
         def format_summary(translation):
@@ -623,6 +643,8 @@ class AbsSum(Transformer):
             summary = (
                 raw_summary.replace("[unused0]", "")
                 .replace("[unused3]", "")
+                .replace("[CLS]", "")
+                .replace("[SEP]", ".")
                 .replace("[PAD]", "")
                 .replace("[unused1]", "")
                 .replace(r" +", " ")
@@ -673,7 +695,7 @@ class AbsSum(Transformer):
                 the model is going to be saved under "fine_tuned" folder of the cached directory
                 of the object. Defaults to None.
         """
-        save_obj = {"optims": [self.optim_bert, self.optim_dec]}
+        save_obj = {"optims": [self.optim_bert.state_dict(), self.optim_dec.state_dict()]}
         model_to_save = (
             self.model.module if hasattr(self.model, "module") else self.model
         )  # Take care of distributed/parallel training

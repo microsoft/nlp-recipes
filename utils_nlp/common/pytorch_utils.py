@@ -28,10 +28,21 @@ def get_device(
     return device, num_gpus
 
 
-def move_model_to_device(model, device, num_gpus=None, gpu_ids=None, local_rank=-1):
+def move_model_to_device(model, device):
+    if not isinstance(device, torch.device):
+        raise ValueError("device must be of type torch.device.")
+
+    # unwrap model
+    if isinstance(model, torch.nn.DataParallel):
+        model = model.module
+
+    # move to device
+    return model.to(device)
+
+
+def parallelize_model(model, device, num_gpus=None, gpu_ids=None, local_rank=-1):
     """Moves a model to the specified device (cpu or gpu/s)
        and implements data parallelism when multiple gpus are specified.
-
     Args:
         model (Module): A PyTorch model.
         device (torch.device): A PyTorch device.
@@ -45,10 +56,10 @@ def move_model_to_device(model, device, num_gpus=None, gpu_ids=None, local_rank=
         local_rank (int): Local GPU ID within a node. Used in distributed environments.
             If not -1, num_gpus and gpu_ids are ignored.
             Defaults to -1.
-
     Returns:
         Module, DataParallel, DistributedDataParallel: A PyTorch Module or
-            a DataParallel/DistributedDataParallel wrapper (when multiple gpus are used).
+            a DataParallel/DistributedDataParallel wrapper,
+            when multiple gpus are used.
     """
     if not isinstance(device, torch.device):
         raise ValueError("device must be of type torch.device.")
@@ -58,8 +69,11 @@ def move_model_to_device(model, device, num_gpus=None, gpu_ids=None, local_rank=
         model = model.module
     # wrap in DataParallel or DistributedDataParallel
     if local_rank != -1:
-        self.model = torch.nn.parallel.DistributedDataParallel(
-            self.model, device_ids=[local_rank], output_device=local_rank, find_unused_parameters=True,
+        model = torch.nn.parallel.DistributedDataParallel(
+            model,
+            device_ids=[local_rank],
+            output_device=local_rank,
+            find_unused_parameters=True,
         )
     else:
         if device.type == "cuda":
@@ -70,13 +84,15 @@ def move_model_to_device(model, device, num_gpus=None, gpu_ids=None, local_rank=
             if num_cuda_devices < 1:
                 raise Exception("CUDA devices are not available.")
             if gpu_ids is None:
-                num_gpus = num_cuda_devices if num_gpus is None else min(num_gpus, num_cuda_devices)
+                num_gpus = (
+                    num_cuda_devices
+                    if num_gpus is None
+                    else min(num_gpus, num_cuda_devices)
+                )
                 gpu_ids = list(range(num_gpus))
             if len(gpu_ids) > 1:
                 model = torch.nn.DataParallel(model, device_ids=gpu_ids)
-    # move to device
-    return model.to(device)
-
+    return model
 
 def dataloader_from_dataset(ds, batch_size=32, num_gpus=None, shuffle=False, distributed=False):
     """Creates a PyTorch DataLoader given a Dataset object.

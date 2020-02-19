@@ -125,6 +125,7 @@ class Transformer:
         scheduler=None,
         fp16=False,
         fp16_opt_level="O1",
+        amp_handle=None,
         local_rank=-1,
         verbose=True,
         seed=None,
@@ -146,10 +147,10 @@ class Transformer:
                 from apex import amp
             except ImportError:
                 raise ImportError("Please install apex from https://www.github.com/nvidia/apex")
-            self.model, optimizer = amp.initialize(self.model, optimizer, opt_level=fp16_opt_level)
+            #self.model, optimizer = amp.initialize(self.model, optimizer, opt_level=fp16_opt_level)
 
         # move model
-        self.model = move_model_to_device(self.model, device, num_gpus, gpu_ids, local_rank)
+        #self.model = move_model_to_device(self.model, device, num_gpus, gpu_ids, local_rank)
 
         # init training
         global_step = 0
@@ -182,6 +183,8 @@ class Transformer:
                 if fp16:
                     with amp.scale_loss(loss, optimizer) as scaled_loss:
                         scaled_loss.backward()
+                        if amp_handle:
+                            amp_handle._clear_cache()
                 else:
                     loss.backward()
 
