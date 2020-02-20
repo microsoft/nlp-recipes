@@ -222,7 +222,7 @@ class Transformer:
                         saved_model_path = os.path.join(
                             self.cache_dir, f"{self.model_name}_step_{global_step}.pt"
                         )
-                        self.save_model(saved_model_path)
+                        self.save_model(global_step, saved_model_path)
                         if validation_function:
                             validation_log = validation_function(self)
                             logger.info(validation_log)
@@ -251,7 +251,7 @@ class Transformer:
                 logits = outputs[0]
             yield logits.detach().cpu().numpy()
 
-    def save_model(self, full_name=None):
+    def save_model(self, global_step=None, full_name=None):
         """
         save the trained model.
 

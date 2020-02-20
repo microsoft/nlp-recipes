@@ -332,12 +332,12 @@ class AbsSumProcessor:
             return story_token_ids
 
 def validate(summarizer, validate_sum_dataset, cache_dir):
-    TOP_N = 10
+    TOP_N = 8
 
     src = validate_sum_dataset.source[0:TOP_N]
     reference_summaries = ["".join(t).rstrip("\n") for t in validate_sum_dataset.target[0:TOP_N]]
     generated_summaries = summarizer.predict(
-        shorten_dataset(validate_sum_dataset, top_n=TOP_N), batch_size=4
+        shorten_dataset(validate_sum_dataset, top_n=TOP_N), num_gpus=2, batch_size=4
     )
     assert len(generated_summaries) == len(reference_summaries)
     for i in generated_summaries[0:1]:
@@ -511,13 +511,16 @@ class AbsSum(Transformer):
         self.amp = get_amp(fp16)
         if self.amp:
             self.model, optim = self.amp.initialize(self.model, optimizers, opt_level=fp16_opt_level)
-        
+       
+        global_step = 0
         if checkpoint:
             if checkpoint['optimizers']:
                 for i in range(len(optimizers)):
                     model_builder.load_optimizer_checkpoint(optimizers[i], checkpoint['optimizers'][i])
             if self.amp and "amp" in checkpoint and checkpoint['amp']:
                 self.amp.load_state_dict(checkpoint['amp'])
+            if "global_step" in checkpoint and checkpoint["global_step"]:
+                global_step = checkpoint["global_step"]
 
         self.model = parallelize_model(
             model=self.model, 
@@ -556,6 +559,7 @@ class AbsSum(Transformer):
             device=device,
             num_gpus=num_gpus,
             max_steps=max_steps,
+            global_step=global_step,
             max_grad_norm=max_grad_norm,
             gradient_accumulation_steps=gradient_accumulation_steps,
             scheduler=None,
@@ -626,8 +630,8 @@ class AbsSum(Transformer):
             summary = (
                 raw_summary.replace("[unused0]", "")
                 .replace("[unused3]", "")
-                .replace("[CLS]", "")
-                .replace("[SEP]", ".")
+                #.replace("[CLS]", "")
+                #.replace("[SEP]", ".")
                 .replace("[PAD]", "")
                 .replace("[unused1]", "")
                 .replace(r" +", " ")
@@ -669,7 +673,7 @@ class AbsSum(Transformer):
             generated_summaries += summaries
         return generated_summaries
 
-    def save_model(self, full_name=None):
+    def save_model(self, global_step=None, full_name=None):
         """
         save the trained model.
 
@@ -691,11 +695,12 @@ class AbsSum(Transformer):
             "optimizers": [self.optim_bert.state_dict(), self.optim_dec.state_dict()],
             "model": model_to_save.state_dict(),
             "amp": self.amp.state_dict() if self.amp else None,
+            "global_step": global_step
         }
 
         logger.info("Saving model checkpoint to %s", full_name)
         try:
-            print("saving through pytorch")
+            print("saving through pytorch to {}".format(full_name))
             torch.save(checkpoint, full_name)
         except OSError:
             try:
