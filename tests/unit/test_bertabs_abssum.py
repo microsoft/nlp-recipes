@@ -139,9 +139,8 @@ def main_worker(local_rank, ngpus_per_node, summarizer, args):
       )
 
     #torch.cuda.set_device(local_rank)
-    
-
-    checkpoint = torch.load(os.path.join(MODEL_PATH, "new_new_summarizer_step20000.pt"))
+    #checkpoint = torch.load(os.path.join(MODEL_PATH, "summarizer_step20000_with_global_step.pt"))
+    checkpoint = None
     train_sum_dataset, test_sum_dataset = preprocess_cnndm_abs()
     def this_validate(class_obj):
         return validate(class_obj, test_sum_dataset, CACHE_PATH)
@@ -150,8 +149,9 @@ def main_worker(local_rank, ngpus_per_node, summarizer, args):
         save_every = -1
         this_validate = None
     else:
-        save_every = 10
+        save_every = 100
 
+    #summarizer.model.load_checkpoint(checkpoint['model'])
     summarizer.fit(
         train_sum_dataset,
         world_size=world_size,
@@ -159,8 +159,9 @@ def main_worker(local_rank, ngpus_per_node, summarizer, args):
         local_rank=local_rank,
         rank=rank,
         batch_size=8,
-        max_steps=30000,
+        max_steps=50000/world_size,
         learning_rate_bert=0.002,
+        learning_rate_dec=0.2,
         warmup_steps_bert=20000,
         warmup_steps_dec=10000,
         save_every=save_every,
@@ -168,8 +169,12 @@ def main_worker(local_rank, ngpus_per_node, summarizer, args):
         validation_function=this_validate,
         fp16=True,
         fp16_opt_level="O2",
-        checkpoint=checkpoint
+        checkpoint=None
     )
+    if rank == 0 or local_rank == -1:
+        saved_model_path = os.path.join(MODEL_PATH, "summarizer_step70000_with_glocal_step.pt")
+        summarizer.save_model(70000, saved_model_path)
+
 
     dist.destroy_process_group()
 
@@ -181,8 +186,8 @@ def test_train_model():
         processor, cache_dir=CACHE_PATH
     )
  
-    checkpoint = torch.load(os.path.join(MODEL_PATH, "new_new_summarizer_step20000.pt"))
-    #checkpoint = None
+    #checkpoint = torch.load(os.path.join(MODEL_PATH, "new_new_summarizer_step20000.pt"))
+    checkpoint = None
     #summarizer.model.load_checkpoint(checkpoint['model'])
    
     train_sum_dataset, test_sum_dataset = preprocess_cnndm_abs()
@@ -191,21 +196,23 @@ def test_train_model():
         return validate(class_obj, test_sum_dataset, CACHE_PATH)
     summarizer.fit(
         train_sum_dataset,
-        batch_size=4,
+        batch_size=5,
         max_steps=30000,
+        local_rank=-1,
         learning_rate_bert=0.002,
+        learning_rate_dec=0.2,
         warmup_steps_bert=20000,
         warmup_steps_dec=10000,
-        num_gpus=2,
-        save_every=10,
+        num_gpus=1,
         report_every=10,
+        save_every=100,
         validation_function=this_validate,
         fp16=False,
         fp16_opt_level="O1",
         checkpoint=checkpoint
     )
-    saved_model_path = os.path.join(MODEL_PATH, "summarizer_step50000.pt")
-    summarizer.save_model(saved_model_path)
+    saved_model_path = os.path.join(MODEL_PATH, "summarizer_step30000.pt")
+    summarizer.save_model(30000, saved_model_path)
 
     summarizer = AbsSum(
         processor,
@@ -239,13 +246,34 @@ def test_pretrained_model():
     processor = AbsSumProcessor(cache_dir=CACHE_PATH)
     #checkpoint = torch.load(os.path.join(MODEL_PATH, "new_model_step_148000_torch1.4.0.pt"))
     #checkpoint = torch.load(os.path.join(MODEL_PATH, "bert-base-uncased_step_2900.pt"))
-    checkpoint = torch.load(os.path.join(MODEL_PATH, "new_new_summarizer_step20000.pt"))
+    
+    checkpoint = torch.load(os.path.join(MODEL_PATH, "summarizer_step20000_with_global_step.pt"))
+    
+    #checkpoint = torch.load(os.path.join(MODEL_PATH, "summarizer_step20000.pt"))
     summarizer = AbsSum(
         processor,
         cache_dir=CACHE_PATH,
     )
     summarizer.model.load_checkpoint(checkpoint['model'])
-    
+    """
+    summarizer.optim_bert = model_builder.build_optim_bert(
+            summarizer.model,
+            visible_gpus=None, #",".join([str(i) for i in range(num_gpus)]), #"0,1,2,3",
+            lr_bert=0.002,
+            warmup_steps_bert=20000,
+            checkpoint=None,
+        )
+    summarizer.optim_dec = model_builder.build_optim_dec(
+            summarizer.model,
+            visible_gpus=None, #",".join([str(i) for i in range(num_gpus)]), #"0,1,2,3"
+            lr_dec=0.2,
+            warmup_steps_dec=10000,
+        )
+    summarizer.amp=None
+    summarizer.save_model(20000, os.path.join(MODEL_PATH, "summarizer_step20000_with_global_step.pt"))
+    return
+    """
+
     top_n = 10
     src = test_sum_dataset.source[0:top_n]
     reference_summaries = ["".join(t).rstrip("\n") for t in test_sum_dataset.target[0:top_n]]
@@ -262,7 +290,7 @@ def test_pretrained_model():
 
 #test_preprocessing()
 #preprocess_cnndm_abs()
-#test_train_model()
+test_train_model()
 #test_pretrained_model()
-if __name__ == "__main__":
-    main()
+#if __name__ == "__main__":
+#    main()
