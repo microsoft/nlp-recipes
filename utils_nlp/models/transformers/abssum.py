@@ -222,6 +222,7 @@ class AbsSumProcessor:
         stories = [" ".join(story) for story, _ in data]
         summaries = [" ".join(summary) for _, summary in data]
 
+
         encoded_text = [self.preprocess(story, summary) for story, summary in data]
         # print(encoded_text[0])
 
@@ -249,7 +250,6 @@ class AbsSumProcessor:
                 encoded_summary.ne(self.tokenizer.pad_token_id).sum()
                 for encoded_summary in encoded_summaries
             ]
-            # print(summary_num_tokens)
 
             Batch = namedtuple(
                 "Batch",
@@ -569,7 +569,6 @@ class AbsSum(Transformer):
             save_every=save_every,
             clip_grad_norm=False,
             optimizer=optimizers,
-            loss_function=None,
             fp16=fp16,
             amp=self.amp,
             validation_function=validation_function,
@@ -630,8 +629,8 @@ class AbsSum(Transformer):
             summary = (
                 raw_summary.replace("[unused0]", "")
                 .replace("[unused3]", "")
-                #.replace("[CLS]", "")
-                #.replace("[SEP]", ".")
+                .replace("[CLS]", "")
+                .replace("[SEP]", ".")
                 .replace("[PAD]", "")
                 .replace("[unused1]", "")
                 .replace(r" +", " ")
