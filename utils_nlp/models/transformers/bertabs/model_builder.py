@@ -246,6 +246,7 @@ class AbsSummarizer(nn.Module):
             )
             self.decoder.embeddings = tgt_embeddings
             self.generator[0].weight = self.decoder.embeddings.weight
+
         self.symbols = symbols
         self.label_smoothing = label_smoothing
         self.train_loss = abs_loss(
@@ -254,7 +255,9 @@ class AbsSummarizer(nn.Module):
                 self.vocab_size,
                 train=True,
                 label_smoothing=self.label_smoothing,
-            )
+        )
+
+
     def load_checkpoint(self, checkpoint):
         if checkpoint is not None:
             self.load_state_dict(checkpoint, strict=True)
@@ -280,5 +283,5 @@ class AbsSummarizer(nn.Module):
         top_vec = self.bert(src, segs, mask_src)
         dec_state = self.decoder.init_decoder_state(src, top_vec)
         decoder_outputs, state = self.decoder(tgt[:, :-1], top_vec, dec_state)
-        loss = self.train_loss.monolithic_compute_loss(decoder_outputs, tgt[:,:-1], tgt_num_tokens)
+        loss = self.train_loss.monolithic_compute_loss(decoder_outputs, tgt[:,1:], tgt_num_tokens)
         return loss, decoder_outputs
