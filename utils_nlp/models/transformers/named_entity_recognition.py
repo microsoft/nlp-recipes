@@ -7,15 +7,32 @@ from collections import Iterable
 import numpy as np
 import torch
 from torch.utils.data import TensorDataset
-from transformers.modeling_bert import BERT_PRETRAINED_MODEL_ARCHIVE_MAP, BertForTokenClassification
-from transformers.modeling_distilbert import DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP, DistilBertForTokenClassification
+from transformers.modeling_bert import (
+    BERT_PRETRAINED_MODEL_ARCHIVE_MAP,
+    BertForTokenClassification,
+)
+from transformers.modeling_distilbert import (
+    DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP,
+    DistilBertForTokenClassification,
+)
 
 from utils_nlp.common.pytorch_utils import compute_training_steps
-from utils_nlp.models.transformers.common import MAX_SEQ_LEN, TOKENIZER_CLASS, Transformer
+from utils_nlp.models.transformers.common import (
+    MAX_SEQ_LEN,
+    TOKENIZER_CLASS,
+    Transformer,
+)
 
 TC_MODEL_CLASS = {}
-TC_MODEL_CLASS.update({k: BertForTokenClassification for k in BERT_PRETRAINED_MODEL_ARCHIVE_MAP})
-TC_MODEL_CLASS.update({k: DistilBertForTokenClassification for k in DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP})
+TC_MODEL_CLASS.update(
+    {k: BertForTokenClassification for k in BERT_PRETRAINED_MODEL_ARCHIVE_MAP}
+)
+TC_MODEL_CLASS.update(
+    {
+        k: DistilBertForTokenClassification
+        for k in DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP
+    }
+)
 
 
 class TokenClassificationProcessor:
@@ -36,7 +53,10 @@ class TokenClassificationProcessor:
         self.to_lower = to_lower
         self.cache_dir = cache_dir
         self.tokenizer = TOKENIZER_CLASS[model_name].from_pretrained(
-            model_name, do_lower_case=to_lower, cache_dir=cache_dir, output_loading_info=False
+            model_name,
+            do_lower_case=to_lower,
+            cache_dir=cache_dir,
+            output_loading_info=False,
         )
 
     @staticmethod
@@ -59,7 +79,11 @@ class TokenClassificationProcessor:
         batch = tuple(t.to(device) for t in batch)
         if model_name.split("-")[0] in ["bert", "distilbert"]:
             if train_mode:
-                inputs = {"input_ids": batch[0], "attention_mask": batch[1], "labels": batch[3]}
+                inputs = {
+                    "input_ids": batch[0],
+                    "attention_mask": batch[1],
+                    "labels": batch[3],
+                }
             else:
                 inputs = {"input_ids": batch[0], "attention_mask": batch[1]}
 
@@ -96,7 +120,14 @@ class TokenClassificationProcessor:
             label_map[trailing_piece_tag] = len(label_set)
         return label_map
 
-    def preprocess_for_bert(self, text, max_len=MAX_SEQ_LEN, labels=None, label_map=None, trailing_piece_tag="X"):
+    def preprocess_for_bert(
+        self,
+        text,
+        max_len=MAX_SEQ_LEN,
+        labels=None,
+        label_map=None,
+        trailing_piece_tag="X",
+    ):
         """
         Tokenize and preprocesses input word lists, involving the following steps
             0. WordPiece tokenization.
@@ -151,7 +182,9 @@ class TokenClassificationProcessor:
             return isinstance(obj, Iterable) and not isinstance(obj, str)
 
         if max_len > MAX_SEQ_LEN:
-            logging.warning("Setting max_len to max allowed sequence length: {}".format(MAX_SEQ_LEN))
+            logging.warning(
+                "Setting max_len to max allowed sequence length: {}".format(MAX_SEQ_LEN)
+            )
             max_len = MAX_SEQ_LEN
 
         if not _is_iterable_but_not_string(text):
@@ -184,7 +217,9 @@ class TokenClassificationProcessor:
         for t, t_labels in zip(text, labels):
             if len(t) != len(t_labels):
                 raise ValueError(
-                    "The number of words is {0}, but the number of labels is {1}.".format(len(t), len(t_labels))
+                    "Num of words and num of labels should be the same {0}!={1}".format(
+                        len(t), len(t_labels)
+                    )
                 )
 
             new_labels = []
@@ -198,7 +233,11 @@ class TokenClassificationProcessor:
                     new_tokens.append(sub_word)
 
             if len(new_tokens) > max_len:
-                logging.warn("Text after tokenization with length {} has been truncated".format(len(new_tokens)))
+                logging.warn(
+                    "Text after tokenization with length {} has been truncated".format(
+                        len(new_tokens)
+                    )
+                )
                 new_tokens = new_tokens[:max_len]
                 new_labels = new_labels[:max_len]
             input_ids = self.tokenizer.convert_tokens_to_ids(new_tokens)
@@ -215,7 +254,9 @@ class TokenClassificationProcessor:
             input_mask += padding
             new_labels += label_padding
 
-            trailing_token_mask_all.append([True if label != trailing_piece_tag else False for label in new_labels])
+            trailing_token_mask_all.append(
+                [True if label != trailing_piece_tag else False for label in new_labels]
+            )
 
             if label_map:
                 label_ids = [label_map[label] for label in new_labels]
@@ -257,7 +298,10 @@ class TokenClassifier(Transformer):
 
     def __init__(self, model_name="bert-base-cased", num_labels=2, cache_dir="."):
         super().__init__(
-            model_class=TC_MODEL_CLASS, model_name=model_name, num_labels=num_labels, cache_dir=cache_dir,
+            model_class=TC_MODEL_CLASS,
+            model_name=model_name,
+            num_labels=num_labels,
+            cache_dir=cache_dir,
         )
 
     @staticmethod
@@ -277,47 +321,76 @@ class TokenClassifier(Transformer):
         learning_rate=5e-5,
         adam_epsilon=1e-8,
         warmup_steps=0,
+        fp16=False,
+        fp16_opt_level="O1",
+        checkpoint_state_dict=None,
         verbose=True,
         seed=None,
     ):
         """
-        Fine-tunes a pre-trained token classification model.
+        Fine-tunes a pre-trained sequence classification model.
 
         Args:
             train_dataloader (Dataloader): A PyTorch DataLoader to be used for training.
             num_epochs (int, optional): Number of training epochs. Defaults to 1.
             max_steps (int, optional): Total number of training steps.
                 If set to a positive value, it overrides num_epochs.
-                Otherwise, it's determined by the dataset length, gradient_accumulation_steps, and num_epochs.
+                Otherwise, it's determined by the dataset length,
+                gradient_accumulation_steps, and num_epochs.
                 Defualts to -1.
             gradient_accumulation_steps (int, optional): Number of steps to accumulate
                 before performing a backward/update pass.
                 Default to 1.
-            num_gpus (int, optional): The number of GPUs to use. If None, all available GPUs will
-                be used. If set to 0 or GPUs are not available, CPU device will be used.
+            num_gpus (int, optional): The number of GPUs to use.
+                If None, all available GPUs will be used.
+                If set to 0 or GPUs are not available, CPU device will be used.
                 Defaults to None.
             gpu_ids (list): List of GPU IDs to be used.
                 If set to None, the first num_gpus GPUs will be used.
                 Defaults to None.
-            local_rank (int, optional): Local_rank for distributed training on GPUs. Defaults to
-                -1, which means non-distributed training.
-            weight_decay (float, optional): Weight decay to apply after each parameter update.
+            local_rank (int, optional): Local_rank for distributed training on GPUs.
+                Defaults to -1, which means non-distributed training.
+            weight_decay (float, optional): Weight decay to apply after each
+                parameter update.
                 Defaults to 0.0.
-            learning_rate (float, optional):  Learning rate of the AdamW optimizer. Defaults to
-                5e-5.
-            adam_epsilon (float, optional): Epsilon of the AdamW optimizer. Defaults to 1e-8.
-            warmup_steps (int, optional): Number of steps taken to increase learning rate from 0
-                to `learning rate`. Defaults to 0.
-            verbose (bool, optional): Whether to print out the training log. Defaults to True.
-            seed (int, optional): Random seed used to improve reproducibility. Defaults to None.
+            learning_rate (float, optional):  Learning rate of the AdamW optimizer.
+                Defaults to 5e-5.
+            adam_epsilon (float, optional): Epsilon of the AdamW optimizer.
+                Defaults to 1e-8.
+            warmup_steps (int, optional): Number of steps taken to increase learning
+                rate from 0 to `learning rate`. Defaults to 0.
+            fp16 (bool): Whether to use 16-bit mixed precision through Apex
+                Defaults to False
+            fp16_opt_level (str): Apex AMP optimization level for fp16.
+                One of in ['O0', 'O1', 'O2', and 'O3']
+                See https://nvidia.github.io/apex/amp.html"
+                Defaults to "01"
+            checkpoint_state_dict (dict): Checkpoint states of model and optimizer.
+                If specified, the model and optimizer's parameters are loaded using
+                checkpoint_state_dict["model"] and checkpoint_state_dict["optimizer"]
+                Defaults to None.
+            verbose (bool, optional): Whether to print out the training log.
+                Defaults to True.
+            seed (int, optional): Random seed used to improve reproducibility.
+                Defaults to None.
         """
 
-        # init optimizer
-        optimizer = Transformer.get_default_optimizer(self.model, weight_decay, learning_rate, adam_epsilon)
+        # init device and optimizer
+        device, num_gpus, amp = self.prepare_model_and_optimizer(
+            num_gpus=num_gpus,
+            gpu_ids=gpu_ids,
+            local_rank=local_rank,
+            weight_decay=weight_decay,
+            learning_rate=learning_rate,
+            adam_epsilon=adam_epsilon,
+            fp16=fp16,
+            fp16_opt_level=fp16_opt_level,
+            checkpoint_state_dict=checkpoint_state_dict,
+        )
 
         # compute the max number of training steps
         max_steps = compute_training_steps(
-            train_dataloader,
+            dataloader=train_dataloader,
             num_epochs=num_epochs,
             max_steps=max_steps,
             gradient_accumulation_steps=gradient_accumulation_steps,
@@ -325,19 +398,21 @@ class TokenClassifier(Transformer):
 
         # init scheduler
         scheduler = Transformer.get_default_scheduler(
-            optimizer=optimizer, warmup_steps=warmup_steps, num_training_steps=max_steps,
+            optimizer=self.optimizer, warmup_steps=warmup_steps, num_training_steps=max_steps
         )
 
         # fine tune
         super().fine_tune(
             train_dataloader=train_dataloader,
             get_inputs=TokenClassificationProcessor.get_inputs,
+            device=device,
             num_gpus=num_gpus,
-            gpu_ids=gpu_ids,
             max_steps=max_steps,
             gradient_accumulation_steps=gradient_accumulation_steps,
-            optimizer=optimizer,
+            optimizer=self.optimizer,
             scheduler=scheduler,
+            fp16=fp16,
+            amp=amp,
             local_rank=local_rank,
             verbose=verbose,
             seed=seed,
@@ -349,13 +424,15 @@ class TokenClassifier(Transformer):
 
         Args:
             test_dataloader (DataLoader): DataLoader for scoring the data.
-            num_gpus (int, optional): The number of GPUs to use. If None, all available GPUs will
-                be used. If set to 0 or GPUs are not available, CPU device will be used.
+            num_gpus (int, optional): The number of GPUs to use.
+                If None, all available GPUs will be used. If set to 0 or GPUs are
+                not available, CPU device will be used.
                 Defaults to None.
             gpu_ids (list): List of GPU IDs to be used.
                 If set to None, the first num_gpus GPUs will be used.
                 Defaults to None.
-            verbose (bool, optional): Whether to print out the training log. Defaults to True.
+            verbose (bool, optional): Whether to print out the training log.
+                Defaults to True.
 
         Returns
             1darray: numpy array of predicted label indices.
@@ -370,28 +447,33 @@ class TokenClassifier(Transformer):
                 verbose=verbose,
             )
         )
-        return np.concatenate(preds)
+        preds = np.concatenate(preds)
+        return preds
 
     def get_predicted_token_labels(self, predictions, label_map, dataset):
         """
         Post-process the raw prediction values and get the class label for each token.
 
         Args:
-            predictions (ndarray): A numpy ndarray produced from the `predict` function call.
-                The shape of the ndarray is [number_of_examples, sequence_length, number_of_labels].
+            predictions (ndarray): A numpy ndarray produced from the `predict`
+                function call. The shape of the ndarray is:
+                [number_of_examples, sequence_length, number_of_labels].
             label_map (dict): A dictionary object to map a label (str) to an ID (int).
                 dataset (TensorDataset): The TensorDataset for evaluation.
             dataset (Dataset): The test Dataset instance.
 
         Returns:
-            list: A list of lists. The size of the retured list is the number of testing samples.
+            list: A list of lists. The size of the retured list is the number of
+                testing samples.
             Each sublist represents the predicted label for each token.
         """
 
         num_samples = len(dataset.tensors[0])
         if num_samples != predictions.shape[0]:
             raise ValueError(
-                "Predictions have {0} samples, but got {1} samples in dataset".format(predictions.shape[0], num_samples)
+                "Predictions have {0} samples, but got {1} samples in dataset".format(
+                    predictions.shape[0], num_samples
+                )
             )
 
         label_id2str = {v: k for k, v in label_map.items()}
@@ -428,7 +510,8 @@ class TokenClassifier(Transformer):
             dataset (Dataset): The test Dataset instance.
 
         Returns:
-            list: A list of lists. The size of the retured list is the number of testing samples.
+            list: A list of lists. The size of the retured list is the number
+                of testing samples.
             Each sublist represents the predicted label for each token.
         """
 

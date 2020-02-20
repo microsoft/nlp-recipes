@@ -92,7 +92,10 @@ def parallelize_model(model, device, num_gpus=None, gpu_ids=None, local_rank=-1)
                 model = torch.nn.DataParallel(model, device_ids=gpu_ids)
     return model
 
-def dataloader_from_dataset(ds, batch_size=32, num_gpus=None, shuffle=False, distributed=False):
+
+def dataloader_from_dataset(
+    ds, batch_size=32, num_gpus=None, shuffle=False, distributed=False
+):
     """Creates a PyTorch DataLoader given a Dataset object.
 
     Args:
@@ -102,7 +105,8 @@ def dataloader_from_dataset(ds, batch_size=32, num_gpus=None, shuffle=False, dis
             Defaults to 32.
         num_gpus (int, optional): The number of GPUs to be used. Defaults to None.
         shuffle (bool, optional): If True, a RandomSampler is used. Defaults to False.
-        distributed (book, optional): If True, a DistributedSampler is used. Defaults to False.
+        distributed (book, optional): If True, a DistributedSampler is used.
+        Defaults to False.
 
     Returns:
         Module, DataParallel: A PyTorch Module or
@@ -121,7 +125,9 @@ def dataloader_from_dataset(ds, batch_size=32, num_gpus=None, shuffle=False, dis
     return DataLoader(ds, sampler=sampler, batch_size=batch_size)
 
 
-def compute_training_steps(dataloader, num_epochs=1, max_steps=-1, gradient_accumulation_steps=1):
+def compute_training_steps(
+    dataloader, num_epochs=1, max_steps=-1, gradient_accumulation_steps=1
+):
     """Computes the max training steps given a dataloader.
 
     Args:
@@ -129,8 +135,9 @@ def compute_training_steps(dataloader, num_epochs=1, max_steps=-1, gradient_accu
         num_epochs (int, optional): Number of training epochs. Defaults to 1.
         max_steps (int, optional): Total number of training steps.
             If set to a positive value, it overrides num_epochs.
-            Otherwise, it's determined by the dataset length, gradient_accumulation_steps, and num_epochs.
-            Defualts to -1.
+            Otherwise, it's determined by the dataset length,
+            gradient_accumulation_steps, and num_epochs.
+            Defaults to -1.
         gradient_accumulation_steps (int, optional): Number of steps to accumulate
             before performing a backward/update pass.
             Default to 1.
@@ -148,6 +155,7 @@ def compute_training_steps(dataloader, num_epochs=1, max_steps=-1, gradient_accu
     if max_steps <= 0:
         raise Exception("Max steps cannot be determined.")
     return max_steps
+
 
 def get_amp(fp16):
     """This function ensures that fp16 execution of torch.einsum is enabled
