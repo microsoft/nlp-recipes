@@ -132,7 +132,6 @@ class Transformer:
         report_every=10,
         save_every=-1,
         clip_grad_norm=True,
-        loss_function=None,
         validation_function=None,
     ):
 
@@ -158,11 +157,7 @@ class Transformer:
                 inputs = get_inputs(batch, device, self.model_name)
                 outputs = self.model(**inputs)
 
-                if loss_function:
-                    # check if backward is already done by loss_function
-                    loss = loss_function(batch, outputs)
-                else:
-                    loss = outputs[0]
+                loss = outputs[0]
 
                 if num_gpus > 1:
                     loss = loss.mean()
@@ -201,7 +196,7 @@ class Transformer:
                             endtime_string,
                             accum_loss / report_every,
                             end - start,
-                            len(batch),
+                            list(inputs.values())[0].size()[0],
                             global_step,
                             max_steps,
                         )
