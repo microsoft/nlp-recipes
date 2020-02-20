@@ -16,7 +16,7 @@ from .loss import abs_loss
 
 def load_optimizer_checkpoint(optimizer, checkpoint):
     if checkpoint is not None:
-        saved_optimizer_state_dict = checkpoint.state_dict()
+        saved_optimizer_state_dict = checkpoint #.state_dict()
         optimizer.optimizer.load_state_dict(saved_optimizer_state_dict)
         if (optimizer.method == "adam") and (len(optimizer.optimizer.state) < 1):
             raise RuntimeError(
@@ -248,11 +248,6 @@ class AbsSummarizer(nn.Module):
             self.generator[0].weight = self.decoder.embeddings.weight
         self.symbols = symbols
         self.label_smoothing = label_smoothing
-
-    def load_checkpoint(self, checkpoint):
-        if checkpoint is not None:
-            self.load_state_dict(checkpoint, strict=True)
-
         self.train_loss = abs_loss(
                 self.generator,
                 self.symbols,
@@ -260,6 +255,17 @@ class AbsSummarizer(nn.Module):
                 train=True,
                 label_smoothing=self.label_smoothing,
             )
+    def load_checkpoint(self, checkpoint):
+        if checkpoint is not None:
+            self.load_state_dict(checkpoint, strict=True)
+        self.train_loss = abs_loss(
+                self.generator,
+                self.symbols,
+                self.vocab_size,
+                train=True,
+                label_smoothing=self.label_smoothing,
+            )
+
 
 
     #def move_to_device(self, device, move_to_device_fn):

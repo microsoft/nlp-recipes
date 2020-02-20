@@ -331,20 +331,13 @@ class AbsSumProcessor:
         else:
             return story_token_ids
 
-def validate(summarizer, validate_data_path, cache_dir):
+def validate(summarizer, validate_sum_dataset, cache_dir):
     TOP_N = 10
-    #processor = AbsSumProcessor(cache_dir=cache_dir)
-    test_sum_dataset = torch.load(validate_data_path)
-    #summarizer = AbsSum(
-    #    processor,
-    #    checkpoint=torch.load(saved_model_path),
-    #    cache_dir=cache_dir,
-    #)
 
-    src = test_sum_dataset.source[0:TOP_N]
-    reference_summaries = ["".join(t).rstrip("\n") for t in test_sum_dataset.target[0:TOP_N]]
+    src = validate_sum_dataset.source[0:TOP_N]
+    reference_summaries = ["".join(t).rstrip("\n") for t in validate_sum_dataset.target[0:TOP_N]]
     generated_summaries = summarizer.predict(
-        shorten_dataset(test_sum_dataset, top_n=TOP_N), batch_size=8
+        shorten_dataset(validate_sum_dataset, top_n=TOP_N), batch_size=4
     )
     assert len(generated_summaries) == len(reference_summaries)
     for i in generated_summaries[0:1]:
@@ -371,7 +364,6 @@ class AbsSum(Transformer):
         encoder="encoder",
         finetune_bert=True,
         cache_dir=".",
-        checkpoint=None,
         label_smoothing=0.1,
     ):
         """Initialize a ExtractiveSummarizer.
@@ -403,7 +395,6 @@ class AbsSum(Transformer):
             )
 
         self.model_class = MODEL_CLASS[model_name]
-        self.checkpoint = checkpoint
         self.cache_dir = cache_dir
 
         self.model = AbsSummarizer(
@@ -496,6 +487,8 @@ class AbsSum(Transformer):
         device, num_gpus = get_device(num_gpus=num_gpus, gpu_ids=gpu_ids, local_rank=local_rank)
         # move model to devices
         print("device is {}".format(device)) 
+        if checkpoint:
+            self.model.load_checkpoint(checkpoint['model'])
         self.model = move_model_to_device(model=self.model, device=device)
 
         # init optimizer
@@ -517,13 +510,14 @@ class AbsSum(Transformer):
 
         self.amp = get_amp(fp16)
         if self.amp:
-            self.model, optim = amp.initialize(self.model, optimizers, opt_level=opt_level)
-        if self.checkpoint:
-            self.model.load_checkpoint(self.checkpoint['model'])
-            for i in range(len(optimizers)):
-                model_builder.load_optimizer_checkpoint(optimizers[i], self.checkpoint['optimizers'][i])
-            if self.amp and self.checkpoint.has_key('amp'):
-                self.amp.load_state_dict(self.checkpoint['amp'])
+            self.model, optim = self.amp.initialize(self.model, optimizers, opt_level=fp16_opt_level)
+        
+        if checkpoint:
+            if checkpoint['optimizers']:
+                for i in range(len(optimizers)):
+                    model_builder.load_optimizer_checkpoint(optimizers[i], checkpoint['optimizers'][i])
+            if self.amp and "amp" in checkpoint and checkpoint['amp']:
+                self.amp.load_state_dict(checkpoint['amp'])
 
         self.model = parallelize_model(
             model=self.model, 
@@ -532,8 +526,6 @@ class AbsSum(Transformer):
             gpu_ids=gpu_ids, 
             local_rank=local_rank,
         )
-
-
 
             
         if local_rank == -1:

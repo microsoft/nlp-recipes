@@ -18,6 +18,7 @@ from utils_nlp.models.transformers.datasets import (
     SummarizationNonIterableDataset,
 )
 from utils_nlp.models.transformers.abssum import AbsSum, AbsSumProcessor, validate
+from utils_nlp.models.transformers.bertabs import model_builder
 
 from utils_nlp.dataset.cnndm import CNNDMBertSumProcessedData, CNNDMSummarizationDataset
 from utils_nlp.models.transformers.datasets import SummarizationNonIterableDataset
@@ -106,7 +107,7 @@ def preprocess_cnndm_abs():
 parser = argparse.ArgumentParser()
 parser.add_argument("--rank", type=int, default=0,
                     help="The rank of the current node in the cluster")
-parser.add_argument("--dist_url", type=str, default="tcp://127.0.0.1:29501",
+parser.add_argument("--dist_url", type=str, default="tcp://127.0.0.1:29502",
                     help="URL specifying how to initialize the process groupi.")
 
 parser.add_argument("--node_count", type=int, default=1,
@@ -117,13 +118,9 @@ def main():
     args = parser.parse_args()
     ngpus_per_node = torch.cuda.device_count()
     processor = AbsSumProcessor(cache_dir=CACHE_PATH)
-    checkpoint = torch.load(os.path.join(MODEL_PATH, "summarizer_step20000.pt"))
-    checkpoint = None
     summarizer = AbsSum(
-        processor, checkpoint=checkpoint, cache_dir=CACHE_PATH
+        processor, cache_dir=CACHE_PATH
     )
-
-
     mp.spawn(main_worker, nprocs=ngpus_per_node, args=(ngpus_per_node, summarizer,  args))
 
 
@@ -132,25 +129,28 @@ def main_worker(local_rank, ngpus_per_node, summarizer, args):
     world_size = args.node_count * ngpus_per_node
     print("world_size is {}".format(world_size))
     print("local_rank is {} and rank is {}".format(local_rank, rank))
-
+    
+    
     torch.distributed.init_process_group(
         backend="nccl",
         init_method=args.dist_url,
         world_size=world_size,
         rank=rank,
       )
-    torch.cuda.set_device(local_rank)
-    #return  
+
+    #torch.cuda.set_device(local_rank)
+    
+
+    checkpoint = torch.load(os.path.join(MODEL_PATH, "new_new_summarizer_step20000.pt"))
     train_sum_dataset, test_sum_dataset = preprocess_cnndm_abs()
     def this_validate(class_obj):
-        return validate(class_obj, os.path.join(DATA_PATH, "test_abssum_dataset_full.pt"), CACHE_PATH)
+        return validate(class_obj, test_sum_dataset, CACHE_PATH)
 
     if rank not in [-1, 0]:
         save_every = -1
         this_validate = None
     else:
         save_every = 10
-        this_validate = None
 
     summarizer.fit(
         train_sum_dataset,
@@ -158,7 +158,7 @@ def main_worker(local_rank, ngpus_per_node, summarizer, args):
         num_gpus=None,
         local_rank=local_rank,
         rank=rank,
-        batch_size=2,
+        batch_size=8,
         max_steps=30000,
         learning_rate_bert=0.002,
         warmup_steps_bert=20000,
@@ -166,7 +166,9 @@ def main_worker(local_rank, ngpus_per_node, summarizer, args):
         save_every=save_every,
         report_every=10,
         validation_function=this_validate,
-        fp16=False
+        fp16=True,
+        fp16_opt_level="O2",
+        checkpoint=checkpoint
     )
 
     dist.destroy_process_group()
@@ -175,31 +177,32 @@ def main_worker(local_rank, ngpus_per_node, summarizer, args):
 
 def test_train_model():
     processor = AbsSumProcessor(cache_dir=CACHE_PATH)
-    checkpoint = torch.load(os.path.join(MODEL_PATH, "summarizer_step20000.pt"))
-    # checkpoint = torch.load(os.path.join(MODEL_PATH, "bert-base-uncased_step_2900.pt"))
-    #checkpoint = None
     summarizer = AbsSum(
-        processor, checkpoint=None, cache_dir=CACHE_PATH
+        processor, cache_dir=CACHE_PATH
     )
  
-    summarizer.model.load_checkpoint(checkpoint['model'])
+    checkpoint = torch.load(os.path.join(MODEL_PATH, "new_new_summarizer_step20000.pt"))
+    #checkpoint = None
+    #summarizer.model.load_checkpoint(checkpoint['model'])
    
     train_sum_dataset, test_sum_dataset = preprocess_cnndm_abs()
    
     def this_validate(class_obj):
-        return validate(class_obj, os.path.join(DATA_PATH, "test_abssum_dataset_full.pt"), CACHE_PATH)
+        return validate(class_obj, test_sum_dataset, CACHE_PATH)
     summarizer.fit(
         train_sum_dataset,
-        batch_size=8,
+        batch_size=4,
         max_steps=30000,
         learning_rate_bert=0.002,
         warmup_steps_bert=20000,
         warmup_steps_dec=10000,
         num_gpus=2,
-        save_every=100,
+        save_every=10,
         report_every=10,
         validation_function=this_validate,
-        fp16=False
+        fp16=False,
+        fp16_opt_level="O1",
+        checkpoint=checkpoint
     )
     saved_model_path = os.path.join(MODEL_PATH, "summarizer_step50000.pt")
     summarizer.save_model(saved_model_path)
@@ -234,12 +237,11 @@ def test_pretrained_model():
     train_sum_dataset, test_sum_dataset = preprocess_cnndm_abs()
     
     processor = AbsSumProcessor(cache_dir=CACHE_PATH)
-    checkpoint = torch.load(os.path.join(MODEL_PATH, "model_step_148000_torch1.4.0.pt"))
+    #checkpoint = torch.load(os.path.join(MODEL_PATH, "new_model_step_148000_torch1.4.0.pt"))
     #checkpoint = torch.load(os.path.join(MODEL_PATH, "bert-base-uncased_step_2900.pt"))
-    #checkpoint = torch.load(os.path.join(MODEL_PATH, "summarizer_step20000.pt"))
+    checkpoint = torch.load(os.path.join(MODEL_PATH, "new_new_summarizer_step20000.pt"))
     summarizer = AbsSum(
         processor,
-        checkpoint=None,
         cache_dir=CACHE_PATH,
     )
     summarizer.model.load_checkpoint(checkpoint['model'])
@@ -260,7 +262,7 @@ def test_pretrained_model():
 
 #test_preprocessing()
 #preprocess_cnndm_abs()
-test_train_model()
+#test_train_model()
 #test_pretrained_model()
-#if __name__ == "__main__":
-#    main()
+if __name__ == "__main__":
+    main()
