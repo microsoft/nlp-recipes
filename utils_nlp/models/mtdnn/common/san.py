@@ -202,7 +202,7 @@ class SANBERTNetwork(nn.Module):
             sequence_output = self.bert.extract_features(input_ids)
             pooled_output = self.pooler(sequence_output)
         else:
-            all_encoder_layers, pooled_output = self.bert(input_ids, token_type_ids, attention_mask)
+            all_encoder_layers, pooled_output = self.bert(input_ids=input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask)
             sequence_output = all_encoder_layers[-1]
 
         decoder_opt = self.decoder_opts[task_id]
