@@ -355,13 +355,12 @@ def validate(summarizer, validate_sum_dataset, cache_dir):
 
 
 class AbsSum(Transformer):
-    """class which performs extractive summarization fine tuning and prediction """
+    """class which performs abstractive summarization fine tuning and prediction """
 
     def __init__(
         self,
         processor,
         model_name="bert-base-uncased",
-        encoder="encoder",
         finetune_bert=True,
         cache_dir=".",
         label_smoothing=0.1,
@@ -399,7 +398,6 @@ class AbsSum(Transformer):
 
         self.model = AbsSummarizer(
             temp_dir=cache_dir,
-            encoder=encoder,
             finetune_bert=finetune_bert,
             checkpoint=None,
             label_smoothing=label_smoothing,
