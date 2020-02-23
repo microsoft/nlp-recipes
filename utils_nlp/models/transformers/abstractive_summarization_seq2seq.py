@@ -578,6 +578,10 @@ class S2SAbstractiveSummarizer(Transformer):
         if save_model and local_rank in [-1, 0]:
             self.save_model(global_step, fp16)
 
+        self.model.cpu()
+        torch.cuda.empty_cache()
+        
+
     def predict(
         self,
         test_dataset,
@@ -709,7 +713,7 @@ class S2SAbstractiveSummarizer(Transformer):
         # get device
         device, num_gpus = get_device(num_gpus=num_gpus, gpu_ids=gpu_ids, local_rank=local_rank)
 
-        # move model
+        # # move model
         model = move_model_to_device(model=model, device=device)
 
         batch_size = per_gpu_batch_size * max(1, num_gpus)
@@ -718,7 +722,7 @@ class S2SAbstractiveSummarizer(Transformer):
             model=model, device=device, num_gpus=num_gpus, gpu_ids=gpu_ids, local_rank=local_rank
         )
 
-        torch.cuda.empty_cache()
+        # torch.cuda.empty_cache()
         model.eval()
         first_batch = True
         batch_count = 0
@@ -776,10 +780,17 @@ class S2SAbstractiveSummarizer(Transformer):
                         }
 
             first_batch = False
+
+        del model
+        del batch
+        torch.cuda.empty_cache()
+
         if need_score_traces:
             return output_lines, score_trace_list
         else:
             return output_lines
+
+
 
     def save_model(self, global_step, fp16):
         model_to_save = self.model.module if hasattr(self.model, "module") else self.model
