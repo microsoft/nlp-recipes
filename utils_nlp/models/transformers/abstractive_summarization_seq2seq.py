@@ -575,7 +575,7 @@ class S2SAbstractiveSummarizer(Transformer):
             seed=seed,
         )
 
-        if save_model:
+        if save_model and local_rank in [-1, 0]:
             self.save_model(global_step, fp16)
 
     def predict(
@@ -708,6 +708,7 @@ class S2SAbstractiveSummarizer(Transformer):
             model.half()
         # get device
         device, num_gpus = get_device(num_gpus=num_gpus, gpu_ids=gpu_ids, local_rank=local_rank)
+
         # move model
         model = move_model_to_device(model=model, device=device)
 
