@@ -166,6 +166,7 @@ class AbsSummarizer(nn.Module):
         label_smoothing=0.1,
         checkpoint=None,
         bert_from_extractive=None,
+        test=False
     ):
         super(AbsSummarizer, self).__init__()
         self.bert = Bert(large, temp_dir, finetune_bert)
@@ -249,25 +250,28 @@ class AbsSummarizer(nn.Module):
 
         self.symbols = symbols
         self.label_smoothing = label_smoothing
-        self.train_loss = abs_loss(
-                self.generator,
-                self.symbols,
-                self.vocab_size,
-                train=True,
-                label_smoothing=self.label_smoothing,
-        )
+        self.test = test
+        if not test:
+            self.train_loss = abs_loss(
+                    self.generator,
+                    self.symbols,
+                    self.vocab_size,
+                    train=True,
+                    label_smoothing=self.label_smoothing,
+            )
 
 
     def load_checkpoint(self, checkpoint):
         if checkpoint is not None:
-            self.load_state_dict(checkpoint, strict=True)
-        self.train_loss = abs_loss(
-                self.generator,
-                self.symbols,
-                self.vocab_size,
-                train=True,
-                label_smoothing=self.label_smoothing,
-            )
+            self.load_state_dict(checkpoint, strict=False)
+        if not self.test:
+            self.train_loss = abs_loss(
+                    self.generator,
+                    self.symbols,
+                    self.vocab_size,
+                    train=True,
+                    label_smoothing=self.label_smoothing,
+                )
 
 
 

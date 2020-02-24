@@ -364,6 +364,7 @@ class AbsSum(Transformer):
         finetune_bert=True,
         cache_dir=".",
         label_smoothing=0.1,
+        test=False,
     ):
         """Initialize a ExtractiveSummarizer.
 
@@ -402,6 +403,7 @@ class AbsSum(Transformer):
             checkpoint=None,
             label_smoothing=label_smoothing,
             symbols=processor.symbols,
+            test=test
         )
         self.processor = processor
         self.optim_bert = None
@@ -486,9 +488,11 @@ class AbsSum(Transformer):
         # move model to devices
         print("device is {}".format(device)) 
         if checkpoint:
+            # the following line creats addtional processes on GPU 0
+            # point where memory use increase
+            checkpoint = torch.load(checkpoint, map_location='cpu')
             self.model.load_checkpoint(checkpoint['model'])
         self.model = move_model_to_device(model=self.model, device=device)
-
         # init optimizer
 
         self.optim_bert = model_builder.build_optim_bert(
@@ -518,7 +522,8 @@ class AbsSum(Transformer):
             if self.amp and "amp" in checkpoint and checkpoint['amp']:
                 self.amp.load_state_dict(checkpoint['amp'])
             if "global_step" in checkpoint and checkpoint["global_step"]:
-                global_step = checkpoint["global_step"]
+                global_step = checkpoint["global_step"]/world_size
+                print("global_step is {}".format(global_step))
 
         self.model = parallelize_model(
             model=self.model, 
@@ -576,6 +581,7 @@ class AbsSum(Transformer):
         self,
         test_dataset,
         num_gpus=1,
+        local_rank=-1,
         gpu_ids=None,
         batch_size=16,
         # sentence_separator="<q>",
@@ -612,7 +618,7 @@ class AbsSum(Transformer):
         """
         #num_gpus = 2
         
-        device, num_gpus = get_device(num_gpus=num_gpus, local_rank=-1)
+        device, num_gpus = get_device(num_gpus=num_gpus, local_rank=local_rank)
          # move model to devices
         def this_model_move_callback(model, device):
             model =  move_model_to_device(model, device)
@@ -628,11 +634,11 @@ class AbsSum(Transformer):
                 raw_summary.replace("[unused0]", "")
                 .replace("[unused3]", "")
                 .replace("[CLS]", "")
-                .replace("[SEP]", ".")
+                .replace("[SEP]", "")
                 .replace("[PAD]", "")
                 .replace("[unused1]", "")
                 .replace(r" +", " ")
-                .replace(" [unused2] ", ". ")
+                .replace(" [unused2] ", ".")
                 .replace("[unused2]", "")
                 .strip()
             )
@@ -656,7 +662,7 @@ class AbsSum(Transformer):
             min_length=min_length,
             max_length=max_length,
         )
-        #self.model = self.model.move_to_device(device, this_model_move_callback)
+        self.model = this_model_move_callback(self.model, device)
 
         predictor = predictor.move_to_device(device, this_model_move_callback)
 
