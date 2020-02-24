@@ -590,6 +590,7 @@ class AbsSum(Transformer):
         beam_size=5,
         min_length=15,
         max_length=150,
+        fp16=False,
         verbose=True,
     ):
         """
@@ -617,15 +618,40 @@ class AbsSum(Transformer):
             List of strings which are the summaries
 
         """
-        #num_gpus = 2
-        
         device, num_gpus = get_device(num_gpus=num_gpus, local_rank=local_rank)
          # move model to devices
         def this_model_move_callback(model, device):
             model =  move_model_to_device(model, device)
-            return parallelize_model(model, device, num_gpus=num_gpus, gpu_ids=None, local_rank=-1)
-        #self.model = move_model_to_device(self.model, device, num_gpus=num_gpus, None, local_rank=local_rank)
+            return parallelize_model(model, device, num_gpus=num_gpus, gpu_ids=None, local_rank=local_rank)
 
+        if fp16:
+            self.model = self.model.half()
+        
+        self.model = this_model_move_callback(self.model, device)
+        self.model.eval()
+
+
+        predictor = build_predictor(
+            self.processor.tokenizer,
+            self.processor.symbols,
+            self.model,
+            alpha=alpha,
+            beam_size=beam_size,
+            min_length=min_length,
+            max_length=max_length,
+        )
+        predictor = predictor.move_to_device(device, this_model_move_callback)
+        
+       
+        test_sampler = SequentialSampler(test_dataset)
+
+        def collate_fn(data):
+            return self.processor.collate(data, 512, device, train_mode=False)
+
+        test_dataloader = DataLoader(
+            test_dataset, sampler=test_sampler, batch_size=batch_size, collate_fn=collate_fn,
+        )
+        print("dataset length is {}".format(len(test_dataset)))
         def format_summary(translation):
             """ Transforms the output of the `from_batch` function
             into nicely formatted summaries.
@@ -645,27 +671,6 @@ class AbsSum(Transformer):
             )
 
             return summary
-
-        test_sampler = SequentialSampler(test_dataset)
-
-        def collate_fn(data):
-            return self.processor.collate(data, 512, device, train_mode=False)
-
-        test_dataloader = DataLoader(
-            test_dataset, sampler=test_sampler, batch_size=batch_size, collate_fn=collate_fn,
-        )
-        predictor = build_predictor(
-            self.processor.tokenizer,
-            self.processor.symbols,
-            self.model,
-            alpha=alpha,
-            beam_size=beam_size,
-            min_length=min_length,
-            max_length=max_length,
-        )
-        self.model = this_model_move_callback(self.model, device)
-
-        predictor = predictor.move_to_device(device, this_model_move_callback)
 
         generated_summaries = []
         from tqdm import tqdm
