@@ -9,6 +9,7 @@ from collections import namedtuple
 import itertools
 import logging
 import os
+import pickle
 import random
 
 import numpy as np

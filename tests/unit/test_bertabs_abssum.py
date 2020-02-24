@@ -126,7 +126,7 @@ def main():
 
     #shutil.rmtree(args.output_dir)
     args = parser.parse_args()
-    ngpus_per_node = torch.cuda.device_count()
+    ngpus_per_node = 1 #torch.cuda.device_count()
     processor = AbsSumProcessor(cache_dir=CACHE_PATH)
     summarizer = AbsSum(
         processor, cache_dir=CACHE_PATH
@@ -168,7 +168,7 @@ def main_worker(local_rank, ngpus_per_node, summarizer, args):
         num_gpus=None,
         local_rank=local_rank,
         rank=rank,
-        batch_size=6,
+        batch_size=8,
         max_steps=50000/world_size,
         learning_rate_bert=0.003,
         learning_rate_dec=0.3,
@@ -178,7 +178,7 @@ def main_worker(local_rank, ngpus_per_node, summarizer, args):
         report_every=10,
         validation_function=this_validate,
         fp16=True,
-        fp16_opt_level="O1",
+        fp16_opt_level="O2",
         checkpoint=None
     )
     if rank == 0 or local_rank == -1:
@@ -208,16 +208,16 @@ def test_train_model():
         return validate(class_obj, test_sum_dataset, CACHE_PATH)
     summarizer.fit(
         train_sum_dataset,
-        batch_size=8,
+        batch_size=6,
         max_steps=30000,
         local_rank=-1,
         learning_rate_bert=0.002,
         learning_rate_dec=0.2,
         warmup_steps_bert=20000,
         warmup_steps_dec=10000,
-        num_gpus=2,
+        num_gpus=1,
         report_every=10,
-        save_every=100,
+        save_every=400,
         validation_function=this_validate,
         fp16=False,
         fp16_opt_level="O1",
@@ -259,7 +259,7 @@ def test_pretrained_model():
     checkpoint = torch.load(os.path.join(MODEL_PATH, "new_model_step_148000_torch1.4.0.pt"))
     
     #checkpoint = torch.load(os.path.join(MODEL_PATH, "summarizer_step20000_with_global_step.pt"))
-    
+    checkpoint = torch.load(os.path.join(MODEL_PATH, "bert-base-uncased_step_400.pt")) 
     summarizer = AbsSum(
         processor,
         cache_dir=CACHE_PATH,
@@ -284,13 +284,14 @@ def test_pretrained_model():
     return
     """
 
-    top_n = 10
+    top_n = 8
     src = test_sum_dataset.source[0:top_n]
     reference_summaries = ["".join(t).rstrip("\n") for t in test_sum_dataset.target[0:top_n]]
     print("start prediction")
     generated_summaries = summarizer.predict(
-        shorten_dataset(test_sum_dataset, top_n=top_n), batch_size=3, num_gpus=2
+        shorten_dataset(test_sum_dataset, top_n=top_n), batch_size=4, num_gpus=2
     )
+    print(generated_summaries[0])
     assert len(generated_summaries) == len(reference_summaries)
     RESULT_DIR = TemporaryDirectory().name
     rouge_score = get_rouge(generated_summaries, reference_summaries, RESULT_DIR)
