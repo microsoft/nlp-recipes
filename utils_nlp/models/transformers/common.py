@@ -289,13 +289,18 @@ class Transformer:
                         print(log_line)
                         accum_loss = 0
                         start = end
-                    if type(optimizer) == list:
-                        for o in optimizer:
-                            o.step()
-                    else:
-                        optimizer.step()
+                    if optimizer:
+                        if type(optimizer) == list:
+                            for o in optimizer:
+                                o.step()
+                        else:
+                            optimizer.step()
                     if scheduler:
-                        scheduler.step()
+                        if type(scheduler) == list:
+                            for s in scheduler:
+                                s.step()
+                        else:
+                            scheduler.step()
                     self.model.zero_grad()
 
                     if save_every != -1 and global_step % save_every == 0 and verbose:
