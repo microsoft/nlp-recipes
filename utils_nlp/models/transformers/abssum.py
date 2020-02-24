@@ -589,6 +589,7 @@ class AbsSum(Transformer):
         beam_size=5,
         min_length=15,
         max_length=150,
+        fp16=False,
         verbose=True,
     ):
         """
@@ -622,8 +623,11 @@ class AbsSum(Transformer):
          # move model to devices
         def this_model_move_callback(model, device):
             model =  move_model_to_device(model, device)
-            return parallelize_model(model, device, num_gpus=num_gpus, gpu_ids=None, local_rank=-1)
+            return parallelize_model(model, device, num_gpus=num_gpus, gpu_ids=None, local_rank=local_rank)
         #self.model = move_model_to_device(self.model, device, num_gpus=num_gpus, None, local_rank=local_rank)
+
+        if fp16:
+            self.model = self.model.half()
 
         def format_summary(translation):
             """ Transforms the output of the `from_batch` function
