@@ -17,7 +17,9 @@ def get_device(num_gpus=None, gpu_ids=None, local_rank=-1):
             if num_gpus is not None
             else torch.cuda.device_count()
         )
-        device = torch.device("cuda" if torch.cuda.is_available() and num_gpus > 0 else "cpu")
+        device = torch.device(
+            "cuda" if torch.cuda.is_available() and num_gpus > 0 else "cpu"
+        )
     else:
         torch.cuda.set_device(local_rank)
         device = torch.device("cuda", local_rank)
@@ -40,7 +42,6 @@ def move_model_to_device(model, device):
 def parallelize_model(model, device, num_gpus=None, gpu_ids=None, local_rank=-1):
     """Moves a model to the specified device (cpu or gpu/s)
        and implements data parallelism when multiple gpus are specified.
-
     Args:
         model (Module): A PyTorch model.
         device (torch.device): A PyTorch device.
@@ -54,10 +55,10 @@ def parallelize_model(model, device, num_gpus=None, gpu_ids=None, local_rank=-1)
         local_rank (int): Local GPU ID within a node. Used in distributed environments.
             If not -1, num_gpus and gpu_ids are ignored.
             Defaults to -1.
-
     Returns:
         Module, DataParallel, DistributedDataParallel: A PyTorch Module or
-            a DataParallel/DistributedDataParallel wrapper (when multiple gpus are used).
+            a DataParallel/DistributedDataParallel wrapper,
+            when multiple gpus are used.
     """
     if not isinstance(device, torch.device):
         raise ValueError("device must be of type torch.device.")
@@ -68,7 +69,10 @@ def parallelize_model(model, device, num_gpus=None, gpu_ids=None, local_rank=-1)
     # wrap in DataParallel or DistributedDataParallel
     if local_rank != -1:
         model = torch.nn.parallel.DistributedDataParallel(
-            model, device_ids=[local_rank], output_device=local_rank, find_unused_parameters=True
+            model,
+            device_ids=[local_rank],
+            output_device=local_rank,
+            find_unused_parameters=True,
         )
     else:
         if device.type == "cuda":
@@ -79,14 +83,20 @@ def parallelize_model(model, device, num_gpus=None, gpu_ids=None, local_rank=-1)
             if num_cuda_devices < 1:
                 raise Exception("CUDA devices are not available.")
             if gpu_ids is None:
-                num_gpus = num_cuda_devices if num_gpus is None else min(num_gpus, num_cuda_devices)
+                num_gpus = (
+                    num_cuda_devices
+                    if num_gpus is None
+                    else min(num_gpus, num_cuda_devices)
+                )
                 gpu_ids = list(range(num_gpus))
             if len(gpu_ids) > 1:
                 model = torch.nn.DataParallel(model, device_ids=gpu_ids)
     return model
 
 
-def dataloader_from_dataset(ds, batch_size=32, num_gpus=None, shuffle=False, distributed=False):
+def dataloader_from_dataset(
+    ds, batch_size=32, num_gpus=None, shuffle=False, distributed=False
+):
     """Creates a PyTorch DataLoader given a Dataset object.
 
     Args:
@@ -96,7 +106,8 @@ def dataloader_from_dataset(ds, batch_size=32, num_gpus=None, shuffle=False, dis
             Defaults to 32.
         num_gpus (int, optional): The number of GPUs to be used. Defaults to None.
         shuffle (bool, optional): If True, a RandomSampler is used. Defaults to False.
-        distributed (book, optional): If True, a DistributedSampler is used. Defaults to False.
+        distributed (book, optional): If True, a DistributedSampler is used.
+        Defaults to False.
 
     Returns:
         Module, DataParallel: A PyTorch Module or
@@ -115,7 +126,9 @@ def dataloader_from_dataset(ds, batch_size=32, num_gpus=None, shuffle=False, dis
     return DataLoader(ds, sampler=sampler, batch_size=batch_size)
 
 
-def compute_training_steps(dataloader, num_epochs=1, max_steps=-1, gradient_accumulation_steps=1):
+def compute_training_steps(
+    dataloader, num_epochs=1, max_steps=-1, gradient_accumulation_steps=1
+):
     """Computes the max training steps given a dataloader.
 
     Args:
@@ -123,8 +136,9 @@ def compute_training_steps(dataloader, num_epochs=1, max_steps=-1, gradient_accu
         num_epochs (int, optional): Number of training epochs. Defaults to 1.
         max_steps (int, optional): Total number of training steps.
             If set to a positive value, it overrides num_epochs.
-            Otherwise, it's determined by the dataset length, gradient_accumulation_steps,
-            and num_epochs. Defualts to -1.
+            Otherwise, it's determined by the dataset length,
+            gradient_accumulation_steps, and num_epochs.
+            Defaults to -1.
         gradient_accumulation_steps (int, optional): Number of steps to accumulate
             before performing a backward/update pass.
             Default to 1.
@@ -145,18 +159,21 @@ def compute_training_steps(dataloader, num_epochs=1, max_steps=-1, gradient_accu
 
 
 def get_amp(fp16):
-    # Before we do anything with models, we want to ensure that we get fp16 execution
-    # of torch.einsum if args.fp16 is set. Otherwise it'll default to "promote" mode,
-    # and we'll get fp32 operations. Note that running `--fp16_opt_level="O2"` will
-    # remove the need for this code, but it is still valid.
+    """This function ensures that fp16 execution of torch.einsum is enabled
+        if args.fp16 is set. Otherwise, it'll default to "promote" mode,
+        where the operations are in fp32.
+        Note that running `--fp16_opt_level="O2"` will remove the need for this code.
+    """
+    # Before we do anything with models, we want to
     if fp16:
         try:
             from apex import amp
 
             amp.register_half_function(torch, "einsum")
         except ImportError:
-            raise ImportError("Please install apex from https://www.github.com/nvidia/apex")
+            raise ImportError(
+                "Please install apex from https://www.github.com/nvidia/apex"
+            )
     else:
         amp = None
-
     return amp

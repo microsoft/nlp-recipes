@@ -49,6 +49,7 @@ from utils_nlp.common.pytorch_utils import (
     compute_training_steps,
     get_device,
     move_model_to_device,
+    parallelize_model,
 )
 from utils_nlp.models.transformers.common import (
     MAX_SEQ_LEN,
@@ -329,51 +330,62 @@ class QAProcessor:
 
         Args:
             results (list): List of :class:`QAResultExtended`.
-            examples_file (str): One of the files cached by :meth:`QAProcessor.preprocess`. This
-                file contains the original document tokens that are used to generate the final
-                answers from the predicted start and end positions.
-            features_file (str): One of the files cached by :meth:`QAProcessor.preprocess`. This
-                file contains the mapping from indices in the processed token list to the original
-                document tokens that are used to generate the final predicted answers.
-            n_best_size (int, optional): The number of candidates to choose from each QAResult to
-                generate the final prediction. It's also the maximum number of n-best answers to
-                output for each question. Note that the number of n-best answers can be smaller than
-                `n_best_size` because some unqualified answers, e.g. answer that are too long,
-                are removed.
-            n_top_start (int, optional): For XLNet only. Beam size for span start. Note that this
-                needs to be consistent with the XLNet model configuration. Defaults to 5.
-            n_top_end (int, optional): For XLNet only. Beam size for span end. Note that this needs
-                to be consistent with the XLNet model configuration. Defaults to 5.
-            max_answer_length (int, optional): Maximum length of the answer. Defaults to 30.
-            unanswerable_exists (bool, optional): Whether there are unanswerable questions in the
-                data. If True, the start and end logits of the [CLS] token, which indicate the
-                probability of the answer being empty, are included in the candidate answer list.
+            examples_file (str): One of the files cached by
+                :meth:`QAProcessor.preprocess`. This file contains the original
+                document tokens that are used to generate the final answers from
+                the predicted start and end positions.
+            features_file (str): One of the files cached by
+                :meth:`QAProcessor.preprocess`. This file contains the mapping from
+                indices in the processed token list to the original document tokens
+                that are used to generate the final predicted answers.
+            n_best_size (int, optional): The number of candidates to choose from each
+                QAResult to generate the final prediction.
+                It's also the maximum number of n-best answers to output for
+                each question. Note that the number of n-best answers can be smaller
+                than `n_best_size` because some unqualified answers, e.g. answers
+                that are too long are removed.
+            n_top_start (int, optional): For XLNet only. Beam size for span start.
+                Note that this needs to be consistent with the XLNet model
+                configuration. Defaults to 5.
+            n_top_end (int, optional): For XLNet only. Beam size for span end.
+                Note that this needs to be consistent with the XLNet model
+                configuration. Defaults to 5.
+            max_answer_length (int, optional): Maximum length of the answer.
+                Defaults to 30.
+            unanswerable_exists (bool, optional): Whether there are unanswerable
+                questions in the data. If True, the start and end logits of the
+                [CLS] token, which indicate the probability of the answer being empty,
+                are included in the candidate answer list.
                 Defaults to False.
-            output_prediction_file (str, optional): Path of the file to save the predicted answers.
+            output_prediction_file (str, optional): Path of the file to save the
+                predicted answers.
                 Defaults to "./qa_predictions.json".
-            output_nbest_file (str, optional): Path of the file to save the n-best answers. Defaults
-                to "./nbest_predictions.json".
-            output_null_log_odds_file (str, optional): If unanswerable_exists is True, the score
-                difference between empty prediction and best non-empty prediction are saved to this
-                file. These scores can be used to find the best threshold for predicting an empty
-                answer. Defaults to "./null_odds.json".
+            output_nbest_file (str, optional): Path of the file to save the n-best
+                answers. Defaults to "./nbest_predictions.json".
+            output_null_log_odds_file (str, optional): If unanswerable_exists is True,
+                the score difference between empty prediction and best non-empty
+                prediction are saved to this file. These scores can be used to find the
+                best threshold for predicting an empty answer.
+                Defaults to "./null_odds.json".
             null_score_diff_threshold (float, optional): For BERT models only.
-                If unanswerable_exists=True and the score difference between empty prediction and
-                best non-empty prediction is higher than this threshold, the final predicted
-                answer is empty. Defaults to 0.0.
-            verbose_logging (bool, optional): Whether to log details of answer postprocessing.
-                Defaults to False.
+                If unanswerable_exists=True and the score difference between empty
+                prediction and best non-empty prediction is higher than this threshold,
+                the final predicted answer is empty. Defaults to 0.0.
+            verbose_logging (bool, optional): Whether to log details of answer
+                postprocessing. Defaults to False.
 
         Returns:
             tuple: (OrderedDict, OrderedDict, OrderedDict)
                 The keys of the dictionaries are the `qa_id` in the original
                 :class:`utils_nlp.dataset.pytorch.QADataset`
-                The values of the first dictionary are the predicted answer texts in string type.
-                The values of the second dictionary are the softmax probabilities of the predicted
-                answers.
-                The values of the third dictionary are the n-best answers for each qa_id. Note that
-                the number of n-best answers can be smaller than `n_best_size` because some
-                unqualified answers, e.g. answers that are too long, are removed.
+                The values of the first dictionary are the predicted answer texts
+                    in string type.
+                The values of the second dictionary are the softmax probabilities
+                    of the predicted answers.
+                The values of the third dictionary are the n-best answers for
+                    each qa_id. Note that the number of n-best answers can be smaller
+                    than `n_best_size` because some unqualified answers, e.g. answers
+                    that are too long, are removed.
         """
         if self.model_type == "xlnet":
             final_answers, answer_probs, nbest_answers = postprocess_xlnet_answer(
@@ -415,16 +427,17 @@ QAResult_ = collections.namedtuple("QAResult", ["unique_id", "start_logits", "en
 # create a wrapper class so that we can add docstrings
 class QAResult(QAResult_):
     """
-    Question answering prediction result returned by AnswerExtractor.predict for BERT models.
+    Question answering prediction result returned by AnswerExtractor.predict
+        for BERT models.
 
     Args:
-        unique_id (int): An id identifying a unique document-question-answer triplet. During
-            postprocessing, this id is used to map the prediction results back to the original
-            document-question-answer triplet.
-        start_logits (list): List of logits for predicting each token being the start of the
-            answer span.
-        end__logits (list): List of logits for predicting each token being the end of the answer
-            span.
+        unique_id (int): An id identifying a unique document-question-answer triplet.
+            During postprocessing, this id is used to map the prediction results back
+            to the original document-question-answer triplet.
+        start_logits (list): List of logits for predicting each token being the
+            start of the answer span.
+        end__logits (list): List of logits for predicting each token being the end
+            of the answer span.
 
     """
 
@@ -447,21 +460,24 @@ QAResultExtended_ = collections.namedtuple(
 # create a wrapper class so that we can add docstrings
 class QAResultExtended(QAResultExtended_):
     """
-    Question answering prediction result returned by AnswerExtractor.predict for XLNet models.
+    Question answering prediction result returned by AnswerExtractor.predict for
+        XLNet models.
 
     Args:
-        unique_id (int): An id identifying a unique document-question-answer triplet. During
-            postprocessing, this id is used to map the prediction results back to the original
-            document-question-answer triplet.
-        start_top_log_probs (list): Log probabilities for the top config.start_n_top start token
+        unique_id (int): An id identifying a unique document-question-answer triplet.
+            During postprocessing, this id is used to map the prediction results back
+            to the original document-question-answer triplet.
+        start_top_log_probs (list): Log probabilities for the top config.start_n_top
+            start token possibilities (beam-search).
+        start_top_index (list): Indices for the top config.start_n_top start token
             possibilities (beam-search).
-        start_top_index (list): Indices for the top config.start_n_top start token possibilities
-            (beam-search).
         end_top_log_probs (list): Log probabilities for the top ``config.start_n_top *
             config.end_n_top`` end token possibilities (beam-search).
-        end_top_index (list): Indices for the top ``config.start_n_top * config.end_n_top`` end
-            token possibilities (beam-search).
-        cls_logits (float): Log probabilities for the ``is_impossible`` label of the answers.
+        end_top_index (list): Indices for the top
+            ``config.start_n_top * config.end_n_top`` end token possibilities
+            (beam-search).
+        cls_logits (float): Log probabilities for the ``is_impossible`` label
+            of the answers.
 
     """
 
@@ -473,14 +489,16 @@ class AnswerExtractor(Transformer):
     Answer extractor based on pre-trained transformers models.
 
     Args:
-        model_name (model_name, optional): Name of the pre-trained transformers model. Call
-            AnswerExtractor.list_supported_models() to see all the models supported. Defaults to
-            "bert-base-cased".
+        model_name (model_name, optional): Name of the pre-trained transformers model.
+            Call AnswerExtractor.list_supported_models() to see all the
+                models supported. Defaults to "bert-base-cased".
         cache_dir (str, optional):  Location of BERT's cache directory.
-            When calling the `fit` method, if `cache_model` is `True`, the fine-tuned model is
-            saved to a `fine_tuned` folder under this directory. Defaults to ".".
-        load_model_from_dir (str, optional): Directory to load the model from. The directory must
-            contain a model file "pytorch_model.bin" and a configuration file "config.json".
+            When calling the `fit` method, if `cache_model` is `True`, the fine-tuned
+            model is saved to a `fine_tuned` folder under this directory.
+            Defaults to ".".
+        load_model_from_dir (str, optional): Directory to load the model from.
+            The directory must contain a model file "pytorch_model.bin" and a
+            configuration file "config.json".
             Defaults to None.
 
     """
@@ -512,6 +530,9 @@ class AnswerExtractor(Transformer):
         learning_rate=5e-5,
         adam_epsilon=1e-8,
         warmup_steps=0,
+        fp16=False,
+        fp16_opt_level="O1",
+        checkpoint_state_dict=None,
         verbose=True,
         seed=None,
         cache_model=True,
@@ -548,6 +569,16 @@ class AnswerExtractor(Transformer):
             warmup_steps (int, optional): Number of steps taken to increase
                 learning rate from 0 to `learning rate`.
                 Defaults to 0.
+            fp16 (bool): Whether to use 16-bit mixed precision through Apex
+                Defaults to False
+            fp16_opt_level (str): Apex AMP optimization level for fp16.
+                One of in ['O0', 'O1', 'O2', and 'O3']
+                See https://nvidia.github.io/apex/amp.html"
+                Defaults to "01"
+            checkpoint_state_dict (dict): Checkpoint states of model and optimizer.
+                If specified, the model and optimizer's parameters are loaded using
+                checkpoint_state_dict["model"] and checkpoint_state_dict["optimizer"]
+                Defaults to None.
             verbose (bool, optional): Whether to print out the training log.
                 Defaults to True.
             seed (int, optional): Random seed used to improve reproducibility.
@@ -559,9 +590,17 @@ class AnswerExtractor(Transformer):
 
         """
 
-        # init optimizer
-        optimizer = Transformer.get_default_optimizer(
-            self.model, weight_decay, learning_rate, adam_epsilon
+        # init device and optimizer
+        device, num_gpus, amp = self.prepare_model_and_optimizer(
+            num_gpus=num_gpus,
+            gpu_ids=gpu_ids,
+            local_rank=local_rank,
+            weight_decay=weight_decay,
+            learning_rate=learning_rate,
+            adam_epsilon=adam_epsilon,
+            fp16=fp16,
+            fp16_opt_level=fp16_opt_level,
+            checkpoint_state_dict=checkpoint_state_dict,
         )
 
         # compute the max number of training steps
@@ -574,19 +613,21 @@ class AnswerExtractor(Transformer):
 
         # inin scheduler
         scheduler = Transformer.get_default_scheduler(
-            optimizer=optimizer, warmup_steps=warmup_steps, num_training_steps=max_steps
+            optimizer=self.optimizer, warmup_steps=warmup_steps, num_training_steps=max_steps
         )
 
         # fine tune
         super().fine_tune(
             train_dataloader=train_dataloader,
             get_inputs=QAProcessor.get_inputs,
+            device=device,
             num_gpus=num_gpus,
-            gpu_ids=gpu_ids,
             max_steps=max_steps,
             gradient_accumulation_steps=gradient_accumulation_steps,
-            optimizer=optimizer,
+            optimizer=self.optimizer,
             scheduler=scheduler,
+            fp16=fp16,
+            amp=amp,
             local_rank=local_rank,
             verbose=verbose,
             seed=seed,
@@ -620,9 +661,15 @@ class AnswerExtractor(Transformer):
             return tensor.detach().cpu().tolist()
 
         # get device
-        device, num_gpus = get_device(num_gpus=num_gpus, local_rank=-1)
+        device, num_gpus = get_device(num_gpus=num_gpus, gpu_ids=gpu_ids, local_rank=-1)
+
         # move model
-        self.model = move_model_to_device(self.model, device, num_gpus, gpu_ids, local_rank=-1)
+        self.model = move_model_to_device(model=self.model, device=device)
+
+        # parallelize model
+        self.model = parallelize_model(
+            model=self.model, device=device, num_gpus=num_gpus, gpu_ids=gpu_ids, local_rank=-1,
+        )
 
         all_results = []
         for batch in tqdm(test_dataloader, desc="Evaluating", disable=not verbose):
@@ -914,7 +961,7 @@ def postprocess_bert_answer(
             scores_diff_json[example["qa_id"]] = score_diff
             if score_diff > null_score_diff_threshold:
                 all_predictions[example["qa_id"]] = ""
-                ## TODO: double check this
+                # TODO: double check this
                 all_probs[example["qa_id"]] = probs[null_prediction_index]
             else:
                 all_predictions[example["qa_id"]] = best_non_null_entry.text
@@ -955,52 +1002,57 @@ def postprocess_xlnet_answer(
     verbose_logging=False,
 ):
     """
-    Postprocesses start and end logits generated by :meth:`AnswerExtractor.fit` for XLNet.
+    Postprocesses start and end logits generated by :meth:`AnswerExtractor.fit`
+        for XLNet.
 
     Args:
         results (list): List of :class:`QAResultExtended`.
-        examples_file (str): One of the files cached by :meth:`QAProcessor.preprocess`. This file
-            contains the original document tokens that are used to generate the final answers
-            from the predicted start and end positions.
-        features_file (str): One of the files cached by :meth:`QAProcessor.preprocess`. This file
-            contains the mapping from indices in the processed token list to the original
-            document tokens that are used to generate the final predicted answers.
+        examples_file (str): One of the files cached by :meth:`QAProcessor.preprocess`.
+            This file contains the original document tokens that are used to generate
+            the final answers from the predicted start and end positions.
+        features_file (str): One of the files cached by :meth:`QAProcessor.preprocess`.
+            This file contains the mapping from indices in the processed token list to
+            the original document tokens that are used to generate the final
+            predicted answers.
         tokenizer (XLNetTokenizer): Tokenizer used during data preprocessing.
-        n_best_size (int, optional): The number of candidates to choose from each QAResult to
-            generate the final prediction. It's also the maximum number of n-best answers to
-            output for each question. Note that the number of n-best answers can be smaller than
-            `n_best_size` because some unqualified answers, e.g. answer that are too long,
-            are removed.
-        n_top_start (int, optional): Beam size for span start. Note that this needs to be
-            consistent with the XLNet model configuration. Defaults to 5.
+        n_best_size (int, optional): The number of candidates to choose from each
+            QAResult to generate the final prediction. It's also the maximum number
+            of n-best answers to output for each question.
+            Note that the number of n-best answers can be smaller than `n_best_size`
+            because some unqualified answers, e.g. answer that are too long are removed.
+        n_top_start (int, optional): Beam size for span start. Note that this needs to
+            be consistent with the XLNet model configuration. Defaults to 5.
         n_top_end (int, optional): Beam size for span end. Note that this needs to be
             consistent with the XLNet model configuration. Defaults to 5.
         max_answer_length (int, optional): Maximum length of the answer. Defaults to 30.
-        unanswerable_exists (bool, optional): Whether there are unanswerable questions in the
-            data. If True, the start and end logits of the [CLS] token, which indicate the
-            probability of the answer being empty, are included in the candidate answer list.
+        unanswerable_exists (bool, optional): Whether there are unanswerable questions
+            in the data. If True, the start and end logits of the [CLS] token, which
+            indicate the probability of the answer being empty, are included in the
+            candidate answer list.
             Defaults to False.
-        output_prediction_file (str, optional): Path of the file to save the predicted answers.
-            Defaults to "./qa_predictions.json".
-        output_nbest_file (str, optional): Path of the file to save the n-best answers. Defaults
-            to "./nbest_predictions.json".
-        output_null_log_odds_file (str, optional): If unanswerable_exists is True, the score
-            difference between empty prediction and best non-empty prediction are saved to this
-            file. These scores can be used to find the best threshold for predicting an empty
-            answer. Defaults to "./null_odds.json".
-        verbose_logging (bool, optional): Whether to log details of answer postprocessing.
-            Defaults to False.
+        output_prediction_file (str, optional): Path of the file to save the
+            predicted answers. Defaults to "./qa_predictions.json".
+        output_nbest_file (str, optional): Path of the file to save the n-best answers.
+            Defaults to "./nbest_predictions.json".
+        output_null_log_odds_file (str, optional): If unanswerable_exists is True,
+            the score difference between empty prediction and best non-empty prediction
+            are saved to this file. These scores can be used to find the best threshold
+            for predicting an empty answer. Defaults to "./null_odds.json".
+        verbose_logging (bool, optional): Whether to log details of answer
+            postprocessing. Defaults to False.
 
     Returns:
         tuple: (OrderedDict, OrderedDict, OrderedDict)
             The keys of the dictionaries are the `qa_id` in the original
             :class:`utils_nlp.dataset.pytorch.QADataset`
-            The values of the first dictionary are the predicted answer texts in string type.
-            The values of the second dictionary are the softmax probabilities of the predicted
-            answers.
-            The values of the third dictionary are the n-best answers for each qa_id. Note that
-            the number of n-best answers can be smaller than `n_best_size` because some
-            unqualified answers, e.g. answers that are too long, are removed.
+            The values of the first dictionary are the predicted answer texts in
+                string type.
+            The values of the second dictionary are the softmax probabilities of
+                the predicted answers.
+            The values of the third dictionary are the n-best answers for each qa_id.
+            Note that the number of n-best answers can be smaller than `n_best_size`
+            because some unqualified answers, e.g. answers that are too
+            long are removed.
 
     """
     with jsonlines.open(examples_file) as reader:
@@ -1189,7 +1241,8 @@ def _is_iterable_but_not_string(obj):
 def _create_qa_example(qa_input, is_training):
     """ Initial preprocessing to create _QAExample for feature extraction. """
 
-    # _QAExample is a data structure representing an unique document-question-answer triplet.
+    # _QAExample is a data structure representing an unique document-question-answer
+    #   triplet.
     # Args:
     #     qa_id (int): An unique id identifying the document-question pair.
     #         This is used to map prediction results to ground truth answers
@@ -1299,14 +1352,16 @@ def _create_qa_features(
     doc_stride,
     custom_tokenize=None,
 ):
-    """Extracts features for model training and scoring from document-question-answer triplet."""
+    """Extracts features for model training and scoring from document-question-answer
+        triplet.
+    """
 
     # _QAFeatures is data structure representing features of an unique document
     # span-question-answer triplet.
     # Args:
     #     unique_id (int): An unique id identifying the span-question-answer triplet.
-    #     qa_id (int or str):  An unique id identifying the document-question-answer sample in the
-    #         original :class:`utils_nlp.dataset.pytorch.QADataset`
+    #     qa_id (int or str):  An unique id identifying the document-question-answer
+    #     sample in the original :class:`utils_nlp.dataset.pytorch.QADataset`
     #     tokens (list): Concatenated question tokens and paragraph tokens.
     #     token_to_orig_map (dict): A dictionary mapping token indices in the
     #         document span back to the token indices in the original document
@@ -1340,8 +1395,8 @@ def _create_qa_features(
     #     start_position (int): Index of the starting token of the answer span.
     #     end_position (int): Index of the ending token of the answer span.
     #     cls_index (int): Index of the CLS token.
-    #     p_mask (list): Mask with 1 for token than cannot be in the answer, 0 for token which can
-    #         be in an answer.
+    #     p_mask (list): Mask with 1 for token than cannot be in the answer,
+    #     0 for token which can be in an answer.
     #     paragraph_len(int): Number of tokens in the document span.
     _QAFeatures = collections.namedtuple(
         "_QAFeatures",
@@ -1529,7 +1584,7 @@ def _create_qa_features(
         # p_mask: mask with 1 for token than cannot be in the answer
         # (0 for token which can be in an answer)
         # Original TF implem also keep the classification token (set to 0) (not sure why...)
-        ## TODO: Should we set p_mask = 1 for cls token?
+        # TODO: Should we set p_mask = 1 for cls token?
         p_mask = []
 
         # CLS token at the beginning

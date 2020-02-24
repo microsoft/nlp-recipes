@@ -9,7 +9,11 @@ import torch.nn as nn
 from torch.nn.modules.container import Sequential
 from torch.nn.parallel.data_parallel import DataParallel
 
-from utils_nlp.common.pytorch_utils import get_device, move_model_to_device
+from utils_nlp.common.pytorch_utils import (
+    get_device,
+    move_model_to_device,
+    parallelize_model,
+)
 
 
 @pytest.fixture
@@ -63,7 +67,9 @@ def test_move_to_device_cpu(model):
 def test_move_to_device_cpu_parallelized(model):
     # test when input model is parallelized
     model_parallelized = nn.DataParallel(model)
-    model_parallelized_output = move_model_to_device(model_parallelized, torch.device("cpu"))
+    model_parallelized_output = move_model_to_device(
+        model_parallelized, torch.device("cpu")
+    )
     assert isinstance(model_parallelized_output, nn.modules.container.Sequential)
 
 
@@ -79,7 +85,10 @@ def test_move_to_device_exception_wrong_type(model):
         move_model_to_device(model, torch.device("opengl"))
 
 
-@pytest.mark.skipif(torch.cuda.is_available(), reason="Skip if we are executing the cpu tests on a gpu machine")
+@pytest.mark.skipif(
+    torch.cuda.is_available(),
+    reason="Skip if we are executing the cpu tests on a gpu machine",
+)
 def test_move_to_device_exception_gpu_model_on_cpu_machine(model):
     # test when the model is moved to a gpu but it is a cpu machine
     with pytest.raises(Exception):
@@ -87,16 +96,18 @@ def test_move_to_device_exception_gpu_model_on_cpu_machine(model):
 
 
 @pytest.mark.gpu
-def test_move_to_device_exception_cuda_zero_gpus(model):
+def test_parallelize_model_exception_cuda_zero_gpus(model):
     # test when device.type is cuda, but num_gpus is 0
     with pytest.raises(ValueError):
-        move_model_to_device(model, torch.device("cuda"), num_gpus=0)
+        model = move_model_to_device(model, torch.device("cuda"))
+        parallelize_model(model, torch.device("cuda"), num_gpus=0)
 
 
 @pytest.mark.gpu
 def test_move_to_device_gpu(model):
     # test when device.type="cuda"
     model_cuda = move_model_to_device(model, torch.device("cuda"))
+    model_cuda = parallelize_model(model_cuda, torch.device("cuda"))
     num_cuda_devices = torch.cuda.device_count()
 
     if num_cuda_devices > 1:
@@ -104,16 +115,25 @@ def test_move_to_device_gpu(model):
     else:
         assert isinstance(model_cuda, Sequential)
 
-    model_cuda_1_gpu = move_model_to_device(model, torch.device("cuda"), num_gpus=1)
+    model_cuda_1_gpu = move_model_to_device(model, torch.device("cuda"))
+    model_cuda_1_gpu = parallelize_model(
+        model_cuda_1_gpu, torch.device("cuda"), num_gpus=1
+    )
     assert isinstance(model_cuda_1_gpu, Sequential)
 
-    model_cuda_1_more_gpu = move_model_to_device(model, torch.device("cuda"), num_gpus=num_cuda_devices + 1)
+    model_cuda_1_more_gpu = move_model_to_device(model, torch.device("cuda"))
+    model_cuda_1_more_gpu = parallelize_model(
+        model_cuda_1_more_gpu, torch.device("cuda"), num_gpus=num_cuda_devices + 1
+    )
     if num_cuda_devices > 1:
         assert isinstance(model_cuda_1_more_gpu, DataParallel)
     else:
         assert isinstance(model_cuda_1_more_gpu, Sequential)
 
-    model_cuda_same_gpu = move_model_to_device(model, torch.device("cuda"), num_gpus=num_cuda_devices)
+    model_cuda_same_gpu = move_model_to_device(model, torch.device("cuda"))
+    model_cuda_same_gpu = parallelize_model(
+        model_cuda_same_gpu, torch.device("cuda"), num_gpus=num_cuda_devices
+    )
     if num_cuda_devices > 1:
         assert isinstance(model_cuda_same_gpu, DataParallel)
     else:
