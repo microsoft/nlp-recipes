@@ -118,20 +118,12 @@ def main_worker(local_rank, ngpus_per_node, summarizer, prediction_result, args)
 
     train_sum_dataset, test_sum_dataset = load_processed_cnndm_abs(args.data_dir)
 
-    if rank not in [-1, 0]:
-        save_every = -1
-        this_validate = None
-    else:
-        save_every = 500
-
-    #TOP_N = 128
-    #if args.quick_run.lower() == "false":
     TOP_N = args.top_n
 
     start = time.time()
 
     prediction = summarizer.predict(shorten_dataset(test_sum_dataset, top_n=TOP_N, world_size=world_size, rank=rank),
-                batch_size=args.batch_size, num_gpus=None, local_rank=local_rank)
+                batch_size=args.batch_size, num_gpus=1, local_rank=local_rank, fp16=args.fp16)
     prediction_result.append((rank,prediction))
     #print(prediction[0])
 
