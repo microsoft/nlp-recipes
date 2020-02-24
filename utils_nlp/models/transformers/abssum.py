@@ -335,9 +335,9 @@ def validate(summarizer, validate_sum_dataset, cache_dir):
     TOP_N = 8
 
     src = validate_sum_dataset.source[0:TOP_N]
-    reference_summaries = ["".join(t).rstrip("\n") for t in validate_sum_dataset.target[0:TOP_N]]
+    reference_summaries = [" ".join(t).rstrip("\n") for t in validate_sum_dataset.target[0:TOP_N]]
     generated_summaries = summarizer.predict(
-        shorten_dataset(validate_sum_dataset, top_n=TOP_N), num_gpus=2, batch_size=4
+        shorten_dataset(validate_sum_dataset, top_n=TOP_N), num_gpus=1, batch_size=4
     )
     assert len(generated_summaries) == len(reference_summaries)
     for i in generated_summaries[0:1]:
@@ -495,6 +495,7 @@ class AbsSum(Transformer):
         self.model = move_model_to_device(model=self.model, device=device)
         # init optimizer
 
+        #"""
         self.optim_bert = model_builder.build_optim_bert(
             self.model,
             visible_gpus=None, #",".join([str(i) for i in range(num_gpus)]), #"0,1,2,3",
@@ -508,7 +509,13 @@ class AbsSum(Transformer):
             lr_dec=learning_rate_dec,
             warmup_steps_dec=warmup_steps_dec,
         )
+        #"""
+        self.scheduler_bert = torch.optim.lr_scheduler.CyclicLR(self.optim_bert.optimizer,cycle_momentum=False, base_lr=2e-3,max_lr=1e-2,step_size_up=2000)
+        self.scheduler_dec = torch.optim.lr_scheduler.CyclicLR(self.optim_dec.optimizer, cycle_momentum=False, base_lr=2e-1,max_lr=5e-1,step_size_up=2000)
+
+
         optimizers = [self.optim_bert, self.optim_dec]
+        schedulers = [self.scheduler_bert, self.scheduler_dec]
 
         self.amp = get_amp(fp16)
         if self.amp:
@@ -565,13 +572,13 @@ class AbsSum(Transformer):
             global_step=global_step,
             max_grad_norm=max_grad_norm,
             gradient_accumulation_steps=gradient_accumulation_steps,
-            scheduler=None,
             verbose=verbose,
             seed=seed,
             report_every=report_every,
             save_every=save_every,
             clip_grad_norm=False,
             optimizer=optimizers,
+            scheduler=schedulers,
             fp16=fp16,
             amp=self.amp,
             validation_function=validation_function,
