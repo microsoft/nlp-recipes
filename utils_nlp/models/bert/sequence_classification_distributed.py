@@ -14,7 +14,11 @@ from pytorch_pretrained_bert.modeling import BertForSequenceClassification
 from pytorch_pretrained_bert.optimization import BertAdam
 from tqdm import tqdm
 
-from utils_nlp.common.pytorch_utils import get_device, move_model_to_device
+from utils_nlp.common.pytorch_utils import (
+    get_device,
+    move_model_to_device,
+    parallelize_model,
+)
 from utils_nlp.models.bert.common import Language
 
 try:
@@ -27,13 +31,18 @@ class BERTSequenceClassifier:
     """BERT-based sequence classifier"""
 
     def __init__(
-        self, language=Language.ENGLISH, num_labels=2, cache_dir=".", use_distributed=False
+        self,
+        language=Language.ENGLISH,
+        num_labels=2,
+        cache_dir=".",
+        use_distributed=False,
     ):
 
         """
 
         Args:
-            language: Language passed to pre-trained BERT model to pick the appropriate model
+            language: Language passed to pre-trained BERT model to pick the appropriate
+                model
             num_labels: number of unique labels in train dataset
             cache_dir: cache_dir to load pre-trained BERT model. Defaults to "."
         """
@@ -55,10 +64,16 @@ class BERTSequenceClassifier:
         no_decay = ["bias", "LayerNorm.bias", "LayerNorm.weight"]
         optimizer_grouped_parameters = [
             {
-                "params": [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)],
+                "params": [
+                    p for n, p in param_optimizer if not any(nd in n for nd in no_decay)
+                ],
                 "weight_decay": 0.01,
             },
-            {"params": [p for n, p in param_optimizer if any(nd in n for nd in no_decay)]},
+            {
+                "params": [
+                    p for n, p in param_optimizer if any(nd in n for nd in no_decay)
+                ]
+            },
         ]
         self.optimizer_params = optimizer_grouped_parameters
         self.name_parameters = self.model.named_parameters()
@@ -72,7 +87,11 @@ class BERTSequenceClassifier:
                 warnings.warn("No GPU available! Using CPU.")
 
     def create_optimizer(
-        self, num_train_optimization_steps, lr=2e-5, fp16_allreduce=False, warmup_proportion=None
+        self,
+        num_train_optimization_steps,
+        lr=2e-5,
+        fp16_allreduce=False,
+        warmup_proportion=None,
     ):
 
         """
@@ -84,11 +103,12 @@ class BERTSequenceClassifier:
             warmup_proportion (float, optional): proportion of training to
                 perform linear learning rate warmup for. e.g., 0.1 = 10% of
                 training. defaults to none.
-            fp16_allreduce(bool, optional)L if true, use fp16 compression during allreduce
+            fp16_allreduce(bool, optional)L if true, use fp16 compression
+                during allreduce.
 
         Returns:
-            pytorch_pretrained_bert.optimization.BertAdam  : A BertAdam optimizer with user
-            specified config.
+            pytorch_pretrained_bert.optimization.BertAdam  : A BertAdam optimizer with
+                user specified config.
 
         """
         if self.use_distributed:
@@ -105,9 +125,13 @@ class BERTSequenceClassifier:
             )
 
         if self.use_distributed:
-            compression = hvd.Compression.fp16 if fp16_allreduce else hvd.Compression.none
+            compression = (
+                hvd.Compression.fp16 if fp16_allreduce else hvd.Compression.none
+            )
             optimizer = hvd.DistributedOptimizer(
-                optimizer, named_parameters=self.model.named_parameters(), compression=compression
+                optimizer,
+                named_parameters=self.model.named_parameters(),
+                compression=compression,
             )
 
         return optimizer
@@ -144,7 +168,8 @@ class BERTSequenceClassifier:
     def save_model(self):
         """
         Method to save the trained model.
-        #ToDo: Works for English Language now. Multiple language support needs to be added.
+        #ToDo: Works for English Language now. Multiple language support needs to
+        # be added.
 
         """
         # Save the model to the outputs directory for capture
@@ -152,7 +177,9 @@ class BERTSequenceClassifier:
         os.makedirs(output_dir, exist_ok=True)
 
         # Save a trained model, configuration and tokenizer
-        model_to_save = self.model.module if hasattr(self.model, "module") else self.model
+        model_to_save = (
+            self.model.module if hasattr(self.model, "module") else self.model
+        )
 
         # If we save using the predefined names, we can load using `from_pretrained`
         output_model_file = "outputs/bert-large-uncased"
@@ -179,9 +206,11 @@ class BERTSequenceClassifier:
         Args:
             train_loader(torch.DataLoader): Torch Dataloader created from Torch Dataset
             epoch(int): Current epoch number of training.
-            bert_optimizer(optimizer): optimizer can be BERTAdam for local and Dsitributed if Horovod
+            bert_optimizer(optimizer): optimizer can be BERTAdam for local and
+                Dsitributed if Horovod
             num_epochs(int): the number of epochs to run
-            num_gpus(int): the number of gpus. If None is specified, all available GPUs will be used.
+            num_gpus(int): the number of gpus. If None is specified, all available GPUs
+                will be used.
             lr (float): learning rate of the adam optimizer. defaults to 2e-5.
             warmup_proportion (float, optional): proportion of training to
                 perform linear learning rate warmup for. e.g., 0.1 = 10% of
@@ -192,8 +221,8 @@ class BERTSequenceClassifier:
 
         device, num_gpus = get_device(num_gpus)
 
-        self.model = move_model_to_device(self.model, device, num_gpus)
-
+        self.model = move_model_to_device(self.model, device)
+        self.model = parallelize_model(self.model, device, num_gpus=num_gpus)
         if bert_optimizer is None:
             bert_optimizer = self.create_optimizer(
                 num_train_optimization_steps=num_train_optimization_steps,
@@ -260,8 +289,8 @@ class BERTSequenceClassifier:
     def predict(self, test_loader, num_gpus=None, probabilities=False):
         """
 
-        Method to predict the results on the test loader. Only evaluates for non distributed
-        workload on the head node in a distributed setup.
+        Method to predict the results on the test loader. Only evaluates for
+            non distributed workload on the head node in a distributed setup.
 
         Args:
             test_loader(torch Dataloader): Torch Dataloader created from Torch Dataset
@@ -273,11 +302,13 @@ class BERTSequenceClassifier:
                 is also returned. Defaults to False.
 
         Returns:
-            1darray, dict(1darray, 1darray, ndarray): Predicted classes and target labels or
-                a dictionary with classes, target labels, probabilities) if probabilities is True.
+            1darray, dict(1darray, 1darray, ndarray): Predicted classes and
+                target labels or a dictionary with classes, target labels,
+                probabilities) if probabilities is True.
         """
         device, num_gpus = get_device(num_gpus)
-        self.model = move_model_to_device(self.model, device, num_gpus)
+        self.model = move_model_to_device(self.model, device)
+        self.model = parallelize_model(self.model, device, num_gpus=num_gpus)
 
         # score
         self.model.eval()

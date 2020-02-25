@@ -390,6 +390,9 @@ class SummarizationDataset(Dataset):
     def __len__(self):
         return len(self._source)
 
+    def get_target(self):
+        return self._target
+
 
 def parallel_preprocess(input_data, preprocess_pipeline, word_tokenize=None, num_pool=-1):
     if num_pool == -1:
