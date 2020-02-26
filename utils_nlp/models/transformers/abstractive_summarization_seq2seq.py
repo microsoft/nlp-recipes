@@ -603,7 +603,7 @@ class S2SAbstractiveSummarizer(Transformer):
             no_segment_embedding = False
             vocab = self.tokenizer.vocab
 
-        if self._model_type in ("unilm", "unilm1"):
+        if self._model_type != "unilm1.2" and self._model_type in ("unilm", "unilm1"):
             new_segment_ids = True
         else:
             new_segment_ids = False
