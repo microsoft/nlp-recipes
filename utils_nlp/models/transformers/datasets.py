@@ -63,7 +63,9 @@ class SCDataSet(Dataset):
 class SPCDataSet(Dataset):
     """Dataset for sequence pair classification tasks"""
 
-    def __init__(self, df, text1_col, text2_col, label_col, transform, **transform_args):
+    def __init__(
+        self, df, text1_col, text2_col, label_col, transform, **transform_args
+    ):
         self.df = df
         cols = list(df.columns)
         self.transform = transform
@@ -127,14 +129,23 @@ class SPCDataSet(Dataset):
 #    doc_text (str): Input document text.
 #    question_text(str): Input question text.
 #    qa_id (int or str): An unique id identifying a document-question-answer sample.
-#    is_impossible (bool): If the question is impossible to answer based on the input document.
-#    answer_start (int or list): Index of the answer start word in doc_text. For testing data,
-#        this can be a list of integers for multiple ground truth answers.
-#    answer_text (str or list): Text of the answer. For testing data, this can be a list of strings
+#    is_impossible (bool): If the question is impossible to answer based on the input
+#    document.
+#    answer_start (int or list): Index of the answer start word in doc_text. For
+#        testing data, this can be a list of integers for multiple ground truth answers.
+#    answer_text (str or list): Text of the answer. For testing data, this can be a
+#        list of strings
 #        for multiple ground truth answers.
 QAInput = collections.namedtuple(
     "QAInput",
-    ["doc_text", "question_text", "qa_id", "is_impossible", "answer_start", "answer_text"],
+    [
+        "doc_text",
+        "question_text",
+        "qa_id",
+        "is_impossible",
+        "answer_start",
+        "answer_text",
+    ],
 )
 
 
@@ -157,19 +168,19 @@ class QADataset(Dataset):
             df (pandas.DataFrame): Input data frame.
             doc_text_col (str): Name of the column containing the document texts.
             question_text_col (str): Name of the column containing the question texts.
-            qa_id_col (str, optional): Name of the column containing the unique ids identifying
-                document-question-answer samples. If not provided, a "qa_id" column is
-                automatically created. Defaults to None.
-            answer_start_col (str, optional): Name of the column containing answer start indices.
-                For testing data, each value in the column can be a list of integers for multiple
-                ground truth answers. Defaults to None.
-            answer_text_col (str, optional): Name of the column containing answer texts. For
-                testing data, each value in the column can be a list of strings for multiple
-                ground truth answers. Defaults to None.
-            is_impossible_col (str, optional): Name of the column containing boolean values
-                indicating if the question is impossible to answer. If not provided,
-                a "is_impossible" column is automatically created and populated with False.
-                Defaults to None.
+            qa_id_col (str, optional): Name of the column containing the unique ids
+                identifying document-question-answer samples. If not provided, a
+                "qa_id" column is automatically created. Defaults to None.
+            answer_start_col (str, optional): Name of the column containing answer
+                start indices. For testing data, each value in the column can be a list
+                of integers for multiple ground truth answers. Defaults to None.
+            answer_text_col (str, optional): Name of the column containing answer texts.
+                For testing data, each value in the column can be a list of strings for
+                multiple ground truth answers. Defaults to None.
+            is_impossible_col (str, optional): Name of the column containing boolean
+                values indicating if the question is impossible to answer. If not
+                provided, a "is_impossible" column is automatically created and
+                populated with False. Defaults to None.
         """
         self.df = df.copy()
         self.doc_text_col = doc_text_col
@@ -195,7 +206,9 @@ class QADataset(Dataset):
         self.answer_text_col = answer_text_col
 
     def __getitem__(self, idx):
-        current_item = self.df.iloc[idx,]
+        current_item = self.df.iloc[
+            idx,
+        ]
         if self.actual_answer_available:
             return QAInput(
                 doc_text=current_item[self.doc_text_col],
@@ -251,7 +264,9 @@ def _preprocess(sentences, preprocess_pipeline, word_tokenize=None):
 def _create_data_from_iterator(iterator, preprocessing, word_tokenize):
     for line in iterator:
         yield _preprocess(
-            sentences=line, preprocess_pipeline=preprocessing, word_tokenize=word_tokenize
+            sentences=line,
+            preprocess_pipeline=preprocessing,
+            word_tokenize=word_tokenize,
         )
 
 
@@ -273,14 +288,16 @@ class IterableSummarizationDataset(IterableDataset):
             source_file (str): Full path of the file which contains a list of
                 the paragraphs with line break as seperator.
             target_file (str): Full path of the file which contains a list of
-                the summaries for the paragraphs in the source file with line break as seperator.
+                the summaries for the paragraphs in the source file with line break as
+                seperator.
             source_preprocessing (list of functions): A list of preprocessing functions
                 to process the paragraphs in the source file.
-            target_preprocessing (list of functions): A list of preprocessing functions to
-                process the paragraphs in the source file.
-            word_tokenization (function): Tokenization function for tokenize the paragraphs
-                and summaries. The tokenization method is used for sentence selection
-                in :meth:`utils_nlp.models.transformers.extractive_summarization.
+            target_preprocessing (list of functions): A list of preprocessing functions
+                to process the paragraphs in the source file.
+            word_tokenization (function): Tokenization function for tokenize the
+                paragraphs and summaries. The tokenization method is used for sentence
+                selection in
+                :meth:`utils_nlp.models.transformers.extractive_summarization.
                 ExtSumProcessor.preprocess`
             top_n (int, optional): The number which specifies how many examples in the
                 beginning of the paragraph and summary lists that will be processed by
@@ -334,14 +351,16 @@ class SummarizationDataset(Dataset):
             source_file (str): Full path of the file which contains a list of
                 the paragraphs with line break as seperator.
             target_file (str): Full path of the file which contains a list of
-                the summaries for the paragraphs in the source file with line break as seperator.
+                the summaries for the paragraphs in the source file with line break
+                as seperator.
             source_preprocessing (list of functions): A list of preprocessing functions
                 to process the paragraphs in the source file.
-            target_preprocessing (list of functions): A list of preprocessing functions to
-                process the paragraphs in the source file.
-            word_tokenization (function): Tokenization function for tokenize the paragraphs
-                and summaries. The tokenization method is used for sentence selection
-                in :meth:`utils_nlp.models.transformers.extractive_summarization.
+            target_preprocessing (list of functions): A list of preprocessing functions
+                to process the paragraphs in the source file.
+            word_tokenization (function): Tokenization function for tokenize the
+                paragraphs and summaries. The tokenization method is used for sentence
+                selection in
+                :meth:`utils_nlp.models.transformers.extractive_summarization.
                 ExtSumProcessor.preprocess`
             top_n (int, optional): The number which specifies how many examples in the
                 beginning of the paragraph and summary lists that will be processed by
@@ -349,14 +368,14 @@ class SummarizationDataset(Dataset):
                 and summaries should be procsssed.
         """
 
-        with open(source_file) as f:
+        with open(source_file, encoding="utf-8") as f:
             if top_n != -1:
                 self._source = list(itertools.islice(f, top_n))
             else:
                 self._source = f.readlines()
 
         if target_file is not None:
-            with open(target_file) as f:
+            with open(target_file, encoding="utf-8") as f:
                 if top_n != -1:
                     self._target = list(itertools.islice(f, top_n))
                 else:
@@ -372,14 +391,10 @@ class SummarizationDataset(Dataset):
 
         if self._target is not None:
             self._target = parallel_preprocess(
-                self._target, preprocess_pipeline=target_preprocessing, num_pool=n_processes
+                self._target,
+                preprocess_pipeline=target_preprocessing,
+                num_pool=n_processes,
             )
-
-        # for i, s in enumerate(self._source):
-        #     self._source[i] = _preprocess(sentences=s, preprocess_pipeline=source_preprocessing)
-
-        # for i, t in enumerate(self._target):
-        #     self._target[i] = _preprocess(sentences=t, preprocess_pipeline=target_preprocessing)
 
     def __getitem__(self, idx):
         if self._target is None:
@@ -394,7 +409,9 @@ class SummarizationDataset(Dataset):
         return self._target
 
 
-def parallel_preprocess(input_data, preprocess_pipeline, word_tokenize=None, num_pool=-1):
+def parallel_preprocess(
+    input_data, preprocess_pipeline, word_tokenize=None, num_pool=-1
+):
     if num_pool == -1:
         num_pool = cpu_count()
 
@@ -403,7 +420,11 @@ def parallel_preprocess(input_data, preprocess_pipeline, word_tokenize=None, num
     p = Pool(num_pool)
 
     results = p.map(
-        partial(_preprocess, preprocess_pipeline=preprocess_pipeline, word_tokenize=word_tokenize),
+        partial(
+            _preprocess,
+            preprocess_pipeline=preprocess_pipeline,
+            word_tokenize=word_tokenize,
+        ),
         input_data,
         chunksize=int(len(input_data) / num_pool),
     )
