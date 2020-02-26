@@ -6,7 +6,8 @@ from utils_nlp.models.mtdnn.tasks.config import MTDNNTaskDefs
 
 if __name__ == "__main__":
     config = MTDNNConfig()
-
+    #config.log_per_updates = 10
+    print(config)
     # Define task parameters
     tasks_params = {
         "mnli": {
@@ -47,8 +48,8 @@ if __name__ == "__main__":
     data_processor = MTDNNDataProcess(
         config=config,
         task_defs=task_defs,
-        batch_size=8,
-        data_dir="/home/useradmin/sources/mt-dnn/data/canonical_data/bert_uncased_lower",
+        batch_size=16,
+        data_dir="D:/experiments/codes/mt-dnn-private/data/mt_dnn_uncased_lower",
         train_datasets_list=["mnli"],
         test_datasets_list=["mnli_mismatched", "mnli_matched"],
     )
@@ -59,11 +60,15 @@ if __name__ == "__main__":
 
     # Update config with data preprocess params
     config = data_processor.update_config(config)
+    
+    # Update steps
+    num_all_batches = config.epochs * len(multitask_train_dataloader) // config.grad_accumulation_step
 
     # Instantiate model
-    model = MTDNNModel(config)
+    #import pdb; pdb.set_trace()
+    model = MTDNNModel(config, pretrained_model_name= "bert-base-uncased", num_train_step=num_all_batches,)
     print("Network: ", model.network)
-
+    #import pdb; pdb.set_trace()
     # Create a process pipeline for training and inference
     pipeline_process = MTDNNPipelineProcess(
         model=model,
@@ -73,9 +78,9 @@ if __name__ == "__main__":
         dev_dataloaders_list=dev_dataloaders_list,
         test_dataloaders_list=test_dataloaders_list,
     )
-
     # Fit training data to model
     pipeline_process.fit(1)
+    pipeline_process.predict(1)
 
     # print("Config Class: ", b.config_class)
     # print("Config: ", b.config)
