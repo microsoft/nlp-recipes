@@ -113,7 +113,7 @@ class AbsSumProcessor:
         model_name="bert-base-uncased",
         to_lower=False,
         cache_dir=".",
-        max_len=512,
+        max_src_len=512,
         max_target_len=140,
     ):
         """ Initialize the preprocessor.
@@ -144,14 +144,11 @@ class AbsSumProcessor:
         self.sep_token = "[SEP]"
         self.cls_token = "[CLS]"
         self.pad_token = "[PAD]"
-        self.tgt_bos = "[unused0]"
-        self.tgt_eos = "[unused1]"
+        self.tgt_bos = self.symbols["BOS"]
+        self.tgt_eos = self.symbols["EOS"]
 
-        self.sep_vid = self.tokenizer.vocab[self.sep_token]
-        self.cls_vid = self.tokenizer.vocab[self.cls_token]
-        self.pad_vid = self.tokenizer.vocab[self.pad_token]
 
-        self.max_len = max_len
+        self.max_src_len = max_src_len
         self.max_target_len = max_target_len
 
     @staticmethod
@@ -243,7 +240,8 @@ class AbsSumProcessor:
         if train_mode:
             encoded_summaries = torch.tensor(
                 [
-                    fit_to_block_size(summary, block_size, self.tokenizer.pad_token_id)
+                    [self.tgt_bos] + fit_to_block_size(summary, block_size-2, self.tokenizer.pad_token_id)
+                    +[self.tgt_eos]
                     for _, summary in encoded_text
                 ]
             )
@@ -308,7 +306,7 @@ class AbsSumProcessor:
             try:
                 if len(line) <= 0:
                     continue
-                story_lines_token_ids.append(self.tokenizer.encode(line, max_length=self.max_len))
+                story_lines_token_ids.append(self.tokenizer.encode(line, max_length=self.max_src_len))
             except:
                 print(line)
                 raise
@@ -325,9 +323,9 @@ class AbsSumProcessor:
                 except:
                     print(line)
                     raise
-            summary_token_ids = [
+            summary_token_ids =  [
                 token for sentence in summary_lines_token_ids for token in sentence
-            ]
+            ] 
             return story_token_ids, summary_token_ids
         else:
             return story_token_ids
