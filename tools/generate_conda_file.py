@@ -52,7 +52,8 @@ CONDA_BASE = {
 
 CONDA_GPU = {
     "numba": "numba>=0.38.1",
-    "cudatoolkit": "cudatoolkit==10.2.89",
+    "cudatoolkit": "cudatoolkit==10.1.243",
+    "pytorch": "pytorch==1.4.0",
 }
 
 PIP_BASE = {
@@ -94,11 +95,10 @@ PIP_BASE = {
     "tensorboardX": "tensorboardX==1.8",
     "Cython": "Cython>=0.29.13",
     "googledrivedownloader": "googledrivedownloader>=0.4",
+    "methodtools": "methodtools",
 }
 
-PIP_GPU = {
-    "torch": "torch==1.4.0",
-}
+PIP_GPU = {}
 
 PIP_DARWIN = {}
 PIP_DARWIN_GPU = {}
@@ -130,7 +130,9 @@ if __name__ == "__main__":
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--name", help="specify name of conda environment")
-    parser.add_argument("--gpu", action="store_true", help="include packages for GPU support")
+    parser.add_argument(
+        "--gpu", action="store_true", help="include packages for GPU support"
+    )
     args = parser.parse_args()
 
     # set name for environment and output yaml file
