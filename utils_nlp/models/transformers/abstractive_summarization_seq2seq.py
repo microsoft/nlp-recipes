@@ -11,12 +11,19 @@ import torch
 from torch.utils.data import DataLoader, SequentialSampler, Dataset
 from torch.utils.data.distributed import DistributedSampler
 
-from transformers import BertTokenizer, RobertaTokenizer
 from transformers import RobertaConfig, BertConfig
 
 from utils_nlp.models.transformers.common import TOKENIZER_CLASS, Transformer
-from utils_nlp.common.pytorch_utils import get_device, move_model_to_device, parallelize_model
-from s2s_ft.utils import load_and_cache_examples, Seq2seqDatasetForBert, batch_list_to_batch_tensors
+from utils_nlp.common.pytorch_utils import (
+    get_device,
+    move_model_to_device,
+    parallelize_model,
+)
+from s2s_ft.utils import (
+    load_and_cache_examples,
+    Seq2seqDatasetForBert,
+    batch_list_to_batch_tensors,
+)
 from s2s_ft.modeling import BertForSequenceToSequence
 from s2s_ft.modeling import UNILM_PRETRAINED_MODEL_ARCHIVE_MAP
 from s2s_ft.tokenization_unilm import UnilmTokenizer
@@ -28,11 +35,14 @@ from s2s_ft.modeling_decoding import BertForSeq2SeqDecoder
 SUPPORTED_BERT_MODELS = ["bert-large-uncased", "bert-base-cased", "bert-large-cased"]
 SUPPORTED_ROBERTA_MODELS = ["roberta-base", "roberta-large"]
 
-# ROBERTA and XLM_ROBERTA are converted to BERT format by BertForSequenceToSequence.from_pretrained
+# ROBERTA and XLM_ROBERTA are converted to BERT format by
+# BertForSequenceToSequence.from_pretrained
 MODEL_CLASS = {}
 MODEL_CLASS.update({k: BertForSequenceToSequence for k in SUPPORTED_BERT_MODELS})
 MODEL_CLASS.update({k: BertForSequenceToSequence for k in SUPPORTED_ROBERTA_MODELS})
-MODEL_CLASS.update({k: BertForSequenceToSequence for k in UNILM_PRETRAINED_MODEL_ARCHIVE_MAP})
+MODEL_CLASS.update(
+    {k: BertForSequenceToSequence for k in UNILM_PRETRAINED_MODEL_ARCHIVE_MAP}
+)
 
 
 TOKENIZER_CLASS.update({k: UnilmTokenizer for k in UNILM_PRETRAINED_CONFIG_ARCHIVE_MAP})
@@ -47,7 +57,8 @@ CONFIG_CLASS.update({k: UnilmConfig for k in UNILM_PRETRAINED_CONFIG_ARCHIVE_MAP
 # from transformers.modeling_xlm_roberta import XLM_ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP
 # MODEL_CLASS.update({k: BertForSequenceToSequence for k
 # in XLM_ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP})
-# CONFIG_CLASS.update({k: XLMRobertaConfig for k in XLM_ROBERTA_PRETRAINED_CONFIG_ARCHIVE_MAP})
+# CONFIG_CLASS.update({k: XLMRobertaConfig for k in
+# XLM_ROBERTA_PRETRAINED_CONFIG_ARCHIVE_MAP})
 
 
 logger = logging.getLogger(__name__)
@@ -60,18 +71,6 @@ def _get_model_type(model_name):
         return "unilm"
     else:
         return model_name.split("-")[0]
-
-
-# TODO: Remove this after verifyingthe same tokenizer can be used for fine-tuning
-# and decoding
-def _get_decode_tokenizer(model_type, bert_model_name, to_lower, max_seq_len):
-    if model_type == "roberta":
-        decode_tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
-    else:
-        decode_tokenizer = BertTokenizer.from_pretrained(bert_model_name, do_lower_case=to_lower)
-    decode_tokenizer.max_len = max_seq_len
-
-    return decode_tokenizer
 
 
 def detokenize(tk_list):
@@ -117,22 +116,13 @@ class S2SAbsSumProcessor:
         # self._bert_model_name is needed for BertForSeq2SeqDecoder
         if self._model_type != "bert":
             if self._model_type == "roberta":
-                self._bert_model_name = self._model_name.replace("roberta", "bert") + "-cased"
+                self._bert_model_name = (
+                    self._model_name.replace("roberta", "bert") + "-cased"
+                )
             else:
                 self._bert_model_name = "bert-" + self._model_name.split("-", 1)[-1]
         else:
             self._bert_model_name = self._model_name
-
-        # TODO: Remove this after verifyingthe same tokenizer can be used for fine-tuning
-        # and decoding
-        # self.decode_tokenizer = _get_decode_tokenizer(
-        #     model_type=self._model_type,
-        #     bert_model_name=self._bert_model_name,
-        #     to_lower=to_lower,
-        #     max_seq_len=max_seq_len,
-        # )
-
-        self.decode_tokenizer = self.tokenizer
 
     @classmethod
     def get_inputs(cls, batch, device, model_name):
@@ -147,12 +137,8 @@ class S2SAbsSumProcessor:
         return inputs
 
     def train_dataset_from_iterable_sum_ds(
-        self, sum_ds, load_cached_features=True, local_rank=-1, keep_train_file=False
+        self, sum_ds, load_cached_features=False, local_rank=-1, keep_train_file=False
     ):
-        # If in distributed mode, block all processes except GPU 0
-        if local_rank not in [-1, 0]:
-            torch.distributed.barrier()
-
         temp_dir = "./"
         temp_train_file = os.path.join(
             temp_dir, "train_file_" + datetime.now().strftime("%m%d%Y%H%M%S") + ".jsonl"
@@ -171,19 +157,12 @@ class S2SAbsSumProcessor:
         finally:
             if not keep_train_file and os.path.exists(temp_train_file):
                 os.remove(temp_train_file)
-        # All processes entered torch.distributed.barrier() after GPU 0 joined,
-        # so all processes are unblocked
-        if local_rank == 0:
-            torch.distributed.barrier()
+
         return train_dataset
 
     def train_dataset_from_sum_ds(
-        self, sum_ds, load_cached_features=True, local_rank=-1, keep_train_file=False
+        self, sum_ds, load_cached_features=False, local_rank=-1, keep_train_file=False
     ):
-        # If in distributed mode, block all processes except GPU 0
-        if local_rank not in [-1, 0]:
-            torch.distributed.barrier()
-
         temp_dir = "./"
         temp_train_file = os.path.join(
             temp_dir, "train_file_" + datetime.now().strftime("%m%d%Y%H%M%S") + ".jsonl"
@@ -202,15 +181,16 @@ class S2SAbsSumProcessor:
         finally:
             if not keep_train_file and os.path.exists(temp_train_file):
                 os.remove(temp_train_file)
-        # All processes entered torch.distributed.barrier() after GPU 0 joined,
-        # so all processes are unblocked
-        if local_rank == 0:
-            torch.distributed.barrier()
+
         return train_dataset
 
-    def train_dataset_from_file(self, train_file, load_cached_features=False, local_rank=-1):
+    def train_dataset_from_file(
+        self, train_file, load_cached_features=False, local_rank=-1
+    ):
         if not load_cached_features and os.path.exists(self.cached_features_file):
-            logger.info("Deleting cached feature file {}".format(self.cached_features_file))
+            logger.info(
+                "Deleting cached feature file {}".format(self.cached_features_file)
+            )
             os.remove(self.cached_features_file)
 
         train_features = load_and_cache_examples(
@@ -261,14 +241,14 @@ class S2SAbsSumProcessor:
     def test_dataset_from_file(self, test_file):
         to_pred = load_and_cache_examples(
             test_file,
-            self.decode_tokenizer,
+            self.tokenizer,
             local_rank=-1,
             cached_features_file=None,
             shuffle=False,
         )
 
         input_lines = [
-            self.decode_tokenizer.convert_ids_to_tokens(line["source_ids"]) for line in to_pred
+            self.tokenizer.convert_ids_to_tokens(line["source_ids"]) for line in to_pred
         ]
 
         input_lines = sorted(list(enumerate(input_lines)), key=lambda x: -len(x[1]))
@@ -305,11 +285,13 @@ class S2SAbsSumProcessor:
         if isinstance(example["src"], list):
             source_tokens = example["src"]
         else:
-            source_tokens = self.decode_tokenizer.tokenize(example["src"])
+            source_tokens = self.tokenizer.tokenize(example["src"])
 
         if self._model_type != "roberta":
-            enter_token = self.decode_tokenizer.tokenize("Enter\nToken")[1]
-            source_tokens = [enter_token if x == "[X_SEP]" else x for x in source_tokens]
+            enter_token = self.tokenizer.tokenize("Enter\nToken")[1]
+            source_tokens = [
+                enter_token if x == "[X_SEP]" else x for x in source_tokens
+            ]
 
         return source_tokens
 
@@ -397,9 +379,11 @@ class S2SAbstractiveSummarizer(Transformer):
         if load_model_from_dir is None:
             model_to_load = self._model_name
         elif model_file_name is None:
-            # Assume model was saved by `:func:`~transformers.PreTrainedModel.save_pretrained``,
+            # Assume model was saved by
+            # `:func:`~transformers.PreTrainedModel.save_pretrained``,
             # The load_model_from_dir should contain pytorch_model.bin and config.json
-            # and can be loaded by `:func:`~transformers.PreTrainedModel.from_pretrained``.
+            # and can be loaded by
+            # `:func:`~transformers.PreTrainedModel.from_pretrained``.
             logger.info("Loading cached model from {}".format(load_model_from_dir))
             model_to_load = load_model_from_dir
         else:
@@ -410,15 +394,20 @@ class S2SAbstractiveSummarizer(Transformer):
         # TODO: double check
         if load_model_from_dir is not None and model_file_name is None:
             # Assume config.json is in load_model_from_dir
-            model_config = config_class.from_pretrained(load_model_from_dir, cache_dir=cache_dir)
+            model_config = config_class.from_pretrained(
+                load_model_from_dir, cache_dir=cache_dir
+            )
         else:
-            model_config = config_class.from_pretrained(self._model_name, cache_dir=cache_dir)
+            model_config = config_class.from_pretrained(
+                self._model_name, cache_dir=cache_dir
+            )
 
         # Convert regular model config to sequence to sequence config
         config = BertForSeq2SeqConfig.from_exist_config(
             config=model_config,
             label_smoothing=label_smoothing,
-            max_position_embeddings=self.max_source_seq_length + self.max_target_seq_length,
+            max_position_embeddings=self.max_source_seq_length
+            + self.max_target_seq_length,
         )
         logger.info("Model config for seq2seq: %s", str(config))
 
@@ -431,19 +420,11 @@ class S2SAbstractiveSummarizer(Transformer):
         )
 
         self.tokenizer = TOKENIZER_CLASS[model_name].from_pretrained(
-            self._model_name, do_lower_case=to_lower, cache_dir=cache_dir, output_loading_info=False
+            self._model_name,
+            do_lower_case=to_lower,
+            cache_dir=cache_dir,
+            output_loading_info=False,
         )
-
-        # TODO: Remove this after verifyingthe same tokenizer can be used for fine-tuning
-        # and decoding
-        # self.decode_tokenizer = _get_decode_tokenizer(
-        #     model_type=self._model_type,
-        #     bert_model_name=self._bert_model_name,
-        #     to_lower=to_lower,
-        #     max_seq_len=max_seq_len,
-        # )
-
-        self.decode_tokenizer = self.tokenizer
 
     @staticmethod
     def list_supported_models():
@@ -478,12 +459,16 @@ class S2SAbstractiveSummarizer(Transformer):
             model_recover_checkpoint = os.path.join(
                 self.load_model_from_dir, "model.{}.bin".format(recover_step)
             )
-            logger.info(" ** Recover model checkpoint in %s ** ", model_recover_checkpoint)
+            logger.info(
+                " ** Recover model checkpoint in %s ** ", model_recover_checkpoint
+            )
             model_state_dict = torch.load(model_recover_checkpoint, map_location="cpu")
             optimizer_recover_checkpoint = os.path.join(
                 args.output_dir, "optim.{}.bin".format(recover_step)
             )
-            checkpoint_state_dict = torch.load(optimizer_recover_checkpoint, map_location="cpu")
+            checkpoint_state_dict = torch.load(
+                optimizer_recover_checkpoint, map_location="cpu"
+            )
 
             checkpoint_state_dict["model"] = model_state_dict
             global_step = recover_step
@@ -522,7 +507,9 @@ class S2SAbstractiveSummarizer(Transformer):
             return
 
         self.scheduler = Transformer.get_default_scheduler(
-            optimizer=self.optimizer, warmup_steps=warmup_steps, num_training_steps=max_steps
+            optimizer=self.optimizer,
+            warmup_steps=warmup_steps,
+            num_training_steps=max_steps,
         )
         if recover_step > 0:
             self.scheduler.load_state_dict(checkpoint_state_dict["lr_scheduler"])
@@ -548,7 +535,8 @@ class S2SAbstractiveSummarizer(Transformer):
             if local_rank == -1
             else DistributedSampler(train_dataset, shuffle=False)
         )
-        # batch_size of the dataloader is the number of samples to load each iteration on each node
+        # batch_size of the dataloader is the number of samples to load each
+        # iteration on each node
         train_dataloader = DataLoader(
             train_dataset,
             sampler=train_sampler,
@@ -580,7 +568,6 @@ class S2SAbstractiveSummarizer(Transformer):
 
         self.model.cpu()
         torch.cuda.empty_cache()
-        
 
     def predict(
         self,
@@ -600,7 +587,9 @@ class S2SAbstractiveSummarizer(Transformer):
         verbose=True,
     ):
         if need_score_traces and beam_size <= 1:
-            raise ValueError("Score trace is only available for beam search with beam size > 1.")
+            raise ValueError(
+                "Score trace is only available for beam search with beam size > 1."
+            )
         if max_tgt_length >= self.max_seq_length - 2:
             raise ValueError("Maximum tgt length exceeds max seq length - 2.")
 
@@ -608,11 +597,11 @@ class S2SAbstractiveSummarizer(Transformer):
         if self._model_type == "roberta":
             is_roberta = True
             no_segment_embedding = True
-            vocab = self.decode_tokenizer.encoder
+            vocab = self.tokenizer.encoder
         else:
             is_roberta = False
             no_segment_embedding = False
-            vocab = self.decode_tokenizer.vocab
+            vocab = self.tokenizer.vocab
 
         if self._model_type in ("unilm", "unilm1"):
             new_segment_ids = True
@@ -629,7 +618,7 @@ class S2SAbstractiveSummarizer(Transformer):
         bi_uni_pipeline.append(
             seq2seq_loader.Preprocess4Seq2seqDecoder(
                 list(vocab.keys()),
-                self.decode_tokenizer.convert_tokens_to_ids,
+                self.tokenizer.convert_tokens_to_ids,
                 self.max_seq_length,
                 max_tgt_length=max_tgt_length,
                 new_segment_ids=new_segment_ids,
@@ -661,10 +650,14 @@ class S2SAbstractiveSummarizer(Transformer):
         # prepare decoder
         pair_num_relation = 0
         cls_num_labels = 2
-        type_vocab_size = 6 + (1 if s2s_config.s2s_add_segment else 0) if new_segment_ids else 2
-        mask_word_id, eos_word_ids, sos_word_id = self.decode_tokenizer.convert_tokens_to_ids(
-            [mask_token, sep_token, sep_token]
+        type_vocab_size = (
+            6 + (1 if s2s_config.s2s_add_segment else 0) if new_segment_ids else 2
         )
+        (
+            mask_word_id,
+            eos_word_ids,
+            sos_word_id,
+        ) = self.tokenizer.convert_tokens_to_ids([mask_token, sep_token, sep_token])
         forbid_ignore_set = None
         if forbid_ignore_word:
             w_list = []
@@ -673,7 +666,7 @@ class S2SAbstractiveSummarizer(Transformer):
                     w_list.append(w.upper())
                 else:
                     w_list.append(w)
-            forbid_ignore_set = set(self.decode_tokenizer.convert_tokens_to_ids(w_list))
+            forbid_ignore_set = set(self.tokenizer.convert_tokens_to_ids(w_list))
 
         if hasattr(self.model, "module"):
             state_dict = self.model.module.state_dict()
@@ -711,7 +704,9 @@ class S2SAbstractiveSummarizer(Transformer):
         if fp16:
             model.half()
         # get device
-        device, num_gpus = get_device(num_gpus=num_gpus, gpu_ids=gpu_ids, local_rank=local_rank)
+        device, num_gpus = get_device(
+            num_gpus=num_gpus, gpu_ids=gpu_ids, local_rank=local_rank
+        )
 
         # # move model
         model = move_model_to_device(model=model, device=device)
@@ -719,7 +714,11 @@ class S2SAbstractiveSummarizer(Transformer):
         batch_size = per_gpu_batch_size * max(1, num_gpus)
 
         model = parallelize_model(
-            model=model, device=device, num_gpus=num_gpus, gpu_ids=gpu_ids, local_rank=local_rank
+            model=model,
+            device=device,
+            num_gpus=num_gpus,
+            gpu_ids=gpu_ids,
+            local_rank=local_rank,
         )
 
         # torch.cuda.empty_cache()
@@ -732,13 +731,25 @@ class S2SAbstractiveSummarizer(Transformer):
 
         test_sampler = SequentialSampler(test_dataset)
         test_dataloader = DataLoader(
-            test_dataset, sampler=test_sampler, batch_size=batch_size, collate_fn=collate_fn
+            test_dataset,
+            sampler=test_sampler,
+            batch_size=batch_size,
+            collate_fn=collate_fn,
         )
-        for batch, buf_id in tqdm(test_dataloader, desc="Evaluating", disable=not verbose):
+        for batch, buf_id in tqdm(
+            test_dataloader, desc="Evaluating", disable=not verbose
+        ):
             batch_count += 1
             with torch.no_grad():
                 batch = [t.to(device) if t is not None else None for t in batch]
-                input_ids, token_type_ids, position_ids, input_mask, mask_qkv, task_idx = batch
+                (
+                    input_ids,
+                    token_type_ids,
+                    position_ids,
+                    input_mask,
+                    mask_qkv,
+                    task_idx,
+                ) = batch
                 traces = model(
                     input_ids,
                     token_type_ids,
@@ -755,14 +766,14 @@ class S2SAbstractiveSummarizer(Transformer):
 
                 for i in range(len(batch[0])):
                     w_ids = output_ids[i]
-                    output_buf = self.decode_tokenizer.convert_ids_to_tokens(w_ids)
+                    output_buf = self.tokenizer.convert_ids_to_tokens(w_ids)
                     output_tokens = []
                     for t in output_buf:
                         if t in (sep_token, pad_token):
                             break
                         output_tokens.append(t)
                     if is_roberta:
-                        output_sequence = self.decode_tokenizer.convert_tokens_to_string(
+                        output_sequence = self.tokenizer.convert_tokens_to_string(
                             output_tokens
                         )
                     else:
@@ -790,10 +801,10 @@ class S2SAbstractiveSummarizer(Transformer):
         else:
             return output_lines
 
-
-
     def save_model(self, global_step, fp16):
-        model_to_save = self.model.module if hasattr(self.model, "module") else self.model
+        model_to_save = (
+            self.model.module if hasattr(self.model, "module") else self.model
+        )
         torch.save(
             model_to_save.state_dict(),
             os.path.join(self.cache_dir, "model.{}.bin".format(global_step)),
@@ -804,4 +815,7 @@ class S2SAbstractiveSummarizer(Transformer):
         }
         if fp16:
             optim_to_save["amp"] = self.amp_state_dict
-        torch.save(optim_to_save, os.path.join(self.cache_dir, "optim.{}.bin".format(global_step)))
+        torch.save(
+            optim_to_save,
+            os.path.join(self.cache_dir, "optim.{}.bin".format(global_step)),
+        )
