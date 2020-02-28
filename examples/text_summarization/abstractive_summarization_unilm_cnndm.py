@@ -17,7 +17,7 @@ parser.add_argument("--fp16", type=bool, default=True)
 parser.add_argument("--fp16_opt_level", type=str, default="O2")
 
 
-QUICK_RUN = False
+QUICK_RUN = True
 
 OUTPUT_FILE = "./nlp_cnndm_finetuning_results.txt"
 
@@ -81,6 +81,32 @@ def main():
         ),
     )
 
+    abs_summarizer_fine_tuned = S2SAbstractiveSummarizer(
+        model_name=MODEL_NAME,
+        max_seq_len=MAX_SEQ_LEN,
+        max_source_seq_length=MAX_SOURCE_SEQ_LENGTH,
+        max_target_seq_length=MAX_TARGET_SEQ_LENGTH,
+        load_model_from_dir="./",
+        model_file_name="model." + str(MAX_STEPS) + ".bin",
+    )
+
+    res = abs_summarizer_fine_tuned.predict(
+        test_dataset=test_dataset,
+        per_gpu_batch_size=TEST_PER_GPU_BATCH_SIZE,
+        beam_size=BEAM_SIZE,
+        forbid_ignore_word=FORBID_IGNORE_WORD,
+        fp16=args.fp16,
+    )
+
+    for r in res[:5]:
+        print(r)
+
+    with open(OUTPUT_FILE, "w") as f:
+        for line in res:
+            f.write(line + "\n")
+
+    print(compute_rouge_python(cand=res, ref=test_ds.get_target()))
+
     print(time.time() - start)
 
 
@@ -122,23 +148,6 @@ def main_worker(
         fp16_opt_level=args.fp16_opt_level,
         local_rank=local_rank,
     )
-
-    if local_rank in [-1, 0]:
-        res = abs_summarizer.predict(
-            test_dataset=test_dataset,
-            per_gpu_batch_size=TEST_PER_GPU_BATCH_SIZE,
-            beam_size=BEAM_SIZE,
-            forbid_ignore_word=FORBID_IGNORE_WORD,
-            fp16=args.fp16,
-        )
-        for r in res[:5]:
-            print(r)
-
-        with open(OUTPUT_FILE, "w") as f:
-            for line in res:
-                f.write(line + "\n")
-
-        print(compute_rouge_python(cand=res, ref=test_ds.get_target()))
 
 
 if __name__ == "__main__":
