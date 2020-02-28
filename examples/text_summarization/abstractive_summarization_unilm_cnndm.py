@@ -13,7 +13,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--rank", type=int, default=0)
 parser.add_argument("--dist_url", type=str, default="tcp://127.0.0.1:29500")
 parser.add_argument("--node_count", type=int, default=1)
-parser.add_argument("--fp16", type=bool, default=True)
+parser.add_argument("--fp16", type=bool, default=False)
 parser.add_argument("--fp16_opt_level", type=str, default="O2")
 
 
