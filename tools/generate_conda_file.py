@@ -52,7 +52,7 @@ CONDA_BASE = {
 
 CONDA_GPU = {
     "numba": "numba>=0.38.1",
-    "cudatoolkit": "cudatoolkit==10.1.243",
+    "cudatoolkit": "cudatoolkit=10.1",
     "pytorch": "pytorch==1.4.0",
 }
 
@@ -133,6 +133,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--gpu", action="store_true", help="include packages for GPU support"
     )
+    parser.add_argument("--cuda_version", type=str, default="10.1")
     args = parser.parse_args()
 
     # set name for environment and output yaml file
@@ -149,6 +150,7 @@ if __name__ == "__main__":
     pip_packages = PIP_BASE
 
     # update conda and pip packages based on flags provided
+    CONDA_GPU["cudatoolkit"] = "cudatoolkit=" + args.cuda_version 
     if args.gpu:
         conda_packages.update(CONDA_GPU)
         pip_packages.update(PIP_GPU)
