@@ -25,6 +25,12 @@ from utils_nlp.models.transformers.datasets import SummarizationNonIterableDatas
 from utils_nlp.eval.evaluate_summarization import get_rouge
 
 os.environ["NCCL_IB_DISABLE"] = "0"
+#os.environ["NCCL_DEBUG"] = "INFO"
+os.environ["NCCL_DEBUG_SUBSYS"] = "ALL"
+#os.environ["MASTER_PORT"] = "29952"
+#os.environ["MASTER_ADDR"] = "172.12.0.6"
+#os.environ['NCCL_SOCKET_IFNAME'] = 'lo'
+
 
 def shorten_dataset(dataset, top_n=-1):
     if top_n == -1:
@@ -56,6 +62,8 @@ parser.add_argument("--lr_dec", type=float, default=2e-1,
                     help="Learning rate for the decoder.")
 parser.add_argument("--batch_size", type=int, default=5,
                     help="batch size in terms of input token numbers in training")
+parser.add_argument("--max_pos", type=int, default=640,
+                    help="maximum input length in terms of input token numbers in training")
 parser.add_argument("--max_steps", type=int, default=5e4,
                     help="Maximum number of training steps run in training. If quick_run is set,\
                         it's not used.")
@@ -109,7 +117,8 @@ def main():
     ngpus_per_node = torch.cuda.device_count()
     processor = AbsSumProcessor(cache_dir=args.cache_dir)
     summarizer = AbsSum(
-        processor, cache_dir=args.cache_dir
+        processor, cache_dir=args.cache_dir,
+        max_pos=args.max_pos,
     )
     mp.spawn(main_worker, nprocs=ngpus_per_node, args=(ngpus_per_node, summarizer,  args))
 
@@ -120,13 +129,14 @@ def main_worker(local_rank, ngpus_per_node, summarizer, args):
     print("world_size is {}".format(world_size))
     print("local_rank is {} and rank is {}".format(local_rank, rank))
     
-    
     torch.distributed.init_process_group(
         backend="nccl",
         init_method=args.dist_url,
         world_size=world_size,
         rank=rank,
       )
+
+    # return
     ## should not load checkpoint from this place, otherwise, huge memory increase 
     if args.checkpoint_filename:
         checkpoint = os.path.join(args.cache_dir, args.checkpoint_filename)

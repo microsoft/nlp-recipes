@@ -364,6 +364,7 @@ class AbsSum(Transformer):
         cache_dir=".",
         label_smoothing=0.1,
         test=False,
+        max_pos=640,
     ):
         """Initialize a ExtractiveSummarizer.
 
@@ -402,12 +403,13 @@ class AbsSum(Transformer):
             checkpoint=None,
             label_smoothing=label_smoothing,
             symbols=processor.symbols,
-            test=test
+            test=test,
+            max_pos=max_pos,
         )
         self.processor = processor
         self.optim_bert = None
         self.optim_dec = None
-
+        self.max_pos = max_pos
         
 
     @staticmethod
@@ -421,7 +423,7 @@ class AbsSum(Transformer):
         train_dataset,
         num_gpus=None,
         gpu_ids=None,
-        batch_size=140,
+        batch_size=4,
         local_rank=-1,
         max_steps=5e5,
         warmup_steps_bert=8000,
@@ -496,6 +498,7 @@ class AbsSum(Transformer):
 
         self.optim_bert = model_builder.build_optim_bert(
             self.model,
+            optim=optimization_method,
             visible_gpus=None, #",".join([str(i) for i in range(num_gpus)]), #"0,1,2,3",
             lr_bert=learning_rate_bert,
             warmup_steps_bert=warmup_steps_bert,
@@ -503,11 +506,13 @@ class AbsSum(Transformer):
         )
         self.optim_dec = model_builder.build_optim_dec(
             self.model,
+            optim=optimization_method,
             visible_gpus=None, #",".join([str(i) for i in range(num_gpus)]), #"0,1,2,3"
             lr_dec=learning_rate_dec,
             warmup_steps_dec=warmup_steps_dec,
         )
         optimizers = [self.optim_bert, self.optim_dec]
+
 
         self.amp = get_amp(fp16)
         if self.amp:
@@ -539,7 +544,7 @@ class AbsSum(Transformer):
             sampler = DistributedSampler(train_dataset, num_replicas=world_size, rank=rank)
 
         def collate_fn(data):
-            return self.processor.collate(data, block_size=512, device=device)
+            return self.processor.collate(data, block_size=self.max_pos, device=device)
 
         train_dataloader = DataLoader(
             train_dataset, 
