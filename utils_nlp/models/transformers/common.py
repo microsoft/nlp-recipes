@@ -43,7 +43,7 @@ TOKENIZER_CLASS.update(
 MAX_SEQ_LEN = 512
 
 logger = logging.getLogger(__name__)
-fh = logging.FileHandler("abssum_train.log")
+fh = logging.FileHandler("longer_input_abssum_train.log")
 logger.addHandler(fh)
 logger.setLevel(logging.INFO)
 
@@ -292,13 +292,18 @@ class Transformer:
                         accum_loss = 0
                         train_size = 0
                         start = end
-                    if type(optimizer) == list:
-                        for o in optimizer:
-                            o.step()
-                    else:
-                        optimizer.step()
+                    if optimizer:
+                        if type(optimizer) == list:
+                            for o in optimizer:
+                                o.step()
+                        else:
+                            optimizer.step()
                     if scheduler:
-                        scheduler.step()
+                        if type(scheduler) == list:
+                            for s in scheduler:
+                                s.step()
+                        else:
+                            scheduler.step()
                     self.model.zero_grad()
 
                     if save_every != -1 and global_step % save_every == 0 and verbose:
