@@ -7,6 +7,7 @@ import torch
 from torch.utils.data import Dataset, IterableDataset
 from multiprocessing import Pool, cpu_count
 from functools import partial
+import jsonlines
 
 
 class SCDataSet(Dataset):
@@ -339,33 +340,27 @@ class SummarizationDataset(Dataset):
         target_file=None,
         source_preprocessing=None,
         target_preprocessing=None,
-        word_tokenization=None,
         top_n=-1,
         n_processes=-1,
     ):
         """
         Create a summarization dataset instance given the
-        paths of the source file and the target file
+        paths of the source file and the target file.
 
         Args:
             source_file (str): Full path of the file which contains a list of
-                the paragraphs with line break as seperator.
-            target_file (str): Full path of the file which contains a list of
+                the input paragraphs with line break as seperator.
+            target_file (str, optional): Full path of the file which contains a list of
                 the summaries for the paragraphs in the source file with line break
                 as seperator.
             source_preprocessing (list of functions): A list of preprocessing functions
                 to process the paragraphs in the source file.
             target_preprocessing (list of functions): A list of preprocessing functions
-                to process the paragraphs in the source file.
-            word_tokenization (function): Tokenization function for tokenize the
-                paragraphs and summaries. The tokenization method is used for sentence
-                selection in
-                :meth:`utils_nlp.models.transformers.extractive_summarization.
-                ExtSumProcessor.preprocess`
-            top_n (int, optional): The number which specifies how many examples in the
-                beginning of the paragraph and summary lists that will be processed by
-                this function. Defaults to -1, which means the whole lists of paragraphs
-                and summaries should be procsssed.
+                to process the summaries in the target file.
+            top_n (int, optional): Number of examples to load from the input files.
+                Defaults to -1, which means the entire dataset is loaded.
+            n_processes (int, optional): Number of CPUs to use to process the data in
+                parallel. Defaults to -1, which means all the CPUs will be used.
         """
 
         with open(source_file, encoding="utf-8") as f:
@@ -408,10 +403,34 @@ class SummarizationDataset(Dataset):
     def get_target(self):
         return self._target
 
+    def save_to_jsonl(self, output_file):
+        with jsonlines.open(output_file, mode="w") as writer:
+            if self._target is None:
+                for src in self._source:
+                    writer.write({"src": src})
+            else:
+                for src, tgt in zip(self._source, self._target):
+                    writer.write({"src": src, "tgt": tgt})
+
 
 def parallel_preprocess(
     input_data, preprocess_pipeline, word_tokenize=None, num_pool=-1
 ):
+    """
+    Process data in parallel using multiple GPUs.
+
+    Args:
+        input_data (list): List if input strings to process.
+        preprocess_pipeline (list): List of functions to apply on the input data.
+        word_tokenize (func, optional): A tokenization function used to tokenize
+            the results from preprocess_pipeline.
+        num_pool (int, optional): Number of CPUs to use. Defaults to -1 and all
+            available CPUs are used.
+
+    Returns:
+        list: list of processed text strings.
+
+    """
     if num_pool == -1:
         num_pool = cpu_count()
 

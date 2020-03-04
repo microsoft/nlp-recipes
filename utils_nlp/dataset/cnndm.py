@@ -20,7 +20,11 @@ import regex as re
 from torchtext.utils import download_from_url, extract_archive
 import zipfile
 
-from utils_nlp.dataset.url_utils import maybe_download, maybe_download_googledrive, extract_zip
+from utils_nlp.dataset.url_utils import (
+    maybe_download,
+    maybe_download_googledrive,
+    extract_zip,
+)
 from utils_nlp.models.transformers.datasets import (
     SummarizationDataset,
     IterableSummarizationDataset,
@@ -43,7 +47,9 @@ def CNNDMSummarizationDataset(*args, **kwargs):
 
     def _clean(x):
         return re.sub(
-            r"-lrb-|-rrb-|-lcb-|-rcb-|-lsb-|-rsb-|``|''", lambda m: REMAP.get(m.group()), x
+            r"-lrb-|-rrb-|-lcb-|-rcb-|-lsb-|-rsb-|``|''",
+            lambda m: REMAP.get(m.group()),
+            x,
         )
 
     def _remove_ttags(line):
@@ -103,10 +109,13 @@ class CNNDMBertSumProcessedData:
     @staticmethod
     def download(local_path=".data"):
         file_name = "bertsum_data.zip"
-        url = "https://drive.google.com/uc?export=download&id=1x0d61LP9UAN389YN00z0Pv-7jQgirVg6"
+        url = "https://drive.google.com/uc?export=download&"
+        "id=1x0d61LP9UAN389YN00z0Pv-7jQgirVg6"
         try:
             if os.path.exists(os.path.join(local_path, file_name)):
-                downloaded_zipfile = zipfile.ZipFile(os.path.join(local_path, file_name))
+                downloaded_zipfile = zipfile.ZipFile(
+                    os.path.join(local_path, file_name)
+                )
             else:
                 dataset_zip = download_from_url(url, root=local_path)
                 downloaded_zipfile = zipfile.ZipFile(dataset_zip)
@@ -119,11 +128,10 @@ class CNNDMBertSumProcessedData:
 
 
 def _detokenize(line):
-    # This version of the CNN/DM dataset was originally downloaded from
-    # https://github.com/harvardnlp/sent-summary
-    # and preprocessed following https://github.com/abisee/cnn-dailymail
-    # This function detokenizes the processed dataset to recover the
-    # original dataset, e.g. converts "-LRB-" back to "(" and "-RRB-" back to ")".
+    """
+    Detokenizes the processed CNN/DM dataset to recover the original dataset,
+    e.g. converts "-LRB-" back to "(" and "-RRB-" back to ")".
+    """
     line = line.strip().replace("``", '"').replace("''", '"').replace("`", "'")
     twd = TreebankWordDetokenizer()
     s_list = [
@@ -136,6 +144,26 @@ def _detokenize(line):
 def CNNDMSummarizationDatasetOrg(
     local_path=".", top_n=-1, return_iterable=False, return_dev_data=False
 ):
+    """
+    Downloads a version of the CNN/DailyMail dataset with minimal processing
+    from https://github.com/microsoft/unilm/tree/master/unilm-v1
+    This version of the CNN/DM dataset was originally downloaded from
+    https://github.com/harvardnlp/sent-summary
+    and preprocessed following https://github.com/abisee/cnn-dailymail.
+
+    Args:
+        local_path (str): Path to store the downloaded data. If the data file
+            doesn't exist in this path, it's downloaded and unzipped.
+        top_n (int): Number of lines to read. Defaults to -1 and the entire dataset
+            is read.
+        return_iterable (bool): If False, returns SummarizationDataset.
+            If True, returns IterableSummarizationDataset. Defaults to False.
+        return_dev_data (bool): if False, returns train and test data splits.
+            If True, returns train, test, and dev data splits. Defaults to False.
+
+    Returns:
+        tuple: tuple containing train, test (, and dev) datasets.
+    """
 
     # Download and unzip the data
     FILE_ID = "1jiDbDbAsqy_5BM79SmX6aSu5DQVCAZq1"
@@ -144,10 +172,19 @@ def CNNDMSummarizationDatasetOrg(
     output_dir = os.path.join(local_path, "cnndm_data")
     os.makedirs(output_dir, exist_ok=True)
 
+    # This folder contains the a version of the dataset with minimal processing
     org_data_dir = os.path.join(output_dir, "org_data")
 
     expected_data_files = set(
-        ["train.src", "org_data", "dev.src", "test.tgt", "train.tgt", "dev.tgt", "test.src"]
+        [
+            "train.src",
+            "org_data",
+            "dev.src",
+            "test.tgt",
+            "train.tgt",
+            "dev.tgt",
+            "test.src",
+        ]
     )
     expected_org_data_files = set(
         [
