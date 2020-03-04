@@ -1,24 +1,22 @@
-import time
 import datetime
 import argparse
+import jsonlines
 
-import torch.multiprocessing as mp
 import torch
 
-from utils_nlp.dataset.cnndm import CNNDMSummarizationDatasetOrg
 from utils_nlp.models import S2SAbsSumProcessor, S2SAbstractiveSummarizer
 from utils_nlp.eval import compute_rouge_python
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--rank", type=int, default=0)
-parser.add_argument("--dist_url", type=str, default="tcp://127.0.0.1:29500")
-parser.add_argument("--node_count", type=int, default=1)
+parser.add_argument(
+    "--local_rank", type=int, default=-1, help="For distributed training: local_rank"
+)
 parser.add_argument("--fp16", type=bool, default=False)
 parser.add_argument("--fp16_opt_level", type=str, default="O2")
+args = parser.parse_args()
 
 
 QUICK_RUN = True
-
 OUTPUT_FILE = "./nlp_cnndm_finetuning_results.txt"
 
 # model parameters
@@ -28,32 +26,37 @@ MAX_SOURCE_SEQ_LENGTH = 640
 MAX_TARGET_SEQ_LENGTH = 128
 
 # fine-tuning parameters
-TRAIN_PER_GPU_BATCH_SIZE = 2
+TRAIN_PER_GPU_BATCH_SIZE = 1
 GRADIENT_ACCUMULATION_STEPS = 2
 LEARNING_RATE = 3e-5
 if QUICK_RUN:
     TOP_N = 100
-    WARMUP_STEPS = 5
-    MAX_STEPS = 50
+    WARMUP_STEPS = 10
+    MAX_STEPS = 100
 else:
     TOP_N = -1
     WARMUP_STEPS = 500
     MAX_STEPS = 5000
 
 # inference parameters
-TEST_PER_GPU_BATCH_SIZE = 24
+TEST_PER_GPU_BATCH_SIZE = 12
 BEAM_SIZE = 5
 FORBID_IGNORE_WORD = "."
 
+train_ds = "train_ds.jsonl"
+test_ds = "test_ds.jsonl"
+
 
 def main():
-    start = time.time()
-    args = parser.parse_args()
-    ngpus_per_node = torch.cuda.device_count()
+    torch.distributed.init_process_group(
+        timeout=datetime.timedelta(0, 5400), backend="nccl",
+    )
 
-    train_ds, test_ds = CNNDMSummarizationDatasetOrg(top_n=TOP_N)
+    if args.local_rank not in [-1, 0]:
+        torch.distributed.barrier()
 
     processor = S2SAbsSumProcessor(model_name=MODEL_NAME)
+
     abs_summarizer = S2SAbstractiveSummarizer(
         model_name=MODEL_NAME,
         max_seq_len=MAX_SEQ_LEN,
@@ -61,80 +64,15 @@ def main():
         max_target_seq_length=MAX_TARGET_SEQ_LENGTH,
     )
 
-    train_dataset = processor.train_dataset_from_sum_ds(
-        train_ds, load_cached_features=True
+    if args.local_rank == 0:
+        torch.distributed.barrier()
+
+    train_dataset = processor.s2s_dataset_from_json_or_file(
+        train_ds, train_mode=True, local_rank=args.local_rank
     )
 
-    test_dataset = processor.test_dataset_from_sum_ds(test_ds)
-
-    mp.spawn(
-        main_worker,
-        nprocs=ngpus_per_node,
-        args=(
-            ngpus_per_node,
-            abs_summarizer,
-            processor,
-            train_dataset,
-            test_dataset,
-            test_ds,
-            args,
-        ),
-    )
-
-    abs_summarizer_fine_tuned = S2SAbstractiveSummarizer(
-        model_name=MODEL_NAME,
-        max_seq_len=MAX_SEQ_LEN,
-        max_source_seq_length=MAX_SOURCE_SEQ_LENGTH,
-        max_target_seq_length=MAX_TARGET_SEQ_LENGTH,
-        load_model_from_dir="./",
-        model_file_name="model." + str(MAX_STEPS) + ".bin",
-    )
-
-    res = abs_summarizer_fine_tuned.predict(
-        test_dataset=test_dataset,
-        per_gpu_batch_size=TEST_PER_GPU_BATCH_SIZE,
-        beam_size=BEAM_SIZE,
-        forbid_ignore_word=FORBID_IGNORE_WORD,
-        fp16=args.fp16,
-    )
-
-    for r in res[:5]:
-        print(r)
-
-    with open(OUTPUT_FILE, "w") as f:
-        for line in res:
-            f.write(line + "\n")
-
-    print(compute_rouge_python(cand=res, ref=test_ds.get_target()))
-
-    print(time.time() - start)
-
-
-def main_worker(
-    local_rank,
-    ngpus_per_node,
-    abs_summarizer,
-    processor,
-    train_dataset,
-    test_dataset,
-    test_ds,
-    args,
-):
-    rank = args.rank * ngpus_per_node + local_rank
-    world_size = args.node_count * ngpus_per_node
-
-    print("init_method: {}".format(args.dist_url))
-    print("ngpus_per_node: {}".format(ngpus_per_node))
-    print("rank: {}".format(rank))
-    print("local_rank: {}".format(local_rank))
-    print("world_size: {}".format(world_size))
-
-    torch.distributed.init_process_group(
-        timeout=datetime.timedelta(0, 5400),
-        backend="nccl",
-        init_method=args.dist_url,
-        world_size=world_size,
-        rank=rank,
+    test_dataset = processor.s2s_dataset_from_json_or_file(
+        test_ds, train_mode=False, local_rank=args.local_rank
     )
 
     abs_summarizer.fit(
@@ -146,8 +84,36 @@ def main_worker(
         max_steps=MAX_STEPS,
         fp16=args.fp16,
         fp16_opt_level=args.fp16_opt_level,
-        local_rank=local_rank,
+        local_rank=args.local_rank,
     )
+
+    torch.distributed.barrier()
+
+    if args.local_rank in [-1, 0]:
+        res = abs_summarizer.predict(
+            test_dataset=test_dataset,
+            per_gpu_batch_size=TEST_PER_GPU_BATCH_SIZE,
+            beam_size=BEAM_SIZE,
+            forbid_ignore_word=FORBID_IGNORE_WORD,
+            fp16=args.fp16,
+        )
+
+        for r in res[:5]:
+            print(r)
+
+        with open(OUTPUT_FILE, "w") as f:
+            for line in res:
+                f.write(line + "\n")
+
+        tgt = []
+        with jsonlines.open(test_ds) as reader:
+            for item in reader:
+                tgt.append(item["tgt"])
+
+        for t in tgt[:5]:
+            print(t)
+
+        print(compute_rouge_python(cand=res, ref=tgt))
 
 
 if __name__ == "__main__":
