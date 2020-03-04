@@ -2,10 +2,10 @@
 # Licensed under the MIT License.
 
 import os
-from datetime import datetime
-import jsonlines
+import json
 import logging
 from tqdm import tqdm
+import random
 
 import torch
 from torch.utils.data import DataLoader, SequentialSampler, Dataset
@@ -20,7 +20,6 @@ from utils_nlp.common.pytorch_utils import (
     parallelize_model,
 )
 from s2s_ft.utils import (
-    load_and_cache_examples,
     Seq2seqDatasetForBert,
     batch_list_to_batch_tensors,
 )
@@ -101,15 +100,12 @@ class S2SAbsSumProcessor:
         to_lower=False,
         max_seq_len=512,
         cache_dir=".",
-        cached_features_file_name="train_features",
     ):
 
         self.tokenizer = TOKENIZER_CLASS[model_name].from_pretrained(
             model_name, do_lower_case=to_lower, cache_dir=cache_dir
         )
-
-        self.cached_features_file = os.path.join(cache_dir, cached_features_file_name)
-
+        self.cache_dir = cache_dir
         self._model_name = model_name
         self._model_type = _get_model_type(self._model_name)
 
@@ -136,123 +132,97 @@ class S2SAbsSumProcessor:
         }
         return inputs
 
-    def train_dataset_from_iterable_sum_ds(
-        self, sum_ds, load_cached_features=False, local_rank=-1, keep_train_file=False
+    @staticmethod
+    def create_s2s_dataset(
+        examples,
+        train_mode,
+        tokenizer,
+        output_dir,
+        local_rank=-1,
+        cached_features_file=None,
     ):
-        temp_dir = "./"
-        temp_train_file = os.path.join(
-            temp_dir, "train_file_" + datetime.now().strftime("%m%d%Y%H%M%S") + ".jsonl"
-        )
-        try:
-            with jsonlines.open(temp_train_file, mode="w") as writer:
-                for source, target in zip(sum_ds, sum_ds.get_target()):
-                    writer.write({"src": source, "tgt": target})
+        if train_mode:
+            cached_features_file_name = "cached_features_for_training.pt"
+            shuffle_flag = True
+        else:
+            cached_features_file_name = "cached_features_for_testing.pt"
+            shuffle_flag = False
 
-            train_dataset = self.train_dataset_from_file(
-                train_file=temp_train_file,
-                load_cached_features=load_cached_features,
-                local_rank=local_rank,
-            )
+        if cached_features_file is None:
+            cached_features_file = os.path.join(output_dir, cached_features_file_name)
+            if os.path.exists(cached_features_file):
+                os.remove(cached_features_file)
 
-        finally:
-            if not keep_train_file and os.path.exists(temp_train_file):
-                os.remove(temp_train_file)
-
-        return train_dataset
-
-    def train_dataset_from_sum_ds(
-        self, sum_ds, load_cached_features=False, local_rank=-1, keep_train_file=False
-    ):
-        temp_dir = "./"
-        temp_train_file = os.path.join(
-            temp_dir, "train_file_" + datetime.now().strftime("%m%d%Y%H%M%S") + ".jsonl"
-        )
-        try:
-            with jsonlines.open(temp_train_file, mode="w") as writer:
-                for item in sum_ds:
-                    writer.write(item)
-
-            train_dataset = self.train_dataset_from_file(
-                train_file=temp_train_file,
-                load_cached_features=load_cached_features,
-                local_rank=local_rank,
-            )
-
-        finally:
-            if not keep_train_file and os.path.exists(temp_train_file):
-                os.remove(temp_train_file)
-
-        return train_dataset
-
-    def train_dataset_from_file(
-        self, train_file, load_cached_features=False, local_rank=-1
-    ):
-        if not load_cached_features and os.path.exists(self.cached_features_file):
-            logger.info(
-                "Deleting cached feature file {}".format(self.cached_features_file)
-            )
-            os.remove(self.cached_features_file)
-
-        train_features = load_and_cache_examples(
-            example_file=train_file,
-            tokenizer=self.tokenizer,
+        features = load_and_cache_examples(
+            input_examples=examples,
+            tokenizer=tokenizer,
+            cached_features_file=cached_features_file,
+            shuffle=shuffle_flag,
             local_rank=local_rank,
-            cached_features_file=self.cached_features_file,
-            shuffle=True,
         )
 
-        return S2SAbsSumDataset(train_features)
+        if not train_mode:
+            features = [
+                tokenizer.convert_ids_to_tokens(line["source_ids"]) for line in features
+            ]
 
-    def test_dataset_from_iterable_sum_ds(self, sum_ds, keep_test_file=False):
-        temp_dir = "./"
-        temp_test_file = os.path.join(
-            temp_dir, "test_file_" + datetime.now().strftime("%m%d%Y%H%M%S") + ".jsonl"
-        )
-        try:
-            with jsonlines.open(temp_test_file, mode="w") as writer:
-                for source, target in zip(sum_ds, sum_ds.get_target()):
-                    writer.write({"src": source, "tgt": target})
-            test_dataset = self.test_dataset_from_file(test_file=temp_test_file)
+            features = sorted(list(enumerate(features)), key=lambda x: -len(x[1]))
 
-        finally:
-            if not keep_test_file and os.path.exists(temp_test_file):
-                os.remove(temp_test_file)
+        return S2SAbsSumDataset(features)
 
-        return test_dataset
+    def s2s_dataset_from_iterable_sum_ds(
+        self, sum_ds, train_mode, cached_features_file=None, local_rank=-1
+    ):
+        examples = []
+        if train_mode:
+            for source, target in zip(sum_ds, sum_ds.get_target()):
+                examples.append({"src": source, "tgt": target})
+        else:
+            for source in sum_ds:
+                examples.append({"src": source})
 
-    def test_dataset_from_sum_ds(self, sum_ds, keep_test_file=False):
-        temp_dir = "./"
-        temp_test_file = os.path.join(
-            temp_dir, "test_file_" + datetime.now().strftime("%m%d%Y%H%M%S") + ".jsonl"
-        )
-        try:
-            with jsonlines.open(temp_test_file, mode="w") as writer:
-                for item in sum_ds:
-                    writer.write(item)
-
-            test_dataset = self.test_dataset_from_file(test_file=temp_test_file)
-
-        finally:
-            if not keep_test_file and os.path.exists(temp_test_file):
-                os.remove(temp_test_file)
-
-        return test_dataset
-
-    def test_dataset_from_file(self, test_file):
-        to_pred = load_and_cache_examples(
-            test_file,
-            self.tokenizer,
-            local_rank=-1,
-            cached_features_file=None,
-            shuffle=False,
+        s2s_dataset = S2SAbsSumProcessor.create_s2s_dataset(
+            examples=examples,
+            train_mode=train_mode,
+            tokenizer=self.tokenizer,
+            output_dir=self.cache_dir,
+            local_rank=local_rank,
+            cached_features_file=cached_features_file,
         )
 
-        input_lines = [
-            self.tokenizer.convert_ids_to_tokens(line["source_ids"]) for line in to_pred
-        ]
+        return s2s_dataset
 
-        input_lines = sorted(list(enumerate(input_lines)), key=lambda x: -len(x[1]))
-        return S2SAbsSumDataset(input_lines)
+    def s2s_dataset_from_sum_ds(
+        self, sum_ds, train_mode, cached_features_file=None, local_rank=-1
+    ):
+        examples = []
+        for item in sum_ds:
+            examples.append(item)
+
+        s2s_dataset = S2SAbsSumProcessor.create_s2s_dataset(
+            examples=examples,
+            train_mode=train_mode,
+            tokenizer=self.tokenizer,
+            output_dir=self.cache_dir,
+            local_rank=local_rank,
+            cached_features_file=cached_features_file,
+        )
+
+        return s2s_dataset
+
+    def s2s_dataset_from_json_or_file(
+        self, input_data, train_mode, cached_features_file=None, local_rank=-1
+    ):
+        s2s_dataset = S2SAbsSumProcessor.create_s2s_dataset(
+            examples=input_data,
+            train_mode=train_mode,
+            tokenizer=self.tokenizer,
+            output_dir=self.cache_dir,
+            local_rank=local_rank,
+            cached_features_file=cached_features_file,
+        )
+
+        return s2s_dataset
 
 
 class S2SConfig:
@@ -777,3 +747,70 @@ class S2SAbstractiveSummarizer(Transformer):
             optim_to_save,
             os.path.join(self.cache_dir, "optim.{}.bin".format(global_step)),
         )
+
+
+def load_and_cache_examples(
+    input_examples,
+    tokenizer,
+    local_rank,
+    train_mode=True,
+    cached_features_file=None,
+    shuffle=True,
+):
+
+    # Make sure only the first process in distributed training process the dataset,
+    # and the others will use the cache
+    if local_rank not in [-1, 0]:
+        torch.distributed.barrier()
+
+    if cached_features_file is not None and os.path.exists(cached_features_file):
+        logger.info("Loading features from cached file %s", cached_features_file)
+        features = torch.load(cached_features_file)
+    else:
+        if isinstance(input_examples, str):
+            logger.info("Creating features from dataset file at %s", input_examples)
+            examples = []
+            with open(input_examples, mode="r", encoding="utf-8") as reader:
+                for line in reader:
+                    examples.append(json.loads(line))
+        else:
+            examples = input_examples
+
+        features = []
+        if train_mode:
+            for example in tqdm(examples):
+                if isinstance(example["src"], list):
+                    source_tokens = example["src"]
+                    target_tokens = example["tgt"]
+                else:
+                    source_tokens = tokenizer.tokenize(example["src"])
+                    target_tokens = tokenizer.tokenize(example["tgt"])
+                features.append(
+                    {
+                        "source_ids": tokenizer.convert_tokens_to_ids(source_tokens),
+                        "target_ids": tokenizer.convert_tokens_to_ids(target_tokens),
+                    }
+                )
+        else:
+            for example in tqdm(examples):
+                if isinstance(example["src"], list):
+                    source_tokens = example["src"]
+                else:
+                    source_tokens = tokenizer.tokenize(example["src"])
+                features.append(
+                    {"source_ids": tokenizer.convert_tokens_to_ids(source_tokens),}
+                )
+
+        if shuffle:
+            random.shuffle(features)
+
+        if cached_features_file is not None:
+            logger.info("Saving features into cached file %s", cached_features_file)
+            torch.save(features, cached_features_file)
+
+    # Make sure only the first process in distributed training process the dataset,
+    # and the others will use the cache
+    if local_rank == 0:
+        torch.distributed.barrier()
+
+    return features

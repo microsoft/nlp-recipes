@@ -43,7 +43,10 @@ def maybe_download(url, filename=None, work_directory=".", expected_bytes=None):
 
         with open(filepath, "wb") as file:
             for data in tqdm(
-                r.iter_content(block_size), total=num_iterables, unit="KB", unit_scale=True
+                r.iter_content(block_size),
+                total=num_iterables,
+                unit="KB",
+                unit_scale=True,
             ):
                 file.write(data)
     else:
@@ -57,14 +60,18 @@ def maybe_download(url, filename=None, work_directory=".", expected_bytes=None):
     return filepath
 
 
-def maybe_download_googledrive(google_file_id, file_name, work_directory=".", expected_bytes=None):
+def maybe_download_googledrive(
+    google_file_id, file_name, work_directory=".", expected_bytes=None
+):
     """Download a file from google drive if it is not already downloaded.
 
     Args:
-        filename (str): File name.
-        work_directory (str): Working directory.
-        url (str): URL of the file to download.
-        expected_bytes (int): Expected file size in bytes.
+        google_file_id (str): The ID of the google file which can be found in
+            the file link, e.g. https://drive.google.com/file/d/{google_file_id}/view
+        file_name (str): Name of the downloaded file.
+        work_directory (str, optional): Directory to download the file to.
+            Defaults to ".".
+        expected_bytes (int, optional): Expected file size in bytes.
     Returns:
         str: File path of the file downloaded.
     """
