@@ -71,6 +71,8 @@ def main():
         train_ds, load_cached_features=True, local_rank=args.local_rank
     )
 
+    torch.distributed.barrier() 
+
     abs_summarizer.fit(
         train_dataset=train_dataset,
         per_gpu_batch_size=TRAIN_PER_GPU_BATCH_SIZE,
