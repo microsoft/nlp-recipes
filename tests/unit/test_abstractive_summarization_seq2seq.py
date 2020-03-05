@@ -18,7 +18,7 @@ TEST_PER_GPU_BATCH_SIZE = 1
 
 
 @pytest.fixture()
-def s2s_test_data(tmp):
+def s2s_test_data():
     train_ds = [
         {
             "src": "Moscow is usually blanketed in snow for four to five months "
@@ -75,12 +75,13 @@ def s2s_test_data(tmp):
     return {"train_ds": train_ds, "test_ds": test_ds}
 
 
+@pytest.mark.gpu
 def test_S2SAbstractiveSummarizer(s2s_test_data, tmp):
     processor = S2SAbsSumProcessor(cache_dir=tmp)
-    train_dataset = processor.s2s_dataset_from_sum_ds(
+    train_dataset = processor.s2s_dataset_from_json_or_file(
         s2s_test_data["train_ds"], train_mode=True
     )
-    test_dataset = processor.s2s_dataset_from_sum_ds(
+    test_dataset = processor.s2s_dataset_from_json_or_file(
         s2s_test_data["test_ds"], train_mode=False
     )
     abs_summarizer = S2SAbstractiveSummarizer(
@@ -133,3 +134,8 @@ def test_S2SAbstractiveSummarizer(s2s_test_data, tmp):
         per_gpu_batch_size=TEST_PER_GPU_BATCH_SIZE,
         max_tgt_length=MAX_TGT_LENGTH,
     )
+
+
+@pytest.mark.gpu
+def test_S2SAbsSumProcessor(s2s_test_data, tmp):
+    pass
