@@ -95,11 +95,7 @@ class S2SAbsSumDataset(Dataset):
 
 class S2SAbsSumProcessor:
     def __init__(
-        self,
-        model_name="unilm-base-cased",
-        to_lower=False,
-        max_seq_len=512,
-        cache_dir=".",
+        self, model_name="unilm-base-cased", to_lower=False, cache_dir=".",
     ):
 
         self.tokenizer = TOKENIZER_CLASS[model_name].from_pretrained(
@@ -107,18 +103,6 @@ class S2SAbsSumProcessor:
         )
         self.cache_dir = cache_dir
         self._model_name = model_name
-        self._model_type = _get_model_type(self._model_name)
-
-        # self._bert_model_name is needed for BertForSeq2SeqDecoder
-        if self._model_type != "bert":
-            if self._model_type == "roberta":
-                self._bert_model_name = (
-                    self._model_name.replace("roberta", "bert") + "-cased"
-                )
-            else:
-                self._bert_model_name = "bert-" + self._model_name.split("-", 1)[-1]
-        else:
-            self._bert_model_name = self._model_name
 
     @classmethod
     def get_inputs(cls, batch, device, model_name):
@@ -159,6 +143,7 @@ class S2SAbsSumProcessor:
             cached_features_file=cached_features_file,
             shuffle=shuffle_flag,
             local_rank=local_rank,
+            train_mode=train_mode,
         )
 
         if not train_mode:
@@ -279,7 +264,7 @@ class S2SAbstractiveSummarizer(Transformer):
         load_model_from_dir=None,
         model_file_name=None,
         label_smoothing=0.1,
-        max_seq_len=512,
+        max_seq_length=512,
         max_source_seq_length=464,
         max_target_seq_length=48,
     ):
@@ -288,22 +273,31 @@ class S2SAbstractiveSummarizer(Transformer):
             raise ValueError(
                 "Model name {0} is not supported by {1}. "
                 "Call '{1}.list_supported_models()' to get all supported model "
-                "names.".format(value, self.__class__.__name__)
+                "names.".format(model_name, self.__class__.__name__)
             )
         model_class = MODEL_CLASS[model_name]
         config_class = CONFIG_CLASS[model_name]
 
         self._model_name = model_name
-        ## Check with MSRA team how to determine tokenizer and config from model names
-        self._bert_model_name = self._model_name.replace("unilm", "bert")
+        self._model_type = _get_model_type(self._model_name)
+
+        # self._bert_model_name is needed for BertForSeq2SeqDecoder
+        if self._model_type != "bert":
+            if self._model_type == "roberta":
+                self._bert_model_name = (
+                    self._model_name.replace("roberta", "bert") + "-cased"
+                )
+            else:
+                self._bert_model_name = "bert-" + self._model_name.split("-", 1)[-1]
+        else:
+            self._bert_model_name = self._model_name
+
         self.cache_dir = cache_dir
         self.load_model_from_dir = load_model_from_dir
         self.do_lower_case = to_lower
-        self.max_seq_length = max_seq_len
+        self.max_seq_length = max_seq_length
         self.max_source_seq_length = max_source_seq_length
         self.max_target_seq_length = max_target_seq_length
-
-        self._model_type = _get_model_type(model_name)
 
         if load_model_from_dir is None:
             model_to_load = self._model_name
@@ -320,7 +314,6 @@ class S2SAbstractiveSummarizer(Transformer):
             model_to_load = os.path.join(load_model_from_dir, model_file_name)
             logger.info("Loading cached model from {}".format(model_to_load))
 
-        # TODO: double check
         if load_model_from_dir is not None and model_file_name is None:
             # Assume config.json is in load_model_from_dir
             model_config = config_class.from_pretrained(
@@ -366,6 +359,7 @@ class S2SAbstractiveSummarizer(Transformer):
         per_gpu_batch_size=8,
         num_epochs=1,
         recover_step=-1,
+        recover_dir=None,
         max_steps=-1,
         local_rank=-1,
         num_gpus=None,
@@ -377,7 +371,7 @@ class S2SAbstractiveSummarizer(Transformer):
         fp16=False,
         fp16_opt_level="O1",
         max_grad_norm=1.0,
-        save_model=True,
+        save_model_to_dir=None,
         verbose=True,
         seed=None,
         random_prob=0.1,
@@ -386,14 +380,14 @@ class S2SAbstractiveSummarizer(Transformer):
         global_step = 0
         if recover_step > 0:
             model_recover_checkpoint = os.path.join(
-                self.load_model_from_dir, "model.{}.bin".format(recover_step)
+                recover_dir, "model.{}.bin".format(recover_step)
             )
             logger.info(
                 " ** Recover model checkpoint in %s ** ", model_recover_checkpoint
             )
             model_state_dict = torch.load(model_recover_checkpoint, map_location="cpu")
             optimizer_recover_checkpoint = os.path.join(
-                args.output_dir, "optim.{}.bin".format(recover_step)
+                recover_dir, "optim.{}.bin".format(recover_step)
             )
             checkpoint_state_dict = torch.load(
                 optimizer_recover_checkpoint, map_location="cpu"
@@ -491,9 +485,10 @@ class S2SAbstractiveSummarizer(Transformer):
             seed=seed,
         )
 
-        if save_model and local_rank in [-1, 0]:
-            self.save_model(global_step, fp16)
+        if save_model_to_dir is not None and local_rank in [-1, 0]:
+            self.save_model(save_model_to_dir, global_step, fp16)
 
+        # release GPU memories
         self.model.cpu()
         torch.cuda.empty_cache()
 
@@ -531,8 +526,13 @@ class S2SAbstractiveSummarizer(Transformer):
             no_segment_embedding = False
             vocab = self.tokenizer.vocab
 
-        if self._model_type != "unilm1.2" and self._model_type in ("unilm", "unilm1"):
-            new_segment_ids = True
+        if not self._model_name.startswith("unilm1.2"):
+            if self._model_name.startswith("unilm-") or self._model_name.startswith(
+                "unilm1-"
+            ):
+                new_segment_ids = True
+            else:
+                new_segment_ids = False
         else:
             new_segment_ids = False
 
@@ -729,13 +729,13 @@ class S2SAbstractiveSummarizer(Transformer):
         else:
             return output_lines
 
-    def save_model(self, global_step, fp16):
+    def save_model(self, output_dir, global_step, fp16):
         model_to_save = (
             self.model.module if hasattr(self.model, "module") else self.model
         )
         torch.save(
             model_to_save.state_dict(),
-            os.path.join(self.cache_dir, "model.{}.bin".format(global_step)),
+            os.path.join(output_dir, "model.{}.bin".format(global_step)),
         )
         optim_to_save = {
             "optimizer": self.optimizer.state_dict(),
@@ -744,8 +744,7 @@ class S2SAbstractiveSummarizer(Transformer):
         if fp16:
             optim_to_save["amp"] = self.amp_state_dict
         torch.save(
-            optim_to_save,
-            os.path.join(self.cache_dir, "optim.{}.bin".format(global_step)),
+            optim_to_save, os.path.join(output_dir, "optim.{}.bin".format(global_step)),
         )
 
 

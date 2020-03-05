@@ -21,7 +21,7 @@ OUTPUT_FILE = "./nlp_cnndm_finetuning_results.txt"
 
 # model parameters
 MODEL_NAME = "unilm-large-cased"
-MAX_SEQ_LEN = 768
+MAX_SEQ_LENGTH = 768
 MAX_SOURCE_SEQ_LENGTH = 640
 MAX_TARGET_SEQ_LENGTH = 128
 
@@ -39,7 +39,7 @@ else:
     MAX_STEPS = 5000
 
 # inference parameters
-TEST_PER_GPU_BATCH_SIZE = 12
+TEST_PER_GPU_BATCH_SIZE = 8
 BEAM_SIZE = 5
 FORBID_IGNORE_WORD = "."
 
@@ -59,7 +59,7 @@ def main():
 
     abs_summarizer = S2SAbstractiveSummarizer(
         model_name=MODEL_NAME,
-        max_seq_len=MAX_SEQ_LEN,
+        max_seq_length=MAX_SEQ_LENGTH,
         max_source_seq_length=MAX_SOURCE_SEQ_LENGTH,
         max_target_seq_length=MAX_TARGET_SEQ_LENGTH,
     )
@@ -85,6 +85,7 @@ def main():
         fp16=args.fp16,
         fp16_opt_level=args.fp16_opt_level,
         local_rank=args.local_rank,
+        save_model_to_dir=".",
     )
 
     torch.distributed.barrier()
@@ -101,7 +102,7 @@ def main():
         for r in res[:5]:
             print(r)
 
-        with open(OUTPUT_FILE, "w") as f:
+        with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
             for line in res:
                 f.write(line + "\n")
 
