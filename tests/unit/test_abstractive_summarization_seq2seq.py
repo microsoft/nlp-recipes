@@ -1,11 +1,14 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
+import os
 import pytest
 
-from utils_nlp.models import (
-    S2SAbsSumProcessor,
-    S2SAbstractiveSummarizer,
+from utils_nlp.models import S2SAbsSumProcessor, S2SAbstractiveSummarizer, S2SConfig
+
+from utils_nlp.models.transformers.datasets import (
+    IterableSummarizationDataset,
+    SummarizationDataset,
 )
 
 MAX_SEQ_LENGTH = 96
@@ -136,6 +139,91 @@ def test_S2SAbstractiveSummarizer(s2s_test_data, tmp):
     )
 
 
-@pytest.mark.gpu
 def test_S2SAbsSumProcessor(s2s_test_data, tmp):
-    pass
+    expected_output_length = 4
+    # prepare files for testing
+    train_source_file = os.path.join(tmp, "train.src")
+    train_target_file = os.path.join(tmp, "train.tgt")
+
+    test_source_file = os.path.join(tmp, "test.src")
+
+    train_json_file = os.path.join(tmp, "train.json")
+    test_json_file = os.path.join(tmp, "test.json")
+
+    with open(train_source_file, "w") as src_file, open(
+        train_target_file, "w"
+    ) as tgt_file:
+        for item in s2s_test_data["train_ds"]:
+            src_file.write(item["src"] + "\n")
+            tgt_file.write(item["tgt"] + "\n")
+
+    with open(test_source_file, "w") as src_file:
+        for item in s2s_test_data["test_ds"]:
+            src_file.write(item["src"] + "\n")
+
+    train_iterable_sum_ds = IterableSummarizationDataset(
+        source_file=train_source_file, target_file=train_target_file
+    )
+    test_iterable_sum_ds = IterableSummarizationDataset(source_file=test_source_file)
+
+    train_sum_ds = SummarizationDataset(
+        source_file=train_source_file, target_file=train_target_file
+    )
+    test_sum_ds = SummarizationDataset(source_file=test_source_file)
+
+    train_sum_ds.save_to_jsonl(train_json_file)
+    test_sum_ds.save_to_jsonl(test_json_file)
+
+    processor = S2SAbsSumProcessor(cache_dir=tmp)
+
+    train_json_output = processor.s2s_dataset_from_json_or_file(
+        input_data=s2s_test_data["train_ds"], train_mode=True
+    )
+    test_json_output = processor.s2s_dataset_from_json_or_file(
+        input_data=s2s_test_data["test_ds"], train_mode=False
+    )
+
+    assert len(train_json_output) == expected_output_length
+    assert len(test_json_output) == expected_output_length
+
+    train_file_output = processor.s2s_dataset_from_json_or_file(
+        input_data=train_json_file, train_mode=True
+    )
+    test_file_output = processor.s2s_dataset_from_json_or_file(
+        input_data=test_json_file, train_mode=False
+    )
+
+    assert len(train_file_output) == expected_output_length
+    assert len(test_file_output) == expected_output_length
+
+    train_iterable_sum_ds_output = processor.s2s_dataset_from_iterable_sum_ds(
+        sum_ds=train_iterable_sum_ds, train_mode=True
+    )
+    test_iterable_sum_ds_output = processor.s2s_dataset_from_iterable_sum_ds(
+        sum_ds=test_iterable_sum_ds, train_mode=False
+    )
+
+    assert len(train_iterable_sum_ds_output) == expected_output_length
+    assert len(test_iterable_sum_ds_output) == expected_output_length
+
+    train_sum_ds_output = processor.s2s_dataset_from_sum_ds(
+        sum_ds=train_sum_ds, train_mode=True
+    )
+    test_sum_ds_output = processor.s2s_dataset_from_sum_ds(
+        sum_ds=test_sum_ds, train_mode=False
+    )
+
+    assert len(train_sum_ds_output) == expected_output_length
+    assert len(test_sum_ds_output) == expected_output_length
+
+
+def test_S2SConfig(tmp):
+    config_file = os.path.join(tmp, "s2s_config.json")
+
+    config = S2SConfig()
+
+    config.save_to_json(config_file)
+
+    loaded_config = S2SConfig.load_from_json(config_file)
+
+    assert loaded_config.__dict__ == config.__dict__
