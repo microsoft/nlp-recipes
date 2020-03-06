@@ -366,7 +366,11 @@ class S2SConfig:
             encoder of S2S. Defaults to False.
         pos_shift (bool, optional): Whether to use position shift for
             fine-tuning. Defaults to False.
-
+        ffn_type (int, optional): Type of the feedforward network. 0: mlp.
+            1: W((Wx+b) elem_prod x). Defaults to 0.
+        num_qkv (int, optional): Number of different <Q, K, V>. Defaults to 0.
+        seg_emb (bool, optional): Whether to use segment embedding for
+            self-attention. Defaults to False.
 
     """
 
@@ -422,6 +426,37 @@ class S2SAbstractiveSummarizer(Transformer):
         max_source_seq_length=464,
         max_target_seq_length=48,
     ):
+        """
+        Abstractive summarizer based on s2s-ft.
+
+        Args:
+            model_name (str, optional): Name of the model.
+                Call `S2SAbstractiveSummarizer.list_supported_models()` to see all
+                supported model names. Defaults to "unilm-base-cased".
+            to_lower (bool, optional): Whether to convert all letters to lower case
+                during tokenization. This is determined by if a cased model is used.
+                Defaults to False, which corresponds to a cased model.
+            cache_dir (str, optional): Directory to cache downloaded model files.
+                Defaults to ".".
+            load_model_from_dir (str, optional): Directory to load the model from. If
+                model_file_name is not provided, assume model was saved by
+                `:func:`~transformers.PreTrainedModel.save_pretrained`` and the
+                directory should contain pytorch_model.bin and config.json.
+                Defaults to None.
+            model_file_name (str, optional): Name of the model file under
+                `load_model_from_dir`. If provided, assume model was saved by
+                `S2SAbstractiveSummarizer.save_model`.
+            label_smoothing (float, optional): Alpha in label smoothing.
+                Defaults to 0.1.
+            max_seq_length (int, optional): Maximum length of the sequence that
+                concatenates source sequence tokens, target sequence tokens, and
+                special tokens like cls and sep. Defaults to 512.
+            max_source_seq_length (int, optional): Maximum number of tokens in the
+                source sequence after tokenization. Defaults to 464.
+            max_target_seq_length (int, optional); Maximum number of tokens in the
+                target sequence after tokenization. Defaults to 48.
+
+        """
 
         if model_name not in self.list_supported_models():
             raise ValueError(
@@ -514,6 +549,7 @@ class S2SAbstractiveSummarizer(Transformer):
         num_epochs=1,
         recover_step=-1,
         recover_dir=None,
+        save_model_to_dir=None,
         max_steps=-1,
         local_rank=-1,
         num_gpus=None,
@@ -525,12 +561,65 @@ class S2SAbstractiveSummarizer(Transformer):
         fp16=False,
         fp16_opt_level="O1",
         max_grad_norm=1.0,
-        save_model_to_dir=None,
         verbose=True,
         seed=None,
         random_prob=0.1,
         keep_prob=0.1,
     ):
+
+        """
+        Method for model-fine tuning.
+
+        Args:
+            train_dataset (S2SAbsSumDataset): Training dataset.
+            learning_rate (float, optional): Learning rate. Defaults to 5e-5.
+            per_gpu_batch_size (int, optional): Number of samples in each batch per
+                GPU. Defaults to 8.
+            num_epochs (int, optional): Number of passes through the entire training
+                dataset. Ignored if `max_steps` is set. Defaults to 1.
+            recover_step (int, optional): Step number to resume model fine-tuning from,
+                assuming the model was saved by `S2SAbstractiveSummarizer.save_model`
+                and the name is in the format "model.{recover_step}.bin".
+                Defaults to -1, which means start model fine-tuning from scratch.
+            recover_dir (str, optional): Directory to load model from if recover_step is
+                provided. Defaults to None.
+            save_model_to_dir (str, optional): Directory to save the model to. Defaults
+                to None and the fine-tuned model is not saved.
+            max_steps (int, optional): Maximum number of training steps. Defaults to -1
+                and the number of training steps is determined by  `num_epochs` and the
+                length of `train_dataset`.
+            local_rank (int, optional): Rank of the device in distributed training.
+                Defaults to -1 which means non-distributed training.
+            num_gpus (int, optional): Number of GPUs to use. Ignored if `gpu_ids` is
+                provided. Defaults to None and all available GPUs are used.
+            gpu_ids (list, optional): List of GPU IDs ot use. Defaults to None and GPUs
+                used are determined by num_gpus.
+            gradient_accumulation_steps (int, optional): Number of steps to accmumulate
+                gradient before each back propagation and model parameters update.
+                Defaults to 1.
+            weight_decay (float, optional): Weight decay to apply after each parameter
+                update. Defaults to 0.01.
+            adam_epsilon (float, optional): Epsilon of the AdamW optimizer.
+                Defaults to 1e-8.
+            warmup_steps (int, optional): Number of steps taken to increase learning
+                rate from 0 to `learning rate`. Defaults to 0.
+            fp16 (bool, optional): Whether to use 16-bit mixed precision through Apex.
+                Defaults to False.
+            fp16_opt_level(str, optional): Apex AMP optimization level for fp16.
+                One of in ['O0', 'O1', 'O2', and 'O3'].
+                See https://nvidia.github.io/apex/amp.html"
+                Defaults to "01"
+            max_grad_norm (float, optional): Maximum gradient norm for gradient
+                clipping. Defaults to 1.0.
+            verbose (bool, optional): Whether to output training log. Defaults to True.
+            seed (int, optional): Random seed for model initialization.
+                Defaults to None.
+            random_prob (float, optional): Probability to randomly replace a masked
+                token. Defaults to 0.1.
+            keep_prob (float, optional): Probability to keep no change for a masked
+                token. Defaults to 0.1.
+
+        """
         global_step = 0
         if recover_step > 0:
             model_recover_checkpoint = os.path.join(
@@ -650,7 +739,7 @@ class S2SAbstractiveSummarizer(Transformer):
         self,
         test_dataset,
         per_gpu_batch_size=4,
-        max_tgt_length=128,
+        max_tgt_length=64,
         beam_size=1,
         need_score_traces=False,
         length_penalty=0,
@@ -663,6 +752,43 @@ class S2SAbstractiveSummarizer(Transformer):
         fp16=False,
         verbose=True,
     ):
+        """
+        Method for predicting, i.e. generating summaries.
+        Args:
+            test_dataset (S2SAbsSumDataset): Testing dataset.
+            per_gpu_batch_size (int, optional): Number of testing samples in each
+                batch per GPU. Defaults to 4.
+            max_tgt_length (int, optional): Maximum number of tokens in output
+                sequence. Defaults to 64.
+            beam_size (int, optional): Beam size of beam search. Defaults to 1.
+            need_score_traces (bool, optional): Whether to return score traces of
+                beam search. Defaults to False.
+            length_penalty (float, optional): Length penalty for beam search.
+                Defaults to 0.
+            forbid_duplicate_ngrams (bool, optional): Whether to forbid duplicate
+                n-grams when generating output. Size of the n-gram is determined by
+                `S2SConfig.ngram_size` which defaults to 3. Defaults to True.
+            forbid_ignore_word (str, optional): Words to ignore when forbidding
+                duplicate ngrams. Multiple words should be separated by "|", for
+                example, ".|[X_SEP]". Defaults to ".".
+            s2s_config (S2SConfig, optional): Some default decoding settings that
+                the users usually don't need to change. Defaults to S2SConfig().
+            num_gpus (int, optional): Number of GPUs to use. Ignored if `gpu_ids` is
+                provided. Defaults to None and all available GPUs are used.
+            gpu_ids (list, optional): List of GPU IDs ot use. Defaults to None and GPUs
+                used are determined by num_gpus.
+            local_rank (int, optional): Rank of the device in distributed training.
+                Defaults to -1 which means non-distributed training.
+            fp16 (bool, optional): Whether to use 16-bit mixed precision through Apex.
+                Defaults to False.
+            verbose(bool, optional): Whether to output predicting log. Defaults to True.
+
+        Returns:
+            List or tuple of lists: List of generated summaries. If `need_score_traces`
+                is True, also returns the score traces of beam search.
+
+        """
+
         if need_score_traces and beam_size <= 1:
             raise ValueError(
                 "Score trace is only available for beam search with beam size > 1."
@@ -910,7 +1036,6 @@ def load_and_cache_examples(
     cached_features_file=None,
     shuffle=True,
 ):
-
     # Make sure only the first process in distributed training process the dataset,
     # and the others will use the cache
     if local_rank not in [-1, 0]:
