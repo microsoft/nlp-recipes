@@ -31,7 +31,7 @@ class MTDNNDataProcess:
         config: MTDNNConfig,
         task_defs: MTDNNTaskDefs,
         batch_size: int,
-        data_dir: str = "data/canonical_data/bert_uncased_lower",
+        data_dir: str,
         train_datasets_list: list = ["mnli"],
         test_datasets_list: list = ["mnli_mismatched,mnli_matched"],
         glue_format: bool = False,
@@ -145,10 +145,6 @@ class MTDNNDataProcess:
             collate_fn=train_collater.collate_fn,
             pin_memory=self.config.cuda,
         )
-
-        # Update class configuration with decoder opts
-        self.config = self.update_config(self.config)
-
         return multitask_train_data
 
     def _process_dev_test_datasets(self):
@@ -246,40 +242,27 @@ class MTDNNDataProcess:
     def generate_decoder_opt(self, enable_san, max_opt):
         return max_opt if enable_san and max_opt < 3 else 0
 
-    def update_config(self, config: MTDNNConfig):
-        # Update configurations with options obtained from preprocessing training data
-        setattr(config, "decoder_opts", self.decoder_opts)
-        setattr(config, "task_types", self.task_types)
-        setattr(config, "tasks_dropout_p", self.dropout_list)
-        setattr(config, "loss_types", self.loss_types)
-        setattr(config, "kd_loss_types", self.kd_loss_types)
-        setattr(config, "tasks_nclass_list", self.nclass_list)
-        return config
+    # Getters for Model training configuration
+    def get_decoder_options_list(self) -> list:
+        return self.decoder_opts
 
-    # # Property Getters
-    # @property
-    # def decoder_opts(self):
-    #     return self.decoder_opts
+    def get_task_types_list(self) -> list:
+        return self.task_types
 
-    # @property
-    # def task_types(self):
-    #     return self.task_types
+    def get_tasks_dropout_prob_list(self) -> list:
+        return self.dropout_list
 
-    # @property
-    # def tasks_dropout_p(self):
-    #     return self.tasks_dropout_p
+    def get_loss_types_list(self) -> list:
+        return self.loss_types
 
-    # @property
-    # def loss_types(self):
-    #     return self.loss_types
+    def get_kd_loss_types_list(self) -> list:
+        return self.kd_loss_types
 
-    # @property
-    # def kd_loss_types(self):
-    #     return self.kd_loss_types
+    def get_task_nclass_list(self) -> list:
+        return self.nclass_list
 
-    # @property
-    # def nclass_list(Self):
-    #     return self.nclass_list
+    def get_num_all_batches(self) -> int:
+        return self._num_all_batches
 
 
 class MTDNNPipelineProcess:

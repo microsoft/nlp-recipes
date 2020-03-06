@@ -87,12 +87,33 @@ class MTDNNModel(MTDNNPretrainedModel):
         config: MTDNNConfig,
         pretrained_model_name: str = "mtdnn-base-uncased",
         num_train_step: int = -1,
+        decoder_opts: list = None,
+        task_types: list = None,
+        dropout_list: list = None,
+        loss_types: list = None,
+        kd_loss_types: list = None,
+        tasks_nclass_list: list = None,
     ):
+
+        # Input validation
         assert (
             config.init_checkpoint in self.supported_init_checkpoints()
         ), f"Initial checkpoint must be in {self.supported_init_checkpoints()}"
+
+        assert decoder_opts, "Decoder options list is required!"
+        assert task_types, "Task types list is required!"
+        assert dropout_list, "Task dropout list is required!"
+        assert loss_types, "Loss types list is required!"
+        assert kd_loss_types, "KD Loss types list is required!"
+        assert tasks_nclass_list, "Tasks nclass list is required!"
+
         super(MTDNNModel, self).__init__(config)
+
+        # Initialize model config and update with training options
         self.config = config
+        self.update_config_with_training_opts(
+            decoder_opts, task_types, dropout_list, loss_types, kd_loss_types, tasks_nclass_list
+        )
         self.pooler = None
 
         # Resume from model checkpoint
@@ -488,3 +509,14 @@ class MTDNNModel(MTDNNPretrainedModel):
             "roberta.base",
             "roberta.large",
         ]
+
+    def update_config_with_training_opts(
+        self, decoder_opts, task_types, dropout_list, loss_types, kd_loss_types, tasks_nclass_list
+    ):
+        # Update configurations with options obtained from preprocessing training data
+        setattr(self.config, "decoder_opts", decoder_opts)
+        setattr(self.config, "task_types", task_types)
+        setattr(self.config, "tasks_dropout_p", dropout_list)
+        setattr(self.config, "loss_types", loss_types)
+        setattr(self.config, "kd_loss_types", kd_loss_types)
+        setattr(self.config, "tasks_nclass_list", tasks_nclass_list)

@@ -8,6 +8,8 @@ from utils_nlp.models.mtdnn.tasks.config import MTDNNTaskDefs
 
 
 if __name__ == "__main__":
+    torch.cuda.empty_cache()
+
     config = MTDNNConfig()
     # config.log_per_updates = 10
     # print(config)
@@ -51,18 +53,32 @@ if __name__ == "__main__":
     dev_dataloaders_list = data_processor.get_dev_dataloaders()
     test_dataloaders_list = data_processor.get_test_dataloaders()
 
-    # Update config with data preprocess params
-    config = data_processor.update_config(config)
+    # # Update config with data preprocess params
+    # config = data_processor.update_config(config)
+
+    # Get training options to initialize model
+    decoder_opts = data_processor.get_decoder_options_list()
+    task_types = data_processor.get_task_types_list()
+    dropout_list = data_processor.get_tasks_dropout_prob_list()
+    loss_types = data_processor.get_loss_types_list()
+    kd_loss_types = data_processor.get_kd_loss_types_list()
+    tasks_nclass_list = data_processor.get_task_nclass_list()
 
     # Update steps
-    num_all_batches = (
-        config.epochs * len(multitask_train_dataloader) // config.grad_accumulation_step
-    )
+    num_all_batches = data_processor.get_num_all_batches()
 
     # Instantiate model
     # import pdb; pdb.set_trace()
     model = MTDNNModel(
-        config, pretrained_model_name="bert-base-uncased", num_train_step=num_all_batches,
+        config,
+        pretrained_model_name="bert-base-uncased",
+        num_train_step=num_all_batches,
+        decoder_opts=decoder_opts,
+        task_types=task_types,
+        dropout_list=dropout_list,
+        loss_types=loss_types,
+        kd_loss_types=kd_loss_types,
+        tasks_nclass_list=tasks_nclass_list,
     )
     print("Network: ", model.network)
 
@@ -83,11 +99,11 @@ if __name__ == "__main__":
     # self.optimizer.load_state_dict(model_state_dict["optimizer"])
     # self.config = model_state_dict["config"]
     # pipeline_process.fit(1)
-    import pdb
+    # import pdb
 
-    pdb.set_trace()
+    # pdb.set_trace()
 
-    pipeline_process.predict(model_checkpoint=checkpt)
+    pipeline_process.predict(trained_model_chckpt=checkpt)
 
     # Training and inference
     # model.train(...)
