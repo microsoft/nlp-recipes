@@ -129,7 +129,7 @@ if __name__ == "__main__":
     parser.add_argument("--gpu", action="store_true", help="include packages for GPU support")
     args = parser.parse_args()
 
-    # set name for environment and output yaml file
+    # set name of environment and output yaml file
     conda_env = "nlp_cpu"
     if args.gpu:
         conda_env = "nlp_gpu"
