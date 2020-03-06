@@ -196,7 +196,7 @@ class AbsSummarizer(nn.Module):
             self.bert.model = BertModel(bert_config)
 
         if max_pos > 512:
-            my_pos_embeddi = nn.Embedding(max_pos, self.bert.model.config.hidden_size)
+            my_pos_embeddings = nn.Embedding(max_pos, self.bert.model.config.hidden_size)
             my_pos_embeddings.weight.data[
                 :512
             ] = self.bert.model.embeddings.position_embeddings.weight.data

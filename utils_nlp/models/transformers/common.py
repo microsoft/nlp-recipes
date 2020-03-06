@@ -43,7 +43,7 @@ TOKENIZER_CLASS.update(
 MAX_SEQ_LEN = 512
 
 logger = logging.getLogger(__name__)
-fh = logging.FileHandler("abssum_train.log")
+fh = logging.FileHandler("longer_input_abssum_train.log")
 logger.addHandler(fh)
 logger.setLevel(logging.INFO)
 
