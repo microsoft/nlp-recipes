@@ -22,7 +22,7 @@ from utils_nlp.models.mtdnn.dataset_mtdnn import (
 from utils_nlp.models.mtdnn.modeling_mtdnn import MTDNNModel
 from utils_nlp.models.mtdnn.tasks.config import MTDNNTaskDefs
 
-logger = MTDNNCommonUtils.setup_logging()
+logger = MTDNNCommonUtils.setup_logging(mode="w")
 
 
 class MTDNNDataProcess:
@@ -362,26 +362,25 @@ class MTDNNPipelineProcess:
                     logger.info(f"Saving mt-dnn model to {model_file}")
                     self.model.save(model_file)
 
-            """Xiaodl: I move the save model func here since it makes more senses
-            that is save each checkpoint after the model training.
-            I further move the save function in prediction.
-            Alternatively, we need to refactor save function.
-            """
-            model_file = os.path.join(
-                self.output_dir, "model_{}.pt".format(epoch)
-            )
+            # TODO: Alternatively, we need to refactor save function
+            # and move into prediction
+            # Saving each checkpoint after model training
+            model_file = os.path.join(self.output_dir, "model_{}.pt".format(epoch))
             logger.info(f"Saving mt-dnn model to {model_file}")
             self.model.save(model_file)
 
-    def predict(self, epoch=0):
-        """ Inference of model on test datasets """
-        """ Fit model to training datasets """
-        """Xiaodl: prediction don't need the epochs args
-        We may need to del it.
+    def predict(self, trained_model_chckpt: str = None, saved_epoch_idx: int = 0):
+        """ 
+        Inference of model on test datasets
         """
-        logger.info(f"At epoch {epoch}")
-        start = datetime.now()
+
+        # Load a trained checkpoint if a valid model checkpoint
+        if trained_model_chckpt and os.path.exists(trained_model_chckpt):
+            logger.info(f"Running predictions using: {trained_model_chckpt}")
+            self.model.load(trained_model_chckpt)
+
         # Create batches and train
+        start = datetime.now()
         for idx, dataset in enumerate(self.test_datasets_list):
             prefix = dataset.split("_")[0]
             label_dict = self.task_defs.global_map.get(prefix, None)
@@ -398,13 +397,19 @@ class MTDNNPipelineProcess:
                 for key, val in dev_metrics.items():
                     if self.config.use_tensor_board:
                         self.tensor_board.add_scalar(
-                            f"dev/{dataset}/{key}", val, global_step=epoch
+                            f"dev/{dataset}/{key}", val, global_step=saved_epoch_idx
                         )
                     if isinstance(val, str):
-                        logger.info(f"Task {dataset} -- epoch {epoch} -- Dev {key}:\n {val}")
+                        logger.info(
+                            f"Task {dataset} -- epoch {saved_epoch_idx} -- Dev {key}:\n {val}"
+                        )
                     else:
-                        logger.info(f"Task {dataset} -- epoch {epoch} -- Dev {key}: {val:.3f}")
-                score_file = os.path.join(self.output_dir, f"{dataset}_dev_scores_{epoch}.json")
+                        logger.info(
+                            f"Task {dataset} -- epoch {saved_epoch_idx} -- Dev {key}: {val:.3f}"
+                        )
+                score_file = os.path.join(
+                    self.output_dir, f"{dataset}_dev_scores_{saved_epoch_idx}.json"
+                )
                 results = {
                     "metrics": dev_metrics,
                     "predictions": dev_predictions,
@@ -416,7 +421,7 @@ class MTDNNPipelineProcess:
                 MTDNNCommonUtils.dump(score_file, results)
                 if self.config.use_glue_format:
                     official_score_file = os.path.join(
-                        self.output_dir, "{}_dev_scores_{}.tsv".format(dataset, epoch)
+                        self.output_dir, "{}_dev_scores_{}.tsv".format(dataset, saved_epoch_idx)
                     )
                     submit(official_score_file, results, label_dict)
 
@@ -439,7 +444,7 @@ class MTDNNPipelineProcess:
                         task_type=self.task_defs.task_type_map[prefix],
                     )
                 score_file = os.path.join(
-                    self.output_dir, f"{dataset}_test_scores_{epoch}.json"
+                    self.output_dir, f"{dataset}_test_scores_{saved_epoch_idx}.json"
                 )
                 results = {
                     "metrics": test_metrics,
@@ -450,7 +455,7 @@ class MTDNNPipelineProcess:
                 MTDNNCommonUtils.dump(score_file, results)
                 if self.config.use_glue_format:
                     official_score_file = os.path.join(
-                        self.output_dir, f"{dataset}_test_scores_{epoch}.tsv"
+                        self.output_dir, f"{dataset}_test_scores_{saved_epoch_idx}.tsv"
                     )
                     submit(official_score_file, results, label_dict)
                 logger.info("[new test scores saved.]")
