@@ -66,6 +66,22 @@ class MTDNNPretrainedModel(nn.Module):
 
 
 class MTDNNModel(MTDNNPretrainedModel):
+    """Instance of an MTDNN Model
+    
+    Arguments:
+        MTDNNPretrainedModel {BertPretrainedModel} -- Inherited from Bert Pretrained
+        config  {MTDNNConfig} -- MTDNN Configuration Object 
+        pretrained_model_name {str} -- Name of the pretrained model to initial checkpoint
+        num_train_step  {int} -- Number of steps to take each training
+    
+    Raises:
+        RuntimeError: [description]
+        ImportError: [description]
+    
+    Returns:
+        MTDNNModel -- An Instance of an MTDNN Model
+    """
+
     def __init__(
         self,
         config: MTDNNConfig,
@@ -455,7 +471,7 @@ class MTDNNModel(MTDNNPretrainedModel):
         model_state_dict = torch.load(checkpoint)
         self.network.load_state_dict(model_state_dict["state"], strict=False)
         self.optimizer.load_state_dict(model_state_dict["optimizer"])
-        self.config.update(model_state_dict["config"])
+        self.config = model_state_dict["config"]
 
     def cuda(self):
         self.network.cuda(device=self.config.cuda_device)
