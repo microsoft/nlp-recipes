@@ -25,7 +25,7 @@ from utils_nlp.models.transformers.datasets import SummarizationNonIterableDatas
 from utils_nlp.eval.evaluate_summarization import get_rouge
 
 CACHE_PATH = "/dadendev/nlp-recipes/examples/text_summarization/abstemp"
-DATA_PATH = "/dadendev/nlp-recipes/examples/text_summarization"
+DATA_PATH = "/dadendev/nlp-recipes/examples/text_summarization/abstemp"
 MODEL_PATH = "/dadendev/nlp-recipes/examples/text_summarization/abstemp"
 TOP_N = 10
 
@@ -259,10 +259,11 @@ def test_pretrained_model():
     checkpoint = torch.load(os.path.join(MODEL_PATH, "new_model_step_148000_torch1.4.0.pt"))
     
     #checkpoint = torch.load(os.path.join(MODEL_PATH, "summarizer_step20000_with_global_step.pt"))
-    checkpoint = torch.load(os.path.join(MODEL_PATH, "bert-base-uncased_step_400.pt")) 
+    #checkpoint = torch.load(os.path.join(MODEL_PATH, "bert-base-uncased_step_400.pt")) 
     summarizer = AbsSum(
         processor,
         cache_dir=CACHE_PATH,
+        max_pos=512,
     )
     summarizer.model.load_checkpoint(checkpoint['model'])
     """
@@ -284,14 +285,15 @@ def test_pretrained_model():
     return
     """
 
-    top_n = 8
+    top_n = 96*4
     src = test_sum_dataset.source[0:top_n]
     reference_summaries = ["".join(t).rstrip("\n") for t in test_sum_dataset.target[0:top_n]]
     print("start prediction")
     generated_summaries = summarizer.predict(
-        shorten_dataset(test_sum_dataset, top_n=top_n), batch_size=4, num_gpus=2
+        shorten_dataset(test_sum_dataset, top_n=top_n), batch_size=96+16, num_gpus=1, max_seq_length=512
     )
     print(generated_summaries[0])
+    print(len(generated_summaries))
     assert len(generated_summaries) == len(reference_summaries)
     RESULT_DIR = TemporaryDirectory().name
     rouge_score = get_rouge(generated_summaries, reference_summaries, RESULT_DIR)
@@ -303,6 +305,6 @@ def test_pretrained_model():
 #test_collate()
 #preprocess_cnndm_abs()
 #test_train_model()
-#test_pretrained_model()
-if __name__ == "__main__":
-    main()
+test_pretrained_model()
+#if __name__ == "__main__":
+#    main()

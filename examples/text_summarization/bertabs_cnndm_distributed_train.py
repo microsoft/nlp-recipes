@@ -115,10 +115,9 @@ def main():
     print("data_dir is {}".format(args.data_dir))
     print("cache_dir is {}".format(args.cache_dir))
     ngpus_per_node = torch.cuda.device_count()
-    processor = AbsSumProcessor(cache_dir=args.cache_dir)
+    processor = AbsSumProcessor(cache_dir=args.cache_dir, max_src_len=max_pos)
     summarizer = AbsSum(
-        processor, cache_dir=args.cache_dir,
-        max_pos=args.max_pos,
+        processor, cache_dir=args.cache_dir
     )
     mp.spawn(main_worker, nprocs=ngpus_per_node, args=(ngpus_per_node, summarizer,  args))
 

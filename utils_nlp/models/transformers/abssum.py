@@ -113,7 +113,7 @@ class AbsSumProcessor:
         model_name="bert-base-uncased",
         to_lower=False,
         cache_dir=".",
-        max_src_len=512,
+        max_src_len=640,
         max_target_len=140,
     ):
         """ Initialize the preprocessor.
@@ -364,7 +364,7 @@ class AbsSum(Transformer):
         cache_dir=".",
         label_smoothing=0.1,
         test=False,
-        max_pos=640,
+        max_pos=768,
     ):
         """Initialize a ExtractiveSummarizer.
 
@@ -396,6 +396,7 @@ class AbsSum(Transformer):
 
         self.model_class = MODEL_CLASS[model_name]
         self.cache_dir = cache_dir
+        self.max_pos = max_pos
 
         self.model = AbsSummarizer(
             temp_dir=cache_dir,
@@ -404,12 +405,11 @@ class AbsSum(Transformer):
             label_smoothing=label_smoothing,
             symbols=processor.symbols,
             test=test,
-            max_pos=max_pos,
+            max_pos=self.max_pos,
         )
         self.processor = processor
         self.optim_bert = None
         self.optim_dec = None
-        self.max_pos = max_pos
         
 
     @staticmethod
@@ -588,13 +588,13 @@ class AbsSum(Transformer):
         local_rank=-1,
         gpu_ids=None,
         batch_size=16,
-        # sentence_separator="<q>",
         alpha=0.6,
         beam_size=5,
         min_length=15,
         max_length=150,
         fp16=False,
         verbose=True,
+        max_seq_length=768,
     ):
         """
         Predict the summarization for the input data iterator.
@@ -621,11 +621,11 @@ class AbsSum(Transformer):
             List of strings which are the summaries
 
         """
-        device, num_gpus = get_device(num_gpus=num_gpus, local_rank=local_rank)
-         # move model to devices
+        device, num_gpus = get_device(num_gpus=num_gpus, gpu_ids=gpu_ids, local_rank=local_rank)
+        # move model to devices
         def this_model_move_callback(model, device):
             model =  move_model_to_device(model, device)
-            return parallelize_model(model, device, num_gpus=num_gpus, gpu_ids=None, local_rank=local_rank)
+            return parallelize_model(model, device, num_gpus=num_gpus, gpu_ids=gpu_ids, local_rank=local_rank)
 
         if fp16:
             self.model = self.model.half()
@@ -643,13 +643,13 @@ class AbsSum(Transformer):
             min_length=min_length,
             max_length=max_length,
         )
-        predictor = predictor.move_to_device(device, this_model_move_callback)
+        predictor = this_model_move_callback(predictor, device)
         
        
         test_sampler = SequentialSampler(test_dataset)
 
         def collate_fn(data):
-            return self.processor.collate(data, 512, device, train_mode=False)
+            return self.processor.collate(data, max_seq_length, device, train_mode=False)
 
         test_dataloader = DataLoader(
             test_dataset, sampler=test_sampler, batch_size=batch_size, collate_fn=collate_fn,
@@ -659,7 +659,7 @@ class AbsSum(Transformer):
             """ Transforms the output of the `from_batch` function
             into nicely formatted summaries.
             """
-            raw_summary, _, = translation
+            raw_summary = translation
             summary = (
                 raw_summary.replace("[unused0]", "")
                 .replace("[unused3]", "")
@@ -673,16 +673,31 @@ class AbsSum(Transformer):
                 .strip()
             )
 
+
             return summary
+
+        def generate_summary_from_tokenid(preds, pred_score):
+            batch_size = preds.size()[0]   # batch.batch_size
+            translations = []
+            for b in range(batch_size):
+                if len(preds[b]) < 1:
+                    pred_sents = ""
+                else:
+                    pred_sents = self.processor.tokenizer.convert_ids_to_tokens([int(n) for n in preds[b] if int(n)!=0])
+                    pred_sents = " ".join(pred_sents).replace(" ##", "")
+                translations.append(pred_sents)
+            return translations
 
         generated_summaries = []
         from tqdm import tqdm
 
-        for batch in tqdm(test_dataloader):
-            batch_data = predictor.translate_batch(batch)
-            translations = predictor.from_batch(batch_data)
-            summaries = [format_summary(t) for t in translations]
-            generated_summaries += summaries
+        for batch in tqdm(test_dataloader,  desc="Generating summary", disable=not verbose):
+            input = self.processor.get_inputs(batch, device, "bert", train_mode=False)
+            translations, scores = predictor(**input)
+            
+            translations_text = generate_summary_from_tokenid(translations, scores) 
+            summaries = [format_summary(t) for t in translations_text]
+            generated_summaries.extend(summaries)
         return generated_summaries
 
     def save_model(self, global_step=None, full_name=None):

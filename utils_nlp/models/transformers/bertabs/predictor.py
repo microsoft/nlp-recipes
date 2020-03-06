@@ -6,7 +6,7 @@ import os
 import math
 
 import torch
-
+from torch import nn
 from tensorboardX import SummaryWriter
 
 # from others.utils import rouge_results_to_str, test_rouge, tile
@@ -55,7 +55,7 @@ def tile(x, count, dim=0):
     return x
 
 
-class Translator(object):
+class Translator(nn.Module):
     """
     Uses a model to translate a batch of sentences.
 
@@ -70,14 +70,12 @@ class Translator(object):
        global_scores (:obj:`GlobalScorer`):
          object to rescore final translations
        copy_attn (bool): use copy attention during translation
-       cuda (bool): use cuda
        beam_trace (bool): trace beam search for debugging
        logger(logging.Logger): logger.
     """
 
     def __init__(
         self,
-        # args,
         beam_size,
         min_length,
         max_length,
@@ -89,10 +87,9 @@ class Translator(object):
         logger=None,
         dump_beam="",
     ):
+        super(Translator, self).__init__()
         self.logger = logger
-        self.cuda = 0  # args.visible_gpus != '-1'
 
-        # self.args = args
         self.model = model.module if hasattr(model, "module") else model
         self.generator = self.model.generator
         self.decoder = self.model.decoder
@@ -115,10 +112,6 @@ class Translator(object):
         self.beam_trace = self.dump_beam != ""
         self.beam_accum = None
 
-        # tensorboard_log_dir = args.model_path
-
-        # self.tensorboard_writer = SummaryWriter(tensorboard_log_dir, comment="Unmt")
-
         if self.beam_trace:
             self.beam_accum = {
                 "predicted_ids": [],
@@ -126,90 +119,15 @@ class Translator(object):
                 "scores": [],
                 "log_probs": [],
             }
-
-    def move_to_device(self, device, move_to_device_fn):
-        self.move_to_device_fn = move_to_device_fn
-        self.model = move_to_device_fn(self.model, device)
-        self.bert = move_to_device_fn(self.bert, device)
-        self.generator = move_to_device_fn(self.generator, device)
-        return self
-
+    """
     def eval(self):
         self.model.eval()
         self.bert.eval()
         self.decoder.eval()
         self.generator.eval()
+    """
 
-    def _build_target_tokens(self, pred):
-        # vocab = self.fields["tgt"].vocab
-        tokens = []
-        for tok in pred:
-            tok = int(tok)
-            tokens.append(tok)
-            if tokens[-1] == self.end_token:
-                tokens = tokens[:-1]
-                break
-        tokens = [t for t in tokens if t < len(self.vocab)]
-        tokens = self.vocab.DecodeIds(tokens).split(" ")
-        return tokens
-
-    def from_batch(self, translation_batch):
-        batch = translation_batch["batch"]
-        # assert len(translation_batch["gold_score"]) == len(translation_batch["predictions"])
-        batch_size = batch.batch_size
-
-        # preds, pred_score, gold_score, tgt_str, src = (
-        preds, pred_score, src = (
-            translation_batch["predictions"],
-            translation_batch["scores"],
-            # translation_batch["gold_score"],
-            # batch.tgt_str,
-            batch.src,
-        )
-        # print(preds)
-        # print(pred_score)
-        # print(batch.tgt_str)
-        # print(batch.src)
-
-        translations = []
-        for b in range(batch_size):
-
-            if len(preds[b]) < 1:
-                pred_sents = ""
-            else:
-                pred_sents = self.vocab.convert_ids_to_tokens([int(n) for n in preds[b][0]])
-                pred_sents = " ".join(pred_sents).replace(" ##", "")
-            # gold_sent = " ".join(tgt_str[b].split())
-            # translation = Translation(fname[b],src[:, b] if src is not None else None,
-            #                           src_raw, pred_sents,
-            #                           attn[b], pred_score[b], gold_sent,
-            #                           gold_score[b])
-            # src = self.spm.DecodeIds([int(t) for t in translation_batch['batch'].src[0][5] if int(t) != len(self.spm)])
-            raw_src = [self.vocab.ids_to_tokens[int(t)] for t in src[b]][:500]
-            raw_src = " ".join(raw_src)
-            # translation = (pred_sents, gold_sent, raw_src)
-            translation = (pred_sents, raw_src)
-            # translation = (pred_sents[0], gold_sent)
-            translations.append(translation)
-
-        return translations
-
-    def translate(self, batch, attn_debug=False):
-
-        #self.model.eval()
-        self.eval()
-        # pred_results, gold_results = [], []
-        with torch.no_grad():
-            batch_data = self.translate_batch(batch)
-            translations = self.from_batch(batch_data)
-
-            # for trans in translations:
-            #    pred, gold, src = trans
-            #    pred_str = pred.replace('[unused0]', '').replace('[unused3]', '').replace('[PAD]', '').replace('[unused1]', '').replace(r' +', ' ').replace(' [unused2] ', '<q>').replace('[unused2]', '').strip()
-            #    gold_str = gold.strip()
-        return translations
-
-    def translate_batch(self, batch, fast=False):
+    def forward(self, src, segs, mask_src):
         """
         Translate a batch of sentences.
 
@@ -224,22 +142,22 @@ class Translator(object):
            Shouldn't need the original dataset.
         """
         with torch.no_grad():
-            return self._fast_translate_batch(batch, self.max_length, min_length=self.min_length)
+            predictions, scores = self._fast_translate_batch(src, segs, mask_src, self.max_length, min_length=self.min_length)
+            return predictions, scores
+        
 
-    def _fast_translate_batch(self, batch, max_length, min_length=0):
+    def _fast_translate_batch(self, src, segs, mask_src, max_length, min_length=0):
         # TODO: faster code path for beam_size == 1.
 
         # TODO: support these blacklisted features.
         assert not self.dump_beam
 
         beam_size = self.beam_size
-        batch_size = batch.batch_size
-        src = batch.src
-        segs = batch.segs
-        mask_src = batch.mask_src
+        batch_size = src.size()[0] #32 #batch.batch_size
 
         src_features = self.bert(src, segs, mask_src)
-        dec_states = self.decoder.init_decoder_state(src, src_features, with_cache=True)
+        this_decoder = self.decoder.module if hasattr(self.decoder, "module") else self.decoder
+        dec_states = this_decoder.init_decoder_state(src, src_features, with_cache=True)
         
         device = src_features.device
 
@@ -266,7 +184,7 @@ class Translator(object):
         results["predictions"] = [[] for _ in range(batch_size)]  # noqa: F812
         results["scores"] = [[] for _ in range(batch_size)]  # noqa: F812
         # results["gold_score"] = [0] * batch_size
-        results["batch"] = batch
+        #results["batch"] = batch
 
         for step in range(max_length):
             decoder_input = alive_seq[:, -1].view(1, -1)
@@ -274,7 +192,7 @@ class Translator(object):
             # Decoder forward.
             decoder_input = decoder_input.transpose(0, 1)
 
-            dec_out, dec_states = self.decoder(
+            dec_out, dec_states = this_decoder(
                 decoder_input, src_features, dec_states, step=step
             )
 
@@ -321,13 +239,11 @@ class Translator(object):
 
             # Resolve beam origin and true word ids.
             topk_beam_index = topk_ids.div(vocab_size)
-            # print("topk_beam_index.shape {}".format( topk_beam_index.size()))
             topk_ids = topk_ids.fmod(vocab_size)
 
             # Map beam_index to batch_index in the flat representation.
             batch_index = topk_beam_index + beam_offset[: topk_beam_index.size(0)].unsqueeze(1)
             select_indices = batch_index.view(-1)
-            # print("select_indices {}".format(select_indices))
 
             # Append last prediction.
             alive_seq = torch.cat(
@@ -335,15 +251,10 @@ class Translator(object):
             )
 
             is_finished = topk_ids.eq(self.end_token)
-            # print("is_finished {}".format(is_finished))
-            # print("is_finished size {}".format(is_finished.size()))
             if step + 1 == max_length:
-                # print("reached max_length {} at step {}".format(max_length, step))
                 is_finished.fill_(True)
-                # print("is_finished {}".format(is_finished))
             # End condition is top beam is finished.
             end_condition = is_finished[:, 0].eq(True)
-            # print("end_condition {}".format(end_condition))
             if step + 1 == max_length:
                 assert not any(end_condition.eq(False))
 
@@ -353,7 +264,6 @@ class Translator(object):
                 for i in range(is_finished.size(0)):
                     b = batch_offset[i]
                     if end_condition[i]:
-                        # print("batch offset {} finished".format(b))
                         is_finished[i].fill_(1)
                     finished_hyp = is_finished[i].nonzero().view(-1)
                     # Store finished hypotheses for this batch.
@@ -363,9 +273,6 @@ class Translator(object):
                     if end_condition[i]:
                         best_hyp = sorted(hypotheses[b], key=lambda x: x[0], reverse=True)
                         score, pred = best_hyp[0]
-                        # if len(pred) == 0:
-                        #    print("batch offset {} finished with empty prediction {}".format(b, pred))
-
                         results["scores"][b].append(score)
                         results["predictions"][b].append(pred)
                 non_finished = end_condition.eq(0).nonzero().view(-1)
@@ -383,63 +290,7 @@ class Translator(object):
             dec_states.map_batch_fn(lambda state, dim: state.index_select(dim, select_indices))
 
         empty_output = [len(results["predictions"][b]) <= 0 for b in batch_offset]
-        if any(empty_output):
-            print("there is empty output {}".format(empty_output))
-            print(batch_offset)
-            print(results)
+        predictions = torch.tensor([i[0].tolist()[0:self.max_length]+[0]*(self.max_length-i[0].size()[0]) for i in results["predictions"]], device=device)
+        scores = torch.tensor([i[0].item() for i in results['scores']], device=device)
+        return predictions,  scores
 
-        # print("###########################################")
-        return results
-
-
-class Translation(object):
-    """
-    Container for a translated sentence.
-
-    Attributes:
-        src (`LongTensor`): src word ids
-        src_raw ([str]): raw src words
-
-        pred_sents ([[str]]): words from the n-best translations
-        pred_scores ([[float]]): log-probs of n-best translations
-        attns ([`FloatTensor`]) : attention dist for each translation
-        gold_sent ([str]): words from gold translation
-        gold_score ([float]): log-prob of gold translation
-
-    """
-
-    def __init__(
-        self, fname, src, src_raw, pred_sents, attn, pred_scores, tgt_sent=None, gold_score=0
-    ):
-        self.fname = fname
-        self.src = src
-        self.src_raw = src_raw
-        self.pred_sents = pred_sents
-        self.attns = attn
-        self.pred_scores = pred_scores
-        self.gold_sent = tgt_sent
-        self.gold_score = gold_score
-
-    def log(self, sent_number):
-        """
-        Log translation.
-        """
-
-        output = "\nSENT {}: {}\n".format(sent_number, self.src_raw)
-
-        best_pred = self.pred_sents[0]
-        best_score = self.pred_scores[0]
-        pred_sent = " ".join(best_pred)
-        output += "PRED {}: {}\n".format(sent_number, pred_sent)
-        output += "PRED SCORE: {:.4f}\n".format(best_score)
-
-        if self.gold_sent is not None:
-            tgt_sent = " ".join(self.gold_sent)
-            output += "GOLD {}: {}\n".format(sent_number, tgt_sent)
-            output += "GOLD SCORE: {:.4f}\n".format(self.gold_score)
-        if len(self.pred_sents) > 1:
-            output += "\nBEST HYP:\n"
-            for score, sent in zip(self.pred_scores, self.pred_sents):
-                output += "[{:.4f}] {}\n".format(score, sent)
-
-        return output
