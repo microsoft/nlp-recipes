@@ -52,7 +52,8 @@ CONDA_BASE = {
 
 CONDA_GPU = {
     "numba": "numba>=0.38.1",
-    "cudatoolkit": "cudatoolkit==10.2.89",
+    "cudatoolkit": "cudatoolkit=10.1",
+    "pytorch": "pytorch==1.4.0",
 }
 
 PIP_BASE = {
@@ -93,9 +94,7 @@ PIP_BASE = {
     "tensorboardX": "tensorboardX==1.8",
 }
 
-PIP_GPU = {
-    "torch": "torch==1.4.0",
-}
+PIP_GPU = {}
 
 PIP_DARWIN = {}
 PIP_DARWIN_GPU = {}
@@ -130,7 +129,7 @@ if __name__ == "__main__":
     parser.add_argument("--gpu", action="store_true", help="include packages for GPU support")
     args = parser.parse_args()
 
-    # set name for environment and output yaml file
+    # set name of environment and output yaml file
     conda_env = "nlp_cpu"
     if args.gpu:
         conda_env = "nlp_gpu"
