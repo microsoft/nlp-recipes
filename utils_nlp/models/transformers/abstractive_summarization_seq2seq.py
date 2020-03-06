@@ -83,6 +83,11 @@ def detokenize(tk_list):
 
 
 class S2SAbsSumDataset(Dataset):
+    """
+    Dataset containing data processed and ready to be passed to
+    S2SAbstractiveSummarizer.fit and S2SAbstractiveSummarizer.predict.
+    """
+
     def __init__(self, features):
         self.features = features
 
@@ -94,6 +99,21 @@ class S2SAbsSumDataset(Dataset):
 
 
 class S2SAbsSumProcessor:
+    """
+    Processor with methods for converting input data in different formats
+    to S2SAbsSumDataset for training and testing.
+
+    Args:
+        model_name (str, optional): Name of the model which determines the
+            tokenizer to use. Call `S2SAbsSumProcessor.list_supported_models()`
+            to see all supported model names. Defaults to "unilm-base-cased".
+        to_lower (bool, optional): Whether to convert all letters to lower case
+            during tokenization. This is determined by if a cased model is used.
+            Defaults to False, which corresponds to a cased model.
+        cache_dir (str, optional): Directory to cache the tokenizer.
+            Defaults to ".".
+    """
+
     def __init__(
         self, model_name="unilm-base-cased", to_lower=False, cache_dir=".",
     ):
@@ -104,8 +124,16 @@ class S2SAbsSumProcessor:
         self.cache_dir = cache_dir
         self._model_name = model_name
 
+    @staticmethod
+    def list_supported_models():
+        return list(MODEL_CLASS)
+
     @classmethod
     def get_inputs(cls, batch, device, model_name):
+        """
+        Converts a batch of features to model input format,
+        used by Transformer.fine_tune.
+        """
         batch = tuple(t.to(device) for t in batch)
         inputs = {
             "source_ids": batch[0],
@@ -125,12 +153,49 @@ class S2SAbsSumProcessor:
         local_rank=-1,
         cached_features_file=None,
     ):
+        """
+        Creates S2SAbsSumDataset from input file or list of dictionaries.
+
+        Args:
+            examples (str or list): Input file path or list of dictionaries.
+                The input file should be in the following format:
+                {"src": "abcdefg", "tgt": "ag"}
+                {"src": "hijklmn", "tgt": "hn"}
+                where the "src" field is the input text to summarize and the "tgt"
+                field is the summary.
+                The list of dictionaries should be in similar format:
+                [{"src": "abcdefg", "tgt": "ag"},
+                {"src": "hijklmn", "tgt": "hn"}]
+                The "tgt" field is optional if `train_mode` is False.
+            train_mode (bool): Whether the input data is for training or testing.
+                If True, both "src" and "tgt" fields need to be provided in
+                `examples`.
+                If False, only the "src" field is required.
+            tokenizer (tokenizer): Tokenizer used to convert tokens to token ids. The
+                type of the tokenizer depends on the model that will be used.
+            output_dir (str): Directory to save the cached features files.
+            local_rank (int, optional): Local rank of the device in distributed
+                training. Defaults to -1, which means non-distributed training.
+            cached_features_file (str, optional): Path of the cached features file.
+                If provided and the file already exists, it is loaded and used.
+                If provided and the file doesn't exist, processed features are
+                saved to this file.
+                If not provided, processed features are saved to `output_dir`.
+                Defaults to None.
+
+        Returns:
+            S2SAbsSumDataset
+
+        """
         if train_mode:
             cached_features_file_name = "cached_features_for_training.pt"
             shuffle_flag = True
         else:
             cached_features_file_name = "cached_features_for_testing.pt"
             shuffle_flag = False
+
+        if not os.path.exists(output_dir):
+            os.mkdir(output_dir)
 
         if cached_features_file is None:
             cached_features_file = os.path.join(output_dir, cached_features_file_name)
@@ -158,6 +223,25 @@ class S2SAbsSumProcessor:
     def s2s_dataset_from_iterable_sum_ds(
         self, sum_ds, train_mode, cached_features_file=None, local_rank=-1
     ):
+        """
+        Converts IterableSummarizationDataset to S2SAbsSumDataset.
+
+        Args:
+            sum_ds (IterableSummarizationDataset): Input dataset.
+            train_mode (bool): Whether the input data is for training or testing.
+            cached_features_file (str, optional): Path of the cached features file.
+                If provided and the file already exists, it is loaded and used.
+                If provided and the file doesn't exist, processed features are
+                saved to this file.
+                If not provided, processed features are saved to cache_dir.
+                Defaults to None.
+            local_rank (int, optional): Local rank of the device in distributed
+                training. Defaults to -1, which means non-distributed training.
+
+        Returns:
+            S2SAbsSumDataset
+        """
+
         examples = []
         if train_mode:
             for source, target in zip(sum_ds, sum_ds.get_target()):
@@ -180,6 +264,25 @@ class S2SAbsSumProcessor:
     def s2s_dataset_from_sum_ds(
         self, sum_ds, train_mode, cached_features_file=None, local_rank=-1
     ):
+
+        """
+        Converts SummarizationDataset to S2SAbsSumDataset.
+
+        Args:
+            sum_ds (SummarizationDataset): Input dataset.
+            train_mode (bool): Whether the input data is for training or testing.
+            cached_features_file (str, optional): Path of the cached features file.
+                If provided and the file already exists, it is loaded and used.
+                If provided and the file doesn't exist, processed features are
+                saved to this file.
+                If not provided, processed features are saved to cache_dir.
+                Defaults to None.
+            local_rank (int, optional): Local rank of the device in distributed
+                training. Defaults to -1, which means non-distributed training.
+
+        Returns:
+            S2SAbsSumDataset
+        """
         examples = []
         for item in sum_ds:
             examples.append(item)
@@ -198,6 +301,34 @@ class S2SAbsSumProcessor:
     def s2s_dataset_from_json_or_file(
         self, input_data, train_mode, cached_features_file=None, local_rank=-1
     ):
+        """
+        Converts input file or list of dictionaries to S2SAbsSumDataset.
+
+        Args:
+            input_data (str or list): Input file path or list of dictionaries.
+                The input file should be in the following format:
+                {"src": "abcdefg", "tgt": "ag"}
+                {"src": "hijklmn", "tgt": "hn"}
+                where the "src" field is the input text to summarize and the "tgt"
+                field is the summary.
+                The list of dictionaries should be in similar format:
+                [{"src": "abcdefg", "tgt": "ag"},
+                {"src": "hijklmn", "tgt": "hn"}]
+                The "tgt" field is optional if `train_mode` is False.
+            train_mode (bool): Whether the input data is for training or testing.
+            cached_features_file (str, optional): Path of the cached features file.
+                If provided and the file already exists, it is loaded and used.
+                If provided and the file doesn't exist, processed features are
+                saved to this file.
+                If not provided, processed features are saved to cache_dir.
+                Defaults to None.
+            local_rank (int, optional): Local rank of the device in distributed
+                training. Defaults to -1, which means non-distributed training.
+
+        Returns:
+            S2SAbsSumDataset
+        """
+
         s2s_dataset = S2SAbsSumProcessor.create_s2s_dataset(
             examples=input_data,
             train_mode=train_mode,
@@ -211,9 +342,32 @@ class S2SAbsSumProcessor:
 
 
 class S2SConfig:
-    """This class contains some default decoding settings that the users usually
-       don't need to change.
-       Will add more detailed docstrings for each option.
+    """
+    This class contains some default decoding settings that the users usually
+    don't need to change.
+
+    Args:
+        new_pos_ids (bool, optional): Whether to use new_pos_ids for LMs.
+            Defaults to False.
+        min_len (int, optional): Minimal length of the output.
+            Defaults to 1.
+        ngram_size (int, optional): Size of forbidden duplicate ngrams.
+            Defaults to 3.
+        mode (str, optional): Choose in "s2s" (sequence to sequence),
+            "l2r" (left to right), and "both". Defaults to "s2s".
+        s2s_special_token (bool, optional): If True, use a special cls token
+            at the beginning of the sequence. Otherwise, use sep token at
+            at the beginning of the sequence. Defaults to False.
+        s2s_add_segment (bool, optional): If True, use special segment id for
+            the first token. Otherwise, use the same segment id for the first
+            token and the first sequence. Defaults to False.
+        s2s_share_segment (bool, optional): If `s2s_add_segment=True` and
+            `s2s_share_segement=True`, sharing segment embeddings for the
+            encoder of S2S. Defaults to False.
+        pos_shift (bool, optional): Whether to use position shift for
+            fine-tuning. Defaults to False.
+
+
     """
 
     def __init__(
