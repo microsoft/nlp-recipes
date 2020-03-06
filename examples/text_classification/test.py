@@ -1,13 +1,16 @@
+import torch
+
 from utils_nlp.models.mtdnn.common.types import EncoderModelType
 from utils_nlp.models.mtdnn.configuration_mtdnn import MTDNNConfig
 from utils_nlp.models.mtdnn.modeling_mtdnn import MTDNNModel
 from utils_nlp.models.mtdnn.process_mtdnn import MTDNNDataProcess, MTDNNPipelineProcess
 from utils_nlp.models.mtdnn.tasks.config import MTDNNTaskDefs
 
+
 if __name__ == "__main__":
     config = MTDNNConfig()
-    #config.log_per_updates = 10
-    print(config)
+    # config.log_per_updates = 10
+    # print(config)
     # Define task parameters
     tasks_params = {
         "mnli": {
@@ -35,21 +38,11 @@ if __name__ == "__main__":
     task_defs = MTDNNTaskDefs(tasks_params)
 
     # Make the Data Preprocess step and update the config with training data updates
-    # data_processor = MTDNNDataProcess(
-    #     config=config,
-    #     task_defs=task_defs,
-    #     batch_size=8,
-    #     data_dir="/home/useradmin/sources/mt-dnn/data/canonical_data/bert_uncased_lower",
-    #     train_datasets_list=["mnli"],
-    #     test_datasets_list=["mnli_mismatched, mnli_matched"],
-    # )
-
-    # Make the Data Preprocess step and update the config with training data updates
     data_processor = MTDNNDataProcess(
         config=config,
         task_defs=task_defs,
         batch_size=16,
-        data_dir="D:/experiments/codes/mt-dnn-private/data/mt_dnn_uncased_lower",
+        data_dir="/home/useradmin/sources/mt-dnn/data/canonical_data/bert_uncased_lower",
         train_datasets_list=["mnli"],
         test_datasets_list=["mnli_mismatched", "mnli_matched"],
     )
@@ -60,15 +53,19 @@ if __name__ == "__main__":
 
     # Update config with data preprocess params
     config = data_processor.update_config(config)
-    
+
     # Update steps
-    num_all_batches = config.epochs * len(multitask_train_dataloader) // config.grad_accumulation_step
+    num_all_batches = (
+        config.epochs * len(multitask_train_dataloader) // config.grad_accumulation_step
+    )
 
     # Instantiate model
-    #import pdb; pdb.set_trace()
-    model = MTDNNModel(config, pretrained_model_name= "bert-base-uncased", num_train_step=num_all_batches,)
+    # import pdb; pdb.set_trace()
+    model = MTDNNModel(
+        config, pretrained_model_name="bert-base-uncased", num_train_step=num_all_batches,
+    )
     print("Network: ", model.network)
-    #import pdb; pdb.set_trace()
+
     # Create a process pipeline for training and inference
     pipeline_process = MTDNNPipelineProcess(
         model=model,
@@ -79,20 +76,18 @@ if __name__ == "__main__":
         test_dataloaders_list=test_dataloaders_list,
     )
     # Fit training data to model
-    pipeline_process.fit(1)
-    pipeline_process.predict(1)
+    checkpt = "/home/useradmin/sources/nlp-xiadong/nlp-recipes/checkpoint/model_0.pt"
 
-    # print("Config Class: ", b.config_class)
-    # print("Config: ", b.config)
-    # print("Pooler: ", b.pooler)
-    # print("Encoding: ", b.encoder)
-    # print("Embeddings: ", b.embeddings)
+    model_state_dict = torch.load(checkpt)
+    # new_model = load_state_dict(model_state_dict["state"], strict=False)
+    # self.optimizer.load_state_dict(model_state_dict["optimizer"])
+    # self.config = model_state_dict["config"]
+    # pipeline_process.fit(1)
+    import pdb
 
-    # if config.encoder_type == EncoderModelType.BERT:
-    #     print("Bert Config: ", b.bert_config)
+    pdb.set_trace()
 
-    # print("Archive Map: ", b.pretrained_model_archive_map)
-    # print("Base Model Prefix: ", b.base_model_prefix)
+    pipeline_process.predict(model_checkpoint=checkpt)
 
     # Training and inference
     # model.train(...)
