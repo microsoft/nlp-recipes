@@ -2,7 +2,7 @@
 # Licensed under the MIT License.
 
 # This script reuses some code from https://github.com/nlpyang/Presumm
-# HuggingFace's
+# This script reuses some code from https://github.com/huggingface/transformers/
 # Add to noticefile
 
 from collections import namedtuple
@@ -11,59 +11,67 @@ import logging
 import os
 import pickle
 import random
+import shutil
 
 import numpy as np
 import torch
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data.distributed import DistributedSampler
-from torch.utils.data import DataLoader, Dataset, IterableDataset, SequentialSampler
+from torch.utils.data import DataLoader, Dataset, IterableDataset, SequentialSampler, RandomSampler
 
 # from torch.utils.data.distributed import DistributedSampler
 from transformers import BertModel, DistilBertModel
 
-from bertsum.models import data_loader, model_builder
-from bertsum.models.data_loader import Batch
-from bertsum.models.model_builder import Summarizer
-from utils_nlp.common.pytorch_utils import compute_training_steps, get_device
-from utils_nlp.dataset.sentence_selection import combination_selection, greedy_selection
+from utils_nlp.common.pytorch_utils import compute_training_steps, get_device, get_amp, move_model_to_device, parallelize_model
 from utils_nlp.models.transformers.common import TOKENIZER_CLASS, Transformer
 
-from utils_nlp.common.pytorch_utils import get_amp, move_model_to_device, parallelize_model
-from .extractive_summarization import Bunch
 
 from torch.utils.data import SequentialSampler, RandomSampler, DataLoader
 
-MODEL_CLASS = {"bert-base-uncased": BertModel, "distilbert-base-uncased": DistilBertModel}
+MODEL_CLASS = {"bert-base-uncased": BertModel}
 
 logger = logging.getLogger(__name__)
 
 import sys
 
-# sys.path.insert(0, "/dadendev/PreSumm2/PreSumm/src")
-# sys.path.insert(0, "/dadendev/PreSumm2/PreSumm/src/models")
-from utils_nlp.models.transformers.bertabs import model_builder
-from utils_nlp.models.transformers.bertabs.model_builder import AbsSummarizer
-from utils_nlp.models.transformers.bertabs.loss import abs_loss
-from utils_nlp.models.transformers.bertabs.predictor import build_predictor
+from utils_nlp.models.transformers.bertsum import model_builder
+from utils_nlp.models.transformers.bertsum.model_builder import AbsSummarizer
+from utils_nlp.models.transformers.bertsum.loss import abs_loss
+from utils_nlp.models.transformers.bertsum.predictor import build_predictor
 
-from utils_nlp.dataset.cnndm import CNNDMBertSumProcessedData, CNNDMSummarizationDataset
+from utils_nlp.dataset.cnndm import CNNDMSummarizationDataset
 from utils_nlp.models.transformers.datasets import SummarizationNonIterableDataset
 from utils_nlp.eval.evaluate_summarization import get_rouge
 
 from tempfile import TemporaryDirectory
 
-from utils_nlp.common.pytorch_utils import get_device
 
 def shorten_dataset(dataset, top_n=-1):
+    """ Shorten the dataset to be the top_n examples
+    Args:
+        dataset (SummarizationNonIterableDataset): dataset to be shortened.
+        top_n (long): the number of the examples returned.
+
+    Returns:
+        dataset (SummarizationNonIterableDataset): shortened dataset.
+
+    """
     if top_n == -1:
         return dataset
     return SummarizationNonIterableDataset(dataset.source[0:top_n], dataset.target[0:top_n])
 
 
-
 def fit_to_block_size(sequence, block_size, pad_token_id):
     """ Adapt the source and target sequences' lengths to the block size.
     If the sequence is shorter we append padding token to the right of the sequence.
+
+    Args:
+        sequence (list): sequence to be truncated to padded
+        block_size (int): length of the output
+
+    Returns:
+        sequence (list): padded or shortend list
+
     """
     if len(sequence) > block_size:
         return sequence[:block_size]
@@ -74,7 +82,16 @@ def fit_to_block_size(sequence, block_size, pad_token_id):
 
 def build_mask(sequence, pad_token_id):
     """ Builds the mask. The attention mechanism will only attend to positions
-    with value 1. """
+    with value 1. 
+    
+    Args:
+        sequence (list): sequences for which the mask is built for.
+        pad_token_id (long): padding token id for which the mask is 0.
+
+    Returns:
+        mask (list): sequences of 1s and 0s.
+    
+    """
     mask = torch.ones_like(sequence)
     idx_pad_tokens = sequence == pad_token_id
     mask[idx_pad_tokens] = 0
@@ -84,11 +101,16 @@ def build_mask(sequence, pad_token_id):
 def compute_token_type_ids(batch, separator_token_id):
     """ Segment embeddings as described in [1]
     The values {0,1} were found in the repository [2].
-    Attributes:
-        batch: torch.Tensor, size [batch_size, block_size]
+
+    Args:
+        batch (torch.Tensor, size [batch_size, block_size]):
             Batch of input.
         separator_token_id: int
             The value of the token that separates the segments.
+
+    Returns:
+        torch.Tensor, size [batch_size, block_size]): segment embeddings.
+
     [1] Liu, Yang, and Mirella Lapata. "Text summarization with pretrained encoders."
         arXiv preprint arXiv:1908.08345 (2019).
     [2] https://github.com/nlpyang/PreSumm (/src/prepro/data_builder.py, commit fac1217)
@@ -105,8 +127,8 @@ def compute_token_type_ids(batch, separator_token_id):
     return torch.tensor(batch_embeddings)
 
 
-class AbsSumProcessor:
-    """Class for preprocessing extractive summarization data."""
+class BertSumAbsProcessor:
+    """Class for preprocessing abstractive summarization data for BertSumAbs algorithm."""
 
     def __init__(
         self,
@@ -125,9 +147,11 @@ class AbsSumProcessor:
                 tokenization. This is determined by if a cased model is used.
                 Defaults to False, which corresponds to a cased model.
             cache_dir (str, optional): Directory to cache the tokenizer. Defaults to ".".
-            max_src_ntokens (int, optional): Max number of tokens that be used
-                as input. Defaults to 512.
-        
+            max_src_len (int, optional): Max number of tokens that be used
+                as input. Defaults to 640.
+            max_target_len (int, optional): Max number of tokens that be used
+                as in target. Defaults to 140.
+
         """
         self.model_name = model_name
         self.tokenizer = TOKENIZER_CLASS[self.model_name].from_pretrained(
@@ -163,8 +187,8 @@ class AbsSumProcessor:
     def model_name(self, value):
         if value not in self.list_supported_models():
             raise ValueError(
-                "Model name {} is not supported by ExtSumProcessor. "
-                "Call 'ExtSumProcessor.list_supported_models()' to get all supported model "
+                "Model name {} is not supported by BertSumAbsProcessor. "
+                "Call 'BertSumAbsProcessor.list_supported_models()' to get all supported model "
                 "names.".format(value)
             )
 
@@ -176,9 +200,10 @@ class AbsSumProcessor:
         Creates an input dictionary given a model name.
 
         Args:
-            batch (object): A Batch containing input ids, segment ids, sentence class ids,
-                masks for the input ids, masks for  sentence class ids and source text.
-                If train_model is True, it also contains the labels and target text.
+            batch (object): A Batch containing input ids, segment ids, 
+                masks for the input ids and source text. If train_mode is True, it
+                also contains the target ids and the number of tokens 
+                in the target and target text.
             device (torch.device): A PyTorch device.
             model_name (bool, optional): Model name used to format the inputs.
             train_mode (bool, optional): Training mode flag.
@@ -186,11 +211,11 @@ class AbsSumProcessor:
 
         Returns:
             dict: Dictionary containing input ids, segment ids, sentence class ids,
-            masks for the input ids, masks for the sentence class ids and labels.
-            Labels are only returned when train_mode is True.
+            masks for the input ids. Target ids and number of tokens in the target are
+            only returned when train_mode is True.
         """
 
-        if model_name.split("-")[0] in ["bert", "distilbert"]:
+        if model_name.split("-")[0] in ["bert"]:
             if train_mode:
                 # labels must be the last
 
@@ -213,8 +238,20 @@ class AbsSumProcessor:
     def collate(self, data, block_size, device, train_mode=True):
         """ Collate formats the data passed to the data loader.
         In particular we tokenize the data batch after batch to avoid keeping them
-        all in memory. We output the data as a namedtuple to fit the original BertAbs's
-        API.
+        all in memory. 
+
+        Args:
+            data (list of (str, str)): input data to be loaded.
+            block_size (long): size of the encoded data to be passed into the data loader
+            device (torch.device): A PyTorch device.
+            train_mode (bool, optional): Training mode flag.
+                Defaults to True.
+
+        Returns:
+            namedtuple: a nametuple containing input ids, segment ids,
+                masks for the input ids and source text. If train_mode is True, it
+                also contains the target ids and the number of tokens
+                in the target and target text.
         """
         data = [x for x in data if not len(x[1]) == 0]  # remove empty_files
         stories = [" ".join(story) for story, _ in data]
@@ -222,9 +259,7 @@ class AbsSumProcessor:
 
 
         encoded_text = [self.preprocess(story, summary) for story, summary in data]
-        # print(encoded_text[0])
 
-        # """"""
         encoded_stories = torch.tensor(
             [
                 fit_to_block_size(story, block_size, self.tokenizer.pad_token_id)
@@ -235,12 +270,12 @@ class AbsSumProcessor:
             encoded_stories, self.tokenizer.cls_token_id
         )
         encoder_mask = build_mask(encoded_stories, self.tokenizer.pad_token_id)
-        # """
 
         if train_mode:
             encoded_summaries = torch.tensor(
                 [
-                    [self.tgt_bos] + fit_to_block_size(summary, block_size-2, self.tokenizer.pad_token_id)
+                    [self.tgt_bos] + fit_to_block_size(summary, block_size-2, 
+                        self.tokenizer.pad_token_id)
                     +[self.tgt_eos]
                     for _, summary in encoded_text
                 ]
@@ -265,7 +300,7 @@ class AbsSumProcessor:
             )
             batch = Batch(
                 # document_names=None,
-                batch_size=len(encoded_stories),
+                # batch_size=len(encoded_stories),
                 src=encoded_stories.to(device),
                 segs=encoder_token_type_ids.to(device),
                 mask_src=encoder_mask.to(device),
@@ -278,7 +313,7 @@ class AbsSumProcessor:
             Batch = namedtuple("Batch", ["batch_size", "src", "segs", "mask_src"])
             batch = Batch(
                 # document_names=None,
-                batch_size=len(encoded_stories),
+                i# batch_size=len(encoded_stories),
                 src=encoded_stories.to(device),
                 segs=encoder_token_type_ids.to(device),
                 mask_src=encoder_mask.to(device),
@@ -290,17 +325,16 @@ class AbsSumProcessor:
         """preprocess multiple data points
 
            Args:
-              sources (list of list of strings): List of word tokenized sentences.
-              targets (list of list of strings, optional): List of word tokenized sentences.
+              story_lines (list of strings): List of sentences.
+              targets (list of strings, optional): List of sentences.
                   Defaults to None, which means it doesn't include summary and is
                   not training data.
 
             Returns:
-                Iterator of dictory objects containing input ids, segment ids, sentence class ids,
-                labels, source text and target text. If targets is None, the label and target text
-                are None.
+                If summary_lines is None, return list of list of token ids. Otherwise,
+                return a tuple of (list of list of token ids, list of list of token ids).
+
         """
-        # story_lines_token_ids = [self.tokenizer.encode(line, max_length=self.max_len) for line in story_lines]
         story_lines_token_ids = []
         for line in story_lines:
             try:
@@ -330,7 +364,17 @@ class AbsSumProcessor:
         else:
             return story_token_ids
 
-def validate(summarizer, validate_sum_dataset, cache_dir):
+def validate(summarizer, validate_sum_dataset):
+    """ validation function to be used optionally in fine tuning.
+
+    Args:
+        summarizer(BertSumAbs): The summarizer under fine tuning.
+        validate_sum_dataset (SummarizationNonIterableDataset): dataset for validation.
+
+    Returns:
+        string: a string which contains the rouge score on a subset of the validation dataset
+
+    """
     TOP_N = 8
 
     src = validate_sum_dataset.source[0:TOP_N]
@@ -339,22 +383,19 @@ def validate(summarizer, validate_sum_dataset, cache_dir):
         shorten_dataset(validate_sum_dataset, top_n=TOP_N), num_gpus=1, batch_size=4
     )
     assert len(generated_summaries) == len(reference_summaries)
-    for i in generated_summaries[0:1]:
-        print(i)
-        print("\n")
-        print("###################")
-
-    for i in reference_summaries[0:1]:
-        print(i)
-        print("\n")
+    print("###################")
+    print("prediction is {}".format(generated_summaries[0]))
+    print("reference is {}".format(reference_summaries[0]))
 
     RESULT_DIR = TemporaryDirectory().name
     rouge_score = get_rouge(generated_summaries, reference_summaries, RESULT_DIR)
+    shutil.rmtree(RESULT_DIR, ignore_errors=True)
     return "rouge score: {}".format(rouge_score)
 
 
-class AbsSum(Transformer):
-    """class which performs abstractive summarization fine tuning and prediction """
+class BertSumAbs(Transformer):
+    """class which performs abstractive summarization fine tuning and 
+        prediction based on BertSumAbs model  """
 
     def __init__(
         self,
@@ -364,24 +405,24 @@ class AbsSum(Transformer):
         cache_dir=".",
         label_smoothing=0.1,
         test=False,
-        max_pos=768,
+        max_pos_length=768,
     ):
-        """Initialize a ExtractiveSummarizer.
+        """Initialize an object of BertSumAbs.
 
         Args:
-            model_name (str, optional): Transformer model name used in preprocessing.
-                check MODEL_CLASS for supported models. Defaults to "distilbert-base-uncased".
-            encoder (str, optional): Encoder algorithm used by summarization layer.
-                There are four options:
-                    - baseline: it used a smaller transformer model to replace the bert model
-                      and with transformer summarization layer.
-                    - classifier: it uses pretrained BERT and fine-tune BERT with simple logistic
-                      classification summarization layer.
-                    - transformer: it uses pretrained BERT and fine-tune BERT with transformer
-                      summarization layer.
-                    - RNN: it uses pretrained BERT and fine-tune BERT with LSTM summarization layer.
-                Defaults to "transformer".
+            processor (BertSumAbsProcessor): A processor with symbols, tokenizers
+                and collate functions that are used in finetuning and prediction.
+            model_name (str, optional:) Name of the pretrained model which is used
+                to initialize the encoder of the BertSumAbs model.
+                check MODEL_CLASS for supported models. Defaults to "bert-base-uncased".
+            finetune_bert (bool, option): Whether the bert model in the encoder is
+                finetune or not. Defaults to True.
             cache_dir (str, optional): Directory to cache the tokenizer. Defaults to ".".
+            label_smoothing (float, optional): Defaults to 0.1.
+            test (bool, optional): Whether the class is initiated for test or not.
+                Defaults to False.
+            max_pos_length (int, optional): maximum postional embedding length for the
+                input. Defaults to 768.
         """
 
         super().__init__(
@@ -389,8 +430,8 @@ class AbsSum(Transformer):
         )
         if model_name not in self.list_supported_models():
             raise ValueError(
-                "Model name {} is not supported by ExtractiveSummarizer. "
-                "Call 'ExtractiveSummarizer.list_supported_models()' to get all supported model "
+                "Model name {} is not supported by BertSumAbs. "
+                "Call 'BertSumAbs.list_supported_models()' to get all supported model "
                 "names.".format(value)
             )
 
@@ -452,7 +493,7 @@ class AbsSum(Transformer):
         Fine-tune pre-trained transofmer models for extractive summarization.
 
         Args:
-            train_dataset (ExtSumProcessedIterableDataset): Training dataset.
+            train_dataset (SummarizationNonIterableDataset): Training dataset.
             num_gpus (int, optional): The number of GPUs to use. If None, all available GPUs will
                 be used. If set to 0 or GPUs are not available, CPU device will
                 be used. Defaults to None.
