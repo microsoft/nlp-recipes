@@ -7,7 +7,7 @@ import nltk
 import pytest
 from nltk import tokenize
 
-from utils_nlp.models.transformers.datasets import SummarizationDataset
+from utils_nlp.models.transformers.datasets import IterableSummarizationDataset
 from utils_nlp.models.transformers.extractive_summarization import (
     ExtractiveSummarizer,
     ExtSumProcessedData,
@@ -51,14 +51,14 @@ def data_to_file(tmp_module):
     f = open(target_file, "w")
     f.write(target)
     f.close()
-    train_dataset = SummarizationDataset(
+    train_dataset = IterableSummarizationDataset(
         source_file,
         target_file,
         [tokenize.sent_tokenize],
         [tokenize.sent_tokenize],
         nltk.word_tokenize,
     )
-    test_dataset = SummarizationDataset(
+    test_dataset = IterableSummarizationDataset(
         source_file,
         target_file,
         [tokenize.sent_tokenize],

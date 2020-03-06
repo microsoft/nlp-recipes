@@ -1,0 +1,39 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT License.
+
+import papermill as pm
+import pytest
+import scrapbook as sb
+from tests.notebooks_common import KERNEL_NAME, OUTPUT_NOTEBOOK
+
+ABS_TOL = 0.02
+
+
+@pytest.mark.gpu
+@pytest.mark.integration
+@pytest.mark.skip(
+    reason="s2s-ft not available on PYPI and can not be included in "
+    "generate_conda_file.py"
+)
+def test_unilm_abstractive_summarization(notebooks, tmp):
+    notebook_path = notebooks["unilm_abstractive_summarization"]
+    pm.execute_notebook(
+        notebook_path,
+        OUTPUT_NOTEBOOK,
+        kernel_name=KERNEL_NAME,
+        parameters=dict(
+            QUICK_RUN=True,
+            TOP_N=100,
+            WARMUP_STEPS=5,
+            MAX_STEPS=50,
+            GRADIENT_ACCUMULATION_STEPS=1,
+            TEST_PER_GPU_BATCH_SIZE=2,
+            BEAM_SIZE=3,
+            MODEL_DIR=tmp,
+            RESULT_DIR=tmp,
+        ),
+    )
+    result = sb.read_notebook(OUTPUT_NOTEBOOK).scraps.data_dict
+    assert pytest.approx(result["rouge_1_f_score"], 0.2, abs=ABS_TOL)
+    assert pytest.approx(result["rouge_2_f_score"], 0.07, abs=ABS_TOL)
+    assert pytest.approx(result["rouge_l_f_score"], 0.16, abs=ABS_TOL)
