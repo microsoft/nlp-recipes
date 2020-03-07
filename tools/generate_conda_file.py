@@ -96,6 +96,8 @@ PIP_BASE = {
     "Cython": "Cython>=0.29.13",
     "googledrivedownloader": "googledrivedownloader>=0.4",
     "methodtools": "methodtools",
+    "s2s-ft": "-e git+https://github.com/microsoft/unilm.git"
+    "@7f931fcfb965bf60f0fbe2ddd37798f356e6ee5e#egg=s2s-ft&subdirectory=s2s-ft",
 }
 
 PIP_GPU = {}
@@ -150,7 +152,7 @@ if __name__ == "__main__":
     pip_packages = PIP_BASE
 
     # update conda and pip packages based on flags provided
-    CONDA_GPU["cudatoolkit"] = "cudatoolkit=" + args.cuda_version 
+    CONDA_GPU["cudatoolkit"] = "cudatoolkit=" + args.cuda_version
     if args.gpu:
         conda_packages.update(CONDA_GPU)
         pip_packages.update(PIP_GPU)

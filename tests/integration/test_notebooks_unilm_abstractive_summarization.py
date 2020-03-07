@@ -11,10 +11,6 @@ ABS_TOL = 0.02
 
 @pytest.mark.gpu
 @pytest.mark.integration
-@pytest.mark.skip(
-    reason="s2s-ft not available on PYPI and can not be included in "
-    "generate_conda_file.py"
-)
 def test_unilm_abstractive_summarization(notebooks, tmp):
     notebook_path = notebooks["unilm_abstractive_summarization"]
     pm.execute_notebook(
