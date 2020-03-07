@@ -288,7 +288,6 @@ class BertSumAbsProcessor:
             Batch = namedtuple(
                 "Batch",
                 [
-                    "batch_size",
                     "src",
                     "segs",
                     "mask_src",
@@ -310,10 +309,10 @@ class BertSumAbsProcessor:
                 tgt_str=summaries,
             )
         else:
-            Batch = namedtuple("Batch", ["batch_size", "src", "segs", "mask_src"])
+            Batch = namedtuple("Batch", ["src", "segs", "mask_src"])
             batch = Batch(
                 # document_names=None,
-                i# batch_size=len(encoded_stories),
+                # batch_size=len(encoded_stories),
                 src=encoded_stories.to(device),
                 segs=encoder_token_type_ids.to(device),
                 mask_src=encoder_mask.to(device),
@@ -418,7 +417,7 @@ class BertSumAbs(Transformer):
             finetune_bert (bool, option): Whether the bert model in the encoder is
                 finetune or not. Defaults to True.
             cache_dir (str, optional): Directory to cache the tokenizer. Defaults to ".".
-            label_smoothing (float, optional): Defaults to 0.1.
+            label_smoothing (float, optional): The amount of label smoothing. Value range is [0, 1]. Defaults to 0.1.
             test (bool, optional): Whether the class is initiated for test or not.
                 Defaults to False.
             max_pos_length (int, optional): maximum postional embedding length for the
@@ -437,7 +436,7 @@ class BertSumAbs(Transformer):
 
         self.model_class = MODEL_CLASS[model_name]
         self.cache_dir = cache_dir
-        self.max_pos = max_pos
+        self.max_pos_length = max_pos_length
 
         self.model = AbsSummarizer(
             temp_dir=cache_dir,
@@ -446,7 +445,7 @@ class BertSumAbs(Transformer):
             label_smoothing=label_smoothing,
             symbols=processor.symbols,
             test=test,
-            max_pos=self.max_pos,
+            max_pos=self.max_pos_length,
         )
         self.processor = processor
         self.optim_bert = None
@@ -466,9 +465,9 @@ class BertSumAbs(Transformer):
         gpu_ids=None,
         batch_size=4,
         local_rank=-1,
-        max_steps=5e5,
-        warmup_steps_bert=8000,
-        warmup_steps_dec=8000,
+        max_steps=5e4,
+        warmup_steps_bert=20000,
+        warmup_steps_dec=10000,
         learning_rate_bert=0.002,
         learning_rate_dec=0.2,
         optimization_method="adam",
@@ -481,10 +480,10 @@ class BertSumAbs(Transformer):
         save_every=100,
         verbose=True,
         seed=None,
-        fp16=True,
+        fp16=False,
         fp16_opt_level="O2",
         world_size=1,
-        rank=0,
+        rank=-1,
         validation_function=None,
         checkpoint=None,
         **kwargs,
@@ -504,25 +503,37 @@ class BertSumAbs(Transformer):
             local_rank (int, optional): Local_rank for distributed training on GPUs. Defaults to
                 -1, which means non-distributed training.
             max_steps (int, optional): Maximum number of training steps. Defaults to 5e5.
-            warmup_steps (int, optional): Number of steps taken to increase learning rate from 0
-                to `learning_rate`. Defaults to 1e5.
-            learning_rate (float, optional):  Learning rate of the AdamW optimizer. Defaults to
-                5e-5.
-            optimization_method (string, optional): Optimization method used in fine tuning.
+            warmup_steps_bert (int, optional): Number of steps taken to increase learning rate from 0
+                to `learning_rate` for tuning the BERT encoder. Defaults to 2e4.
+            warmup_steps_dec (int, optional): Number of steps taken to increase learning rate from 0
+                to `learning_rate` for tuning the decoder. Defaults to 1e4.
+            learning_rate_bert (float, optional):  Learning rate of the optimizer for the encoder. Defaults to
+                0.002.
+            learning_rate_dec (float, optional):  Learning rate of the optimizer for the decoder. Defaults to
+                0.2.
+            optimization_method (string, optional): Optimization method used in fine tuning. Defaults to "adam".
             max_grad_norm (float, optional): Maximum gradient norm for gradient clipping.
                 Defaults to 0.
-            gradient_accumulation_steps (int, optional): Number of batches to accumulate
-                gradients on between each model parameter update. Defaults to 1.
-            decay_method (string, optional): learning rate decrease method. Default to 'noam'.
-            report_every (int, optional): The interval by steps to print out the trainint log.
-                Defaults to 50.
             beta1 (float, optional): The exponential decay rate for the first moment estimates.
                 Defaults to 0.9.
             beta2 (float, optional): The exponential decay rate for the second-moment estimates.
                 This value should be set close to 1.0 on problems with a sparse gradient.
                 Defaults to 0.99.
+            decay_method (string, optional): learning rate decrease method. Default to 'noam'.
+            gradient_accumulation_steps (int, optional): Number of batches to accumulate
+                gradients on between each model parameter update. Defaults to 1.
+            report_every (int, optional): The interval by steps to print out the trainint log.
+                Defaults to 10.
+            save_every (int, optional): The interval by steps to save the finetuned model.
+                Defaults to 100.
+           
             verbose (bool, optional): Whether to print out the training log. Defaults to True.
             seed (int, optional): Random seed used to improve reproducibility. Defaults to None.
+            fp16 (bool, optional): Whether to use mixed precision training. Defaults to False.
+            fp16_opt_level (str, optional): optimization level, refer to https://nvidia.github.io/apex/amp.html#opt-levels for details. Value choices are: "O0", "O1", "O2", "O3". Defaults to "O2".
+            world_size (int, optional): Total number of GPUs that will be used. Defaults to 1.
+            rank (int): Rank of the current GPU. Defaults to -1.
+            validation_function
         """
 
         # get device
@@ -554,13 +565,8 @@ class BertSumAbs(Transformer):
             warmup_steps_dec=warmup_steps_dec,
         )
         #"""
-        self.scheduler_bert = torch.optim.lr_scheduler.CyclicLR(self.optim_bert.optimizer,cycle_momentum=False, base_lr=2e-3,max_lr=1e-2,step_size_up=2000)
-        self.scheduler_dec = torch.optim.lr_scheduler.CyclicLR(self.optim_dec.optimizer, cycle_momentum=False, base_lr=2e-1,max_lr=5e-1,step_size_up=2000)
-
 
         optimizers = [self.optim_bert, self.optim_dec]
-        schedulers = [self.scheduler_bert, self.scheduler_dec]
-
 
         self.amp = get_amp(fp16)
         if self.amp:
@@ -592,7 +598,7 @@ class BertSumAbs(Transformer):
             sampler = DistributedSampler(train_dataset, num_replicas=world_size, rank=rank)
 
         def collate_fn(data):
-            return self.processor.collate(data, block_size=self.max_pos, device=device)
+            return self.processor.collate(data, block_size=self.max_pos_length, device=device)
 
         train_dataloader = DataLoader(
             train_dataset, 
@@ -610,7 +616,7 @@ class BertSumAbs(Transformer):
 
         super().fine_tune(
             train_dataloader=train_dataloader,
-            get_inputs=AbsSumProcessor.get_inputs,
+            get_inputs=BertSumAbsProcessor.get_inputs,
             device=device,
             num_gpus=num_gpus,
             max_steps=max_steps,
@@ -623,7 +629,7 @@ class BertSumAbs(Transformer):
             save_every=save_every,
             clip_grad_norm=False,
             optimizer=optimizers,
-            scheduler=schedulers,
+            scheduler=None,
             fp16=fp16,
             amp=self.amp,
             validation_function=validation_function,
@@ -633,8 +639,8 @@ class BertSumAbs(Transformer):
         self,
         test_dataset,
         num_gpus=1,
-        local_rank=-1,
         gpu_ids=None,
+        local_rank=-1,
         batch_size=16,
         alpha=0.6,
         beam_size=5,
@@ -642,27 +648,25 @@ class BertSumAbs(Transformer):
         max_length=150,
         fp16=False,
         verbose=True,
-        max_seq_length=768,
     ):
         """
         Predict the summarization for the input data iterator.
 
         Args:
-            test_dataset (Dataset): Dataset for which the summary to be predicted
+            test_dataset (SummarizationNonIterableDataset): Dataset for which the summary to be predicted
             num_gpus (int, optional): The number of GPUs used in prediction. Defaults to 1.
             gpu_ids (list): List of GPU IDs to be used.
                 If set to None, the first num_gpus GPUs will be used.
                 Defaults to None.
+            local_rank (int, optional): Local rank of the device in distributed
+                inferencing. Defaults to -1, which means non-distributed inferencing.
             batch_size (int, optional): The number of test examples in each batch. Defaults to 16.
-            sentence_separator (str, optional): String to be inserted between sentences in
-                the prediction. Defaults to '<q>'.
-            top_n (int, optional): The number of sentences that should be selected
-                from the paragraph as summary. Defaults to 3.
-            block_trigram (bool, optional): voolean value which specifies whether
-                the summary should include any sentence that has the same trigram
-                as the already selected sentences. Defaults to True.
-            cal_lead (bool, optional): Boolean value which specifies whether the
-                prediction uses the first few sentences as summary. Defaults to False.
+            alpha (float, optional): Length penalty. Defaults to 0.6.
+            beam_size (int, optional): Beam size of beam search. Defaults to 5.
+            min_length (int, optional): Minimum number of tokens in the output sequence. Defaults to 15.
+            max_length (int, optional):  Maximum number of tokens in output
+                sequence. Defaults to 150.
+            fp16 (bool, optional): Whether to use half-precision model for prediction. Defaults to False.
             verbose (bool, optional): Whether to print out the training log. Defaults to True.
 
         Returns:
@@ -697,7 +701,7 @@ class BertSumAbs(Transformer):
         test_sampler = SequentialSampler(test_dataset)
 
         def collate_fn(data):
-            return self.processor.collate(data, max_seq_length, device, train_mode=False)
+            return self.processor.collate(data, self.max_pos_length, device, train_mode=False)
 
         test_dataloader = DataLoader(
             test_dataset, sampler=test_sampler, batch_size=batch_size, collate_fn=collate_fn,
@@ -753,6 +757,7 @@ class BertSumAbs(Transformer):
         save the trained model.
 
         Args:
+            global_step (int, optional): The number of steps that the model has been finetuned for. Defaults to None.
             full_name (str, optional): File name to save the model's `state_dict()`. If it's None,
                 the model is going to be saved under "fine_tuned" folder of the cached directory
                 of the object. Defaults to None.
