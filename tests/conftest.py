@@ -88,6 +88,9 @@ def notebooks():
         "extractive_summarization_cnndm_transformer": os.path.join(
             folder_notebooks, "text_summarization", "extractive_summarization_cnndm_transformer.ipynb"
         ),
+        "abstractive_summarization_bertsumabs_cnndm": os.path.join(
+            folder_notebooks, "text_summarization", "abstractive_summarization_bertsumabs_cnndm.ipynb"
+        ),
     }
     return paths
 

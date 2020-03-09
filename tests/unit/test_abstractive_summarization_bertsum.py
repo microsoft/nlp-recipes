@@ -1,8 +1,5 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
-import sys
-
-sys.path.insert(0, "../../")
 
 import argparse
 import os
@@ -17,17 +14,14 @@ from utils_nlp.models.transformers.datasets import (
     SummarizationDataset,
     SummarizationNonIterableDataset,
 )
-from utils_nlp.models.transformers.abssum import AbsSum, AbsSumProcessor, validate
-from utils_nlp.models.transformers.bertabs import model_builder
-
-from utils_nlp.dataset.cnndm import CNNDMBertSumProcessedData, CNNDMSummarizationDataset
+from utils_nlp.dataset.cnndm import CNNDMSummarizationDataset
+from utils_nlp.models.transformers.abstractive_summarization_bertsum import BertSumAbs, BertSumAbsProcessor, validate
 from utils_nlp.models.transformers.datasets import SummarizationNonIterableDataset
 from utils_nlp.eval.evaluate_summarization import get_rouge
 
-CACHE_PATH = "/dadendev/nlp-recipes/examples/text_summarization/abstemp"
-DATA_PATH = "/dadendev/nlp-recipes/examples/text_summarization/abstemp"
-MODEL_PATH = "/dadendev/nlp-recipes/examples/text_summarization/abstemp"
-TOP_N = 10
+#CACHE_PATH = tmp_module #"/dadendev/nlp-recipes/examples/text_summarization/abstemp"
+#DATA_PATH = tmp_module  #"/dadendev/nlp-recipes/examples/text_summarization/abstemp"
+#MODEL_PATH = tmp_module #"/dadendev/nlp-recipes/examples/text_summarization/abstemp"
 
 # @pytest.fixture()
 def source_data():
@@ -52,46 +46,39 @@ def target_data():
     ]
 
 
-MODEL_NAME = "distilbert-base-uncased"
-NUM_GPUS = 1
+NUM_GPUS = 2
 os.environ["NCCL_IB_DISABLE"] = "0"
 
-def test_preprocessing():
+@pytest.fixture(scope="module")
+def test_dataset_for_bertsumabs(tmp_module):
+    CACHE_PATH = tmp_module #"/dadendev/nlp-recipes/examples/text_summarization/abstemp"
+
+
     source = source_data()
     target = target_data()
-    print(source)
-    print(target)
-    processor = AbsSumProcessor()
+    processor = BertSumAbsProcessor(cache_dir=CACHE_PATH)
     train_dataset = SummarizationNonIterableDataset(source, target)
+    test_dataset = SummarizationNonIterableDataset(source, target)
     batch = processor.collate(train_dataset, 512, "cuda:0")
-    print(batch)
-    print(len(batch.src[0]))
-
-def test_collate():
-    test_data_path = os.path.join(DATA_PATH, "test_abssum_dataset_full.pt")
-    test_sum_dataset = torch.load(test_data_path)
-    temp = shorten_dataset(test_sum_dataset, top_n=2)
-    processor = AbsSumProcessor()
-    batch = processor.collate(temp, 512, "cuda:0")
-    print(batch.tgt)
-    print(batch.tgt_num_tokens)
-    #print(len(batch.src[0]))
+    assert len(batch.src) == 3
+    return train_dataset, test_dataset
 
 def shorten_dataset(dataset, top_n=-1):
     if top_n == -1:
         return dataset
     return SummarizationNonIterableDataset(dataset.source[0:top_n], dataset.target[0:top_n])
 
+#def finetuned_model():
+#    return os.path.join(MODEL_PATH, "dist_extsum_model.pt_step13000")
+#    # return os.path.join(MODEL_PATH, "new_model_step_148000_torch1.4.0.pt")
 
-# @pytest.fixture(scope="module")
-def pretrained_model():
-    return torch.load(os.path.join(MODEL_PATH, "model_step_148000_torch1.4.0.pt"))
-
-def preprocess_cnndm_abs():
-    #TOP_N = -1
-    train_data_path = os.path.join(DATA_PATH, "train_abssum_dataset_full.pt")
-    test_data_path = os.path.join(DATA_PATH, "test_abssum_dataset_full.pt")
-    if False:
+"""
+#def preprocess_cnndm_abs(top_n=8, need_process=True):
+    if need_process is False:
+        top_n = "full"
+    train_data_path = os.path.join(DATA_PATH, "train_abssum_dataset_{}.pt".format(top_n))
+    test_data_path = os.path.join(DATA_PATH, "test_abssum_dataset_{}.pt".format(top_n))
+    if need_process:
         print("processing data")
         train_dataset, test_dataset = CNNDMSummarizationDataset(
             top_n=TOP_N, local_cache_path=DATA_PATH, prepare_extractive=False
@@ -104,133 +91,56 @@ def preprocess_cnndm_abs():
         target = [x[0] for x in list(train_dataset.get_target())]
         train_sum_dataset = SummarizationNonIterableDataset(source, target)
         
-        if TOP_N == -1:
-            torch.save(train_sum_dataset, train_data_path)
-            torch.save(test_sum_dataset, test_data_path)
+        torch.save(train_sum_dataset, train_data_path)
+        torch.save(test_sum_dataset, test_data_path)
 
     else:
         train_sum_dataset = torch.load(train_data_path)
         test_sum_dataset = torch.load(test_data_path)
     return train_sum_dataset, test_sum_dataset
+"""
+
+@pytest.mark.gpu
+@pytest.fixture()
+def test_train_model(tmp_module, test_dataset_for_bertsumabs, batch_size=1):
+    CACHE_PATH = tmp_module #"/dadendev/nlp-recipes/examples/text_summarization/abstemp"
+    DATA_PATH = tmp_module  #"/dadendev/nlp-recipes/examples/text_summarization/abstemp"
+    MODEL_PATH = tmp_module #"/dadendev/nlp-recipes/examples/text_summarization/abstemp"
 
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--rank", type=int, default=0,
-                    help="The rank of the current node in the cluster")
-parser.add_argument("--dist_url", type=str, default="tcp://127.0.0.1:29502",
-                    help="URL specifying how to initialize the process groupi.")
-
-parser.add_argument("--node_count", type=int, default=1,
-                    help="Number of nodes in the cluster.")
-def main():
-
-    #shutil.rmtree(args.output_dir)
-    args = parser.parse_args()
-    ngpus_per_node = 1 #torch.cuda.device_count()
-    processor = AbsSumProcessor(cache_dir=CACHE_PATH)
-    summarizer = AbsSum(
-        processor, cache_dir=CACHE_PATH
-    )
-    mp.spawn(main_worker, nprocs=ngpus_per_node, args=(ngpus_per_node, summarizer,  args))
-
-
-def main_worker(local_rank, ngpus_per_node, summarizer, args):
-    rank = args.rank * ngpus_per_node + local_rank
-    world_size = args.node_count * ngpus_per_node
-    print("world_size is {}".format(world_size))
-    print("local_rank is {} and rank is {}".format(local_rank, rank))
-    
-    
-    torch.distributed.init_process_group(
-        backend="nccl",
-        init_method=args.dist_url,
-        world_size=world_size,
-        rank=rank,
-      )
-
-    #torch.cuda.set_device(local_rank)
-    #checkpoint = torch.load(os.path.join(MODEL_PATH, "summarizer_step20000_with_global_step.pt"))
-    checkpoint = None
-    train_sum_dataset, test_sum_dataset = preprocess_cnndm_abs()
-    def this_validate(class_obj):
-        return validate(class_obj, test_sum_dataset, CACHE_PATH)
-
-    if rank not in [-1, 0]:
-        save_every = -1
-        this_validate = None
-    else:
-        save_every = 400
-
-    #summarizer.model.load_checkpoint(checkpoint['model'])
-    summarizer.fit(
-        train_sum_dataset,
-        world_size=world_size,
-        num_gpus=None,
-        local_rank=local_rank,
-        rank=rank,
-        batch_size=8,
-        max_steps=50000/world_size,
-        learning_rate_bert=0.003,
-        learning_rate_dec=0.3,
-        warmup_steps_bert=20000,
-        warmup_steps_dec=10000,
-        save_every=save_every,
-        report_every=10,
-        validation_function=this_validate,
-        fp16=True,
-        fp16_opt_level="O2",
-        checkpoint=None
-    )
-    if rank == 0 or local_rank == -1:
-        saved_model_path = os.path.join(MODEL_PATH, "summarizer_step70000_with_glocal_step.pt")
-        summarizer.save_model(70000, saved_model_path)
-
-
-    dist.destroy_process_group()
-
-    
-
-def test_train_model():
-    processor = AbsSumProcessor(cache_dir=CACHE_PATH)
-    summarizer = AbsSum(
+    processor = BertSumAbsProcessor(cache_dir=CACHE_PATH)
+    summarizer = BertSumAbs(
         processor, cache_dir=CACHE_PATH
     )
  
-    #checkpoint = torch.load(os.path.join(MODEL_PATH, "new_new_summarizer_step20000.pt"))
     checkpoint = None
-    #summarizer.model.load_checkpoint(checkpoint['model'])
-   
-    train_sum_dataset, test_sum_dataset = preprocess_cnndm_abs()
-   
-    #train_sum_dataset = shorten_dataset(train_sum_dataset, top_n=4) ## at lease gradient_accumulation * batch_size long
+    # train_sum_dataset, test_sum_dataset = preprocess_cnndm_abs(top_n=32)
+    train_sum_dataset, test_sum_dataset = test_dataset_for_bertsumabs
 
     def this_validate(class_obj):
-        return validate(class_obj, test_sum_dataset, CACHE_PATH)
+        return validate(class_obj, test_sum_dataset)
+
+    MAX_STEP = 20
+    TOP_N=8
     summarizer.fit(
         train_sum_dataset,
-        batch_size=6,
-        max_steps=30000,
+        batch_size=batch_size,
+        max_steps=MAX_STEP,
         local_rank=-1,
         learning_rate_bert=0.002,
         learning_rate_dec=0.2,
         warmup_steps_bert=20000,
         warmup_steps_dec=10000,
-        num_gpus=1,
+        num_gpus=NUM_GPUS,
         report_every=10,
-        save_every=400,
+        save_every=100,
         validation_function=this_validate,
         fp16=False,
         fp16_opt_level="O1",
         checkpoint=checkpoint
     )
-    saved_model_path = os.path.join(MODEL_PATH, "summarizer_step30000.pt")
-    summarizer.save_model(30000, saved_model_path)
-
-    summarizer = AbsSum(
-        processor,
-        checkpoint=torch.load(saved_model_path),
-        cache_dir=CACHE_PATH,
-    )
+    saved_model_path = os.path.join(MODEL_PATH, "summarizer_step_{}.pt".format(MAX_STEP))
+    summarizer.save_model(MAX_STEP, saved_model_path)
 
     src = test_sum_dataset.source[0:TOP_N]
     reference_summaries = ["".join(t).rstrip("\n") for t in test_sum_dataset.target[0:TOP_N]]
@@ -238,32 +148,29 @@ def test_train_model():
         shorten_dataset(test_sum_dataset, top_n=TOP_N), batch_size=8
     )
     assert len(generated_summaries) == len(reference_summaries)
-    for i in generated_summaries:
-        print(i)
-        print("\n")
-        print("###################")
-
-    for i in reference_summaries:
-        print(i)
-        print("\n")
-
     RESULT_DIR = TemporaryDirectory().name
     rouge_score = get_rouge(generated_summaries, reference_summaries, RESULT_DIR)
     print(rouge_score)
+    return saved_model_path
+
+@pytest.mark.gpu
+def test_finetuned_model(tmp_module, test_train_model, test_dataset_for_bertsumabs, top_n=8, batch_size=1, num_gpus=4):
+    CACHE_PATH = tmp_module #"/dadendev/nlp-recipes/examples/text_summarization/abstemp"
+    DATA_PATH = tmp_module  #"/dadendev/nlp-recipes/examples/text_summarization/abstemp"
+    MODEL_PATH = tmp_module #"/dadendev/nlp-recipes/examples/text_summarization/abstemp"
 
 
-def test_pretrained_model():
-    train_sum_dataset, test_sum_dataset = preprocess_cnndm_abs()
+    # train_sum_dataset, test_sum_dataset = preprocess_cnndm_abs(need_process=False)
+    train_sum_dataset, test_sum_dataset = test_dataset_for_bertsumabs
     
-    processor = AbsSumProcessor(cache_dir=CACHE_PATH)
-    checkpoint = torch.load(os.path.join(MODEL_PATH, "new_model_step_148000_torch1.4.0.pt"))
+    processor = BertSumAbsProcessor(cache_dir=CACHE_PATH)
+    checkpoint = torch.load(test_train_model)
     
-    #checkpoint = torch.load(os.path.join(MODEL_PATH, "summarizer_step20000_with_global_step.pt"))
-    #checkpoint = torch.load(os.path.join(MODEL_PATH, "bert-base-uncased_step_400.pt")) 
-    summarizer = AbsSum(
+    summarizer = BertSumAbs(
         processor,
         cache_dir=CACHE_PATH,
-        max_pos=512,
+        test=True,
+        max_pos_length = 768
     )
     summarizer.model.load_checkpoint(checkpoint['model'])
     """
@@ -284,27 +191,33 @@ def test_pretrained_model():
     summarizer.save_model(20000, os.path.join(MODEL_PATH, "summarizer_step20000_with_global_step.pt"))
     return
     """
-
-    top_n = 96*4
+    top_n = 50 #len(test_sum_dataset) + 1 
     src = test_sum_dataset.source[0:top_n]
     reference_summaries = ["".join(t).rstrip("\n") for t in test_sum_dataset.target[0:top_n]]
     print("start prediction")
     generated_summaries = summarizer.predict(
-        shorten_dataset(test_sum_dataset, top_n=top_n), batch_size=96+16, num_gpus=1, max_seq_length=512
+        shorten_dataset(test_sum_dataset, top_n=top_n), batch_size=batch_size, num_gpus=num_gpus
     )
-    print(generated_summaries[0])
-    print(len(generated_summaries))
+    def _write_list_to_file(list_items, filename):
+        with open(filename, "w") as filehandle:
+            # for cnt, line in enumerate(filehandle):
+            for item in list_items:
+                filehandle.write("%s\n" % item)
+
+    print("writing generated summaries")
+    _write_list_to_file(generated_summaries, os.path.join(CACHE_PATH, "prediction.txt"))
+
     assert len(generated_summaries) == len(reference_summaries)
     RESULT_DIR = TemporaryDirectory().name
     rouge_score = get_rouge(generated_summaries, reference_summaries, RESULT_DIR)
     print(rouge_score)
-    assert rouge_score["rouge_2_f_score"] > 0.17
 
 
 #test_preprocessing()
-#test_collate()
 #preprocess_cnndm_abs()
-#test_train_model()
-test_pretrained_model()
+#model_path = test_train_model()
+#test_finetuned_model(model_path)
+#test_finetuned_model(finetuned_model(),top_n=-1)
+
 #if __name__ == "__main__":
 #    main()

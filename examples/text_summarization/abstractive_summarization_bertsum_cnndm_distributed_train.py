@@ -17,10 +17,9 @@ if nlp_path not in sys.path:
     sys.path.insert(0, nlp_path)
 
 
-from utils_nlp.models.transformers.abssum import AbsSum, AbsSumProcessor, validate
-from utils_nlp.models.transformers.bertabs import model_builder
+from utils_nlp.models.transformers.abstractive_summarization_bertsum import BertSumAbs, BertSumAbsProcessor, validate
 
-from utils_nlp.dataset.cnndm import CNNDMBertSumProcessedData, CNNDMSummarizationDataset
+from utils_nlp.dataset.cnndm import CNNDMSummarizationDataset
 from utils_nlp.models.transformers.datasets import SummarizationNonIterableDataset
 from utils_nlp.eval.evaluate_summarization import get_rouge
 
@@ -115,9 +114,10 @@ def main():
     print("data_dir is {}".format(args.data_dir))
     print("cache_dir is {}".format(args.cache_dir))
     ngpus_per_node = torch.cuda.device_count()
-    processor = AbsSumProcessor(cache_dir=args.cache_dir, max_src_len=max_pos)
-    summarizer = AbsSum(
-        processor, cache_dir=args.cache_dir
+    processor = BertSumAbsProcessor(cache_dir=args.cache_dir, max_src_len=args.max_pos)
+    summarizer = BertSumAbs(
+        processor, cache_dir=args.cache_dir, 
+        # max_pos_length=512
     )
     mp.spawn(main_worker, nprocs=ngpus_per_node, args=(ngpus_per_node, summarizer,  args))
 
@@ -154,7 +154,9 @@ def main_worker(local_rank, ngpus_per_node, summarizer, args):
     fp16 = args.fp16.lower()== 'true'
     print("fp16 is {}".format(fp16))
     # total number of steps for training
-    MAX_STEPS = 400
+    MAX_STEPS = 50
+    SAVE_EVERY = 50
+    REPORT_EVERY = 10
     # number of steps for warm up
     WARMUP_STEPS_BERT = MAX_STEPS
     WARMUP_STEPS_DEC = MAX_STEPS
@@ -162,6 +164,8 @@ def main_worker(local_rank, ngpus_per_node, summarizer, args):
         MAX_STEPS = args.max_steps
         WARMUP_STEPS_BERT = args.warmup_steps_bert
         WARMUP_STEPS_DEC= args.warmup_steps_dec 
+        SAVE_EVERY = args.save_every
+        REPORT_EVERY = args.report_every
 
     print("max steps is {}".format(MAX_STEPS))
     print("warmup steps for encoder bert is {}".format(WARMUP_STEPS_BERT))
@@ -181,8 +185,8 @@ def main_worker(local_rank, ngpus_per_node, summarizer, args):
         learning_rate_dec=args.lr_dec,
         warmup_steps_bert=WARMUP_STEPS_BERT,
         warmup_steps_dec=WARMUP_STEPS_DEC,
-        save_every=save_every,
-        report_every=args.report_every,
+        save_every=SAVE_EVERY,
+        report_every=REPORT_EVERY,
         validation_function=this_validate,
         fp16=fp16,
         fp16_opt_level=args.fp16_opt_level,
