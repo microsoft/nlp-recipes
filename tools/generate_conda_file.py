@@ -97,7 +97,7 @@ PIP_BASE = {
     "googledrivedownloader": "googledrivedownloader>=0.4",
     "methodtools": "methodtools",
     "s2s-ft": "-e git+https://github.com/microsoft/unilm.git"
-    "@7f931fcfb965bf60f0fbe2ddd37798f356e6ee5e#egg=s2s-ft&subdirectory=s2s-ft",
+    "@s2s-ft.v0.0#egg=s2s-ft&subdirectory=s2s-ft",
 }
 
 PIP_GPU = {}
