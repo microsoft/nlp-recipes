@@ -1,4 +1,7 @@
-#!/usr/bin/env python
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT License.
+# This script reuses code from https://github.com/nlpyang/Presumm
+
 """ Translator Class and builder """
 from __future__ import print_function
 import codecs

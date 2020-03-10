@@ -1,7 +1,12 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT License.
+# This script reuses code from https://github.com/nlpyang/Presumm
+
+"""
+The BertSum models for both extractive and abstractive summarization.
+"""
+
 import sys
-
-# sys.path.insert(0, "/dadendev/PreSumm2/PreSumm/src")
-
 import copy
 
 import torch

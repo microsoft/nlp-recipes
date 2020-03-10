@@ -1,3 +1,8 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT License.
+# This script reuses code from https://github.com/nlpyang/Presumm
+
+
 import math
 
 import torch

@@ -1,3 +1,9 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT License.
+# This script reuses code from https://github.com/nlpyang/Presumm
+
+""" PenaltyBuilder Class used in prediction/translation """
+
 from __future__ import division
 import torch
 

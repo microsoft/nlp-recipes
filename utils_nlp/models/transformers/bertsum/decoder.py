@@ -1,5 +1,9 @@
-"""
-Implementation of "Attention is All You Need"
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT License.
+# This script reuses code from https://github.com/nlpyang/Presumm
+
+""" 
+Decoder implementation of "Attention is All You Need"
 """
 
 import torch

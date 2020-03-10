@@ -1,3 +1,9 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT License.
+# This script reuses code from https://github.com/nlpyang/Presumm
+
+""" Implementation of ADAM optimizer. """
+
 import math
 import torch
 from torch.optim.optimizer import Optimizer

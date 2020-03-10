@@ -1,3 +1,9 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT License.
+# This script reuses code from https://github.com/nlpyang/Presumm
+
+""" Beam classes used in the beam search. """
+
 from __future__ import division
 import torch
 from .penalties import PenaltyBuilder
