@@ -17,12 +17,24 @@ import numpy as np
 import torch
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data.distributed import DistributedSampler
-from torch.utils.data import DataLoader, Dataset, IterableDataset, SequentialSampler, RandomSampler
+from torch.utils.data import (
+    DataLoader,
+    Dataset,
+    IterableDataset,
+    SequentialSampler,
+    RandomSampler,
+)
 
 # from torch.utils.data.distributed import DistributedSampler
 from transformers import BertModel, DistilBertModel
 
-from utils_nlp.common.pytorch_utils import compute_training_steps, get_device, get_amp, move_model_to_device, parallelize_model
+from utils_nlp.common.pytorch_utils import (
+    compute_training_steps,
+    get_device,
+    get_amp,
+    move_model_to_device,
+    parallelize_model,
+)
 from utils_nlp.models.transformers.common import TOKENIZER_CLASS, Transformer
 
 
@@ -43,7 +55,6 @@ from utils_nlp.dataset.cnndm import CNNDMSummarizationDataset
 from utils_nlp.eval.evaluate_summarization import get_rouge
 
 from tempfile import TemporaryDirectory
-
 
 
 def fit_to_block_size(sequence, block_size, pad_token_id):
@@ -156,7 +167,6 @@ class BertSumAbsProcessor:
         self.tgt_bos = self.symbols["BOS"]
         self.tgt_eos = self.symbols["EOS"]
 
-
         self.max_src_len = max_src_len
         self.max_target_len = max_target_len
 
@@ -209,7 +219,7 @@ class BertSumAbsProcessor:
                     "segs": batch.segs,
                     "mask_src": batch.mask_src,
                     "tgt": batch.tgt,
-                    "tgt_num_tokens": batch.tgt_num_tokens
+                    "tgt_num_tokens": batch.tgt_num_tokens,
                 }
             else:
                 return {
@@ -238,12 +248,11 @@ class BertSumAbsProcessor:
                 also contains the target ids and the number of tokens
                 in the target and target text.
         """
-        data = [x for x in data if not len(x['src']) == 0]  # remove empty_files
-        stories = [" ".join(d['src']) for d in data]
-        summaries = [" ".join(d['tgt']) for d in data]
+        data = [x for x in data if not len(x["src"]) == 0]  # remove empty_files
+        stories = [" ".join(d["src"]) for d in data]
+        summaries = [" ".join(d["tgt"]) for d in data]
 
-
-        encoded_text = [self.preprocess(d['src'], d['tgt']) for d in data]
+        encoded_text = [self.preprocess(d["src"], d["tgt"]) for d in data]
 
         encoded_stories = torch.tensor(
             [
@@ -259,9 +268,11 @@ class BertSumAbsProcessor:
         if train_mode:
             encoded_summaries = torch.tensor(
                 [
-                    [self.tgt_bos] + fit_to_block_size(summary, block_size-2, 
-                        self.tokenizer.pad_token_id)
-                    +[self.tgt_eos]
+                    [self.tgt_bos]
+                    + fit_to_block_size(
+                        summary, block_size - 2, self.tokenizer.pad_token_id
+                    )
+                    + [self.tgt_eos]
                     for _, summary in encoded_text
                 ]
             )
@@ -324,11 +335,15 @@ class BertSumAbsProcessor:
             try:
                 if len(line) <= 0:
                     continue
-                story_lines_token_ids.append(self.tokenizer.encode(line, max_length=self.max_src_len))
+                story_lines_token_ids.append(
+                    self.tokenizer.encode(line, max_length=self.max_src_len)
+                )
             except:
                 print(line)
                 raise
-        story_token_ids = [token for sentence in story_lines_token_ids for token in sentence]
+        story_token_ids = [
+            token for sentence in story_lines_token_ids for token in sentence
+        ]
         if summary_lines:
             summary_lines_token_ids = []
             for line in summary_lines:
@@ -341,12 +356,13 @@ class BertSumAbsProcessor:
                 except:
                     print(line)
                     raise
-            summary_token_ids =  [
+            summary_token_ids = [
                 token for sentence in summary_lines_token_ids for token in sentence
-            ] 
+            ]
             return story_token_ids, summary_token_ids
         else:
             return story_token_ids
+
 
 def validate(summarizer, validate_dataset):
     """ validation function to be used optionally in fine tuning.
@@ -361,7 +377,9 @@ def validate(summarizer, validate_dataset):
     """
     TOP_N = 8
     shortened_dataset = validate_dataset.shorten(TOP_N)
-    reference_summaries = [" ".join(t).rstrip("\n") for t in shortened_dataset.get_target()]
+    reference_summaries = [
+        " ".join(t).rstrip("\n") for t in shortened_dataset.get_target()
+    ]
     generated_summaries = summarizer.predict(
         shortened_dataset, num_gpus=1, batch_size=4
     )
@@ -409,7 +427,10 @@ class BertSumAbs(Transformer):
         """
 
         super().__init__(
-            model_class=MODEL_CLASS, model_name=model_name, num_labels=0, cache_dir=cache_dir
+            model_class=MODEL_CLASS,
+            model_name=model_name,
+            num_labels=0,
+            cache_dir=cache_dir,
         )
         if model_name not in self.list_supported_models():
             raise ValueError(
@@ -434,13 +455,10 @@ class BertSumAbs(Transformer):
         self.processor = processor
         self.optim_bert = None
         self.optim_dec = None
-        
 
     @staticmethod
     def list_supported_models():
         return list(MODEL_CLASS.keys())
-
-
 
     def fit(
         self,
@@ -521,22 +539,24 @@ class BertSumAbs(Transformer):
         """
 
         # get device
-        device, num_gpus = get_device(num_gpus=num_gpus, gpu_ids=gpu_ids, local_rank=local_rank)
+        device, num_gpus = get_device(
+            num_gpus=num_gpus, gpu_ids=gpu_ids, local_rank=local_rank
+        )
         # move model to devices
-        print("device is {}".format(device)) 
+        print("device is {}".format(device))
         if checkpoint:
             # the following line creats addtional processes on GPU 0
             # point where memory use increase
-            checkpoint = torch.load(checkpoint, map_location='cpu')
-            self.model.load_checkpoint(checkpoint['model'])
+            checkpoint = torch.load(checkpoint, map_location="cpu")
+            self.model.load_checkpoint(checkpoint["model"])
         self.model = move_model_to_device(model=self.model, device=device)
         # init optimizer
 
-        #"""
+        # """
         self.optim_bert = model_builder.build_optim_bert(
             self.model,
             optim=optimization_method,
-            visible_gpus=None, #",".join([str(i) for i in range(num_gpus)]), #"0,1,2,3",
+            visible_gpus=None,  # ",".join([str(i) for i in range(num_gpus)]), #"0,1,2,3",
             lr_bert=learning_rate_bert,
             warmup_steps_bert=warmup_steps_bert,
             checkpoint=None,
@@ -544,50 +564,57 @@ class BertSumAbs(Transformer):
         self.optim_dec = model_builder.build_optim_dec(
             self.model,
             optim=optimization_method,
-            visible_gpus=None, #",".join([str(i) for i in range(num_gpus)]), #"0,1,2,3"
+            visible_gpus=None,  # ",".join([str(i) for i in range(num_gpus)]), #"0,1,2,3"
             lr_dec=learning_rate_dec,
             warmup_steps_dec=warmup_steps_dec,
         )
-        #"""
+        # """
 
         optimizers = [self.optim_bert, self.optim_dec]
 
         self.amp = get_amp(fp16)
         if self.amp:
-            self.model, optim = self.amp.initialize(self.model, optimizers, opt_level=fp16_opt_level)
-       
+            self.model, optim = self.amp.initialize(
+                self.model, optimizers, opt_level=fp16_opt_level
+            )
+
         global_step = 0
         if checkpoint:
-            if checkpoint['optimizers']:
+            if checkpoint["optimizers"]:
                 for i in range(len(optimizers)):
-                    model_builder.load_optimizer_checkpoint(optimizers[i], checkpoint['optimizers'][i])
-            if self.amp and "amp" in checkpoint and checkpoint['amp']:
-                self.amp.load_state_dict(checkpoint['amp'])
+                    model_builder.load_optimizer_checkpoint(
+                        optimizers[i], checkpoint["optimizers"][i]
+                    )
+            if self.amp and "amp" in checkpoint and checkpoint["amp"]:
+                self.amp.load_state_dict(checkpoint["amp"])
             if "global_step" in checkpoint and checkpoint["global_step"]:
-                global_step = checkpoint["global_step"]/world_size
+                global_step = checkpoint["global_step"] / world_size
                 print("global_step is {}".format(global_step))
 
         self.model = parallelize_model(
-            model=self.model, 
-            device=device, 
-            num_gpus=num_gpus, 
-            gpu_ids=gpu_ids, 
+            model=self.model,
+            device=device,
+            num_gpus=num_gpus,
+            gpu_ids=gpu_ids,
             local_rank=local_rank,
         )
 
-            
         if local_rank == -1:
             sampler = RandomSampler(train_dataset)
         else:
-            sampler = DistributedSampler(train_dataset, num_replicas=world_size, rank=rank)
+            sampler = DistributedSampler(
+                train_dataset, num_replicas=world_size, rank=rank
+            )
 
         def collate_fn(data):
-            return self.processor.collate(data, block_size=self.max_pos_length, device=device)
+            return self.processor.collate(
+                data, block_size=self.max_pos_length, device=device
+            )
 
         train_dataloader = DataLoader(
-            train_dataset, 
-            sampler=sampler, 
-            batch_size=batch_size, 
+            train_dataset,
+            sampler=sampler,
+            batch_size=batch_size,
             collate_fn=collate_fn,
         )
 
@@ -657,18 +684,21 @@ class BertSumAbs(Transformer):
             List of strings which are the summaries
 
         """
-        device, num_gpus = get_device(num_gpus=num_gpus, gpu_ids=gpu_ids, local_rank=local_rank)
+        device, num_gpus = get_device(
+            num_gpus=num_gpus, gpu_ids=gpu_ids, local_rank=local_rank
+        )
         # move model to devices
         def this_model_move_callback(model, device):
-            model =  move_model_to_device(model, device)
-            return parallelize_model(model, device, num_gpus=num_gpus, gpu_ids=gpu_ids, local_rank=local_rank)
+            model = move_model_to_device(model, device)
+            return parallelize_model(
+                model, device, num_gpus=num_gpus, gpu_ids=gpu_ids, local_rank=local_rank
+            )
 
         if fp16:
             self.model = self.model.half()
-        
+
         self.model = this_model_move_callback(self.model, device)
         self.model.eval()
-
 
         predictor = build_predictor(
             self.processor.tokenizer,
@@ -680,17 +710,22 @@ class BertSumAbs(Transformer):
             max_length=max_length,
         )
         predictor = this_model_move_callback(predictor, device)
-        
-       
+
         test_sampler = SequentialSampler(test_dataset)
 
         def collate_fn(data):
-            return self.processor.collate(data, self.max_pos_length, device, train_mode=False)
+            return self.processor.collate(
+                data, self.max_pos_length, device, train_mode=False
+            )
 
         test_dataloader = DataLoader(
-            test_dataset, sampler=test_sampler, batch_size=batch_size, collate_fn=collate_fn,
+            test_dataset,
+            sampler=test_sampler,
+            batch_size=batch_size,
+            collate_fn=collate_fn,
         )
         print("dataset length is {}".format(len(test_dataset)))
+
         def format_summary(translation):
             """ Transforms the output of the `from_batch` function
             into nicely formatted summaries.
@@ -709,17 +744,18 @@ class BertSumAbs(Transformer):
                 .strip()
             )
 
-
             return summary
 
         def generate_summary_from_tokenid(preds, pred_score):
-            batch_size = preds.size()[0]   # batch.batch_size
+            batch_size = preds.size()[0]  # batch.batch_size
             translations = []
             for b in range(batch_size):
                 if len(preds[b]) < 1:
                     pred_sents = ""
                 else:
-                    pred_sents = self.processor.tokenizer.convert_ids_to_tokens([int(n) for n in preds[b] if int(n)!=0])
+                    pred_sents = self.processor.tokenizer.convert_ids_to_tokens(
+                        [int(n) for n in preds[b] if int(n) != 0]
+                    )
                     pred_sents = " ".join(pred_sents).replace(" ##", "")
                 translations.append(pred_sents)
             return translations
@@ -727,11 +763,13 @@ class BertSumAbs(Transformer):
         generated_summaries = []
         from tqdm import tqdm
 
-        for batch in tqdm(test_dataloader,  desc="Generating summary", disable=not verbose):
+        for batch in tqdm(
+            test_dataloader, desc="Generating summary", disable=not verbose
+        ):
             input = self.processor.get_inputs(batch, device, "bert", train_mode=False)
             translations, scores = predictor(**input)
-            
-            translations_text = generate_summary_from_tokenid(translations, scores) 
+
+            translations_text = generate_summary_from_tokenid(translations, scores)
             summaries = [format_summary(t) for t in translations_text]
             generated_summaries.extend(summaries)
         return generated_summaries

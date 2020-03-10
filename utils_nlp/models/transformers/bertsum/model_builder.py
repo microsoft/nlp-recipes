@@ -14,13 +14,15 @@ from .encoder import Classifier, ExtTransformerEncoder
 from .optimizers import Optimizer
 from .loss import abs_loss
 
+
 def load_optimizer_checkpoint(optimizer, checkpoint):
     if checkpoint is not None:
-        saved_optimizer_state_dict = checkpoint #.state_dict()
+        saved_optimizer_state_dict = checkpoint  # .state_dict()
         optimizer.optimizer.load_state_dict(saved_optimizer_state_dict)
         if (optimizer.method == "adam") and (len(optimizer.optimizer.state) < 1):
             raise RuntimeError(
-                "Error: loaded Adam optimizer from existing model" + " but optimizer state is empty"
+                "Error: loaded Adam optimizer from existing model"
+                + " but optimizer state is empty"
             )
 
 
@@ -33,7 +35,7 @@ def build_optim(
     beta1=0.9,
     beta2=0.999,
     warmup_steps=8000,
-    #checkpoint=None,
+    # checkpoint=None,
 ):
     """ Build optimizer """
     optim = Optimizer(
@@ -117,7 +119,7 @@ def build_optim_dec(
 def get_generator(vocab_size, dec_hidden_size):
     gen_func = nn.LogSoftmax(dim=-1)
     generator = nn.Sequential(nn.Linear(dec_hidden_size, vocab_size), gen_func)
-    #generator.to(device)
+    # generator.to(device)
 
     return generator
 
@@ -126,9 +128,13 @@ class Bert(nn.Module):
     def __init__(self, large, temp_dir, finetune=False):
         super(Bert, self).__init__()
         if large:
-            self.model = BertModel.from_pretrained("bert-large-uncased", cache_dir=temp_dir)
+            self.model = BertModel.from_pretrained(
+                "bert-large-uncased", cache_dir=temp_dir
+            )
         else:
-            self.model = BertModel.from_pretrained("bert-base-uncased", cache_dir=temp_dir)
+            self.model = BertModel.from_pretrained(
+                "bert-base-uncased", cache_dir=temp_dir
+            )
 
         self.finetune = finetune
 
@@ -166,7 +172,7 @@ class AbsSummarizer(nn.Module):
         label_smoothing=0.1,
         checkpoint=None,
         bert_from_extractive=None,
-        test=False
+        test=False,
     ):
         super(AbsSummarizer, self).__init__()
         self.bert = Bert(large, temp_dir, finetune_bert)
@@ -196,13 +202,17 @@ class AbsSummarizer(nn.Module):
             self.bert.model = BertModel(bert_config)
 
         if max_pos > 512:
-            my_pos_embeddings = nn.Embedding(max_pos, self.bert.model.config.hidden_size)
+            my_pos_embeddings = nn.Embedding(
+                max_pos, self.bert.model.config.hidden_size
+            )
             my_pos_embeddings.weight.data[
                 :512
             ] = self.bert.model.embeddings.position_embeddings.weight.data
             my_pos_embeddings.weight.data[
                 512:
-            ] = self.bert.model.embeddings.position_embeddings.weight.data[-1][None, :].repeat(
+            ] = self.bert.model.embeddings.position_embeddings.weight.data[-1][
+                None, :
+            ].repeat(
                 max_pos - 512, 1
             )
             self.bert.model.embeddings.position_embeddings = my_pos_embeddings
@@ -211,7 +221,9 @@ class AbsSummarizer(nn.Module):
             self.vocab_size, self.bert.model.config.hidden_size, padding_idx=0
         )
         if share_emb:
-            tgt_embeddings.weight = copy.deepcopy(self.bert.model.embeddings.word_embeddings.weight)
+            tgt_embeddings.weight = copy.deepcopy(
+                self.bert.model.embeddings.word_embeddings.weight
+            )
 
         self.decoder = TransformerDecoder(
             dec_layers,
@@ -253,39 +265,39 @@ class AbsSummarizer(nn.Module):
         self.test = test
         if not test:
             self.train_loss = abs_loss(
-                    self.generator,
-                    self.symbols,
-                    self.vocab_size,
-                    train=True,
-                    label_smoothing=self.label_smoothing,
+                self.generator,
+                self.symbols,
+                self.vocab_size,
+                train=True,
+                label_smoothing=self.label_smoothing,
             )
-
 
     def load_checkpoint(self, checkpoint):
         if checkpoint is not None:
             self.load_state_dict(checkpoint, strict=False)
         if not self.test:
             self.train_loss = abs_loss(
-                    self.generator,
-                    self.symbols,
-                    self.vocab_size,
-                    train=True,
-                    label_smoothing=self.label_smoothing,
-                )
+                self.generator,
+                self.symbols,
+                self.vocab_size,
+                train=True,
+                label_smoothing=self.label_smoothing,
+            )
 
-
-
-    #def move_to_device(self, device, move_to_device_fn):
-        #self.to(device)
-        #self.generator = move_to_device_fn(self.generator, device)
+    # def move_to_device(self, device, move_to_device_fn):
+    # self.to(device)
+    # self.generator = move_to_device_fn(self.generator, device)
     #    self = move_to_device_fn(self, device)
     #    return self
 
-
     # def forward(self, src, tgt, segs, clss, mask_src, mask_tgt, mask_cls):
-    def forward(self, src, segs, mask_src, tgt, tgt_num_tokens):  # , mask_tgt, mask_cls):
+    def forward(
+        self, src, segs, mask_src, tgt, tgt_num_tokens
+    ):  # , mask_tgt, mask_cls):
         top_vec = self.bert(src, segs, mask_src)
         dec_state = self.decoder.init_decoder_state(src, top_vec)
         decoder_outputs, state = self.decoder(tgt[:, :-1], top_vec, dec_state)
-        loss = self.train_loss.monolithic_compute_loss(decoder_outputs, tgt[:,1:], tgt_num_tokens)
+        loss = self.train_loss.monolithic_compute_loss(
+            decoder_outputs, tgt[:, 1:], tgt_num_tokens
+        )
         return loss, decoder_outputs

@@ -3,14 +3,16 @@ import math
 import torch
 import torch.nn as nn
 
+
 def aeq(*args):
     """
     Assert all arguments have the same value
     """
     arguments = (arg for arg in args)
     first = next(arguments)
-    assert all(arg == first for arg in arguments), \
-        "Not all arguments have the same value: " + str(args)
+    assert all(
+        arg == first for arg in arguments
+    ), "Not all arguments have the same value: " + str(args)
 
 
 def sequence_mask(lengths, max_len=None):
@@ -19,14 +21,20 @@ def sequence_mask(lengths, max_len=None):
     """
     batch_size = lengths.numel()
     max_len = max_len or lengths.max()
-    return (torch.arange(0, max_len)
-            .type_as(lengths)
-            .repeat(batch_size, 1)
-            .lt(lengths.unsqueeze(1)))
+    return (
+        torch.arange(0, max_len)
+        .type_as(lengths)
+        .repeat(batch_size, 1)
+        .lt(lengths.unsqueeze(1))
+    )
 
 
 def gelu(x):
-    return 0.5 * x * (1 + torch.tanh(math.sqrt(2 / math.pi) * (x + 0.044715 * torch.pow(x, 3))))
+    return (
+        0.5
+        * x
+        * (1 + torch.tanh(math.sqrt(2 / math.pi) * (x + 0.044715 * torch.pow(x, 3))))
+    )
 
 
 """ Global attention modules (Luong / Bahdanau) """
@@ -90,12 +98,15 @@ class GlobalAttention(nn.Module):
 
     """
 
-    def __init__(self, dim,  attn_type="dot"):
+    def __init__(self, dim, attn_type="dot"):
         super(GlobalAttention, self).__init__()
 
         self.dim = dim
-        assert attn_type in ["dot", "general", "mlp"], (
-            "Please select a valid attention type.")
+        assert attn_type in [
+            "dot",
+            "general",
+            "mlp",
+        ], "Please select a valid attention type."
         self.attn_type = attn_type
 
         if self.attn_type == "general":
@@ -107,7 +118,6 @@ class GlobalAttention(nn.Module):
         # mlp wants it with bias
         out_bias = self.attn_type == "mlp"
         self.linear_out = nn.Linear(dim * 2, dim, bias=out_bias)
-
 
     def score(self, h_t, h_s):
         """
@@ -180,22 +190,22 @@ class GlobalAttention(nn.Module):
         align = self.score(source, memory_bank)
 
         if memory_masks is not None:
-            memory_masks = memory_masks.transpose(0,1)
-            memory_masks = memory_masks.transpose(1,2)
-            align.masked_fill_(1 - memory_masks.byte(), -float('inf'))
+            memory_masks = memory_masks.transpose(0, 1)
+            memory_masks = memory_masks.transpose(1, 2)
+            align.masked_fill_(1 - memory_masks.byte(), -float("inf"))
 
         if memory_lengths is not None:
             mask = sequence_mask(memory_lengths, max_len=align.size(-1))
             mask = mask.unsqueeze(1)  # Make it broadcastable.
-            align.masked_fill_(1 - mask, -float('inf'))
+            align.masked_fill_(1 - mask, -float("inf"))
 
-        align_vectors = F.softmax(align.view(batch*target_l, source_l), -1)
+        align_vectors = F.softmax(align.view(batch * target_l, source_l), -1)
         align_vectors = align_vectors.view(batch, target_l, source_l)
 
         c = torch.bmm(align_vectors, memory_bank)
 
         # concatenate
-        concat_c = torch.cat([c, source], 2).view(batch*target_l, dim*2)
+        concat_c = torch.cat([c, source], 2).view(batch * target_l, dim * 2)
         attn_h = self.linear_out(concat_c).view(batch, target_l, dim)
         if self.attn_type in ["general", "dot"]:
             attn_h = torch.tanh(attn_h)
@@ -203,7 +213,6 @@ class GlobalAttention(nn.Module):
         if one_step:
             attn_h = attn_h.squeeze(1)
             align_vectors = align_vectors.squeeze(1)
-
 
         else:
             attn_h = attn_h.transpose(0, 1).contiguous()
@@ -287,20 +296,25 @@ class MultiHeadedAttention(nn.Module):
         super(MultiHeadedAttention, self).__init__()
         self.head_count = head_count
 
-        self.linear_keys = nn.Linear(model_dim,
-                                     head_count * self.dim_per_head)
-        self.linear_values = nn.Linear(model_dim,
-                                       head_count * self.dim_per_head)
-        self.linear_query = nn.Linear(model_dim,
-                                      head_count * self.dim_per_head)
+        self.linear_keys = nn.Linear(model_dim, head_count * self.dim_per_head)
+        self.linear_values = nn.Linear(model_dim, head_count * self.dim_per_head)
+        self.linear_query = nn.Linear(model_dim, head_count * self.dim_per_head)
         self.softmax = nn.Softmax(dim=-1)
         self.dropout = nn.Dropout(dropout)
         self.use_final_linear = use_final_linear
-        if (self.use_final_linear):
+        if self.use_final_linear:
             self.final_linear = nn.Linear(model_dim, model_dim)
 
-    def forward(self, key, value, query, mask=None,
-                layer_cache=None, type=None, predefined_graph_1=None):
+    def forward(
+        self,
+        key,
+        value,
+        query,
+        mask=None,
+        layer_cache=None,
+        type=None,
+        predefined_graph_1=None,
+    ):
         """
         Compute the context vector and the attention vectors.
 
@@ -345,20 +359,24 @@ class MultiHeadedAttention(nn.Module):
 
         def shape(x):
             """  projection """
-            return x.view(batch_size, -1, head_count, dim_per_head) \
-                .transpose(1, 2)
+            return x.view(batch_size, -1, head_count, dim_per_head).transpose(1, 2)
 
         def unshape(x):
             """  compute context """
-            return x.transpose(1, 2).contiguous() \
+            return (
+                x.transpose(1, 2)
+                .contiguous()
                 .view(batch_size, -1, head_count * dim_per_head)
+            )
 
         # 1) Project key, value, and query.
         if layer_cache is not None:
             if type == "self":
-                query, key, value = self.linear_query(query), \
-                                    self.linear_keys(query), \
-                                    self.linear_values(query)
+                query, key, value = (
+                    self.linear_query(query),
+                    self.linear_keys(query),
+                    self.linear_values(query),
+                )
 
                 key = shape(key)
                 value = shape(value)
@@ -367,30 +385,30 @@ class MultiHeadedAttention(nn.Module):
                     device = key.device
                     if layer_cache["self_keys"] is not None:
                         key = torch.cat(
-                            (layer_cache["self_keys"].to(device), key),
-                            dim=2)
+                            (layer_cache["self_keys"].to(device), key), dim=2
+                        )
                     if layer_cache["self_values"] is not None:
                         value = torch.cat(
-                            (layer_cache["self_values"].to(device), value),
-                            dim=2)
+                            (layer_cache["self_values"].to(device), value), dim=2
+                        )
                     layer_cache["self_keys"] = key
                     layer_cache["self_values"] = value
             elif type == "context":
                 query = self.linear_query(query)
                 if layer_cache is not None:
                     if layer_cache["memory_keys"] is None:
-                        key, value = self.linear_keys(key), \
-                                     self.linear_values(value)
+                        key, value = self.linear_keys(key), self.linear_values(value)
                         key = shape(key)
                         value = shape(value)
                     else:
-                        key, value = layer_cache["memory_keys"], \
-                                     layer_cache["memory_values"]
+                        key, value = (
+                            layer_cache["memory_keys"],
+                            layer_cache["memory_values"],
+                        )
                     layer_cache["memory_keys"] = key
                     layer_cache["memory_values"] = value
                 else:
-                    key, value = self.linear_keys(key), \
-                                 self.linear_values(value)
+                    key, value = self.linear_keys(key), self.linear_values(value)
                     key = shape(key)
                     value = shape(value)
         else:
@@ -411,22 +429,22 @@ class MultiHeadedAttention(nn.Module):
 
         if mask is not None:
             mask = mask.unsqueeze(1).expand_as(scores)
-            #scores = scores.masked_fill(mask, -1e18)
+            # scores = scores.masked_fill(mask, -1e18)
             scores = scores.masked_fill(mask, torch.finfo(torch.float16).min)
-            #scores = scores.masked_fill(mask, -2**16+1)
+            # scores = scores.masked_fill(mask, -2**16+1)
 
         # 3) Apply attention dropout and compute context vectors.
 
         attn = self.softmax(scores)
 
-        if (not predefined_graph_1 is None):
+        if not predefined_graph_1 is None:
             attn_masked = attn[:, -1] * predefined_graph_1
             attn_masked = attn_masked / (torch.sum(attn_masked, 2).unsqueeze(2) + 1e-9)
 
             attn = torch.cat([attn[:, :-1], attn_masked.unsqueeze(1)], 1)
 
         drop_attn = self.dropout(attn)
-        if (self.use_final_linear):
+        if self.use_final_linear:
             context = unshape(torch.matmul(drop_attn, value))
             output = self.final_linear(context)
             return output
@@ -443,7 +461,6 @@ class MultiHeadedAttention(nn.Module):
         # Return one attn
 
 
-
 class DecoderState(object):
     """Interface for grouping together the current state of a recurrent
     decoder. In the simplest case just represents the hidden state of
@@ -452,6 +469,7 @@ class DecoderState(object):
 
     Modules need to implement this to utilize beam search decoding.
     """
+
     def detach(self):
         """ Need to document this """
         self.hidden = tuple([_.detach() for _ in self.hidden])
@@ -463,16 +481,15 @@ class DecoderState(object):
             sizes = e.size()
             br = sizes[1]
             if len(sizes) == 3:
-                sent_states = e.view(sizes[0], beam_size, br // beam_size,
-                                     sizes[2])[:, :, idx]
+                sent_states = e.view(sizes[0], beam_size, br // beam_size, sizes[2])[
+                    :, :, idx
+                ]
             else:
-                sent_states = e.view(sizes[0], beam_size,
-                                     br // beam_size,
-                                     sizes[2],
-                                     sizes[3])[:, :, idx]
+                sent_states = e.view(
+                    sizes[0], beam_size, br // beam_size, sizes[2], sizes[3]
+                )[:, :, idx]
 
-            sent_states.data.copy_(
-                sent_states.data.index_select(1, positions))
+            sent_states.data.copy_(sent_states.data.index_select(1, positions))
 
     def map_batch_fn(self, fn):
         raise NotImplementedError()

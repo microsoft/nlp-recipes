@@ -334,7 +334,7 @@ class IterableSummarizationDataset(IterableDataset):
 
     def get_target(self):
         return self._target
-    
+
 
 class SummarizationDataset(Dataset):
     def __init__(
@@ -406,7 +406,7 @@ class SummarizationDataset(Dataset):
             return self
 
     def __getitem__(self, idx):
-        ## tupe is more adaptive 
+        ## tupe is more adaptive
         if self._target is None:
             return {"src": self._source[idx]}
         else:

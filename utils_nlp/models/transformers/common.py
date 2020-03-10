@@ -233,9 +233,9 @@ class Transformer:
         # TODO: Is this while necessary???
         while global_step < max_steps:
             epoch_iterator = tqdm(
-                train_dataloader, 
+                train_dataloader,
                 desc="Iteration",
-                disable=local_rank not in [-1, 0] or verbose
+                disable=local_rank not in [-1, 0] or verbose,
             )
             for step, batch in enumerate(epoch_iterator):
                 inputs = get_inputs(batch, device, self.model_name)
@@ -261,7 +261,7 @@ class Transformer:
 
                 tr_loss += loss.item()
                 accum_loss += loss.item()
-                train_size += list(inputs.values())[0].size()[0] 
+                train_size += list(inputs.values())[0].size()[0]
                 if (step + 1) % gradient_accumulation_steps == 0:
 
                     global_step += 1
@@ -287,11 +287,10 @@ class Transformer:
                             endtime_string,
                             accum_loss / report_every,
                             end - start,
-                            #list(inputs.values())[0].size()[0],
+                            # list(inputs.values())[0].size()[0],
                             train_size,
                             global_step,
                             max_steps,
-
                         )
                         logger.info(log_line)
                         print(log_line)

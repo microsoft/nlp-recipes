@@ -14,7 +14,14 @@ from .beam import GNMTGlobalScorer
 
 
 def build_predictor(
-    tokenizer, symbols, model, alpha=0.6, beam_size=5, min_length=15, max_length=150, logger=None
+    tokenizer,
+    symbols,
+    model,
+    alpha=0.6,
+    beam_size=5,
+    min_length=15,
+    max_length=150,
+    logger=None,
 ):
     scorer = GNMTGlobalScorer(alpha, length_penalty="wu")
 
@@ -93,7 +100,7 @@ class Translator(nn.Module):
         self.model = model.module if hasattr(model, "module") else model
         self.generator = self.model.generator
         self.decoder = self.model.decoder
-        self.bert =  self.model.bert
+        self.bert = self.model.bert
 
         self.vocab = vocab
         self.symbols = symbols
@@ -119,6 +126,7 @@ class Translator(nn.Module):
                 "scores": [],
                 "log_probs": [],
             }
+
     """
     def eval(self):
         self.model.eval()
@@ -142,9 +150,10 @@ class Translator(nn.Module):
            Shouldn't need the original dataset.
         """
         with torch.no_grad():
-            predictions, scores = self._fast_translate_batch(src, segs, mask_src, self.max_length, min_length=self.min_length)
+            predictions, scores = self._fast_translate_batch(
+                src, segs, mask_src, self.max_length, min_length=self.min_length
+            )
             return predictions, scores
-        
 
     def _fast_translate_batch(self, src, segs, mask_src, max_length, min_length=0):
         # TODO: faster code path for beam_size == 1.
@@ -153,12 +162,14 @@ class Translator(nn.Module):
         assert not self.dump_beam
 
         beam_size = self.beam_size
-        batch_size = src.size()[0] #32 #batch.batch_size
+        batch_size = src.size()[0]  # 32 #batch.batch_size
 
         src_features = self.bert(src, segs, mask_src)
-        this_decoder = self.decoder.module if hasattr(self.decoder, "module") else self.decoder
+        this_decoder = (
+            self.decoder.module if hasattr(self.decoder, "module") else self.decoder
+        )
         dec_states = this_decoder.init_decoder_state(src, src_features, with_cache=True)
-        
+
         device = src_features.device
 
         # Tile states and memory beam_size times.
@@ -169,7 +180,10 @@ class Translator(nn.Module):
             0, batch_size * beam_size, step=beam_size, dtype=torch.long, device=device
         )
         alive_seq = torch.full(
-            [batch_size * beam_size, 1], self.start_token, dtype=torch.long, device=device
+            [batch_size * beam_size, 1],
+            self.start_token,
+            dtype=torch.long,
+            device=device,
         )
 
         # Give full probability to the first beam on the first step.
@@ -184,7 +198,7 @@ class Translator(nn.Module):
         results["predictions"] = [[] for _ in range(batch_size)]  # noqa: F812
         results["scores"] = [[] for _ in range(batch_size)]  # noqa: F812
         # results["gold_score"] = [0] * batch_size
-        #results["batch"] = batch
+        # results["batch"] = batch
 
         for step in range(max_length):
             decoder_input = alive_seq[:, -1].view(1, -1)
@@ -201,7 +215,7 @@ class Translator(nn.Module):
             vocab_size = log_probs.size(-1)
 
             if step < min_length:
-                log_probs[:, self.end_token] = torch.Tensor([-1e20]) 
+                log_probs[:, self.end_token] = torch.Tensor([-1e20])
 
             # Multiply probs by the beam probability.
             log_probs += topk_log_probs.view(-1).unsqueeze(1)
@@ -223,7 +237,8 @@ class Translator(nn.Module):
                         if len(words) <= 3:
                             continue
                         trigrams = [
-                            (words[i - 1], words[i], words[i + 1]) for i in range(1, len(words) - 1)
+                            (words[i - 1], words[i], words[i + 1])
+                            for i in range(1, len(words) - 1)
                         ]
                         trigram = tuple(trigrams[-1])
                         if trigram in trigrams[:-1]:
@@ -242,7 +257,9 @@ class Translator(nn.Module):
             topk_ids = topk_ids.fmod(vocab_size)
 
             # Map beam_index to batch_index in the flat representation.
-            batch_index = topk_beam_index + beam_offset[: topk_beam_index.size(0)].unsqueeze(1)
+            batch_index = topk_beam_index + beam_offset[
+                : topk_beam_index.size(0)
+            ].unsqueeze(1)
             select_indices = batch_index.view(-1)
 
             # Append last prediction.
@@ -271,7 +288,9 @@ class Translator(nn.Module):
                         hypotheses[b].append((topk_scores[i, j], predictions[i, j, 1:]))
                     # If the batch reached the end, save the n_best hypotheses.
                     if end_condition[i]:
-                        best_hyp = sorted(hypotheses[b], key=lambda x: x[0], reverse=True)
+                        best_hyp = sorted(
+                            hypotheses[b], key=lambda x: x[0], reverse=True
+                        )
                         score, pred = best_hyp[0]
                         results["scores"][b].append(score)
                         results["predictions"][b].append(pred)
@@ -283,14 +302,24 @@ class Translator(nn.Module):
                 topk_log_probs = topk_log_probs.index_select(0, non_finished)
                 batch_index = batch_index.index_select(0, non_finished)
                 batch_offset = batch_offset.index_select(0, non_finished)
-                alive_seq = predictions.index_select(0, non_finished).view(-1, alive_seq.size(-1))
+                alive_seq = predictions.index_select(0, non_finished).view(
+                    -1, alive_seq.size(-1)
+                )
             # Reorder states.
             select_indices = batch_index.view(-1)
             src_features = src_features.index_select(0, select_indices)
-            dec_states.map_batch_fn(lambda state, dim: state.index_select(dim, select_indices))
+            dec_states.map_batch_fn(
+                lambda state, dim: state.index_select(dim, select_indices)
+            )
 
         empty_output = [len(results["predictions"][b]) <= 0 for b in batch_offset]
-        predictions = torch.tensor([i[0].tolist()[0:self.max_length]+[0]*(self.max_length-i[0].size()[0]) for i in results["predictions"]], device=device)
-        scores = torch.tensor([i[0].item() for i in results['scores']], device=device)
-        return predictions,  scores
-
+        predictions = torch.tensor(
+            [
+                i[0].tolist()[0 : self.max_length]
+                + [0] * (self.max_length - i[0].size()[0])
+                for i in results["predictions"]
+            ],
+            device=device,
+        )
+        scores = torch.tensor([i[0].item() for i in results["scores"]], device=device)
+        return predictions, scores
