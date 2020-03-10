@@ -40,25 +40,10 @@ from utils_nlp.models.transformers.bertsum.loss import abs_loss
 from utils_nlp.models.transformers.bertsum.predictor import build_predictor
 
 from utils_nlp.dataset.cnndm import CNNDMSummarizationDataset
-from utils_nlp.models.transformers.datasets import SummarizationNonIterableDataset
 from utils_nlp.eval.evaluate_summarization import get_rouge
 
 from tempfile import TemporaryDirectory
 
-
-def shorten_dataset(dataset, top_n=-1):
-    """ Shorten the dataset to be the top_n examples
-    Args:
-        dataset (SummarizationNonIterableDataset): dataset to be shortened.
-        top_n (long): the number of the examples returned.
-
-    Returns:
-        dataset (SummarizationNonIterableDataset): shortened dataset.
-
-    """
-    if top_n == -1:
-        return dataset
-    return SummarizationNonIterableDataset(dataset.source[0:top_n], dataset.target[0:top_n])
 
 
 def fit_to_block_size(sequence, block_size, pad_token_id):
@@ -253,12 +238,12 @@ class BertSumAbsProcessor:
                 also contains the target ids and the number of tokens
                 in the target and target text.
         """
-        data = [x for x in data if not len(x[1]) == 0]  # remove empty_files
-        stories = [" ".join(story) for story, _ in data]
-        summaries = [" ".join(summary) for _, summary in data]
+        data = [x for x in data if not len(x['src']) == 0]  # remove empty_files
+        stories = [" ".join(d['src']) for d in data]
+        summaries = [" ".join(d['tgt']) for d in data]
 
 
-        encoded_text = [self.preprocess(story, summary) for story, summary in data]
+        encoded_text = [self.preprocess(d['src'], d['tgt']) for d in data]
 
         encoded_stories = torch.tensor(
             [
@@ -363,23 +348,22 @@ class BertSumAbsProcessor:
         else:
             return story_token_ids
 
-def validate(summarizer, validate_sum_dataset):
+def validate(summarizer, validate_dataset):
     """ validation function to be used optionally in fine tuning.
 
     Args:
         summarizer(BertSumAbs): The summarizer under fine tuning.
-        validate_sum_dataset (SummarizationNonIterableDataset): dataset for validation.
+        validate_dataset (SummarizationDataset): dataset for validation.
 
     Returns:
         string: a string which contains the rouge score on a subset of the validation dataset
 
     """
     TOP_N = 8
-
-    src = validate_sum_dataset.source[0:TOP_N]
-    reference_summaries = [" ".join(t).rstrip("\n") for t in validate_sum_dataset.target[0:TOP_N]]
+    shortened_dataset = validate_dataset.shorten(TOP_N)
+    reference_summaries = [" ".join(t).rstrip("\n") for t in shortened_dataset.get_target()]
     generated_summaries = summarizer.predict(
-        shorten_dataset(validate_sum_dataset, top_n=TOP_N), num_gpus=1, batch_size=4
+        shortened_dataset, num_gpus=1, batch_size=4
     )
     assert len(generated_summaries) == len(reference_summaries)
     print("###################")
@@ -492,7 +476,7 @@ class BertSumAbs(Transformer):
         Fine-tune pre-trained transofmer models for extractive summarization.
 
         Args:
-            train_dataset (SummarizationNonIterableDataset): Training dataset.
+            train_dataset (SummarizationDataset): Training dataset.
             num_gpus (int, optional): The number of GPUs to use. If None, all available GPUs will
                 be used. If set to 0 or GPUs are not available, CPU device will
                 be used. Defaults to None.
@@ -653,7 +637,7 @@ class BertSumAbs(Transformer):
         Predict the summarization for the input data iterator.
 
         Args:
-            test_dataset (SummarizationNonIterableDataset): Dataset for which the summary to be predicted
+            test_dataset (SummarizationDataset): Dataset for which the summary to be predicted
             num_gpus (int, optional): The number of GPUs used in prediction. Defaults to 1.
             gpu_ids (list): List of GPU IDs to be used.
                 If set to None, the first num_gpus GPUs will be used.
@@ -775,7 +759,8 @@ class BertSumAbs(Transformer):
             "optimizers": [self.optim_bert.state_dict(), self.optim_dec.state_dict()],
             "model": model_to_save.state_dict(),
             "amp": self.amp.state_dict() if self.amp else None,
-            "global_step": global_step
+            "global_step": global_step,
+            "max_pos_length": self.max_pos_length,
         }
 
         logger.info("Saving model checkpoint to %s", full_name)

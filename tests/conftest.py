@@ -36,8 +36,12 @@ def notebooks():
         "similarity_embeddings_baseline": os.path.join(
             folder_notebooks, "sentence_similarity", "baseline_deep_dive.ipynb"
         ),
-        "bert_encoder": os.path.join(folder_notebooks, "sentence_similarity", "bert_encoder.ipynb"),
-        "gensen_local": os.path.join(folder_notebooks, "sentence_similarity", "gensen_local.ipynb"),
+        "bert_encoder": os.path.join(
+            folder_notebooks, "sentence_similarity", "bert_encoder.ipynb"
+        ),
+        "gensen_local": os.path.join(
+            folder_notebooks, "sentence_similarity", "gensen_local.ipynb"
+        ),
         "gensen_aml_deep_dive": os.path.join(
             folder_notebooks, "sentence_similarity", "gensen_aml_deep_dive.ipynb"
         ),
@@ -45,16 +49,22 @@ def notebooks():
             folder_notebooks, "sentence_similarity", "automl_local_deployment_aci.ipynb"
         ),
         "automl_with_pipelines_deployment_aks": os.path.join(
-            folder_notebooks, "sentence_similarity", "automl_with_pipelines_deployment_aks.ipynb"
+            folder_notebooks,
+            "sentence_similarity",
+            "automl_with_pipelines_deployment_aks.ipynb",
         ),
         "question_answering_squad_transformers": os.path.join(
-            folder_notebooks, "question_answering", "question_answering_squad_transformers.ipynb"
+            folder_notebooks,
+            "question_answering",
+            "question_answering_squad_transformers.ipynb",
         ),
         "bert_senteval": os.path.join(
             folder_notebooks, "sentence_similarity", "bert_senteval.ipynb"
         ),
         "bert_qa_trainer": os.path.join(
-            folder_notebooks, "question_answering", "pretrained-BERT-SQuAD-deep-dive-aml.ipynb"
+            folder_notebooks,
+            "question_answering",
+            "pretrained-BERT-SQuAD-deep-dive-aml.ipynb",
         ),
         "bidaf_deep_dive": os.path.join(
             folder_notebooks, "question_answering", "bidaf_aml_deep_dive.ipynb"
@@ -77,16 +87,27 @@ def notebooks():
             folder_notebooks, "text_classification", "tc_mnli_transformers.ipynb"
         ),
         "tc_multi_languages_transformers": os.path.join(
-            folder_notebooks, "text_classification", "tc_multi_languages_transformers.ipynb"
+            folder_notebooks,
+            "text_classification",
+            "tc_multi_languages_transformers.ipynb",
         ),
         "ner_wikigold_transformer": os.path.join(
-            folder_notebooks, "named_entity_recognition", "ner_wikigold_transformer.ipynb"
+            folder_notebooks,
+            "named_entity_recognition",
+            "ner_wikigold_transformer.ipynb",
         ),
         "deep_and_unified_understanding": os.path.join(
             folder_notebooks, "model_explainability", "interpret_dnn_layers.ipynb"
         ),
         "extractive_summarization_cnndm_transformer": os.path.join(
-            folder_notebooks, "text_summarization", "extractive_summarization_cnndm_transformer.ipynb"
+            folder_notebooks,
+            "text_summarization",
+            "extractive_summarization_cnndm_transformer.ipynb",
+        ),
+        "unilm_abstractive_summarization": os.path.join(
+            folder_notebooks,
+            "text_summarization",
+            "abstractive_summarization_unilm_cnndm.ipynb",
         ),
         "abstractive_summarization_bertsumabs_cnndm": os.path.join(
             folder_notebooks, "text_summarization", "abstractive_summarization_bertsumabs_cnndm.ipynb"
@@ -124,7 +145,17 @@ def ner_test_data():
     INPUT_LABEL_IDS = [[3, 5, 5, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]
     return {
         "INPUT_TEXT": [
-            ["Johnathan", "is", "studying", "in", "the", "University", "of", "Michigan", "."]
+            [
+                "Johnathan",
+                "is",
+                "studying",
+                "in",
+                "the",
+                "University",
+                "of",
+                "Michigan",
+                ".",
+            ]
         ],
         "INPUT_TEXT_SINGLE": [
             "Johnathan",
@@ -138,8 +169,20 @@ def ner_test_data():
             ".",
         ],
         "INPUT_LABELS": [["I-PER", "O", "O", "O", "O", "I-ORG", "I-ORG", "I-ORG", "O"]],
-        "INPUT_LABELS_SINGLE": ["I-PER", "O", "O", "O", "O", "I-ORG", "I-ORG", "I-ORG", "O"],
-        "INPUT_LABELS_WRONG": [["I-PER", "O", "O", "O", "O", "I-ORG", "I-ORG", "I-ORG"]],
+        "INPUT_LABELS_SINGLE": [
+            "I-PER",
+            "O",
+            "O",
+            "O",
+            "O",
+            "I-ORG",
+            "I-ORG",
+            "I-ORG",
+            "O",
+        ],
+        "INPUT_LABELS_WRONG": [
+            ["I-PER", "O", "O", "O", "O", "I-ORG", "I-ORG", "I-ORG"]
+        ],
         "INPUT_TOKEN_IDS": [
             [
                 1287,
@@ -166,7 +209,9 @@ def ner_test_data():
         ],
         "INPUT_LABEL_IDS": INPUT_LABEL_IDS,
         "INPUT_MASK": [[1] * 11 + [0] * 9],
-        "PREDICTED_LABELS": [[3, 5, 5, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]],
+        "PREDICTED_LABELS": [
+            [3, 5, 5, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        ],
         "TRAILING_TOKEN_MASK": TRAILING_TOKEN_MASK,
         "UNIQUE_LABELS": UNIQUE_LABELS,
         "LABEL_MAP": LABEL_MAP,
@@ -187,19 +232,23 @@ def qa_test_df():
         {
             "doc_text": [
                 "The color of the sky is blue.",
-                "Architecturally, the school has a Catholic character. Atop the Main Building's "
-                "gold dome is a golden statue of the Virgin Mary. Immediately in front of the Main "
-                "Building and facing it, is a copper statue of Christ with arms upraised with the "
-                'legend "Venite Ad Me Omnes". Next to the Main Building is the Basilica of the '
-                "Sacred Heart. Immediately behind the basilica is the Grotto, a Marian place of "
-                "prayer and reflection. It is a replica of the grotto at Lourdes, France where "
-                "the Virgin Mary reputedly appeared to Saint Bernadette Soubirous in 1858. At "
-                "the end of the main drive (and in a direct line that connects through 3 statues "
-                "and the Gold Dome), is a simple, modern stone statue of Mary.",
+                "Architecturally, the school has a Catholic character. Atop the "
+                "Main Building's gold dome is a golden statue of the Virgin Mary. "
+                "Immediately in front of the Main Building and facing it, is a "
+                "copper statue of Christ with arms upraised with the "
+                'legend "Venite Ad Me Omnes". Next to the Main Building is the '
+                "Basilica of the Sacred Heart. Immediately behind the basilica is "
+                "the Grotto, a Marian place of prayer and reflection. It is a "
+                "replica of the grotto at Lourdes, France where the Virgin Mary "
+                "reputedly appeared to Saint Bernadette Soubirous in 1858. At "
+                "the end of the main drive (and in a direct line that connects "
+                "through 3 statues and the Gold Dome), is a simple, modern stone "
+                "statue of Mary.",
             ],
             "question_text": [
                 "What's the color of the sky?",
-                "To whom did the Virgin Mary allegedly appear in 1858 in Lourdes France?",
+                "To whom did the Virgin Mary allegedly appear in 1858 in Lourdes "
+                "France?",
             ],
             "answer_start": [24, 515],
             "answer_text": ["blue", "Saint Bernadette Soubirous"],
@@ -231,10 +280,14 @@ def qa_test_df():
 
 
 def pytest_addoption(parser):
-    parser.addoption("--subscription_id", help="Azure Subscription Id to create resources in")
+    parser.addoption(
+        "--subscription_id", help="Azure Subscription Id to create resources in"
+    )
     parser.addoption("--resource_group", help="Name of the resource group")
     parser.addoption("--workspace_name", help="Name of Azure ML Workspace")
-    parser.addoption("--workspace_region", help="Azure region to create the workspace in")
+    parser.addoption(
+        "--workspace_region", help="Azure region to create the workspace in"
+    )
     parser.addoption("--cluster_name", help="Name of the AzureML Cluster.")
 
 

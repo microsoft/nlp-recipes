@@ -2,6 +2,8 @@
 # Licensed under the MIT License.
 
 import argparse
+import nltk
+from nltk import tokenize
 import os
 import pytest
 import torch
@@ -12,11 +14,8 @@ from tempfile import TemporaryDirectory
 
 from utils_nlp.models.transformers.datasets import (
     SummarizationDataset,
-    SummarizationNonIterableDataset,
 )
-from utils_nlp.dataset.cnndm import CNNDMSummarizationDataset
 from utils_nlp.models.transformers.abstractive_summarization_bertsum import BertSumAbs, BertSumAbsProcessor, validate
-from utils_nlp.models.transformers.datasets import SummarizationNonIterableDataset
 from utils_nlp.eval.evaluate_summarization import get_rouge
 
 #CACHE_PATH = tmp_module #"/dadendev/nlp-recipes/examples/text_summarization/abstemp"
@@ -49,6 +48,44 @@ def target_data():
 NUM_GPUS = 2
 os.environ["NCCL_IB_DISABLE"] = "0"
 
+
+@pytest.fixture(scope="module")
+def test_dataset_for_bertsumabs(tmp_module):
+    source = source_data()
+    target = target_data()
+    source_file = os.path.join(tmp_module, "source.txt")
+    target_file = os.path.join(tmp_module, "target.txt")
+    f = open(source_file, "w")
+    for i in source:
+        f.write(' '.join(i))
+        f.write('\n')
+    f.close()
+    f = open(target_file, "w")
+    for i in target:
+        f.write(' '.join(i))
+        f.write('\n')
+    f.close()
+    train_dataset = SummarizationDataset(
+        source_file,
+        target_file,
+        [tokenize.sent_tokenize],
+        [tokenize.sent_tokenize],
+        None,
+    )
+    test_dataset = SummarizationDataset(
+        source_file,
+        target_file,
+        [tokenize.sent_tokenize],
+        [tokenize.sent_tokenize],
+        None,
+    )
+    processor = BertSumAbsProcessor(cache_dir=tmp_module)
+    batch = processor.collate(train_dataset, 512, "cuda:0")
+    assert len(batch.src) == 3
+    return train_dataset, test_dataset
+
+
+"""
 @pytest.fixture(scope="module")
 def test_dataset_for_bertsumabs(tmp_module):
     CACHE_PATH = tmp_module #"/dadendev/nlp-recipes/examples/text_summarization/abstemp"
@@ -62,11 +99,12 @@ def test_dataset_for_bertsumabs(tmp_module):
     batch = processor.collate(train_dataset, 512, "cuda:0")
     assert len(batch.src) == 3
     return train_dataset, test_dataset
+"""
 
 def shorten_dataset(dataset, top_n=-1):
     if top_n == -1:
         return dataset
-    return SummarizationNonIterableDataset(dataset.source[0:top_n], dataset.target[0:top_n])
+    return SummarizationDataset(dataset.source[0:top_n], dataset.target[0:top_n])
 
 #def finetuned_model():
 #    return os.path.join(MODEL_PATH, "dist_extsum_model.pt_step13000")
@@ -103,6 +141,7 @@ def shorten_dataset(dataset, top_n=-1):
 @pytest.mark.gpu
 @pytest.fixture()
 def test_train_model(tmp_module, test_dataset_for_bertsumabs, batch_size=1):
+    #return "/dadendev/nlp-recipes/examples/text_summarization/abstemp/dist_extsum_model.pt_step50000"
     CACHE_PATH = tmp_module #"/dadendev/nlp-recipes/examples/text_summarization/abstemp"
     DATA_PATH = tmp_module  #"/dadendev/nlp-recipes/examples/text_summarization/abstemp"
     MODEL_PATH = tmp_module #"/dadendev/nlp-recipes/examples/text_summarization/abstemp"
@@ -142,15 +181,6 @@ def test_train_model(tmp_module, test_dataset_for_bertsumabs, batch_size=1):
     saved_model_path = os.path.join(MODEL_PATH, "summarizer_step_{}.pt".format(MAX_STEP))
     summarizer.save_model(MAX_STEP, saved_model_path)
 
-    src = test_sum_dataset.source[0:TOP_N]
-    reference_summaries = ["".join(t).rstrip("\n") for t in test_sum_dataset.target[0:TOP_N]]
-    generated_summaries = summarizer.predict(
-        shorten_dataset(test_sum_dataset, top_n=TOP_N), batch_size=8
-    )
-    assert len(generated_summaries) == len(reference_summaries)
-    RESULT_DIR = TemporaryDirectory().name
-    rouge_score = get_rouge(generated_summaries, reference_summaries, RESULT_DIR)
-    print(rouge_score)
     return saved_model_path
 
 @pytest.mark.gpu
@@ -170,7 +200,7 @@ def test_finetuned_model(tmp_module, test_train_model, test_dataset_for_bertsuma
         processor,
         cache_dir=CACHE_PATH,
         test=True,
-        max_pos_length = 768
+        max_pos_length = checkpoint['max_pos_length']
     )
     summarizer.model.load_checkpoint(checkpoint['model'])
     """
@@ -192,11 +222,11 @@ def test_finetuned_model(tmp_module, test_train_model, test_dataset_for_bertsuma
     return
     """
     top_n = 50 #len(test_sum_dataset) + 1 
-    src = test_sum_dataset.source[0:top_n]
-    reference_summaries = ["".join(t).rstrip("\n") for t in test_sum_dataset.target[0:top_n]]
+    shortened_dataset= test_sum_dataset.shorten(top_n)
+    reference_summaries = ["".join(t).rstrip("\n") for t in shortened_dataset.get_target()]
     print("start prediction")
     generated_summaries = summarizer.predict(
-        shorten_dataset(test_sum_dataset, top_n=top_n), batch_size=batch_size, num_gpus=num_gpus
+        shortened_dataset, batch_size=batch_size, num_gpus=num_gpus
     )
     def _write_list_to_file(list_items, filename):
         with open(filename, "w") as filehandle:

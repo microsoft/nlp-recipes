@@ -173,7 +173,7 @@ class Transformer:
             self.model, weight_decay, learning_rate, adam_epsilon
         )
 
-        if fp16:
+        if fp16 and amp:
             self.model, self.optimizer = amp.initialize(
                 self.model, self.optimizer, opt_level=fp16_opt_level
             )
@@ -182,7 +182,7 @@ class Transformer:
             self.optimizer.load_state_dict(checkpoint_state_dict["optimizer"])
             self.model.load_state_dict(checkpoint_state_dict["model"])
 
-            if fp16:
+            if fp16 and amp:
                 amp.load_state_dict(checkpoint_state_dict["amp"])
 
         self.model = parallelize_model(
@@ -230,6 +230,7 @@ class Transformer:
 
         # train
         start = time.time()
+        # TODO: Is this while necessary???
         while global_step < max_steps:
             epoch_iterator = tqdm(
                 train_dataloader, 
@@ -240,14 +241,19 @@ class Transformer:
                 inputs = get_inputs(batch, device, self.model_name)
                 outputs = self.model(**inputs)
 
-                loss = outputs[0]
+                if isinstance(outputs, tuple):
+                    loss = outputs[0]
+                else:
+                    # Accomondate models based on older versions of Transformers, e.g. UniLM
+                    loss = outputs
 
                 if num_gpus > 1:
                     loss = loss.mean()
+
                 if gradient_accumulation_steps > 1:
                     loss = loss / gradient_accumulation_steps
 
-                if fp16:
+                if fp16 and amp:
                     with amp.scale_loss(loss, optimizer) as scaled_loss:
                         scaled_loss.backward()
                 else:
@@ -261,7 +267,7 @@ class Transformer:
                     global_step += 1
 
                     if clip_grad_norm:
-                        if fp16:
+                        if fp16 and amp:
                             torch.nn.utils.clip_grad_norm_(
                                 amp.master_params(optimizer), max_grad_norm
                             )
@@ -318,9 +324,8 @@ class Transformer:
                 if global_step > max_steps:
                     epoch_iterator.close()
                     break
-                # del batch
-                # torch.cuda.empty_cache()
-
+        if fp16 and amp:
+            self.amp_state_dict = amp.state_dict()
         return global_step, tr_loss / global_step
 
     def predict(self, eval_dataloader, get_inputs, num_gpus, gpu_ids, verbose=True):

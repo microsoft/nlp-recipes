@@ -159,9 +159,9 @@ def compute_training_steps(
 
 def get_amp(fp16):
     """This function ensures that fp16 execution of torch.einsum is enabled
-        if args.fp16 is set. Otherwise, it'll default to "promote" mode,
+        if fp16 is set. Otherwise, it'll default to "promote" mode,
         where the operations are in fp32.
-        Note that running `--fp16_opt_level="O2"` will remove the need for this code.
+        Note that setting `fp16_opt_level="O2"` will remove the need for this code.
     """
     # Before we do anything with models, we want to
     if fp16:

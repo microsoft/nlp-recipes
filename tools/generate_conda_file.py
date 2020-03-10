@@ -52,7 +52,8 @@ CONDA_BASE = {
 
 CONDA_GPU = {
     "numba": "numba>=0.38.1",
-    "cudatoolkit": "cudatoolkit==10.1.243",
+    "cudatoolkit": "cudatoolkit=10.1",
+    "pytorch": "pytorch==1.4.0",
 }
 
 PIP_BASE = {
@@ -84,18 +85,22 @@ PIP_BASE = {
     "gensim": "gensim>=3.7.0",
     "nltk": "nltk>=3.4",
     "seqeval": "seqeval>=0.0.12",
-    "bertsum": "git+https://github.com/daden-ms/BertSum.git@030c139c97bc57d0c31f6515b8bf9649f999a443#egg=BertSum",
+    "bertsum": "git+https://github.com/daden-ms/BertSum.git"
+    "@030c139c97bc57d0c31f6515b8bf9649f999a443#egg=BertSum",
     "pyrouge": "pyrouge>=0.1.3",
     "py-rouge": "py-rouge>=1.1",
     "indic-nlp-library": "indic-nlp-library>=0.6",
     "torchtext": "torchtext>=0.4.0",
     "multiprocess": "multiprocess==0.70.9",
     "tensorboardX": "tensorboardX==1.8",
+    "Cython": "Cython>=0.29.13",
+    "googledrivedownloader": "googledrivedownloader>=0.4",
+    "methodtools": "methodtools",
+    "s2s-ft": "-e git+https://github.com/microsoft/unilm.git"
+    "@7f931fcfb965bf60f0fbe2ddd37798f356e6ee5e#egg=s2s-ft&subdirectory=s2s-ft",
 }
 
-PIP_GPU = {
-    "torch": "torch==1.4.0",
-}
+PIP_GPU = {}
 
 PIP_DARWIN = {}
 PIP_DARWIN_GPU = {}
@@ -127,10 +132,13 @@ if __name__ == "__main__":
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--name", help="specify name of conda environment")
-    parser.add_argument("--gpu", action="store_true", help="include packages for GPU support")
+    parser.add_argument(
+        "--gpu", action="store_true", help="include packages for GPU support"
+    )
+    parser.add_argument("--cuda_version", type=str, default="10.1")
     args = parser.parse_args()
 
-    # set name for environment and output yaml file
+    # set name of environment and output yaml file
     conda_env = "nlp_cpu"
     if args.gpu:
         conda_env = "nlp_gpu"
@@ -144,6 +152,7 @@ if __name__ == "__main__":
     pip_packages = PIP_BASE
 
     # update conda and pip packages based on flags provided
+    CONDA_GPU["cudatoolkit"] = "cudatoolkit=" + args.cuda_version
     if args.gpu:
         conda_packages.update(CONDA_GPU)
         pip_packages.update(PIP_GPU)
