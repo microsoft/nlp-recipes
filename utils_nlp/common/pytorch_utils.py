@@ -26,6 +26,7 @@ def get_device(num_gpus=None, gpu_ids=None, local_rank=-1):
         num_gpus = 1
     return device, num_gpus
 
+
 def move_model_to_device(model, device):
     if not isinstance(device, torch.device):
         raise ValueError("device must be of type torch.device.")
