@@ -5,6 +5,7 @@ import papermill as pm
 import pytest
 import scrapbook as sb
 from tests.notebooks_common import KERNEL_NAME, OUTPUT_NOTEBOOK
+import torch
 
 ABS_TOL = 0.02
 
@@ -20,7 +21,6 @@ def test_abstractive_summarization_bertsumabs_cnndm(notebooks, tmp):
         parameters=dict(
             QUICK_RUN=True,
             TOP_N=1000,
-            NUM_GPUS=2,
             MAX_POS=512,
             DATA_FOLDER=tmp,
             CACHE_DIR=tmp,

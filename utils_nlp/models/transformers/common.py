@@ -231,7 +231,7 @@ class Transformer:
             epoch_iterator = tqdm(
                 train_dataloader,
                 desc="Iteration",
-                disable=local_rank not in [-1, 0] or verbose,
+                disable=local_rank not in [-1, 0] or not verbose,
             )
             for step, batch in enumerate(epoch_iterator):
                 inputs = get_inputs(batch, device, self.model_name)
@@ -348,7 +348,7 @@ class Transformer:
                 logits = outputs[0]
             yield logits.detach().cpu().numpy()
 
-    def save_model(self, global_step=None, full_name=None):
+    def save_model(self, full_name=None):
         """
         save the trained model.
 

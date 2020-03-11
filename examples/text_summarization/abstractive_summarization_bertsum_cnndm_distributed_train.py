@@ -101,22 +101,22 @@ parser.add_argument(
     "--max_steps",
     type=int,
     default=5e4,
-    help="Maximum number of training steps run in training. If quick_run is set,\
-                        it's not used.",
+    help="Maximum number of training steps run in training. \ 
+        If quick_run is set, it's not used.",
 )
 parser.add_argument(
     "--warmup_steps_bert",
     type=int,
     default=2e4,
-    help="Warm-up number of training steps run in training for the encoder. If quick_run is set,\
-                        it's not used.",
+    help="Warm-up number of training steps run in training for the encoder. \
+        If quick_run is set, it's not used.",
 )
 parser.add_argument(
     "--warmup_steps_dec",
     type=int,
     default=1e4,
-    help="Warm-up number of training steps run in training for the decoder. If quick_run is set,\
-                        it's not used.",
+    help="Warm-up number of training steps run in training for the decoder. \
+        If quick_run is set, it's not used.",
 )
 parser.add_argument(
     "--summary_filename",
@@ -127,7 +127,7 @@ parser.add_argument(
 parser.add_argument(
     "--model_filename",
     type=str,
-    default="dist_extsum_model.pt",
+    default="dist_abssum_model.pt",
     help="model file name saved for evaluation.",
 )
 parser.add_argument(
@@ -161,25 +161,9 @@ parser.add_argument(
     type=str.upper,
     default="O2",
     choices=["O0", "O1", "O2", "O3"],
-    help="optimization level, refer to https://nvidia.github.io/apex/amp.html#opt-levels for details ",
+    help="optimization level, refer to \
+         https://nvidia.github.io/apex/amp.html#opt-levels for details ",
 )
-
-
-def pretrained_model():
-    return torch.load(os.path.join(MODEL_PATH, "model_step_148000_torch1.4.0.pt"))
-
-
-"""
-def load_processed_cnndm_abs(data_path, 
-        train_file= "train_dataset_full.pt", 
-        test_file="test_dataset_full.pt" ):
-    #TOP_N = -1
-    train_data_path = os.path.join(data_path, train_file)
-    test_data_path = os.path.join(data_path, test_file)
-    train_sum_dataset = torch.load(train_data_path)
-    test_sum_dataset = torch.load(test_data_path)
-    return train_sum_dataset, test_sum_dataset
-"""
 
 
 def main():

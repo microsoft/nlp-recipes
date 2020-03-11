@@ -40,7 +40,6 @@ def build_optim(
     beta1=0.9,
     beta2=0.999,
     warmup_steps=8000,
-    # checkpoint=None,
 ):
     """ Build optimizer """
     optim = Optimizer(
@@ -60,14 +59,12 @@ def build_optim(
 
 def build_optim_bert(
     model,
-    visible_gpus="-1",
     optim="adam",
     lr_bert=0.002,
     max_grad_norm=0,
     beta1=0.9,
     beta2=0.999,
     warmup_steps_bert=8000,
-    checkpoint=None,
 ):
 
     optim = Optimizer(
@@ -92,14 +89,12 @@ def build_optim_bert(
 
 def build_optim_dec(
     model,
-    visible_gpus="-1",
     optim="adam",
     lr_dec=0.2,
     max_grad_norm=0,
     beta1=0.9,
     beta2=0.999,
     warmup_steps_dec=8000,
-    checkpoint=None,
 ):
     optim = Optimizer(
         optim,

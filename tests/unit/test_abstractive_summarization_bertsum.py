@@ -70,18 +70,16 @@ def test_dataset_for_bertsumabs(tmp_module):
         f.write("\n")
     f.close()
     train_dataset = SummarizationDataset(
-        source_file,
-        target_file,
-        [tokenize.sent_tokenize],
-        [tokenize.sent_tokenize],
-        None,
+        source_file = source_file,
+        target_file = target_file,
+        source_preprocessing = [tokenize.sent_tokenize],
+        target_preprocessing = [tokenize.sent_tokenize],
     )
     test_dataset = SummarizationDataset(
-        source_file,
-        target_file,
-        [tokenize.sent_tokenize],
-        [tokenize.sent_tokenize],
-        None,
+        source_file = source_file,
+        target_file = target_file,
+        source_preprocessing = [tokenize.sent_tokenize],
+        target_preprocessing = [tokenize.sent_tokenize],
     )
     processor = BertSumAbsProcessor(cache_dir=tmp_module)
     batch = processor.collate(train_dataset, 512, "cuda:0")

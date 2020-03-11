@@ -12,6 +12,7 @@ import os
 import pickle
 import random
 import shutil
+from tqdm import tqdm
 
 import numpy as np
 import torch
@@ -129,10 +130,10 @@ class BertSumAbsProcessor:
     def __init__(
         self,
         model_name="bert-base-uncased",
-        to_lower=False,
+        to_lower=True,
         cache_dir=".",
         max_src_len=640,
-        max_target_len=140,
+        max_tgt_len=140,
     ):
         """ Initialize the preprocessor.
 
@@ -141,11 +142,11 @@ class BertSumAbsProcessor:
                 check MODEL_CLASS for supported models. Defaults to "bert-base-cased".
             to_lower (bool, optional): Whether to convert all letters to lower case during
                 tokenization. This is determined by if a cased model is used.
-                Defaults to False, which corresponds to a cased model.
+                Defaults to True, which corresponds to a uncased model.
             cache_dir (str, optional): Directory to cache the tokenizer. Defaults to ".".
             max_src_len (int, optional): Max number of tokens that be used
                 as input. Defaults to 640.
-            max_target_len (int, optional): Max number of tokens that be used
+            max_tgt_len (int, optional): Max number of tokens that be used
                 as in target. Defaults to 140.
 
         """
@@ -168,11 +169,11 @@ class BertSumAbsProcessor:
         self.tgt_eos = self.symbols["EOS"]
 
         self.max_src_len = max_src_len
-        self.max_target_len = max_target_len
+        self.max_tgt_len = max_tgt_len
 
     @staticmethod
     def list_supported_models():
-        return list(TOKENIZER_CLASS.keys())
+        return list(MODEL_CLASS.keys())
 
     @property
     def model_name(self):
@@ -249,10 +250,14 @@ class BertSumAbsProcessor:
                 in the target and target text.
         """
         data = [x for x in data if not len(x["src"]) == 0]  # remove empty_files
+        if len(data) == 0:
+            return None
         stories = [" ".join(d["src"]) for d in data]
-        summaries = [" ".join(d["tgt"]) for d in data]
-
-        encoded_text = [self.preprocess(d["src"], d["tgt"]) for d in data]
+        if train_mode is True and "tgt" in data[0]: 
+            summaries = [" ".join(d["tgt"]) for d in data]
+            encoded_text = [self.preprocess(d["src"], d["tgt"]) for d in data]
+        else:
+            encoded_text = [self.preprocess(d["src"], None) for d in data]
 
         encoded_stories = torch.tensor(
             [
@@ -265,7 +270,7 @@ class BertSumAbsProcessor:
         )
         encoder_mask = build_mask(encoded_stories, self.tokenizer.pad_token_id)
 
-        if train_mode:
+        if train_mode and "tgt" in data[0]:
             encoded_summaries = torch.tensor(
                 [
                     [self.tgt_bos]
@@ -294,8 +299,6 @@ class BertSumAbsProcessor:
                 ],
             )
             batch = Batch(
-                # document_names=None,
-                # batch_size=len(encoded_stories),
                 src=encoded_stories.to(device),
                 segs=encoder_token_type_ids.to(device),
                 mask_src=encoder_mask.to(device),
@@ -307,8 +310,6 @@ class BertSumAbsProcessor:
         else:
             Batch = namedtuple("Batch", ["src", "segs", "mask_src"])
             batch = Batch(
-                # document_names=None,
-                # batch_size=len(encoded_stories),
                 src=encoded_stories.to(device),
                 segs=encoder_token_type_ids.to(device),
                 mask_src=encoder_mask.to(device),
@@ -351,7 +352,7 @@ class BertSumAbsProcessor:
                     if len(line) <= 0:
                         continue
                     summary_lines_token_ids.append(
-                        self.tokenizer.encode(line, max_length=self.max_target_len)
+                        self.tokenizer.encode(line, max_length=self.max_tgt_len)
                     )
                 except:
                     print(line)
@@ -361,7 +362,7 @@ class BertSumAbsProcessor:
             ]
             return story_token_ids, summary_token_ids
         else:
-            return story_token_ids
+            return story_token_ids, None
 
 
 def validate(summarizer, validate_dataset):
@@ -477,15 +478,15 @@ class BertSumAbs(Transformer):
         beta1=0.9,
         beta2=0.999,
         decay_method="noam",
-        gradient_accumulation_steps=2,
+        gradient_accumulation_steps=1,
         report_every=10,
-        save_every=100,
+        save_every=1000,
         verbose=True,
         seed=None,
         fp16=False,
         fp16_opt_level="O2",
         world_size=1,
-        rank=-1,
+        rank=0,
         validation_function=None,
         checkpoint=None,
         **kwargs,
@@ -502,7 +503,8 @@ class BertSumAbs(Transformer):
                 If set to None, the first num_gpus GPUs will be used.
                 Defaults to None.
             batch_size (int, optional): Maximum number of tokens in each batch.
-            local_rank (int, optional): Local_rank for distributed training on GPUs. Defaults to
+            local_rank (int, optional): Local_rank for distributed training on GPUs. Local rank
+                means the ranking of the current GPU device on the current node. Defaults to
                 -1, which means non-distributed training.
             max_steps (int, optional): Maximum number of training steps. Defaults to 5e5.
             warmup_steps_bert (int, optional): Number of steps taken to increase learning rate from 0
@@ -528,14 +530,27 @@ class BertSumAbs(Transformer):
                 Defaults to 10.
             save_every (int, optional): The interval by steps to save the finetuned model.
                 Defaults to 100.
-           
-            verbose (bool, optional): Whether to print out the training log. Defaults to True.
-            seed (int, optional): Random seed used to improve reproducibility. Defaults to None.
-            fp16 (bool, optional): Whether to use mixed precision training. Defaults to False.
-            fp16_opt_level (str, optional): optimization level, refer to https://nvidia.github.io/apex/amp.html#opt-levels for details. Value choices are: "O0", "O1", "O2", "O3". Defaults to "O2".
-            world_size (int, optional): Total number of GPUs that will be used. Defaults to 1.
-            rank (int): Rank of the current GPU. Defaults to -1.
-            validation_function
+            verbose (bool, optional): Whether to print out the training log. 
+                Defaults to True.
+            seed (int, optional): Random seed used to improve reproducibility. 
+                Defaults to None.
+            fp16 (bool, optional): Whether to use mixed precision training. 
+                Defaults to False.
+            fp16_opt_level (str, optional): optimization level, refer to
+                 https://nvidia.github.io/apex/amp.html#opt-levels for details. 
+                 Value choices are: "O0", "O1", "O2", "O3". Defaults to "O2".
+            world_size (int, optional): Total number of GPUs that will be used. 
+                Defaults to 1.
+            rank (int, optional): Global rank of the current GPU in distributed training. It's 
+                calculated with the rank of the current node in the cluster/world 
+                and the `local_rank` of the device in the current node. 
+                See an example in :file: `examples/text_summarization/
+                abstractive_summarization_bertsum_cnndm_distributed_train.py`.
+                Defaults to 0.
+            validation_function (function, optional): function used in fitting to
+                validate the performance. Default to None.
+            checkpoint (str, optional): file path for a checkpoint based on which the
+                training continues. Default to None.
         """
 
         # get device
@@ -545,30 +560,29 @@ class BertSumAbs(Transformer):
         # move model to devices
         print("device is {}".format(device))
         if checkpoint:
-            # the following line creats addtional processes on GPU 0
-            # point where memory use increase
             checkpoint = torch.load(checkpoint, map_location="cpu")
             self.model.load_checkpoint(checkpoint["model"])
         self.model = move_model_to_device(model=self.model, device=device)
-        # init optimizer
 
-        # """
+        # init optimizer
         self.optim_bert = model_builder.build_optim_bert(
             self.model,
             optim=optimization_method,
-            visible_gpus=None,  # ",".join([str(i) for i in range(num_gpus)]), #"0,1,2,3",
             lr_bert=learning_rate_bert,
             warmup_steps_bert=warmup_steps_bert,
-            checkpoint=None,
+            max_grad_norm=max_grad_norm,
+            beta1=beta1,
+            beta2=beta2,
         )
         self.optim_dec = model_builder.build_optim_dec(
             self.model,
             optim=optimization_method,
-            visible_gpus=None,  # ",".join([str(i) for i in range(num_gpus)]), #"0,1,2,3"
             lr_dec=learning_rate_dec,
             warmup_steps_dec=warmup_steps_dec,
+            max_grad_norm=max_grad_norm,
+            beta1=beta1,
+            beta2=beta2,
         )
-        # """
 
         optimizers = [self.optim_bert, self.optim_dec]
 
@@ -645,6 +659,8 @@ class BertSumAbs(Transformer):
             amp=self.amp,
             validation_function=validation_function,
         )
+
+        self.save_model(max_steps)
 
     def predict(
         self,
@@ -761,7 +777,6 @@ class BertSumAbs(Transformer):
             return translations
 
         generated_summaries = []
-        from tqdm import tqdm
 
         for batch in tqdm(
             test_dataloader, desc="Generating summary", disable=not verbose
@@ -792,7 +807,7 @@ class BertSumAbs(Transformer):
             output_model_dir = os.path.join(self.cache_dir, "fine_tuned")
             os.makedirs(self.cache_dir, exist_ok=True)
             os.makedirs(output_model_dir, exist_ok=True)
-            full_name = os.path.join(output_model_dir, name)
+            full_name = os.path.join(output_model_dir, "bertsumabs.pt")
         checkpoint = {
             "optimizers": [self.optim_bert.state_dict(), self.optim_dec.state_dict()],
             "model": model_to_save.state_dict(),
