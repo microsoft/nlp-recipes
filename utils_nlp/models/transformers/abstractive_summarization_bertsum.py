@@ -420,9 +420,11 @@ class BertSumAbs(Transformer):
             finetune_bert (bool, option): Whether the bert model in the encoder is
                 finetune or not. Defaults to True.
             cache_dir (str, optional): Directory to cache the tokenizer. Defaults to ".".
-            label_smoothing (float, optional): The amount of label smoothing. Value range is [0, 1]. Defaults to 0.1.
-            test (bool, optional): Whether the class is initiated for test or not.
-                Defaults to False.
+            label_smoothing (float, optional): The amount of label smoothing. Value range is [0, 1]. 
+                Defaults to 0.1.
+            test (bool, optional): Whether the class is initiated for test or not. 
+                It must be True if the class obj is only initialized to load a checkpoint for
+                test/inferencing.  Defaults to False.
             max_pos_length (int, optional): maximum postional embedding length for the
                 input. Defaults to 768.
         """
