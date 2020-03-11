@@ -47,7 +47,7 @@ CONDA_BASE = {
     "tensorflow": "tensorflow==1.15.0",
     "tensorflow-hub": "tensorflow-hub==0.7.0",
     "dask": "dask[dataframe]==1.2.2",
-    "papermill": "papermill>=1.0.1",
+    "papermill": "papermill==1.2.1",
 }
 
 CONDA_GPU = {
