@@ -47,6 +47,12 @@ parser.add_argument("--model_name", type=str, default="distilbert-base-uncased",
 parser.add_argument("--encoder", type=str.lower, default='transformer', 
                     choices=['baseline', 'classifier', 'transformer', 'rnn'],
                     help="Encoder types in the extractive summarizer.")
+parser.add_argument(
+    "--max_pos_length",
+    type=int,
+    default=512,
+    help="maximum input length in terms of input token numbers in training",
+)
 parser.add_argument("--learning_rate", type=float, default=1e-3,
                     help="Learning rate.")
 parser.add_argument("--batch_size", type=int, default=3000,
@@ -87,7 +93,7 @@ def main():
 
     ngpus_per_node = torch.cuda.device_count()
 
-    summarizer = ExtractiveSummarizer(args.model_name, args.encoder, args.cache_dir)
+    summarizer = ExtractiveSummarizer(args.model_name, args.encoder, args.max_pos_length, args.cache_dir)
 
     mp.spawn(main_worker, nprocs=ngpus_per_node, args=(ngpus_per_node, summarizer, args))
 
@@ -137,9 +143,10 @@ def main_worker(local_rank, ngpus_per_node, summarizer, args):
         verbose=True,
         report_every=REPORT_EVERY,
         clip_grad_norm=False,
-        local_rank=rank,
+        local_rank=local_rank,
         save_every=save_every,
-        world_size=world_size
+        world_size=world_size,
+        rank=rank
     )
 
     end = time.time()

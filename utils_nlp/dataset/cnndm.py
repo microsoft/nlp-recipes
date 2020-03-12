@@ -139,23 +139,19 @@ class CNNDMBertSumProcessedData:
 
     @staticmethod
     def download(local_path=".data"):
-        file_name = "bertsum_data.zip"
-        url = "https://drive.google.com/uc?export=download&"
-        "id=1x0d61LP9UAN389YN00z0Pv-7jQgirVg6"
-        try:
-            if os.path.exists(os.path.join(local_path, file_name)):
-                downloaded_zipfile = zipfile.ZipFile(
-                    os.path.join(local_path, file_name)
-                )
-            else:
-                dataset_zip = download_from_url(url, root=local_path)
-                downloaded_zipfile = zipfile.ZipFile(dataset_zip)
-        except:
-            print("Unexpected dataset downloading or reading error:", sys.exc_info()[0])
-            raise
-
-        downloaded_zipfile.extractall(local_path)
-        return local_path
+        FILE_ID = "1x0d61LP9UAN389YN00z0Pv-7jQgirVg6"
+        FILE_NAME =  "bertsum_data.zip"
+        os.makedirs(local_path, exist_ok=True)
+        output_dir = os.path.join(local_path, "processed_data")
+        os.makedirs(output_dir, exist_ok=True)
+        maybe_download_googledrive(
+        google_file_id=FILE_ID, file_name=FILE_NAME, work_directory=local_path
+    )
+        extract_zip(
+            file_path=os.path.join(local_path, FILE_NAME),
+            dest_path=output_dir,
+        )
+        return output_dir
 
 
 def _detokenize(line):

@@ -100,6 +100,7 @@ def test_bert_training(data_to_file, tmp_module):
 
     CACHE_DIR = tmp_module
     ENCODER = "transformer"
+    MAX_POS = 768
     BATCH_SIZE = 128
     LEARNING_RATE = 2e-3
     REPORT_EVERY = 50
@@ -108,7 +109,7 @@ def test_bert_training(data_to_file, tmp_module):
     DATA_SAVED_PATH = data_to_file
 
     train_dataset, test_dataset = ExtSumProcessedData().splits(root=DATA_SAVED_PATH)
-    summarizer = ExtractiveSummarizer(MODEL_NAME, ENCODER, CACHE_DIR)
+    summarizer = ExtractiveSummarizer(MODEL_NAME, ENCODER, MAX_POS, CACHE_DIR)
     summarizer.fit(
         train_dataset,
         num_gpus=1,

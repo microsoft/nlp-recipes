@@ -16,9 +16,9 @@ from torch.utils.data import DataLoader, Dataset, IterableDataset, SequentialSam
 
 from transformers import BertModel, DistilBertModel
 
-from bertsum.models import model_builder
-from bertsum.models.data_loader import Batch, DataIterator
-from bertsum.models.model_builder import Summarizer
+from utils_nlp.models.transformers.bertsum import model_builder
+from utils_nlp.models.transformers.bertsum.data_loader import Batch, DataIterator
+from utils_nlp.models.transformers.bertsum.model_builder import BertSumExt
 from utils_nlp.common.pytorch_utils import (
     compute_training_steps,
     get_device,
@@ -536,9 +536,6 @@ class ExtSumProcessor:
                     return None
 
             src_txt = [" ".join(sent) for sent in src]
-            # text = [' '.join(ex['src_txt'][i].split()[:self.args.max_src_ntokens])
-            #  for i in idxs]
-            # text = [_clean(t) for t in text]
             text = " [SEP] [CLS] ".join(src_txt)
             src_subtokens = self.tokenizer.tokenize(text)
             src_subtokens = src_subtokens[:510]
@@ -584,7 +581,8 @@ class ExtractiveSummarizer(Transformer):
     """class which performs extractive summarization fine tuning and prediction """
 
     def __init__(
-        self, model_name="distilbert-base-uncased", encoder="transformer", cache_dir="."
+        self, model_name="distilbert-base-uncased", encoder="transformer",
+        max_pos_length=512, cache_dir="."
     ):
         """Initialize a ExtractiveSummarizer.
 
@@ -633,8 +631,8 @@ class ExtractiveSummarizer(Transformer):
         }
 
         args = Bunch(default_summarizer_layer_parameters)
-        self.model = Summarizer(
-            encoder, args, self.model_class, model_name, None, cache_dir
+        self.model = BertSumExt(
+            encoder, args, self.model_class, model_name, max_pos_length, None, cache_dir
         )
 
     @staticmethod
@@ -656,12 +654,13 @@ class ExtractiveSummarizer(Transformer):
         beta1=0.9,
         beta2=0.999,
         decay_method="noam",
-        gradient_accumulation_steps=2,
+        gradient_accumulation_steps=1,
         report_every=50,
         verbose=True,
         seed=None,
         save_every=-1,
         world_size=1,
+        rank=0,
         **kwargs,
     ):
         """
@@ -708,6 +707,12 @@ class ExtractiveSummarizer(Transformer):
                 Defaults to True.
             seed (int, optional): Random seed used to improve reproducibility.
                 Defaults to None.
+            rank (int, optional): Global rank of the current GPU in distributed training. It's 
+                calculated with the rank of the current node in the cluster/world 
+                and the `local_rank` of the device in the current node. 
+                See an example in :file: `examples/text_summarization/
+                extractive_summarization_cnndm_distributed_train.py`.
+                Defaults to 0.
         """
 
         # get device
@@ -719,6 +724,7 @@ class ExtractiveSummarizer(Transformer):
 
         # init optimizer
         optimizer = model_builder.build_optim(
+            self.model,
             optimization_method,
             learning_rate,
             max_grad_norm,
@@ -726,8 +732,6 @@ class ExtractiveSummarizer(Transformer):
             beta2,
             decay_method,
             warmup_steps,
-            self.model,
-            None,
         )
 
         self.model = parallelize_model(
@@ -744,7 +748,7 @@ class ExtractiveSummarizer(Transformer):
             is_labeled=True,
             batch_size=batch_size,
             world_size=world_size,
-            rank=local_rank,
+            rank=rank,
         )
 
         # compute the max number of training steps

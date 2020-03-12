@@ -15,7 +15,7 @@ from transformers import BertModel, BertConfig
 from torch.nn.init import xavier_uniform_
 
 from .decoder import TransformerDecoder
-from .encoder import Classifier, ExtTransformerEncoder
+from .encoder import Classifier, ExtTransformerEncoder, RNNEncoder
 from .optimizers import Optimizer
 from .loss import abs_loss
 
@@ -33,12 +33,12 @@ def load_optimizer_checkpoint(optimizer, checkpoint):
 
 def build_optim(
     model,
-    visible_gpus="-1",
     optim="adam",
     lr=0.002,
     max_grad_norm=0,
     beta1=0.9,
     beta2=0.999,
+    decay_method="noam",
     warmup_steps=8000,
 ):
     """ Build optimizer """
@@ -48,7 +48,7 @@ def build_optim(
         max_grad_norm,
         beta1=beta1,
         beta2=beta2,
-        decay_method="noam",
+        decay_method=decay_method,
         warmup_steps=warmup_steps,
     )
 
@@ -122,6 +122,84 @@ def get_generator(vocab_size, dec_hidden_size):
     # generator.to(device)
 
     return generator
+
+class Transformer(nn.Module):
+    def __init__(self, temp_dir, model_class, pretrained_model_name, pretrained_config):
+        super(Transformer, self).__init__()
+        if(pretrained_model_name):
+            self.model = model_class.from_pretrained(pretrained_model_name,
+                                                   cache_dir=temp_dir)
+            #self.model = BertModel.from_pretrained('bert-base-uncased', cache_dir=temp_dir)
+        else:
+            self.model = model_class(pretrained_config)
+
+    def forward(self, x, segs, mask):
+        if "DistilBertModel" in str(type(self.model)):
+            outputs = self.model(x, attention_mask =mask)
+        else:
+            outputs = self.model(x, token_type_ids=segs, attention_mask =mask)
+        #print(outputs)
+        #print(len(outputs))
+        top_vec = outputs[0] 
+        
+        return top_vec
+
+class BertSumExt(nn.Module):
+    def __init__(self, encoder, args, model_class, pretrained_model_name, max_pos=512, pretrained_config = None, temp_dir="./"):
+        super(BertSumExt, self).__init__()
+        self.loss = torch.nn.BCELoss(reduction='none')
+        #self.device = device
+        self.transformer = Transformer(temp_dir, model_class, pretrained_model_name, pretrained_config)
+        if (encoder == 'classifier'):
+            self.encoder = Classifier(self.transformer.model.config.hidden_size)
+        elif(encoder=='transformer'):
+            self.encoder = ExtTransformerEncoder(self.transformer.model.config.hidden_size, args.ff_size, args.heads,
+                                                   args.dropout, args.inter_layers)
+        elif(encoder=='rnn'):
+            self.encoder = RNNEncoder(bidirectional=True, num_layers=1,
+                                      input_size=self.transformer.model.config.hidden_size, hidden_size=args.rnn_size,
+                                      dropout=args.dropout)
+        elif (encoder == 'baseline'):
+            bert_config = BertConfig(self.transformer.model.config.vocab_size, hidden_size=args.hidden_size,
+                                     num_hidden_layers=6, num_attention_heads=8, intermediate_size=args.ff_size)
+            self.transformer.model = BertModel(bert_config)
+            self.encoder = Classifier(self.transformer.model.config.hidden_size)
+        
+        self.max_pos = max_pos
+        if(max_pos > 512):
+            my_pos_embeddings = nn.Embedding(self.max_pos, self.transformer.model.config.hidden_size)
+            my_pos_embeddings.weight.data[:512] = self.transformer.model.embeddings.position_embeddings.weight.data
+            my_pos_embeddings.weight.data[512:] = self.transformer.model.embeddings.position_embeddings.weight.data[-1][None,:].repeat(self.max_pos-512,1)
+            self.transformer.model.embeddings.position_embeddings = my_pos_embeddings
+
+        if args.param_init != 0.0:
+            for p in self.encoder.parameters():
+                p.data.uniform_(-args.param_init, args.param_init)
+        if args.param_init_glorot:
+            for p in self.encoder.parameters():
+                if p.dim() > 1:
+                    xavier_uniform_(p)
+
+        #self.to(device)
+    def load_cp(self, pt):
+        self.load_state_dict(pt['model'], strict=True)
+
+    def forward(self, x, segs, clss, mask, mask_cls, labels=None, sentence_range=None):
+
+        top_vec = self.transformer(x, segs, mask)
+        sents_vec = top_vec[torch.arange(top_vec.size(0)).unsqueeze(1), clss]
+        sents_vec = sents_vec * mask_cls[:, :, None].float()
+        sent_scores = self.encoder(sents_vec, mask_cls).squeeze(-1)
+        if labels is not None:
+            loss = self.loss(sent_scores, labels.float())
+            loss = (loss*mask_cls.float()).sum()
+            sent_scores = sent_scores + mask_cls.float()
+            return loss, sent_scores, mask_cls
+        else:
+            sent_scores = sent_scores + mask_cls.float()
+            return sent_scores, mask_cls
+
+
 
 
 class Bert(nn.Module):
