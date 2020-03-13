@@ -28,6 +28,8 @@ from utils_nlp.common.pytorch_utils import (
 from utils_nlp.dataset.sentence_selection import combination_selection, greedy_selection
 from utils_nlp.models.transformers.common import TOKENIZER_CLASS, Transformer
 
+from utils_nlp.models.transformers.abstractive_summarization_bertsum import fit_to_block_size
+
 MODEL_CLASS = {
     "bert-base-uncased": BertModel,
     "distilbert-base-uncased": DistilBertModel,
@@ -368,6 +370,7 @@ class ExtSumProcessor:
         max_src_ntokens=2000,
         min_nsents=3,
         min_src_ntokens=5,
+        max_pos_length=1600,
     ):
         """ Initialize the preprocessor.
 
@@ -404,6 +407,7 @@ class ExtSumProcessor:
         self.max_src_ntokens = max_src_ntokens
         self.min_nsents = min_nsents
         self.min_src_ntokens = min_src_ntokens
+        self.max_pos_length = max_pos_length
 
     @staticmethod
     def list_supported_models():
@@ -538,8 +542,8 @@ class ExtSumProcessor:
             src_txt = [" ".join(sent) for sent in src]
             text = " [SEP] [CLS] ".join(src_txt)
             src_subtokens = self.tokenizer.tokenize(text)
-            src_subtokens = src_subtokens[:510]
-            src_subtokens = ["[CLS]"] + src_subtokens + ["[SEP]"]
+            #src_subtokens = src_subtokens[:510]
+            src_subtokens = ["[CLS]"] + fit_to_block_size(src_subtokens, self.max_pos_length - 2, self.tokenizer.pad_token_id) + ["[SEP]"]
 
             src_subtoken_idxs = self.tokenizer.convert_tokens_to_ids(src_subtokens)
             _segs = [-1] + [
