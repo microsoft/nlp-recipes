@@ -6,28 +6,20 @@
 # Add to noticefile
 
 from collections import namedtuple
-import itertools
 import logging
 import os
 import pickle
-import random
-import shutil
 from tqdm import tqdm
 
-import numpy as np
 import torch
-from torch.nn.parallel import DistributedDataParallel as DDP
-from torch.utils.data.distributed import DistributedSampler
 from torch.utils.data import (
     DataLoader,
-    Dataset,
-    IterableDataset,
     SequentialSampler,
     RandomSampler,
 )
 
 # from torch.utils.data.distributed import DistributedSampler
-from transformers import BertModel, DistilBertModel
+from transformers import BertModel
 
 from utils_nlp.common.pytorch_utils import (
     compute_training_steps,
@@ -36,26 +28,15 @@ from utils_nlp.common.pytorch_utils import (
     move_model_to_device,
     parallelize_model,
 )
+from utils_nlp.eval import compute_rouge_python
 from utils_nlp.models.transformers.common import TOKENIZER_CLASS, Transformer
-
-
-from torch.utils.data import SequentialSampler, RandomSampler, DataLoader
+from utils_nlp.models.transformers.bertsum import model_builder
+from utils_nlp.models.transformers.bertsum.model_builder import AbsSummarizer
+from utils_nlp.models.transformers.bertsum.predictor import build_predictor
 
 MODEL_CLASS = {"bert-base-uncased": BertModel}
 
 logger = logging.getLogger(__name__)
-
-import sys
-
-from utils_nlp.models.transformers.bertsum import model_builder
-from utils_nlp.models.transformers.bertsum.model_builder import AbsSummarizer
-from utils_nlp.models.transformers.bertsum.loss import abs_loss
-from utils_nlp.models.transformers.bertsum.predictor import build_predictor
-
-from utils_nlp.dataset.cnndm import CNNDMSummarizationDataset
-from utils_nlp.eval.evaluate_summarization import get_rouge
-
-from tempfile import TemporaryDirectory
 
 
 def fit_to_block_size(sequence, block_size, pad_token_id):
@@ -79,15 +60,15 @@ def fit_to_block_size(sequence, block_size, pad_token_id):
 
 def build_mask(sequence, pad_token_id):
     """ Builds the mask. The attention mechanism will only attend to positions
-    with value 1. 
-    
+    with value 1.
+
     Args:
         sequence (list): sequences for which the mask is built for.
         pad_token_id (long): padding token id for which the mask is 0.
 
     Returns:
         mask (list): sequences of 1s and 0s.
-    
+
     """
     mask = torch.ones_like(sequence)
     idx_pad_tokens = sequence == pad_token_id
@@ -125,7 +106,8 @@ def compute_token_type_ids(batch, separator_token_id):
 
 
 class BertSumAbsProcessor:
-    """Class for preprocessing abstractive summarization data for BertSumAbs algorithm."""
+    """Class for preprocessing abstractive summarization data for
+        BertSumAbs algorithm."""
 
     def __init__(
         self,
@@ -140,10 +122,11 @@ class BertSumAbsProcessor:
         Args:
             model_name (str, optional): Transformer model name used in preprocessing.
                 check MODEL_CLASS for supported models. Defaults to "bert-base-cased".
-            to_lower (bool, optional): Whether to convert all letters to lower case during
-                tokenization. This is determined by if a cased model is used.
+            to_lower (bool, optional): Whether to convert all letters to lower case
+                during tokenization. This is determined by if a cased model is used.
                 Defaults to True, which corresponds to a uncased model.
-            cache_dir (str, optional): Directory to cache the tokenizer. Defaults to ".".
+            cache_dir (str, optional): Directory to cache the tokenizer.
+                Defaults to ".".
             max_src_len (int, optional): Max number of tokens that be used
                 as input. Defaults to 640.
             max_tgt_len (int, optional): Max number of tokens that be used
@@ -184,8 +167,8 @@ class BertSumAbsProcessor:
         if value not in self.list_supported_models():
             raise ValueError(
                 "Model name {} is not supported by BertSumAbsProcessor. "
-                "Call 'BertSumAbsProcessor.list_supported_models()' to get all supported model "
-                "names.".format(value)
+                "Call 'BertSumAbsProcessor.list_supported_models()' to "
+                "get all supported model names.".format(value)
             )
 
         self._model_name = value
@@ -196,9 +179,9 @@ class BertSumAbsProcessor:
         Creates an input dictionary given a model name.
 
         Args:
-            batch (object): A Batch containing input ids, segment ids, 
+            batch (object): A Batch containing input ids, segment ids,
                 masks for the input ids and source text. If train_mode is True, it
-                also contains the target ids and the number of tokens 
+                also contains the target ids and the number of tokens
                 in the target and target text.
             device (torch.device): A PyTorch device.
             model_name (bool, optional): Model name used to format the inputs.
@@ -234,7 +217,7 @@ class BertSumAbsProcessor:
     def collate(self, data, block_size, device, train_mode=True):
         """ Collate formats the data passed to the data loader.
         In particular we tokenize the data batch after batch to avoid keeping them
-        all in memory. 
+        all in memory.
 
         Args:
             data (list of (str, str)): input data to be loaded.
@@ -253,7 +236,7 @@ class BertSumAbsProcessor:
         if len(data) == 0:
             return None
         stories = [" ".join(d["src"]) for d in data]
-        if train_mode is True and "tgt" in data[0]: 
+        if train_mode is True and "tgt" in data[0]:
             summaries = [" ".join(d["tgt"]) for d in data]
             encoded_text = [self.preprocess(d["src"], d["tgt"]) for d in data]
         else:
@@ -373,7 +356,8 @@ def validate(summarizer, validate_dataset):
         validate_dataset (SummarizationDataset): dataset for validation.
 
     Returns:
-        string: a string which contains the rouge score on a subset of the validation dataset
+        string: A string which contains the rouge score on a subset of
+            the validation dataset.
 
     """
     TOP_N = 8
@@ -389,14 +373,14 @@ def validate(summarizer, validate_dataset):
     print("prediction is {}".format(generated_summaries[0]))
     print("reference is {}".format(reference_summaries[0]))
 
-    RESULT_DIR = TemporaryDirectory().name
-    rouge_score = get_rouge(generated_summaries, reference_summaries, RESULT_DIR)
-    shutil.rmtree(RESULT_DIR, ignore_errors=True)
+    rouge_score = compute_rouge_python(
+        cand=generated_summaries, ref=reference_summaries
+    )
     return "rouge score: {}".format(rouge_score)
 
 
 class BertSumAbs(Transformer):
-    """class which performs abstractive summarization fine tuning and 
+    """class which performs abstractive summarization fine tuning and
         prediction based on BertSumAbs model  """
 
     def __init__(
@@ -420,11 +404,11 @@ class BertSumAbs(Transformer):
             finetune_bert (bool, option): Whether the bert model in the encoder is
                 finetune or not. Defaults to True.
             cache_dir (str, optional): Directory to cache the tokenizer. Defaults to ".".
-            label_smoothing (float, optional): The amount of label smoothing. Value range is [0, 1]. 
-                Defaults to 0.1.
-            test (bool, optional): Whether the class is initiated for test or not. 
-                It must be True if the class obj is only initialized to load a checkpoint for
-                test/inferencing.  Defaults to False.
+            label_smoothing (float, optional): The amount of label smoothing.
+                Value range is [0, 1]. Defaults to 0.1.
+            test (bool, optional): Whether the class is initiated for test or not.
+                It must be True if the class obj is only initialized to load a
+                 checkpoint for test/inferencing.  Defaults to False.
             max_pos_length (int, optional): maximum postional embedding length for the
                 input. Defaults to 768.
         """
@@ -498,54 +482,58 @@ class BertSumAbs(Transformer):
 
         Args:
             train_dataset (SummarizationDataset): Training dataset.
-            num_gpus (int, optional): The number of GPUs to use. If None, all available GPUs will
-                be used. If set to 0 or GPUs are not available, CPU device will
-                be used. Defaults to None.
+            num_gpus (int, optional): The number of GPUs to use. If None, all
+                available GPUs will be used. If set to 0 or GPUs are not available,
+                CPU device will be used. Defaults to None.
             gpu_ids (list): List of GPU IDs to be used.
                 If set to None, the first num_gpus GPUs will be used.
                 Defaults to None.
             batch_size (int, optional): Maximum number of tokens in each batch.
-            local_rank (int, optional): Local_rank for distributed training on GPUs. Local rank
-                means the ranking of the current GPU device on the current node. Defaults to
-                -1, which means non-distributed training.
+            local_rank (int, optional): Local_rank for distributed training on GPUs.
+                Local rank means the ranking of the current GPU device on the current
+                node. Defaults to -1, which means non-distributed training.
             max_steps (int, optional): Maximum number of training steps. Defaults to 5e5.
-            warmup_steps_bert (int, optional): Number of steps taken to increase learning rate from 0
-                to `learning_rate` for tuning the BERT encoder. Defaults to 2e4.
-            warmup_steps_dec (int, optional): Number of steps taken to increase learning rate from 0
-                to `learning_rate` for tuning the decoder. Defaults to 1e4.
-            learning_rate_bert (float, optional):  Learning rate of the optimizer for the encoder. Defaults to
-                0.002.
-            learning_rate_dec (float, optional):  Learning rate of the optimizer for the decoder. Defaults to
-                0.2.
-            optimization_method (string, optional): Optimization method used in fine tuning. Defaults to "adam".
+            warmup_steps_bert (int, optional): Number of steps taken to increase
+                learning rate from 0 to `learning_rate` for tuning the BERT encoder.
+                Defaults to 2e4.
+            warmup_steps_dec (int, optional): Number of steps taken to increase
+                learning rate from 0 to `learning_rate` for tuning the decoder.
+                Defaults to 1e4.
+            learning_rate_bert (float, optional):  Learning rate of the optimizer
+                for the encoder. Defaults to 0.002.
+            learning_rate_dec (float, optional):  Learning rate of the optimizer
+                for the decoder. Defaults to 0.2.
+            optimization_method (string, optional): Optimization method used in fine
+                tuning. Defaults to "adam".
             max_grad_norm (float, optional): Maximum gradient norm for gradient clipping.
                 Defaults to 0.
-            beta1 (float, optional): The exponential decay rate for the first moment estimates.
-                Defaults to 0.9.
-            beta2 (float, optional): The exponential decay rate for the second-moment estimates.
-                This value should be set close to 1.0 on problems with a sparse gradient.
-                Defaults to 0.99.
-            decay_method (string, optional): learning rate decrease method. Default to 'noam'.
+            beta1 (float, optional): The exponential decay rate for the first moment
+                estimates. Defaults to 0.9.
+            beta2 (float, optional): The exponential decay rate for the second-moment
+                estimates. This value should be set close to 1.0 on problems with
+                a sparse gradient. Defaults to 0.99.
+            decay_method (string, optional): learning rate decrease method.
+                Default to 'noam'.
             gradient_accumulation_steps (int, optional): Number of batches to accumulate
                 gradients on between each model parameter update. Defaults to 1.
-            report_every (int, optional): The interval by steps to print out the trainint log.
-                Defaults to 10.
+            report_every (int, optional): The interval by steps to print out the
+                training log. Defaults to 10.
             save_every (int, optional): The interval by steps to save the finetuned model.
                 Defaults to 100.
-            verbose (bool, optional): Whether to print out the training log. 
+            verbose (bool, optional): Whether to print out the training log.
                 Defaults to True.
-            seed (int, optional): Random seed used to improve reproducibility. 
+            seed (int, optional): Random seed used to improve reproducibility.
                 Defaults to None.
-            fp16 (bool, optional): Whether to use mixed precision training. 
+            fp16 (bool, optional): Whether to use mixed precision training.
                 Defaults to False.
             fp16_opt_level (str, optional): optimization level, refer to
-                 https://nvidia.github.io/apex/amp.html#opt-levels for details. 
+                 https://nvidia.github.io/apex/amp.html#opt-levels for details.
                  Value choices are: "O0", "O1", "O2", "O3". Defaults to "O2".
-            world_size (int, optional): Total number of GPUs that will be used. 
+            world_size (int, optional): Total number of GPUs that will be used.
                 Defaults to 1.
-            rank (int, optional): Global rank of the current GPU in distributed training. It's 
-                calculated with the rank of the current node in the cluster/world 
-                and the `local_rank` of the device in the current node. 
+            rank (int, optional): Global rank of the current GPU in distributed
+                training. It's calculated with the rank of the current node in the
+                cluster/world and the `local_rank` of the device in the current node.
                 See an example in :file: `examples/text_summarization/
                 abstractive_summarization_bertsum_cnndm_distributed_train.py`.
                 Defaults to 0.
@@ -682,21 +670,27 @@ class BertSumAbs(Transformer):
         Predict the summarization for the input data iterator.
 
         Args:
-            test_dataset (SummarizationDataset): Dataset for which the summary to be predicted
-            num_gpus (int, optional): The number of GPUs used in prediction. Defaults to 1.
+            test_dataset (SummarizationDataset): Dataset for which the summary
+                to be predicted.
+            num_gpus (int, optional): The number of GPUs used in prediction.
+                Defaults to 1.
             gpu_ids (list): List of GPU IDs to be used.
                 If set to None, the first num_gpus GPUs will be used.
                 Defaults to None.
             local_rank (int, optional): Local rank of the device in distributed
                 inferencing. Defaults to -1, which means non-distributed inferencing.
-            batch_size (int, optional): The number of test examples in each batch. Defaults to 16.
+            batch_size (int, optional): The number of test examples in each batch.
+                Defaults to 16.
             alpha (float, optional): Length penalty. Defaults to 0.6.
             beam_size (int, optional): Beam size of beam search. Defaults to 5.
-            min_length (int, optional): Minimum number of tokens in the output sequence. Defaults to 15.
+            min_length (int, optional): Minimum number of tokens in the output sequence.
+                Defaults to 15.
             max_length (int, optional):  Maximum number of tokens in output
                 sequence. Defaults to 150.
-            fp16 (bool, optional): Whether to use half-precision model for prediction. Defaults to False.
-            verbose (bool, optional): Whether to print out the training log. Defaults to True.
+            fp16 (bool, optional): Whether to use half-precision model for prediction.
+                Defaults to False.
+            verbose (bool, optional): Whether to print out the training log.
+                Defaults to True.
 
         Returns:
             List of strings which are the summaries
@@ -705,6 +699,7 @@ class BertSumAbs(Transformer):
         device, num_gpus = get_device(
             num_gpus=num_gpus, gpu_ids=gpu_ids, local_rank=local_rank
         )
+
         # move model to devices
         def this_model_move_callback(model, device):
             model = move_model_to_device(model, device)
@@ -796,10 +791,11 @@ class BertSumAbs(Transformer):
         save the trained model.
 
         Args:
-            global_step (int, optional): The number of steps that the model has been finetuned for. Defaults to None.
-            full_name (str, optional): File name to save the model's `state_dict()`. If it's None,
-                the model is going to be saved under "fine_tuned" folder of the cached directory
-                of the object. Defaults to None.
+            global_step (int, optional): The number of steps that the model has been
+                finetuned for. Defaults to None.
+            full_name (str, optional): File name to save the model's `state_dict()`.
+                If it's None, the model is going to be saved under "fine_tuned" folder
+                of the cached directory of the object. Defaults to None.
         """
         model_to_save = (
             self.model.module if hasattr(self.model, "module") else self.model
