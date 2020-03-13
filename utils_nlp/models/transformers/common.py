@@ -170,7 +170,7 @@ class Transformer:
             self.model, weight_decay, learning_rate, adam_epsilon
         )
 
-        if fp16:
+        if fp16 and amp:
             self.model, self.optimizer = amp.initialize(
                 self.model, self.optimizer, opt_level=fp16_opt_level
             )
@@ -179,7 +179,7 @@ class Transformer:
             self.optimizer.load_state_dict(checkpoint_state_dict["optimizer"])
             self.model.load_state_dict(checkpoint_state_dict["model"])
 
-            if fp16:
+            if fp16 and amp:
                 amp.load_state_dict(checkpoint_state_dict["amp"])
 
         self.model = parallelize_model(
@@ -212,6 +212,7 @@ class Transformer:
         report_every=10,
         save_every=-1,
         clip_grad_norm=True,
+        validation_function=None,
     ):
 
         if seed is not None:
@@ -220,6 +221,7 @@ class Transformer:
         # init training
         tr_loss = 0.0
         accum_loss = 0
+        train_size = 0
         self.model.train()
         self.model.zero_grad()
 
@@ -248,7 +250,7 @@ class Transformer:
                 if gradient_accumulation_steps > 1:
                     loss = loss / gradient_accumulation_steps
 
-                if fp16:
+                if fp16 and amp:
                     with amp.scale_loss(loss, optimizer) as scaled_loss:
                         scaled_loss.backward()
                 else:
@@ -256,12 +258,13 @@ class Transformer:
 
                 tr_loss += loss.item()
                 accum_loss += loss.item()
-
+                train_size += list(inputs.values())[0].size()[0]
                 if (step + 1) % gradient_accumulation_steps == 0:
+
                     global_step += 1
 
                     if clip_grad_norm:
-                        if fp16:
+                        if fp16 and amp:
                             torch.nn.utils.clip_grad_norm_(
                                 amp.master_params(optimizer), max_grad_norm
                             )
@@ -275,36 +278,54 @@ class Transformer:
                         endtime_string = datetime.datetime.fromtimestamp(end).strftime(
                             "%d/%m/%Y %H:%M:%S"
                         )
-                        print(
-                            """timestamp: {0:s}, loss: {1:.6f}, time duration: {2:f},
-                            number of examples in current step: {3:.0f}, step {4:.0f}
+                        log_line = """timestamp: {0:s}, average loss: {1:.6f}, time duration: {2:f},
+                            number of examples in current reporting: {3:.0f}, step {4:.0f}
                             out of total {5:.0f}""".format(
-                                endtime_string,
-                                accum_loss / report_every,
-                                end - start,
-                                len(batch),
-                                global_step,
-                                max_steps,
-                            )
+                            endtime_string,
+                            accum_loss / report_every,
+                            end - start,
+                            # list(inputs.values())[0].size()[0],
+                            train_size,
+                            global_step,
+                            max_steps,
                         )
+                        logger.info(log_line)
+                        print(log_line)
                         accum_loss = 0
+                        train_size = 0
                         start = end
-
-                    optimizer.step()
+                    if optimizer:
+                        if type(optimizer) == list:
+                            for o in optimizer:
+                                o.step()
+                        else:
+                            optimizer.step()
                     if scheduler:
-                        scheduler.step()
+                        if type(scheduler) == list:
+                            for s in scheduler:
+                                s.step()
+                        else:
+                            scheduler.step()
                     self.model.zero_grad()
-                    if save_every != -1 and global_step % save_every == 0 and verbose:
-                        self.save_model(
-                            os.path.join(
-                                self.cache_dir,
-                                f"{self.model_name}_step_{global_step}.pt",
-                            )
+
+                    if (
+                        save_every != -1
+                        and global_step % save_every == 0
+                        and verbose
+                        and local_rank in [-1, 0]
+                    ):
+                        saved_model_path = os.path.join(
+                            self.cache_dir, f"{self.model_name}_step_{global_step}.pt"
                         )
+                        self.save_model(global_step, saved_model_path)
+                        if validation_function:
+                            validation_log = validation_function(self)
+                            logger.info(validation_log)
+                            print(validation_log)
                 if global_step > max_steps:
                     epoch_iterator.close()
                     break
-        if fp16:
+        if fp16 and amp:
             self.amp_state_dict = amp.state_dict()
         return global_step, tr_loss / global_step
 

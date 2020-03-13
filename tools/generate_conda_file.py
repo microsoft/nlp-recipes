@@ -58,11 +58,11 @@ CONDA_GPU = {
 
 PIP_BASE = {
     "allennlp": "allennlp==0.8.4",
-    "azureml-sdk": "azureml-sdk[automl,notebooks,contrib]==1.0.57",
-    "azureml-train-automl": "azureml-train-automl==1.0.57",
+    "azureml-sdk": "azureml-sdk[automl,notebooks,contrib]==1.0.85",
+    "azureml-train-automl": "azureml-train-automl==1.0.85",
     "azureml-dataprep": "azureml-dataprep==1.1.8",
-    "azureml-widgets": "azureml-widgets==1.0.57",
-    "azureml-mlflow": "azureml-mlflow==1.0.57",
+    "azureml-widgets": "azureml-widgets==1.0.85",
+    "azureml-mlflow": "azureml-mlflow==1.0.85",
     "black": "black>=18.6b4",
     "cached-property": "cached-property==1.5.1",
     "jsonlines": "jsonlines>=1.2.0",
@@ -81,7 +81,7 @@ PIP_BASE = {
         "https://github.com/explosion/spacy-models/releases/download/"
         "en_core_web_sm-2.1.0/en_core_web_sm-2.1.0.tar.gz"
     ),
-    "transformers": "transformers>=2.1.1",
+    "transformers": "transformers==2.5.0",
     "gensim": "gensim>=3.7.0",
     "nltk": "nltk>=3.4",
     "seqeval": "seqeval>=0.0.12",

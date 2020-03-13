@@ -329,6 +329,9 @@ class IterableSummarizationDataset(IterableDataset):
         for x in self._source:
             yield x
 
+    def get_source(self):
+        return self._source
+
     def get_target(self):
         return self._target
 
@@ -391,7 +394,19 @@ class SummarizationDataset(Dataset):
                 num_pool=n_processes,
             )
 
+    def shorten(self, top_n=None):
+        if top_n is None:
+            return self
+        elif top_n <= len(self._source):
+            self._source = self._source[0:top_n]
+            if self._target is not None:
+                self._target = self._target[0:top_n]
+            return self
+        else:
+            return self
+
     def __getitem__(self, idx):
+        ## tupe is more adaptive
         if self._target is None:
             return {"src": self._source[idx]}
         else:
@@ -399,6 +414,9 @@ class SummarizationDataset(Dataset):
 
     def __len__(self):
         return len(self._source)
+
+    def get_source(self):
+        return self._source
 
     def get_target(self):
         return self._target
@@ -417,7 +435,7 @@ def parallel_preprocess(
     input_data, preprocess_pipeline, word_tokenize=None, num_pool=-1
 ):
     """
-    Process data in parallel using multiple GPUs.
+    Process data in parallel using multiple CPUs.
 
     Args:
         input_data (list): List if input strings to process.
