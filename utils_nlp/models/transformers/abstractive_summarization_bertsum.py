@@ -341,7 +341,7 @@ class BertSumAbsProcessor:
                 )
             except:
                 print(line)
-                raise
+                raise ValueError("Invalid line: {}".format(line))
         story_token_ids = [
             token for sentence in story_lines_token_ids for token in sentence
         ]
@@ -661,8 +661,8 @@ class BertSumAbs(Transformer):
             amp=self.amp,
             validation_function=validation_function,
         )
-
-        self.save_model(max_steps)
+        if local_rank in [-1, 0]:
+            self.save_model(max_steps)
 
     def predict(
         self,
