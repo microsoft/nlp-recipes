@@ -512,73 +512,75 @@ class ExtSumProcessor:
             elif oracle_mode == "combination":
                 oracle_ids = combination_selection(source, target, selections)
 
-        def _preprocess(src, tgt=None, oracle_ids=None):
-
-            if len(src) == 0:
-                return None
-
-            original_src_txt = [" ".join(s) for s in src]
-
-            labels = None
-            if oracle_ids is not None and tgt is not None:
-                labels = [0] * len(src)
-                for l in oracle_ids:
-                    labels[l] = 1
-
-            idxs = [i for i, s in enumerate(src) if (len(s) > self.min_src_ntokens)]
-
-            src = [src[i][: self.max_src_ntokens] for i in idxs]
-            src = src[: self.max_nsents]
-            if labels:
-                labels = [labels[i] for i in idxs]
-                labels = labels[: self.max_nsents]
-
-            if len(src) < self.min_nsents:
-                return None
-            if labels:
-                if len(labels) == 0:
-                    return None
-
-            src_txt = [" ".join(sent) for sent in src]
-            text = " [SEP] [CLS] ".join(src_txt)
-            src_subtokens = self.tokenizer.tokenize(text)
-            #src_subtokens = src_subtokens[:510]
-            src_subtokens = ["[CLS]"] + fit_to_block_size(src_subtokens, self.max_pos_length - 2, self.tokenizer.pad_token_id) + ["[SEP]"]
-
-            src_subtoken_idxs = self.tokenizer.convert_tokens_to_ids(src_subtokens)
-            _segs = [-1] + [
-                i for i, t in enumerate(src_subtoken_idxs) if t == self.sep_vid
-            ]
-            segs = [_segs[i] - _segs[i - 1] for i in range(1, len(_segs))]
-            segments_ids = []
-            for i, s in enumerate(segs):
-                if i % 2 == 0:
-                    segments_ids += s * [0]
-                else:
-                    segments_ids += s * [1]
-            cls_ids = [i for i, t in enumerate(src_subtoken_idxs) if t == self.cls_vid]
-            if labels:
-                labels = labels[: len(cls_ids)]
-
-            tgt_txt = None
-            if tgt:
-                tgt_txt = "<q>".join([" ".join(tt) for tt in tgt])
-            src_txt = [original_src_txt[i] for i in idxs]
-            return src_subtoken_idxs, labels, segments_ids, cls_ids, src_txt, tgt_txt
-
-        b_data = _preprocess(source, target, oracle_ids)
-
-        if b_data is None:
+            return {
+                "oracle_ids": oracle_ids,
+                "src_txt": src_txt,
+                "tgt_txt": tgt_txt,
+            }
+        else:
+            return {
+                "src_txt": src_txt,
+            }
+    def collate(self, data, block_size, device, train_mode=True):
+        data = [x for x in data if not len(x["src"]) == 0]  # remove empty_files
+        if len(data) == 0:
             return None
-        indexed_tokens, labels, segments_ids, cls_ids, src_txt, tgt_txt = b_data
-        return {
-            "src": indexed_tokens,
-            "labels": labels,
-            "segs": segments_ids,
-            "clss": cls_ids,
-            "src_txt": src_txt,
-            "tgt_txt": tgt_txt,
-        }
+        
+        
+    def collate_single(self, src, block_size, tgt=None, oracle_ids=None):
+
+        if len(src) == 0:
+            return None
+
+        original_src_txt = [" ".join(s) for s in src]
+
+        labels = None
+        if oracle_ids is not None and tgt is not None:
+            labels = [0] * len(src)
+            for l in oracle_ids:
+                labels[l] = 1
+
+        idxs = [i for i, s in enumerate(src) if (len(s) > self.min_src_ntokens)]
+
+        src = [src[i][: self.max_src_ntokens] for i in idxs]
+        src = src[: self.max_nsents]
+        if labels:
+            labels = [labels[i] for i in idxs]
+            labels = labels[: self.max_nsents]
+
+        if len(src) < self.min_nsents:
+            return None
+        if labels:
+            if len(labels) == 0:
+                return None
+
+        src_txt = [" ".join(sent) for sent in src]
+        text = " [SEP] [CLS] ".join(src_txt)
+        src_subtokens = self.tokenizer.tokenize(text)
+        #src_subtokens = src_subtokens[:510]
+        src_subtokens = ["[CLS]"] + fit_to_block_size(src_subtokens, self.max_pos_length - 2, self.tokenizer.pad_token_id) + ["[SEP]"]
+
+        src_subtoken_idxs = self.tokenizer.convert_tokens_to_ids(src_subtokens)
+        _segs = [-1] + [
+            i for i, t in enumerate(src_subtoken_idxs) if t == self.sep_vid
+        ]
+        segs = [_segs[i] - _segs[i - 1] for i in range(1, len(_segs))]
+        segments_ids = []
+        for i, s in enumerate(segs):
+            if i % 2 == 0:
+                segments_ids += s * [0]
+            else:
+                segments_ids += s * [1]
+        cls_ids = [i for i, t in enumerate(src_subtoken_idxs) if t == self.cls_vid]
+        if labels:
+            labels = labels[: len(cls_ids)]
+
+        tgt_txt = None
+        if tgt:
+            tgt_txt = "<q>".join([" ".join(tt) for tt in tgt])
+        src_txt = [original_src_txt[i] for i in idxs]
+        return src_subtoken_idxs, labels, segments_ids, cls_ids, src_txt, tgt_txt
+
 
 
 class ExtractiveSummarizer(Transformer):
