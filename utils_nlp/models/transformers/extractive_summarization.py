@@ -12,7 +12,14 @@ import random
 
 import numpy as np
 import torch
-from torch.utils.data import DataLoader, Dataset, IterableDataset, SequentialSampler
+from torch.utils.data import (
+    DataLoader,
+    Dataset,
+    IterableDataset,
+    SequentialSampler,
+    RandomSampler,
+)
+from torch.utils.data.distributed import DistributedSampler
 
 from transformers import BertModel, DistilBertModel
 
@@ -341,7 +348,7 @@ class ExtSumProcessedData:
 
         return train_files, test_files
 
-    def splits(self, root):
+    def splits(self, root, train_iterable=False):
         """Get the train and test dataset from the folder
 
         Args:
@@ -352,10 +359,16 @@ class ExtSumProcessedData:
             and ExtSumProcessedDataset as test dataset.
         """
         train_files, test_files = self._get_files(root)
-        return (
-            ExtSumProcessedIterableDataset(train_files, is_shuffle=True),
-            ExtSumProcessedDataset(test_files, is_shuffle=False),
-        )
+        if train_iterable:
+            return (
+                ExtSumProcessedIterableDataset(train_files, is_shuffle=True),
+                ExtSumProcessedDataset(test_files, is_shuffle=False),
+            )
+        else:
+             return (
+                ExtSumProcessedDataset(train_files, is_shuffle=True),
+                ExtSumProcessedDataset(test_files, is_shuffle=False),
+            )
 
 
 class ExtSumProcessor:
@@ -370,7 +383,6 @@ class ExtSumProcessor:
         max_src_ntokens=2000,
         min_nsents=3,
         min_src_ntokens=5,
-        max_pos_length=1600,
     ):
         """ Initialize the preprocessor.
 
@@ -407,7 +419,6 @@ class ExtSumProcessor:
         self.max_src_ntokens = max_src_ntokens
         self.min_nsents = min_nsents
         self.min_src_ntokens = min_src_ntokens
-        self.max_pos_length = max_pos_length
 
     @staticmethod
     def list_supported_models():
@@ -462,7 +473,7 @@ class ExtSumProcessor:
                     "labels": batch.labels,
                 }
             else:
-                batch = Bunch(batch)
+                #batch = Bunch(batch)
                 return {
                     "x": batch.src.to(device),
                     "segs": batch.segs.to(device),
@@ -514,52 +525,67 @@ class ExtSumProcessor:
 
             return {
                 "oracle_ids": oracle_ids,
-                "src_txt": src_txt,
-                "tgt_txt": tgt_txt,
+                "source": source,
+                "target": target,
+                "src_txt": [" ".join(s) for s in source]
             }
         else:
             return {
-                "src_txt": src_txt,
+                "source": source,
             }
-    def collate(self, data, block_size, device, train_mode=True):
-        data = [x for x in data if not len(x["src"]) == 0]  # remove empty_files
+
+    def collate(self, data, block_size, train_mode=True):
         if len(data) == 0:
             return None
-        
-        
-    def collate_single(self, src, block_size, tgt=None, oracle_ids=None):
+        else: 
+            if train_mode is True and "target" in data[0] and "oracle_ids" in data[0]:
+                encoded_text = [self.encode_single(d["source"], block_size, d["target"], d["oracle_ids"])
+                    for d in data] 
+                batch = Batch(list(filter(None, encoded_text)), True)
+            else:
+                encoded_text = [self.encode_single(d["source"], block_size, None, None)
+                    for d in data]
+            #src, labels, segs, clss, src_txt, tgt_txt =  zip(*encoded_text)
+            #new_data = [list(i) for i in list(zip(*encoded_text))]   
+            #batch =  Batch(new_data)
+                batch = Batch(list(filter(None, encoded_text))) 
+            return batch
+
+    def encode_single(self, src, block_size, tgt=None, oracle_ids=None):
 
         if len(src) == 0:
             return None
 
         original_src_txt = [" ".join(s) for s in src]
+        # no filtering for prediction 
+        idxs = [i for i, s in enumerate(src)]
+        src = [src[i] for i in idxs]
 
+        tgt_txt = None
         labels = None
         if oracle_ids is not None and tgt is not None:
             labels = [0] * len(src)
             for l in oracle_ids:
                 labels[l] = 1
 
-        idxs = [i for i, s in enumerate(src) if (len(s) > self.min_src_ntokens)]
-
-        src = [src[i][: self.max_src_ntokens] for i in idxs]
-        src = src[: self.max_nsents]
-        if labels:
+            # source filtering for only training
+            idxs = [i for i, s in enumerate(src) if (len(s) > self.min_src_ntokens)]
+            src = [src[i][: self.max_src_ntokens] for i in idxs]
+            src = src[: self.max_nsents]
             labels = [labels[i] for i in idxs]
             labels = labels[: self.max_nsents]
 
-        if len(src) < self.min_nsents:
-            return None
-        if labels:
+            if len(src) < self.min_nsents:
+                return None
             if len(labels) == 0:
                 return None
+            tgt_txt = "<q>".join([" ".join(tt) for tt in tgt])
 
         src_txt = [" ".join(sent) for sent in src]
         text = " [SEP] [CLS] ".join(src_txt)
         src_subtokens = self.tokenizer.tokenize(text)
         #src_subtokens = src_subtokens[:510]
-        src_subtokens = ["[CLS]"] + fit_to_block_size(src_subtokens, self.max_pos_length - 2, self.tokenizer.pad_token_id) + ["[SEP]"]
-
+        src_subtokens = ["[CLS]"] + fit_to_block_size(src_subtokens, block_size - 2, self.tokenizer.pad_token_id) + ["[SEP]"]
         src_subtoken_idxs = self.tokenizer.convert_tokens_to_ids(src_subtokens)
         _segs = [-1] + [
             i for i, t in enumerate(src_subtoken_idxs) if t == self.sep_vid
@@ -575,11 +601,8 @@ class ExtSumProcessor:
         if labels:
             labels = labels[: len(cls_ids)]
 
-        tgt_txt = None
-        if tgt:
-            tgt_txt = "<q>".join([" ".join(tt) for tt in tgt])
         src_txt = [original_src_txt[i] for i in idxs]
-        return src_subtoken_idxs, labels, segments_ids, cls_ids, src_txt, tgt_txt
+        return src_subtoken_idxs, labels, segments_ids, cls_ids, src_txt, tgt_txt, original_src_txt
 
 
 
@@ -587,7 +610,7 @@ class ExtractiveSummarizer(Transformer):
     """class which performs extractive summarization fine tuning and prediction """
 
     def __init__(
-        self, model_name="distilbert-base-uncased", encoder="transformer",
+        self, processor, model_name="distilbert-base-uncased", encoder="transformer",
         max_pos_length=512, cache_dir="."
     ):
         """Initialize a ExtractiveSummarizer.
@@ -623,7 +646,8 @@ class ExtractiveSummarizer(Transformer):
                 "Call 'ExtractiveSummarizer.list_supported_models()' to get all  "
                 "supported model names.".format(model_name)
             )
-
+        self.processor = processor
+        self.max_pos_length = max_pos_length
         self.model_class = MODEL_CLASS[model_name]
         default_summarizer_layer_parameters = {
             "ff_size": 512,
@@ -749,13 +773,31 @@ class ExtractiveSummarizer(Transformer):
         )
 
         # batch_size is the number of tokens in a batch
-        train_dataloader = get_dataloader(
-            train_dataset.get_stream(),
-            is_labeled=True,
-            batch_size=batch_size,
-            world_size=world_size,
-            rank=rank,
-        )
+        if False: #use_preprocessed_data:
+            train_dataloader = get_dataloader(
+                train_dataset.get_stream(),
+                is_labeled=True,
+                batch_size=batch_size,
+                world_size=world_size,
+                rank=rank,
+            )
+        else:
+            if local_rank == -1:
+                sampler = RandomSampler(train_dataset)
+            else:
+                sampler = DistributedSampler(
+                    train_dataset, num_replicas=world_size, rank=rank
+                )
+            def collate_fn(data):
+                return self.processor.collate(
+                    data, block_size=self.max_pos_length
+                )
+            train_dataloader = DataLoader(
+                train_dataset,
+                sampler=sampler,
+                batch_size=batch_size,
+                collate_fn=collate_fn,
+            )
 
         # compute the max number of training steps
         max_steps = compute_training_steps(
@@ -822,7 +864,7 @@ class ExtractiveSummarizer(Transformer):
 
         """
 
-        def collate_fn(dict_list):
+        def collate_fn_processed_data(dict_list):
             # tuple_batch =  [list(col) for col in zip(*[d.values() for d in dict_list]
             if dict_list is None or len(dict_list) <= 0:
                 return None
@@ -830,13 +872,22 @@ class ExtractiveSummarizer(Transformer):
             # generate mask and mask_cls, and only select tensors for the model input
             # the labels was never used in prediction, set is_labeled as False
             batch = Batch(tuple_batch, is_labeled=False)
-            return {
+            return Bunch({
                 "src": batch.src,
                 "segs": batch.segs,
                 "clss": batch.clss,
                 "mask": batch.mask,
                 "mask_cls": batch.mask_cls,
-            }
+            })
+        
+        def collate_fn(data):
+            return self.processor.collate(
+                data, block_size=self.max_pos_length
+            )
+        if len(test_dataset) == 0:
+            return None        
+        if "segs" in test_dataset[0]:
+            collate_fn = collate_fn_processed_data
 
         test_sampler = SequentialSampler(test_dataset)
         test_dataloader = DataLoader(
