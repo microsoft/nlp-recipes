@@ -18,7 +18,7 @@ from torch.utils.data import (
     RandomSampler,
 )
 
-# from torch.utils.data.distributed import DistributedSampler
+from torch.utils.data.distributed import DistributedSampler
 from transformers import BertModel
 
 from utils_nlp.common.pytorch_utils import (
