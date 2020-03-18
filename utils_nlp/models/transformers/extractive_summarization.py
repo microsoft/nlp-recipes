@@ -705,6 +705,7 @@ class ExtractiveSummarizer(Transformer):
         save_every=-1,
         world_size=1,
         rank=0,
+        use_preprocessed_data=False,
         **kwargs,
     ):
         """
@@ -787,7 +788,7 @@ class ExtractiveSummarizer(Transformer):
         )
 
         # batch_size is the number of tokens in a batch
-        if False: #use_preprocessed_data:
+        if use_preprocessed_data:
             train_dataloader = get_dataloader(
                 train_dataset.get_stream(),
                 is_labeled=True,
@@ -928,6 +929,11 @@ class ExtractiveSummarizer(Transformer):
                 top_n=top_n,
             )
             prediction.extend(temp_pred)
+
+        # release GPU memories
+        self.model.cpu()
+        torch.cuda.empty_cache()
+
         return prediction
 
     def predict_scores(self, test_dataloader, num_gpus=1, gpu_ids=None, verbose=True):

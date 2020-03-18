@@ -321,6 +321,11 @@ class Transformer:
                     break
         if fp16 and amp:
             self.amp_state_dict = amp.state_dict()
+        
+        # release GPU memories
+        self.model.cpu()
+        torch.cuda.empty_cache()
+
         return global_step, tr_loss / global_step
 
     def predict(self, eval_dataloader, get_inputs, num_gpus, gpu_ids, verbose=True):
