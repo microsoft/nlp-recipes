@@ -91,40 +91,39 @@ def CNNDMSummarizationDataset(*args, **kwargs):
         if prepare_extractive:
 
             return (
-                IterableSummarizationDataset(
+
+                SummarizationDataset(
                     train_source_file,
-                    train_target_file,
-                    [_clean, tokenize.sent_tokenize],
-                    [_clean, _remove_ttags, _target_sentence_tokenization],
-                    nltk.word_tokenize,
-                    top_n,
+                    target_file=train_target_file,
+                    source_preprocessing=[_clean, tokenize.sent_tokenize],
+                    target_preprocessing=[_clean, _remove_ttags, _target_sentence_tokenization],
+                    word_tokenize=nltk.word_tokenize,
+                    top_n=top_n
                 ),
-                IterableSummarizationDataset(
+                SummarizationDataset(
                     test_source_file,
-                    test_target_file,
-                    [_clean, tokenize.sent_tokenize],
-                    [_clean, _remove_ttags, _target_sentence_tokenization],
-                    nltk.word_tokenize,
-                    top_n,
+                    target_file=test_target_file,
+                    source_preprocessing=[_clean, tokenize.sent_tokenize],
+                    target_preprocessing=[_clean, _remove_ttags, _target_sentence_tokenization],
+                    word_tokenize=nltk.word_tokenize,
+                    top_n=top_n
                 ),
             )
         else:
             return (
                 SummarizationDataset(
                     train_source_file,
-                    train_target_file,
-                    [_clean, tokenize.sent_tokenize],
-                    [_clean, _remove_ttags, _target_sentence_tokenization],
-                    top_n,
-                    16
+                    target_file=train_target_file,
+                    source_preprocessing=[_clean, tokenize.sent_tokenize],
+                    target_preprocessing=[_clean, _remove_ttags, _target_sentence_tokenization],
+                    top_n=top_n
                 ),
                 SummarizationDataset(
                     test_source_file,
-                    test_target_file,
-                    [_clean, tokenize.sent_tokenize],
-                    [_clean, _remove_ttags, _target_sentence_tokenization],
-                    top_n,
-                    16
+                    target_file=test_target_file,
+                    source_preprocessing=[_clean, tokenize.sent_tokenize],
+                    target_preprocessing=[_clean, _remove_ttags, _target_sentence_tokenization],
+                    top_n=top_n,
                 ),
             )
         

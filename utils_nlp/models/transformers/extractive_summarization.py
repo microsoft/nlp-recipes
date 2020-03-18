@@ -268,6 +268,7 @@ def get_pred(
     # target = []
     # for i, idx in enumerate(selected_ids):
     _pred = []
+    final_selections = []
     if len(example["src_txt"]) == 0:
         pred.append("")
     for j in selected_ids[: len(example["src_txt"])]:
@@ -277,14 +278,23 @@ def get_pred(
         if block_trigram:
             if not _block_tri(candidate, _pred):
                 _pred.append(candidate)
+                final_selections.append(j)
         else:
             _pred.append(candidate)
+            final_selections.append(j)
 
         # only select the top n
         if len(_pred) == top_n:
             break
 
     # _pred = '<q>'.join(_pred)
+    # _pred = sentence_separator.join(_pred)
+    sorted_selections = sorted(final_selections)
+    # if sorted_selections != final_selections:
+    #    print(final_selections, sorted_selections)
+    _pred = []
+    for i in sorted_selections:
+        _pred.append(example["src_txt"][i].strip())
     _pred = sentence_separator.join(_pred)
     pred.append(_pred.strip())
     # target.append(example['tgt_txt'])
@@ -484,7 +494,7 @@ class ExtSumProcessor:
         else:
             raise ValueError("Model not supported: {}".format(model_name))
 
-    def preprocess(self, sources, targets=None, oracle_mode="greedy", selections=3):
+    def preprocess(self, sources, targets=None, source_txt=None, target_txt=None, oracle_mode="greedy", selections=3):
         """preprocess multiple data points
 
            Args:
@@ -503,13 +513,16 @@ class ExtSumProcessor:
                 sentence class ids, labels, source text and target text.
                 If targets is None, the label and target text are None.
         """
-
+        result = []
         if targets is None:
             for source in sources:
-                yield self._preprocess_single(source, None, oracle_mode, selections)
+                # todo: make this part multi-processing, keep the original sentence-split source and target text
+                result.append(self._preprocess_single(source, None, oracle_mode, selections))
         else:
             for (source, target) in zip(sources, targets):
-                yield self._preprocess_single(source, target, oracle_mode, selections)
+                # todo: make this part multi-processing, keep the original sentence-split source text
+                result.append(self._preprocess_single(source, target, oracle_mode, selections))
+        return result
 
     def _preprocess_single(
         self, source, target=None, oracle_mode="greedy", selections=3
@@ -532,6 +545,7 @@ class ExtSumProcessor:
         else:
             return {
                 "source": source,
+                "src_txt": [" ".join(s) for s in source]
             }
 
     def collate(self, data, block_size, train_mode=True):

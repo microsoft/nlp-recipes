@@ -3,6 +3,7 @@
 
 import collections
 import itertools
+import os
 import torch
 from torch.utils.data import Dataset, IterableDataset
 from multiprocessing import Pool, cpu_count
@@ -340,9 +341,12 @@ class SummarizationDataset(Dataset):
     def __init__(
         self,
         source_file,
+        source=None,
         target_file=None,
+        target=None,
         source_preprocessing=None,
         target_preprocessing=None,
+        word_tokenize=None,
         top_n=-1,
         n_processes=-1,
     ):
@@ -365,32 +369,44 @@ class SummarizationDataset(Dataset):
             n_processes (int, optional): Number of CPUs to use to process the data in
                 parallel. Defaults to -1, which means all the CPUs will be used.
         """
+        self._source_txt = []
+        if source_file is not None and os.path.exists(source_file):
+            with open(source_file, encoding="utf-8") as f:
+                if top_n != -1:
+                    self._source_txt = list(itertools.islice(f, top_n))
+                else:
+                    self._source_txt = f.readlines()
+        if source:
+            self._source_txt.extend(source)
 
-        with open(source_file, encoding="utf-8") as f:
-            if top_n != -1:
-                self._source = list(itertools.islice(f, top_n))
-            else:
-                self._source = f.readlines()
-
-        if target_file is not None:
+        self._target_txt = []
+        if target_file is not None and os.path.exists(target_file):
             with open(target_file, encoding="utf-8") as f:
                 if top_n != -1:
-                    self._target = list(itertools.islice(f, top_n))
+                    self._target_txt = list(itertools.islice(f, top_n))
                 else:
                     self._target = f.readlines()
-
-            assert len(self._source) == len(self._target)
+        if target:
+            self._target_txt.extend(target)
+        
+        if len(self._target_txt) == 0:
+            self._target_txt = None
         else:
-            self._target = None
+            assert len(self._source_txt) == len(self._target_txt)
+
 
         self._source = parallel_preprocess(
-            self._source, preprocess_pipeline=source_preprocessing, num_pool=n_processes
+            self._source_txt, 
+            preprocess_pipeline=source_preprocessing, 
+            word_tokenize=word_tokenize, 
+            num_pool=n_processes
         )
 
-        if self._target is not None:
+        if self._target_txt is not None:
             self._target = parallel_preprocess(
-                self._target,
+                self._target_txt,
                 preprocess_pipeline=target_preprocessing,
+                word_tokenize=word_tokenize,
                 num_pool=n_processes,
             )
 
@@ -417,6 +433,12 @@ class SummarizationDataset(Dataset):
 
     def get_source(self):
         return self._source
+    
+    def get_source_txt(self):
+        return self._source_txt
+
+    def get_target_txt(self):
+        return self._target_txt
 
     def get_target(self):
         return self._target
@@ -463,7 +485,7 @@ def parallel_preprocess(
             word_tokenize=word_tokenize,
         ),
         input_data,
-        chunksize=int(len(input_data) / num_pool),
+        chunksize=min(1, int(len(input_data) / num_pool)),
     )
     p.close()
     p.join()
