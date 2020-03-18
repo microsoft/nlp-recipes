@@ -22,7 +22,7 @@ def test_extractive_summarization_cnndm_transformers(notebooks, tmp):
             TOP_N=100,
             CHUNK_SIZE=200,
             USE_PREPROCESSED_DATA=False,
-            DATA_FOLDER=tmp,
+            DATA_PATH=tmp,
             CACHE_DIR=tmp,
             BATCH_SIZE=3000,
             REPORT_EVERY=50,

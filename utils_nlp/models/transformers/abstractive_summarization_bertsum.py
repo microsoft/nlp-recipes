@@ -18,7 +18,7 @@ from torch.utils.data import (
     RandomSampler,
 )
 
-# from torch.utils.data.distributed import DistributedSampler
+from torch.utils.data.distributed import DistributedSampler
 from transformers import BertModel
 
 from utils_nlp.common.pytorch_utils import (
@@ -649,7 +649,11 @@ class BertSumAbs(Transformer):
             amp=self.amp,
             validation_function=validation_function,
         )
-
+        
+         # release GPU memories
+        self.model.cpu()
+        torch.cuda.empty_cache()
+        
         self.save_model(max_steps)
 
     def predict(
@@ -784,6 +788,11 @@ class BertSumAbs(Transformer):
             translations_text = generate_summary_from_tokenid(translations, scores)
             summaries = [format_summary(t) for t in translations_text]
             generated_summaries.extend(summaries)
+            
+         # release GPU memories
+        self.model.cpu()
+        torch.cuda.empty_cache()
+        
         return generated_summaries
 
     def save_model(self, global_step=None, full_name=None):
@@ -806,6 +815,11 @@ class BertSumAbs(Transformer):
             os.makedirs(self.cache_dir, exist_ok=True)
             os.makedirs(output_model_dir, exist_ok=True)
             full_name = os.path.join(output_model_dir, "bertsumabs.pt")
+        else:
+            path, filename = os.path.split(full_name)
+            print(path)
+            os.makedirs(path, exist_ok=True)
+            
         checkpoint = {
             "optimizers": [self.optim_bert.state_dict(), self.optim_dec.state_dict()],
             "model": model_to_save.state_dict(),
