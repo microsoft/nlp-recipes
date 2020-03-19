@@ -195,15 +195,16 @@ def test_parallelize_model(model):
     )
     assert next(model_cuda_intersect_1_gpu.parameters()).is_cuda is True
 
-    # when intersection is only 0, use cuda:0
+    # when threre is no intersection, no change to the model 
     model_base = move_model_to_device(model, torch.device("cuda"))
     model_cuda_intersect_0_gpu = parallelize_model(
         model_base,
         torch.device("cuda"),
         gpu_ids=[x + num_cuda_devices for x in list(range(num_cuda_devices))],
     )
-    assert next(model_cuda_intersect_0_gpu.parameters()).device == torch.device(
-        "cuda:0"
+    assert (
+        next(model_cuda_intersect_0_gpu.parameters()).device
+        == next(model_base.parameters()).device
     )
     assert next(model_cuda_intersect_0_gpu.parameters()).is_cuda is True
     # test device is cpu original model on gpu
