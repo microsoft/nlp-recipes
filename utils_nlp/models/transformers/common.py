@@ -44,6 +44,7 @@ MAX_SEQ_LEN = 512
 
 logger = logging.getLogger(__name__)
 
+
 class Transformer:
     def __init__(
         self,
@@ -307,7 +308,12 @@ class Transformer:
                             scheduler.step()
                     self.model.zero_grad()
 
-                    if save_every != -1 and global_step % save_every == 0 and verbose:
+                    if (
+                        save_every != -1
+                        and global_step % save_every == 0
+                        and verbose
+                        and local_rank in [-1, 0]
+                    ):
                         saved_model_path = os.path.join(
                             self.cache_dir, f"{self.model_name}_step_{global_step}.pt"
                         )

@@ -491,7 +491,7 @@ def parallel_preprocess(
     input_data, preprocess_pipeline, word_tokenize=None, num_pool=-1
 ):
     """
-    Process data in parallel using multiple GPUs.
+    Process data in parallel using multiple CPUs.
 
     Args:
         input_data (list): List if input strings to process.
