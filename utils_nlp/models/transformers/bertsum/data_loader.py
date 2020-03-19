@@ -2,21 +2,19 @@
 Portions Copyright (c) Microsoft Corporation
 """
 import gc
-import glob
 import random
 
 import torch
 
 
-
 class Batch(object):
     def _pad(self, data, pad_id, width=-1):
-        if (width == -1):
+        if width == -1:
             width = max(len(d) for d in data)
         rtn_data = [d + [pad_id] * (width - len(d)) for d in data]
         return rtn_data
 
-    def __init__(self, data=None,   is_labeled=False):
+    def __init__(self, data=None, is_labeled=False):
         """Create a Batch from a list of examples."""
         if data is not None:
             self.batch_size = len(data)
@@ -25,7 +23,7 @@ class Batch(object):
             pre_clss = [x[3] for x in data]
 
             src = torch.tensor(self._pad(pre_src, 0))
-        
+
             pre_labels = None
             labels = None
             if is_labeled:
@@ -38,20 +36,19 @@ class Batch(object):
             mask_cls = ~(clss == -1)
             clss[clss == -1] = 0
 
-            setattr(self, 'clss', clss)
-            setattr(self, 'mask_cls', mask_cls)
-            setattr(self, 'src', src)
-            setattr(self, 'segs', segs)
-            setattr(self, 'mask', mask)
+            setattr(self, "clss", clss)
+            setattr(self, "mask_cls", mask_cls)
+            setattr(self, "src", src)
+            setattr(self, "segs", segs)
+            setattr(self, "mask", mask)
 
-            src_str = [x[-2] for x in data]
-            setattr(self, 'src_str', src_str)
+            src_str = [x[4] for x in data]
+            setattr(self, "src_str", src_str)
 
-
-            if (is_labeled):
-                setattr(self, 'labels', labels)
-                tgt_str = [x[-1] for x in data]
-                setattr(self, 'tgt_str', tgt_str)
+            if is_labeled:
+                setattr(self, "labels", labels)
+                tgt_str = [x[5] for x in data]
+                setattr(self, "tgt_str", tgt_str)
 
     def to(self, device):
         src = self.src.to(device)
@@ -60,14 +57,14 @@ class Batch(object):
         mask = self.mask.to(device)
         mask_cls = self.mask_cls.to(device)
 
-        setattr(self, 'clss', clss)
-        setattr(self, 'mask_cls', mask_cls)
-        setattr(self, 'src', src)
-        setattr(self, 'segs', segs)
-        setattr(self, 'mask', mask)
-        if hasattr(self, 'labels'):
+        setattr(self, "clss", clss)
+        setattr(self, "mask_cls", mask_cls)
+        setattr(self, "src", src)
+        setattr(self, "segs", segs)
+        setattr(self, "mask", mask)
+        if hasattr(self, "labels"):
             labels = self.labels.to(device)
-            setattr(self, 'labels', labels.to(device))
+            setattr(self, "labels", labels.to(device))
 
         return self
 
@@ -96,8 +93,8 @@ def simple_batch_size_fn(new, count):
     global max_n_sents, max_n_tokens, max_size
     if count == 1:
         max_size = 0
-        max_n_sents=0
-        max_n_tokens=0
+        max_n_sents = 0
+        max_n_tokens = 0
     max_n_sents = max(max_n_sents, len(src))
     max_size = max(max_size, max_n_sents)
     src_elements = count * max_size
@@ -105,8 +102,7 @@ def simple_batch_size_fn(new, count):
 
 
 class Dataloader(object):
-    def __init__(self, datasets,  batch_size,
-                 shuffle, is_labeled):
+    def __init__(self, datasets, batch_size, shuffle, is_labeled):
         self.datasets = datasets
         self.batch_size = batch_size
         self.shuffle = shuffle
@@ -122,7 +118,6 @@ class Dataloader(object):
                 yield batch
             self.cur_iter = self._next_dataset_iterator(dataset_iter)
 
-
     def _next_dataset_iterator(self, dataset_iter):
         try:
             # Drop the current dataset for decreasing memory
@@ -137,16 +132,18 @@ class Dataloader(object):
             return None
 
         return DataIterator(
-            dataset=self.cur_dataset,  batch_size=self.batch_size,
-            shuffle=self.shuffle, is_labeled=self.is_labeled)
+            dataset=self.cur_dataset,
+            batch_size=self.batch_size,
+            shuffle=self.shuffle,
+            is_labeled=self.is_labeled,
+        )
 
 
 class DataIterator(object):
-    def __init__(self,  dataset,  batch_size, is_labeled=False,
-                 shuffle=True, sort=True):
+    def __init__(self, dataset, batch_size, is_labeled=False, shuffle=True, sort=True):
         self.batch_size, self.is_labeled, self.dataset = batch_size, is_labeled, dataset
         self.iterations = 0
-        #self.device = device
+        # self.device = device
         self.shuffle = shuffle
         self.sort = sort
 
@@ -160,33 +157,32 @@ class DataIterator(object):
         xs = self.dataset
         return xs
 
-
     def preprocess(self, ex, is_labeled):
-        src = ex['src']
-        if('labels' in ex):
-            labels = ex['labels']
+        src = ex["src"]
+        if "labels" in ex:
+            labels = ex["labels"]
         else:
-            labels = None #ex['src_sent_labels']
+            labels = None  # ex['src_sent_labels']
 
-        segs = ex['segs']
-        #if(not self.args.use_interval):
+        segs = ex["segs"]
+        # if(not self.args.use_interval):
         #    segs=[0]*len(segs)
-        clss = ex['clss']
-        src_txt = ex['src_txt']
-        tgt_txt = ex['tgt_txt']
+        clss = ex["clss"]
+        src_txt = ex["src_txt"]
+        tgt_txt = ex["tgt_txt"]
 
-        if(is_labeled):
-            return src,labels,segs, clss, src_txt, tgt_txt
+        if is_labeled:
+            return src, labels, segs, clss, src_txt, tgt_txt
         else:
-            return src,labels,segs, clss, src_txt, None
+            return src, labels, segs, clss, src_txt, None
 
     def batch_buffer(self, data, batch_size):
         minibatch, size_so_far = [], 0
         for ex in data:
-            if(len(ex['src'])==0):
+            if len(ex["src"]) == 0:
                 continue
             ex = self.preprocess(ex, self.is_labeled)
-            if(ex is None):
+            if ex is None:
                 continue
             minibatch.append(ex)
             size_so_far = simple_batch_size_fn(ex, len(minibatch))
@@ -203,7 +199,7 @@ class DataIterator(object):
         """ Create batches """
         data = self.data()
         for buffer in self.batch_buffer(data, self.batch_size * 50):
-            
+
             if self.sort:
                 p_batch = sorted(buffer, key=lambda x: len(x[3]))
             else:
@@ -211,7 +207,7 @@ class DataIterator(object):
             p_batch = batch(p_batch, self.batch_size)
 
             p_batch = list(p_batch)
-            if (self.shuffle):
+            if self.shuffle:
                 random.shuffle(p_batch)
             for b in p_batch:
                 yield b

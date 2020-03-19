@@ -22,7 +22,7 @@ def test_extractive_summarization_cnndm_transformers(notebooks, tmp):
             TOP_N=100,
             CHUNK_SIZE=200,
             USE_PREPROCESSED_DATA=False,
-            DATA_FOLDER=tmp,
+            DATA_PATH=tmp,
             CACHE_DIR=tmp,
             BATCH_SIZE=3000,
             REPORT_EVERY=50,
@@ -37,7 +37,7 @@ def test_extractive_summarization_cnndm_transformers(notebooks, tmp):
 
 @pytest.mark.gpu
 @pytest.mark.integration
-def test_extractive_summarization_cnndm_transformers(notebooks, tmp):
+def test_extractive_summarization_cnndm_transformers_processed(notebooks, tmp):
     notebook_path = notebooks["extractive_summarization_cnndm_transformer"]
     pm.execute_notebook(
         notebook_path,
@@ -48,10 +48,10 @@ def test_extractive_summarization_cnndm_transformers(notebooks, tmp):
             TOP_N=100,
             CHUNK_SIZE=200,
             USE_PREPROCESSED_DATA=True,
-            DATA_FOLDER=tmp,
+            DATA_PATH=tmp,
             CACHE_DIR=tmp,
+            PROCESSED_DATA_PATH=tmp,
             BATCH_SIZE=3000,
-            USE_PREPROCSSED_DATA=True,
             REPORT_EVERY=50,
             MAX_STEPS=100,
             WARMUP_STEPS=5e2,

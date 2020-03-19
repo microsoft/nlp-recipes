@@ -15,10 +15,8 @@ import nltk
 from nltk import tokenize
 from nltk.tokenize.treebank import TreebankWordDetokenizer
 import os
-import sys
 import regex as re
-from torchtext.utils import download_from_url, extract_archive
-import zipfile
+from torchtext.utils import extract_archive
 
 
 from utils_nlp.dataset.url_utils import (
@@ -47,10 +45,9 @@ REMAP = {
 
 def _clean(x):
     return re.sub(
-        r"-lrb-|-rrb-|-lcb-|-rcb-|-lsb-|-rsb-|``|''",
-        lambda m: REMAP.get(m.group()),
-        x,
+        r"-lrb-|-rrb-|-lcb-|-rcb-|-lsb-|-rsb-|``|''", lambda m: REMAP.get(m.group()), x,
     )
+
 
 def _remove_ttags(line):
     line = re.sub(r"<t>", "", line)
@@ -59,8 +56,10 @@ def _remove_ttags(line):
     line = re.sub(r"</t>", "<q>", line)
     return line
 
+
 def _target_sentence_tokenization(line):
     return line.split("<q>")
+
 
 def join(sentences):
     return " ".join(sentences)
@@ -69,11 +68,11 @@ def join(sentences):
 def CNNDMSummarizationDataset(*args, **kwargs):
     """Load the CNN/Daily Mail dataset preprocessed by harvardnlp group."""
 
-
-
     URLS = ["https://s3.amazonaws.com/opennmt-models/Summary/cnndm.tar.gz"]
 
-    def _setup_datasets(url, top_n=-1, local_cache_path=".data", prepare_extractive=True):
+    def _setup_datasets(
+        url, top_n=-1, local_cache_path=".data", prepare_extractive=True
+    ):
         FILE_NAME = "cnndm.tar.gz"
         maybe_download(url, FILE_NAME, local_cache_path)
         dataset_tar = os.path.join(local_cache_path, FILE_NAME)
@@ -91,22 +90,29 @@ def CNNDMSummarizationDataset(*args, **kwargs):
         if prepare_extractive:
 
             return (
-
                 SummarizationDataset(
                     train_source_file,
                     target_file=train_target_file,
                     source_preprocessing=[_clean, tokenize.sent_tokenize],
-                    target_preprocessing=[_clean, _remove_ttags, _target_sentence_tokenization],
+                    target_preprocessing=[
+                        _clean,
+                        _remove_ttags,
+                        _target_sentence_tokenization,
+                    ],
                     word_tokenize=nltk.word_tokenize,
-                    top_n=top_n
+                    top_n=top_n,
                 ),
                 SummarizationDataset(
                     test_source_file,
                     target_file=test_target_file,
                     source_preprocessing=[_clean, tokenize.sent_tokenize],
-                    target_preprocessing=[_clean, _remove_ttags, _target_sentence_tokenization],
+                    target_preprocessing=[
+                        _clean,
+                        _remove_ttags,
+                        _target_sentence_tokenization,
+                    ],
                     word_tokenize=nltk.word_tokenize,
-                    top_n=top_n
+                    top_n=top_n,
                 ),
             )
         else:
@@ -115,18 +121,25 @@ def CNNDMSummarizationDataset(*args, **kwargs):
                     train_source_file,
                     target_file=train_target_file,
                     source_preprocessing=[_clean, tokenize.sent_tokenize],
-                    target_preprocessing=[_clean, _remove_ttags, _target_sentence_tokenization],
-                    top_n=top_n
+                    target_preprocessing=[
+                        _clean,
+                        _remove_ttags,
+                        _target_sentence_tokenization,
+                    ],
+                    top_n=top_n,
                 ),
                 SummarizationDataset(
                     test_source_file,
                     target_file=test_target_file,
                     source_preprocessing=[_clean, tokenize.sent_tokenize],
-                    target_preprocessing=[_clean, _remove_ttags, _target_sentence_tokenization],
+                    target_preprocessing=[
+                        _clean,
+                        _remove_ttags,
+                        _target_sentence_tokenization,
+                    ],
                     top_n=top_n,
                 ),
             )
-        
 
     return _setup_datasets(*((URLS[0],) + args), **kwargs)
 
@@ -139,16 +152,15 @@ class CNNDMBertSumProcessedData:
     @staticmethod
     def download(local_path=".data"):
         FILE_ID = "1x0d61LP9UAN389YN00z0Pv-7jQgirVg6"
-        FILE_NAME =  "bertsum_data.zip"
+        FILE_NAME = "bertsum_data.zip"
         os.makedirs(local_path, exist_ok=True)
         output_dir = os.path.join(local_path, "processed_data")
         os.makedirs(output_dir, exist_ok=True)
         maybe_download_googledrive(
-        google_file_id=FILE_ID, file_name=FILE_NAME, work_directory=local_path
-    )
+            google_file_id=FILE_ID, file_name=FILE_NAME, work_directory=local_path
+        )
         extract_zip(
-            file_path=os.path.join(local_path, FILE_NAME),
-            dest_path=output_dir,
+            file_path=os.path.join(local_path, FILE_NAME), dest_path=output_dir,
         )
         return output_dir
 

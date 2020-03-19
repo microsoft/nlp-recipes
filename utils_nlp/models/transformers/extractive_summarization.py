@@ -3,12 +3,14 @@
 
 # This script reuses some code from https://github.com/nlpyang/BertSum
 
+import functools
 import gc
 import itertools
 import logging
 import os
 import pickle
 import random
+from multiprocessing import Pool, cpu_count
 
 import numpy as np
 import torch
@@ -20,8 +22,8 @@ from torch.utils.data import (
     RandomSampler,
 )
 from torch.utils.data.distributed import DistributedSampler
-
 from transformers import BertModel, DistilBertModel
+
 
 from utils_nlp.models.transformers.bertsum import model_builder
 from utils_nlp.models.transformers.bertsum.data_loader import Batch, DataIterator
@@ -35,7 +37,9 @@ from utils_nlp.common.pytorch_utils import (
 from utils_nlp.dataset.sentence_selection import combination_selection, greedy_selection
 from utils_nlp.models.transformers.common import TOKENIZER_CLASS, Transformer
 
-from utils_nlp.models.transformers.abstractive_summarization_bertsum import fit_to_block_size
+from utils_nlp.models.transformers.abstractive_summarization_bertsum import (
+    fit_to_block_size,
+)
 
 MODEL_CLASS = {
     "bert-base-uncased": BertModel,
@@ -375,10 +379,71 @@ class ExtSumProcessedData:
                 ExtSumProcessedDataset(test_files, is_shuffle=False),
             )
         else:
-             return (
+            return (
                 ExtSumProcessedDataset(train_files, is_shuffle=True),
                 ExtSumProcessedDataset(test_files, is_shuffle=False),
             )
+
+
+def preprocess_single_add_oracleids(input_data, oracle_mode="greedy", selections=3):
+    """ Preprocess single data point to generate oracle summaries and
+        sentence tokenization of the source text.
+
+        Args:
+            input_data (dict): An item from `SummarizationDataset`
+            oracle_mode (str, optional): Sentence selection method.
+                Defaults to "greedy".
+            selections (int, optional): The number of sentence used as summary.
+                Defaults to 3.
+        Returns:
+            Dictionary of fields "src", "src_txt", "tgt", "tgt_txt" and "oracle_ids"
+    """
+
+    oracle_ids = None
+    if "tgt" in input_data:
+        if oracle_mode == "greedy":
+            oracle_ids = greedy_selection(
+                input_data["src"], input_data["tgt"], selections
+            )
+        elif oracle_mode == "combination":
+            oracle_ids = combination_selection(
+                input_data["src"], input_data["tgt"], selections
+            )
+        input_data["oracle_ids"] = oracle_ids
+    # input_data["src_txt"] = tokenize.sent_tokenize(input_data["src_txt"])
+    return input_data
+
+
+def parallel_preprocess(input_data, preprocess, num_pool=-1):
+    """
+    Process data in parallel using multiple GPUs.
+
+    Args:
+        input_data (list): List if input strings to process.
+        preprocess_pipeline (list): List of functions to apply on the input data.
+        word_tokenize (func, optional): A tokenization function used to tokenize
+            the results from preprocess_pipeline.
+        num_pool (int, optional): Number of CPUs to use. Defaults to -1 and all
+            available CPUs are used.
+
+    Returns:
+        list: list of processed text strings.
+
+    """
+    if num_pool == -1:
+        num_pool = cpu_count()
+
+    num_pool = min(num_pool, len(input_data))
+
+    p = Pool(num_pool)
+
+    results = p.map(
+        preprocess, input_data, chunksize=min(1, int(len(input_data) / num_pool)),
+    )
+    p.close()
+    p.join()
+
+    return results
 
 
 class ExtSumProcessor:
@@ -483,7 +548,7 @@ class ExtSumProcessor:
                     "labels": batch.labels,
                 }
             else:
-                #batch = Bunch(batch)
+                # batch = Bunch(batch)
                 return {
                     "x": batch.src.to(device),
                     "segs": batch.segs.to(device),
@@ -494,15 +559,11 @@ class ExtSumProcessor:
         else:
             raise ValueError("Model not supported: {}".format(model_name))
 
-    def preprocess(self, sources, targets=None, source_txt=None, target_txt=None, oracle_mode="greedy", selections=3):
-        """preprocess multiple data points
+    def preprocess(self, input_data_list, oracle_mode="greedy", selections=3):
+        """ Preprocess multiple data points.
 
            Args:
-              sources (list of list of strings): List of word tokenized sentences.
-              targets (list of list of strings, optional): List of word tokenized
-                sentences.
-                Defaults to None, which means it doesn't include summary and is
-                not training data.
+              input_data_list (SummarizationDataset): The dataset to be preprocessed.
               oracle_mode (str, optional): Sentence selection method.
                 Defaults to "greedy".
               selections (int, optional): The number of sentence used as summary.
@@ -513,73 +574,72 @@ class ExtSumProcessor:
                 sentence class ids, labels, source text and target text.
                 If targets is None, the label and target text are None.
         """
-        result = []
-        if targets is None:
-            for source in sources:
-                # todo: make this part multi-processing, keep the original sentence-split source and target text
-                result.append(self._preprocess_single(source, None, oracle_mode, selections))
-        else:
-            for (source, target) in zip(sources, targets):
-                # todo: make this part multi-processing, keep the original sentence-split source text
-                result.append(self._preprocess_single(source, target, oracle_mode, selections))
-        return result
-
-    def _preprocess_single(
-        self, source, target=None, oracle_mode="greedy", selections=3
-    ):
-        """preprocess single data point"""
-
-        oracle_ids = None
-        if target is not None:
-            if oracle_mode == "greedy":
-                oracle_ids = greedy_selection(source, target, selections)
-            elif oracle_mode == "combination":
-                oracle_ids = combination_selection(source, target, selections)
-
-            return {
-                "oracle_ids": oracle_ids,
-                "source": source,
-                "target": target,
-                "src_txt": [" ".join(s) for s in source]
-            }
-        else:
-            return {
-                "source": source,
-                "src_txt": [" ".join(s) for s in source]
-            }
+        preprocess = functools.partial(
+            preprocess_single_add_oracleids, oracle_mode="greedy", selections=3
+        )
+        return parallel_preprocess(input_data_list, preprocess)
 
     def collate(self, data, block_size, train_mode=True):
+        """ Collcate function for pytorch data loaders.
+            Args:
+                data (list): A list of samples from SummarizationDataset.
+                block_size (int): maximum input length for the model.
+                train_mode (bool): whether the collate function is used for training
+                    or not. Defaults to True.
+
+            Returns:
+                `Batch` object: a data minibatch as the input of a model.
+
+        """
+
         if len(data) == 0:
             return None
-        else: 
-            if train_mode is True and "target" in data[0] and "oracle_ids" in data[0]:
-                encoded_text = [self.encode_single(d["source"], block_size, d["target"], d["oracle_ids"])
-                    for d in data] 
+        else:
+            if train_mode is True and "tgt" in data[0] and "oracle_ids" in data[0]:
+                encoded_text = [self.encode_single(d, block_size) for d in data]
                 batch = Batch(list(filter(None, encoded_text)), True)
             else:
-                encoded_text = [self.encode_single(d["source"], block_size, None, None)
-                    for d in data]
-            #src, labels, segs, clss, src_txt, tgt_txt =  zip(*encoded_text)
-            #new_data = [list(i) for i in list(zip(*encoded_text))]   
-            #batch =  Batch(new_data)
-                batch = Batch(list(filter(None, encoded_text))) 
+                encoded_text = [
+                    self.encode_single(d, block_size, train_mode) for d in data
+                ]
+                # src, labels, segs, clss, src_txt, tgt_txt =  zip(*encoded_text)
+                # new_data = [list(i) for i in list(zip(*encoded_text))]
+                # batch =  Batch(new_data)
+                filtered_list = list(filter(None, encoded_text))
+                # if len(filtered_list) != len(data):
+                #    raise ValueError("no test data shouldn't be skipped")
+                batch = Batch(filtered_list)
             return batch
 
-    def encode_single(self, src, block_size, tgt=None, oracle_ids=None):
+    def encode_single(self, d, block_size, train_mode=True):
+        """ Enocde a single sample.
+            Args:
+                d (dict): s data sample from SummarizationDataset.
+                block_size (int): maximum input length for the model.
+
+            Returns:
+                Tuple of encoded data.
+
+        """
+
+        src = d["src"]
 
         if len(src) == 0:
+            raise ValueError("source doesn't have any sentences")
             return None
 
         original_src_txt = [" ".join(s) for s in src]
-        # no filtering for prediction 
+        # no filtering for prediction
         idxs = [i for i, s in enumerate(src)]
         src = [src[i] for i in idxs]
 
         tgt_txt = None
         labels = None
-        if oracle_ids is not None and tgt is not None:
+        if (
+            train_mode and "oracle_ids" in d and "tgt" in d and "tgt_txt" in d
+        ):  # is not None and tgt is not None:
             labels = [0] * len(src)
-            for l in oracle_ids:
+            for l in d["oracle_ids"]:
                 labels[l] = 1
 
             # source filtering for only training
@@ -593,17 +653,21 @@ class ExtSumProcessor:
                 return None
             if len(labels) == 0:
                 return None
-            tgt_txt = "<q>".join([" ".join(tt) for tt in tgt])
+            tgt_txt = "".join([" ".join(tt) for tt in d["tgt"]])
 
         src_txt = [" ".join(sent) for sent in src]
         text = " [SEP] [CLS] ".join(src_txt)
         src_subtokens = self.tokenizer.tokenize(text)
-        #src_subtokens = src_subtokens[:510]
-        src_subtokens = ["[CLS]"] + fit_to_block_size(src_subtokens, block_size - 2, self.tokenizer.pad_token_id) + ["[SEP]"]
+        # src_subtokens = src_subtokens[:510]
+        src_subtokens = (
+            ["[CLS]"]
+            + fit_to_block_size(
+                src_subtokens, block_size - 2, self.tokenizer.pad_token_id
+            )
+            + ["[SEP]"]
+        )
         src_subtoken_idxs = self.tokenizer.convert_tokens_to_ids(src_subtokens)
-        _segs = [-1] + [
-            i for i, t in enumerate(src_subtoken_idxs) if t == self.sep_vid
-        ]
+        _segs = [-1] + [i for i, t in enumerate(src_subtoken_idxs) if t == self.sep_vid]
         segs = [_segs[i] - _segs[i - 1] for i in range(1, len(_segs))]
         segments_ids = []
         for i, s in enumerate(segs):
@@ -614,18 +678,20 @@ class ExtSumProcessor:
         cls_ids = [i for i, t in enumerate(src_subtoken_idxs) if t == self.cls_vid]
         if labels:
             labels = labels[: len(cls_ids)]
-
         src_txt = [original_src_txt[i] for i in idxs]
-        return src_subtoken_idxs, labels, segments_ids, cls_ids, src_txt, tgt_txt, original_src_txt
-
+        return src_subtoken_idxs, labels, segments_ids, cls_ids, src_txt, tgt_txt
 
 
 class ExtractiveSummarizer(Transformer):
     """class which performs extractive summarization fine tuning and prediction """
 
     def __init__(
-        self, processor, model_name="distilbert-base-uncased", encoder="transformer",
-        max_pos_length=512, cache_dir="."
+        self,
+        processor,
+        model_name="distilbert-base-uncased",
+        encoder="transformer",
+        max_pos_length=512,
+        cache_dir=".",
     ):
         """Initialize a ExtractiveSummarizer.
 
@@ -752,10 +818,10 @@ class ExtractiveSummarizer(Transformer):
                 Defaults to True.
             seed (int, optional): Random seed used to improve reproducibility.
                 Defaults to None.
-            rank (int, optional): Global rank of the current GPU in distributed training. It's 
-                calculated with the rank of the current node in the cluster/world 
-                and the `local_rank` of the device in the current node. 
-                See an example in :file: `examples/text_summarization/
+            rank (int, optional): Global rank of the current GPU in distributed
+                training. It's calculated with the rank of the current node in
+                the cluster/world and the `local_rank` of the device in the current
+                node. See an example in :file: `examples/text_summarization/
                 extractive_summarization_cnndm_distributed_train.py`.
                 Defaults to 0.
         """
@@ -803,10 +869,10 @@ class ExtractiveSummarizer(Transformer):
                 sampler = DistributedSampler(
                     train_dataset, num_replicas=world_size, rank=rank
                 )
+
             def collate_fn(data):
-                return self.processor.collate(
-                    data, block_size=self.max_pos_length
-                )
+                return self.processor.collate(data, block_size=self.max_pos_length)
+
             train_dataloader = DataLoader(
                 train_dataset,
                 sampler=sampler,
@@ -879,7 +945,7 @@ class ExtractiveSummarizer(Transformer):
 
         """
 
-        def collate_fn_processed_data(dict_list):
+        def collate_processed_data(dict_list):
             # tuple_batch =  [list(col) for col in zip(*[d.values() for d in dict_list]
             if dict_list is None or len(dict_list) <= 0:
                 return None
@@ -887,22 +953,27 @@ class ExtractiveSummarizer(Transformer):
             # generate mask and mask_cls, and only select tensors for the model input
             # the labels was never used in prediction, set is_labeled as False
             batch = Batch(tuple_batch, is_labeled=False)
-            return Bunch({
-                "src": batch.src,
-                "segs": batch.segs,
-                "clss": batch.clss,
-                "mask": batch.mask,
-                "mask_cls": batch.mask_cls,
-            })
-        
-        def collate_fn(data):
-            return self.processor.collate(
-                data, block_size=self.max_pos_length
+            return Bunch(
+                {
+                    "src": batch.src,
+                    "segs": batch.segs,
+                    "clss": batch.clss,
+                    "mask": batch.mask,
+                    "mask_cls": batch.mask_cls,
+                }
             )
+
+        def collate(data):
+            return self.processor.collate(
+                data, block_size=self.max_pos_length, train_mode=False
+            )
+
         if len(test_dataset) == 0:
-            return None        
+            return None
         if "segs" in test_dataset[0]:
-            collate_fn = collate_fn_processed_data
+            collate_fn = collate_processed_data
+        else:
+            collate_fn = collate
 
         test_sampler = SequentialSampler(test_dataset)
         test_dataloader = DataLoader(
@@ -914,6 +985,7 @@ class ExtractiveSummarizer(Transformer):
         sent_scores = self.predict_scores(
             test_dataloader, num_gpus=num_gpus, gpu_ids=gpu_ids
         )
+
         sent_scores_list = list(sent_scores)
         scores_list = []
         for i in sent_scores_list:

@@ -14,7 +14,7 @@ if nlp_path not in sys.path:
     sys.path.insert(0, nlp_path)
 
 
-from utils_nlp.dataset.cnndm import CNNDMSummarizationDataset
+from utils_nlp.dataset.cnndm import CNNDMBertSumProcessedData, CNNDMSummarizationDataset
 from utils_nlp.models.transformers.extractive_summarization import (
     ExtractiveSummarizer,
     ExtSumProcessedData,
@@ -92,8 +92,8 @@ def main():
     os.makedirs(args.cache_dir, exist_ok=True)
 
     ngpus_per_node = torch.cuda.device_count()
-
-    summarizer = ExtractiveSummarizer(args.model_name, args.encoder, args.max_pos_length, args.cache_dir)
+    processor = ExtSumProcessor(model_name=args.model_name)
+    summarizer = ExtractiveSummarizer(processor, args.model_name, args.encoder, args.max_pos_length, args.cache_dir)
 
     mp.spawn(main_worker, nprocs=ngpus_per_node, args=(ngpus_per_node, summarizer, args))
 
@@ -115,9 +115,17 @@ def main_worker(local_rank, ngpus_per_node, summarizer, args):
         rank=rank,
     )
 
-    train_dataset, test_dataset = ExtSumProcessedData().splits(root=args.data_dir)
+    if local_rank not in [-1, 0]:
+         torch.distributed.barrier()
+    
+    download_path = CNNDMBertSumProcessedData.download(local_path=args.data_dir)
+    train_dataset, test_dataset = ExtSumProcessedData().splits(root=args.data_dir, train_iterable=True)
+    
+    if local_rank in [-1, 0]:
+        torch.distributed.barrier()
+    
     # total number of steps for training
-    MAX_STEPS = 1e3
+    MAX_STEPS = 1e2
     # number of steps for warm up
     WARMUP_STEPS = 5e2
     if args.quick_run.lower() == "false":
@@ -146,15 +154,15 @@ def main_worker(local_rank, ngpus_per_node, summarizer, args):
         local_rank=local_rank,
         save_every=save_every,
         world_size=world_size,
-        rank=rank
+        rank=rank,
+        use_preprocessed_data=True
     )
 
     end = time.time()
     print("rank {0}, duration {1:.6f}s".format(rank, end - start))
-    if rank in [-1, 0]:
-        summarizer.save_model(os.path.join(args.output_dir, args.model_filename))
+    torch.distributed.barrier()
+    if local_rank in [-1, 0]:
         prediction = summarizer.predict(test_dataset, num_gpus=ngpus_per_node, batch_size=128)
-
         def _write_list_to_file(list_items, filename):
             with open(filename, "w") as filehandle:
                 # for cnt, line in enumerate(filehandle):
