@@ -3,6 +3,7 @@
 
 import collections
 import itertools
+import os
 import torch
 from torch.utils.data import Dataset, IterableDataset
 from multiprocessing import Pool, cpu_count
@@ -259,7 +260,7 @@ def _preprocess(sentences, preprocess_pipeline, word_tokenize=None):
     if word_tokenize is None:
         return sentences
     else:
-        return [word_tokenize(sentence) for sentence in sentences]
+        return sentences, [word_tokenize(sentence) for sentence in sentences]
 
 
 def _create_data_from_iterator(iterator, preprocessing, word_tokenize):
@@ -340,9 +341,12 @@ class SummarizationDataset(Dataset):
     def __init__(
         self,
         source_file,
+        source=None,
         target_file=None,
+        target=None,
         source_preprocessing=None,
         target_preprocessing=None,
+        word_tokenize=None,
         top_n=-1,
         n_processes=-1,
     ):
@@ -353,9 +357,13 @@ class SummarizationDataset(Dataset):
         Args:
             source_file (str): Full path of the file which contains a list of
                 the input paragraphs with line break as seperator.
+            source (list of str, optional): a list of input paragraphs.
+                Defaults to None.
             target_file (str, optional): Full path of the file which contains a list of
                 the summaries for the paragraphs in the source file with line break
                 as seperator.
+            target (list of str, optional): a list of summaries correponding to
+                `source`. Defaults to None.
             source_preprocessing (list of functions): A list of preprocessing functions
                 to process the paragraphs in the source file.
             target_preprocessing (list of functions): A list of preprocessing functions
@@ -365,52 +373,94 @@ class SummarizationDataset(Dataset):
             n_processes (int, optional): Number of CPUs to use to process the data in
                 parallel. Defaults to -1, which means all the CPUs will be used.
         """
+        self._source_txt = []
+        if source_file is not None and os.path.exists(source_file):
+            with open(source_file, encoding="utf-8") as f:
+                if top_n != -1:
+                    self._source_txt = list(itertools.islice(f, top_n))
+                else:
+                    self._source_txt = f.readlines()
+        if source:
+            self._source_txt.extend(source)
 
-        with open(source_file, encoding="utf-8") as f:
-            if top_n != -1:
-                self._source = list(itertools.islice(f, top_n))
-            else:
-                self._source = f.readlines()
-
-        if target_file is not None:
+        self._target_txt = []
+        if target_file is not None and os.path.exists(target_file):
             with open(target_file, encoding="utf-8") as f:
                 if top_n != -1:
-                    self._target = list(itertools.islice(f, top_n))
+                    self._target_txt = list(itertools.islice(f, top_n))
                 else:
-                    self._target = f.readlines()
+                    self._target_txt = f.readlines()
+        if target:
+            self._target_txt.extend(target)
 
-            assert len(self._source) == len(self._target)
+        if len(self._target_txt) == 0:
+            self._target_txt = None
         else:
-            self._target = None
+            assert len(self._source_txt) == len(self._target_txt)
 
-        self._source = parallel_preprocess(
-            self._source, preprocess_pipeline=source_preprocessing, num_pool=n_processes
+        result = parallel_preprocess(
+            self._source_txt,
+            preprocess_pipeline=source_preprocessing,
+            word_tokenize=word_tokenize,
+            num_pool=n_processes,
         )
+        if word_tokenize:
+            self._source_txt = list(
+                map(lambda x: x[0], filter(lambda x: len(x[0]) > 0, result))
+            )
+            self._source = list(
+                map(lambda x: x[1], filter(lambda x: len(x[1]) > 0, result))
+            )
+        else:
+            self._source = list(
+                map(lambda x: x[0], filter(lambda x: len(x[0]) > 0, result))
+            )
 
-        if self._target is not None:
-            self._target = parallel_preprocess(
-                self._target,
+        if self._target_txt is not None and len(self._target_txt) > 0:
+            result = parallel_preprocess(
+                self._target_txt,
                 preprocess_pipeline=target_preprocessing,
+                word_tokenize=word_tokenize,
                 num_pool=n_processes,
             )
+
+            if word_tokenize:
+                self._target_txt = list(
+                    map(lambda x: x[0], filter(lambda x: len(x[0]) > 0, result))
+                )
+                self._target = list(
+                    map(lambda x: x[1], filter(lambda x: len(x[1]) > 0, result))
+                )
+            else:
+                self._target = list(
+                    map(lambda x: x[0], filter(lambda x: len(x[0]) > 0, result))
+                )
 
     def shorten(self, top_n=None):
         if top_n is None:
             return self
         elif top_n <= len(self._source):
             self._source = self._source[0:top_n]
-            if self._target is not None:
+            self._source_txt = self._source_txt[0:top_n]
+
+            if self._target_txt is not None:
                 self._target = self._target[0:top_n]
+                self._target_txt = self._target_txt[0:top_n]
             return self
         else:
             return self
 
     def __getitem__(self, idx):
         ## tupe is more adaptive
-        if self._target is None:
-            return {"src": self._source[idx]}
+        if self._target_txt is None:
+            return {"src": self._source[idx], "src_txt": self._source_txt[idx]}
         else:
-            return {"src": self._source[idx], "tgt": self._target[idx]}
+            return {
+                "src": self._source[idx],
+                "src_txt": self._source_txt[idx],
+                "tgt": self._target[idx],
+                "tgt_txt": self._target_txt[idx],
+            }
 
     def __len__(self):
         return len(self._source)
@@ -418,12 +468,18 @@ class SummarizationDataset(Dataset):
     def get_source(self):
         return self._source
 
+    def get_source_txt(self):
+        return self._source_txt
+
+    def get_target_txt(self):
+        return self._target_txt
+
     def get_target(self):
         return self._target
 
     def save_to_jsonl(self, output_file):
         with jsonlines.open(output_file, mode="w") as writer:
-            if self._target is None:
+            if self._target_txt is None:
                 for src in self._source:
                     writer.write({"src": src})
             else:
@@ -463,7 +519,7 @@ def parallel_preprocess(
             word_tokenize=word_tokenize,
         ),
         input_data,
-        chunksize=int(len(input_data) / num_pool),
+        chunksize=min(1, int(len(input_data) / num_pool)),
     )
     p.close()
     p.join()
