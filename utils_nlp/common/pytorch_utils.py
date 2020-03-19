@@ -50,7 +50,9 @@ def parallelize_model(model, device, num_gpus=None, gpu_ids=None, local_rank=-1)
             Defaults to None.
         gpu_ids (list): List of GPU IDs to be used.
             If None, the first num_gpus GPUs will be used.
-            If not None, overrides num_gpus.
+            If not None, overrides num_gpus. if gpu_ids is an empty list
+            or there is no valid gpu devices are specified,
+            and device is "cuda", use the first available device.
             Defaults to None.
         local_rank (int): Local GPU ID within a node. Used in distributed environments.
             If not -1, num_gpus and gpu_ids are ignored.
@@ -58,7 +60,7 @@ def parallelize_model(model, device, num_gpus=None, gpu_ids=None, local_rank=-1)
     Returns:
         Module, DataParallel, DistributedDataParallel: A PyTorch Module or
             a DataParallel/DistributedDataParallel wrapper,
-            when multiple gpus are used.
+            when one or multiple gpus are used.
     """
     if not isinstance(device, torch.device):
         raise ValueError("device must be of type torch.device.")
@@ -89,8 +91,11 @@ def parallelize_model(model, device, num_gpus=None, gpu_ids=None, local_rank=-1)
                     else min(num_gpus, num_cuda_devices)
                 )
                 gpu_ids = list(range(num_gpus))
-            if len(gpu_ids) > 1:
-                model = torch.nn.DataParallel(model, device_ids=gpu_ids)
+            else:
+                gpu_ids = list(set(list(range(num_cuda_devices))).intersection(gpu_ids))
+            if len(gpu_ids) == 0:
+                gpu_ids = [0]
+            model = torch.nn.DataParallel(model, device_ids=gpu_ids)
     return model
 
 

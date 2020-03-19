@@ -6,7 +6,6 @@
 import pytest
 import torch
 import torch.nn as nn
-from torch.nn.modules.container import Sequential
 from torch.nn.parallel.data_parallel import DataParallel
 
 from utils_nlp.common.pytorch_utils import (
@@ -27,6 +26,10 @@ def test_get_device_cpu():
     assert device.type == "cpu"
     assert gpus == 0
 
+    device, gpus = get_device(gpu_ids=[])
+    assert device.type == "cpu"
+    assert gpus == 0
+
 
 @pytest.mark.gpu
 def test_machine_is_gpu_machine():
@@ -37,6 +40,10 @@ def test_machine_is_gpu_machine():
 def test_get_device_gpu():
     device, gpus = get_device(num_gpus=1)
     assert isinstance(device, torch.device)
+    assert device.type == "cuda"
+    assert gpus == 1
+
+    device, gpus = get_device(gpu_ids=[0])
     assert device.type == "cuda"
     assert gpus == 1
 
@@ -58,10 +65,18 @@ def test_get_device_local_rank():
     assert gpus == 1
 
 
+def test_get_device_local_rank_cpu():
+    device, gpus = get_device(local_rank=-1, num_gpus=0)
+    assert isinstance(device, torch.device)
+    assert device.type == "cpu"
+    assert gpus == 0
+
+
 def test_move_to_device_cpu(model):
     # test when device.type="cpu"
     model_cpu = move_model_to_device(model, torch.device("cpu"))
     assert isinstance(model_cpu, nn.modules.container.Sequential)
+    assert next(model_cpu.parameters()).is_cuda is False
 
 
 def test_move_to_device_cpu_parallelized(model):
@@ -71,6 +86,7 @@ def test_move_to_device_cpu_parallelized(model):
         model_parallelized, torch.device("cpu")
     )
     assert isinstance(model_parallelized_output, nn.modules.container.Sequential)
+    assert next(model_parallelized.module.parameters()).is_cuda is False
 
 
 def test_move_to_device_exception_not_torch_device(model):
@@ -104,37 +120,105 @@ def test_parallelize_model_exception_cuda_zero_gpus(model):
 
 
 @pytest.mark.gpu
-def test_move_to_device_gpu(model):
-    # test when device.type="cuda"
+def test_parallelize_model(model):
+    # test when device.type="cuda" and move model to all devices
     model_cuda = move_model_to_device(model, torch.device("cuda"))
     model_cuda = parallelize_model(model_cuda, torch.device("cuda"))
     num_cuda_devices = torch.cuda.device_count()
+    assert isinstance(model_cuda, DataParallel)
 
-    if num_cuda_devices > 1:
-        assert isinstance(model_cuda, DataParallel)
-    else:
-        assert isinstance(model_cuda, Sequential)
-
+    # test moving model to only one gpu
     model_cuda_1_gpu = move_model_to_device(model, torch.device("cuda"))
+    assert next(model_cuda_1_gpu.parameters()).is_cuda is True
     model_cuda_1_gpu = parallelize_model(
         model_cuda_1_gpu, torch.device("cuda"), num_gpus=1
     )
-    assert isinstance(model_cuda_1_gpu, Sequential)
+    assert next(model_cuda_1_gpu.parameters()).is_cuda is True
 
+    # test parallelize_model can limit the number of devices
     model_cuda_1_more_gpu = move_model_to_device(model, torch.device("cuda"))
     model_cuda_1_more_gpu = parallelize_model(
         model_cuda_1_more_gpu, torch.device("cuda"), num_gpus=num_cuda_devices + 1
     )
-    if num_cuda_devices > 1:
-        assert isinstance(model_cuda_1_more_gpu, DataParallel)
-    else:
-        assert isinstance(model_cuda_1_more_gpu, Sequential)
+    assert next(model_cuda_1_more_gpu.module.parameters()).is_cuda is True
 
+    # test parallelize_model on the same number of devices
     model_cuda_same_gpu = move_model_to_device(model, torch.device("cuda"))
     model_cuda_same_gpu = parallelize_model(
         model_cuda_same_gpu, torch.device("cuda"), num_gpus=num_cuda_devices
     )
+    assert next(model_cuda_same_gpu.module.parameters()).is_cuda is True
+
+    # test parallelize_model with gpu id
+    model_base = move_model_to_device(model, torch.device("cuda"))
+    # when gpu id is [], gpu id [0] is used
+    model_cuda_0_gpu = parallelize_model(model_base, torch.device("cuda"), gpu_ids=[])
+    # device has priority ??
+    assert next(model_cuda_1_gpu.parameters()).device == torch.device("cuda:0")
+    assert next(model_cuda_0_gpu.parameters()).is_cuda is True
+
+    # test parallelize_model with gpu id is [0]
+    model_base = move_model_to_device(model, torch.device("cuda"))
+    model_cuda_1_gpu = parallelize_model(model_base, torch.device("cuda"), gpu_ids=[0])
+    assert next(model_cuda_1_gpu.parameters()).is_cuda is True
+
+    # test parallelize_model with gpu id is [0:num_device]
+    model_base = move_model_to_device(model, torch.device("cuda"))
+    model_cuda_same_gpu = parallelize_model(
+        model_base, torch.device("cuda"), gpu_ids=list(range(num_cuda_devices))
+    )
     if num_cuda_devices > 1:
-        assert isinstance(model_cuda_same_gpu, DataParallel)
+        assert next(model_cuda_same_gpu.module.parameters()).is_cuda is True
     else:
-        assert isinstance(model_cuda_same_gpu, Sequential)
+        assert next(model_cuda_same_gpu.parameters()).is_cuda is True
+
+    # test parallelize_model with gpu id is [1: num_devices+3]
+    model_base = move_model_to_device(model, torch.device("cuda"))
+    model_cuda_same_gpu = parallelize_model(
+        model_base,
+        torch.device("cuda"),
+        gpu_ids=[x + 1 for x in list(range(num_cuda_devices + 2))],
+    )
+    if num_cuda_devices > 1:
+        assert next(model_cuda_same_gpu.module.parameters()).is_cuda is True
+    else:
+        assert next(model_cuda_same_gpu.parameters()).is_cuda is True
+
+    # when intersection is only 1
+    model_base = move_model_to_device(model, torch.device("cuda"))
+    gpu_ids = [x + num_cuda_devices - 1 for x in list(range(num_cuda_devices))]
+    model_cuda_intersect_1_gpu = parallelize_model(
+        model_base, torch.device("cuda"), gpu_ids=gpu_ids
+    )
+    assert next(model_cuda_intersect_1_gpu.parameters()).device == torch.device(
+        "cuda:{}".format(num_cuda_devices - 1)
+    )
+    assert next(model_cuda_intersect_1_gpu.parameters()).is_cuda is True
+
+    # when intersection is only 0, use cuda:0
+    model_base = move_model_to_device(model, torch.device("cuda"))
+    model_cuda_intersect_0_gpu = parallelize_model(
+        model_base,
+        torch.device("cuda"),
+        gpu_ids=[x + num_cuda_devices for x in list(range(num_cuda_devices))],
+    )
+    assert next(model_cuda_intersect_0_gpu.parameters()).device == torch.device(
+        "cuda:0"
+    )
+    assert next(model_cuda_intersect_0_gpu.parameters()).is_cuda is True
+    # test device is cpu original model on gpu
+    model_base = move_model_to_device(model, torch.device("cuda"))
+    model_cuda_cpu = parallelize_model(
+        model_base,
+        torch.device("cpu"),
+        gpu_ids=[x + num_cuda_devices for x in list(range(num_cuda_devices))],
+    )
+    assert next(model_cuda_cpu.parameters()).is_cuda is True
+    # test device is cpu and original model on cpu
+    model_base = move_model_to_device(model, torch.device("cpu"))
+    model_cuda_cpu = parallelize_model(
+        model_base,
+        torch.device("cpu"),
+        gpu_ids=[x + num_cuda_devices for x in list(range(num_cuda_devices))],
+    )
+    assert next(model_cuda_cpu.parameters()).is_cuda is False
