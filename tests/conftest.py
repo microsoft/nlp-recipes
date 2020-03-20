@@ -25,6 +25,25 @@ from azureml.core.webservice import Webservice
 
 
 @pytest.fixture(scope="module")
+def scripts():
+    folder_notebooks = path_notebooks()
+    paths = {
+        "ddp_bertsumext": os.path.join(
+            folder_notebooks,
+            "text_summarization",
+            "extractive_summarization_cnndm_distributed_train.py",
+        ),
+        "ddp_bertsumabs": os.path.join(
+            folder_notebooks,
+            "text_summarization",
+            "abstractive_summarization_bertsum_cnndm_distributed_train.py",
+        ),
+    }
+
+    return paths
+
+
+@pytest.fixture(scope="module")
 def notebooks():
     folder_notebooks = path_notebooks()
 
