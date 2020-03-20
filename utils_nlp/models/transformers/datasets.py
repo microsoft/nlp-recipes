@@ -413,7 +413,7 @@ class SummarizationDataset(Dataset):
             )
         else:
             self._source = list(
-                map(lambda x: x[0], filter(lambda x: len(x[0]) > 0, result))
+                map(lambda x: x, filter(lambda x: len(x) > 0, result))
             )
 
         if self._target_txt is not None and len(self._target_txt) > 0:
@@ -433,7 +433,7 @@ class SummarizationDataset(Dataset):
                 )
             else:
                 self._target = list(
-                    map(lambda x: x[0], filter(lambda x: len(x[0]) > 0, result))
+                    map(lambda x: x, filter(lambda x: len(x) > 0, result))
                 )
 
     def shorten(self, top_n=None):
