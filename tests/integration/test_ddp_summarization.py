@@ -43,7 +43,7 @@ def test_ddp_extractive_summarization_cnndm_transformers(scripts, tmp):
 @pytest.mark.integration
 def test_ddp_abstractive_summarization_cnndm_transformers(scripts, tmp):
     script = scripts["ddp_bertsumabs"]
-    summary_filename = "bertsumext_prediction.txt"
+    summary_filename = "bertsumabs_prediction.txt"
     import subprocess
 
     process = subprocess.Popen(
@@ -70,5 +70,4 @@ def test_ddp_abstractive_summarization_cnndm_transformers(scripts, tmp):
         print(stdout)
         print(stderr)
         assert False
-        raise RuntimeError("something bad happened")
     assert os.path.exists(os.path.join(tmp, summary_filename))
