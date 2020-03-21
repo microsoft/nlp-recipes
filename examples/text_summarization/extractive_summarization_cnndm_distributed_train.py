@@ -230,7 +230,7 @@ def main_worker(local_rank, ngpus_per_node, summarizer, args):
     torch.distributed.barrier()
     if local_rank in [-1, 0] and args.rank == 0:
 
-        prediction = summarizer.predict(ext_sum_test, batch_size=128)
+        prediction = summarizer.predict(ext_sum_test[0:TOP_N], batch_size=128)
 
         def _write_list_to_file(list_items, filename):
             with open(filename, "w") as filehandle:
