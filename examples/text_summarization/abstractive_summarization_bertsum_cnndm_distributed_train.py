@@ -270,13 +270,15 @@ def main_worker(
     end = time.time()
     print("rank {0}, duration {1:.6f}s".format(rank, end - start))
     if local_rank in [0, -1] and args.rank == 0:
+        TOP_N = -1
+        if args.quick_run.lower() == "false":
+            TOP_N = ngpus_per_node
         saved_model_path = os.path.join(
             args.output_dir, "{}_step{}".format(args.model_filename, MAX_STEPS)
         )
         summarizer.save_model(MAX_STEPS, saved_model_path)
-        top_n = 8
         prediction = summarizer.predict(
-            test_dataset.shorten(top_n=top_n), batch_size=4, num_gpus=ngpus_per_node
+            test_dataset.shorten(top_n=TOP_N), batch_size=ngpus_per_node, num_gpus=ngpus_per_node
         )
         print(prediction[0])
 
