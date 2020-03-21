@@ -39,6 +39,10 @@ def test_ddp_extractive_summarization_cnndm_transformers(scripts, tmp):
     assert os.path.exists(os.path.join(tmp, summary_filename))
 
 
+@pytest.mark.skip(
+    reason="""it takes too long; if the previous test works,
+            and the notebook runs, this should also work."""
+)
 @pytest.mark.gpu
 @pytest.mark.integration
 def test_ddp_abstractive_summarization_cnndm_transformers(scripts, tmp):
@@ -58,6 +62,8 @@ def test_ddp_abstractive_summarization_cnndm_transformers(scripts, tmp):
             tmp,
             "--quick_run",
             "true",
+            "--batch_size",
+            "1",
             "--summary_filename",
             summary_filename,
         ],
