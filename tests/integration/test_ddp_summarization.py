@@ -3,11 +3,14 @@
 
 import os
 import pytest
-
+import torch
 
 @pytest.mark.gpu
 @pytest.mark.integration
 def test_ddp_extractive_summarization_cnndm_transformers(scripts, tmp):
+    ddp_env = os.environ.copy()
+    ddp_env["OMP_NUM_THREADS"] = str(torch.cuda.device_count())
+    ddp_env["KMP_AFFINITY"] = "verbose"
     script = scripts["ddp_bertsumext"]
     summary_filename = "bertsumext_prediction.txt"
     import subprocess
@@ -27,6 +30,7 @@ def test_ddp_extractive_summarization_cnndm_transformers(scripts, tmp):
             "--summary_filename",
             summary_filename,
         ],
+        env=ddp_env,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
