@@ -14,7 +14,6 @@ if nlp_path not in sys.path:
     sys.path.insert(0, nlp_path)
 
 sys.path.insert(0, "./")
-print(sys.path)
 from utils_nlp.dataset.cnndm import CNNDMBertSumProcessedData, CNNDMSummarizationDataset
 from utils_nlp.models.transformers.extractive_summarization import (
     ExtractiveSummarizer,
@@ -25,7 +24,8 @@ from utils_nlp.models.transformers.extractive_summarization import (
 # os.environ["NCCL_BLOCKING_WAIT"] = "1"
 
 os.environ["NCCL_IB_DISABLE"] = "0"
-
+os.environ['OMP_NUM_THREADS'] = str(torch.cuda.device_count())
+os.environ["KMP_AFFINITY"] = "verbose"
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -207,6 +207,7 @@ def main_worker(local_rank, ngpus_per_node, summarizer, args):
     else:
         save_every = SAVE_EVERY
     # """
+    print("starting training")
     summarizer.fit(
         ext_sum_train,
         num_gpus=world_size,
