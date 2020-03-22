@@ -34,7 +34,7 @@ parser.add_argument(
 parser.add_argument(
     "--dist_url",
     type=str,
-    default="tcp://127.0.0.1:29500",
+    default="tcp://127.0.0.1:29501",
     help="URL specifying how to initialize the process groupi.",
 )
 parser.add_argument(
@@ -123,6 +123,19 @@ parser.add_argument(
     default="dist_extsum_model.pt",
     help="model file name saved for evaluation.",
 )
+parser.add_argument(
+    "--train_file",
+    type=str,
+    default=None,
+    help="training data file which is saved through torch",
+)
+parser.add_argument(
+    "--test_file",
+    type=str,
+    default=None,
+    help="test data file for evaluation.",
+)
+
 
 
 def cleanup():
@@ -190,12 +203,15 @@ def main_worker(local_rank, ngpus_per_node, summarizer, args):
     # ext_sum_train, ext_sum_train = ExtSumProcessedData().splits(
     #    root=download_path, train_iterable=True
     # )
-
-    train_dataset, test_dataset = CNNDMSummarizationDataset(
-        top_n=TOP_N, local_cache_path=args.data_dir
-    )
-    ext_sum_train = summarizer.processor.preprocess(train_dataset, oracle_mode="greedy")
-    ext_sum_test = summarizer.processor.preprocess(test_dataset, oracle_mode="greedy")
+    if args.train_file is None or args.test_file is None:
+        train_dataset, test_dataset = CNNDMSummarizationDataset(
+            top_n=TOP_N, local_cache_path=args.data_dir
+        )
+        ext_sum_train = summarizer.processor.preprocess(train_dataset, oracle_mode="greedy")
+        ext_sum_test = summarizer.processor.preprocess(test_dataset, oracle_mode="greedy")
+    else:
+        ext_sum_train = torch.load(os.path.join(args.data_dir, args.train_file))
+        ext_sum_test = torch.load(os.path.join(args.data_dir, args.test_file))
 
     if local_rank in [-1, 0]:
         torch.distributed.barrier()
@@ -229,7 +245,7 @@ def main_worker(local_rank, ngpus_per_node, summarizer, args):
     # """
     torch.distributed.barrier()
     if local_rank in [-1, 0] and args.rank == 0:
-
+        summarizer.save_model(os.path.join(args.output_dir, args.model_filename))
         prediction = summarizer.predict(ext_sum_test[0:TOP_N], batch_size=128)
 
         def _write_list_to_file(list_items, filename):
