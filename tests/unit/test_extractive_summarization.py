@@ -33,8 +33,6 @@ def target_data():
 
 
 MODEL_NAME = "distilbert-base-uncased"
-NUM_GPUS = 1
-
 
 @pytest.fixture(scope="module")
 def data(tmp_module):
@@ -77,7 +75,7 @@ def test_bert_training(data, tmp_module):
     BATCH_SIZE = 128
     LEARNING_RATE = 2e-3
     REPORT_EVERY = 50
-    MAX_STEPS = 2e2
+    MAX_STEPS = 20
     WARMUP_STEPS = 1e2
 
     processor, train_dataset, test_dataset = data
@@ -86,7 +84,7 @@ def test_bert_training(data, tmp_module):
     )
     summarizer.fit(
         train_dataset,
-        num_gpus=1,
+        num_gpus=None,
         batch_size=BATCH_SIZE,
         gradient_accumulation_steps=1,
         max_steps=MAX_STEPS,
@@ -97,5 +95,5 @@ def test_bert_training(data, tmp_module):
         clip_grad_norm=False,
     )
 
-    prediction = summarizer.predict(test_dataset, num_gpus=NUM_GPUS, batch_size=128)
+    prediction = summarizer.predict(test_dataset, num_gpus=None, batch_size=128)
     assert len(prediction) == 1
