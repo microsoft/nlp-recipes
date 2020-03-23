@@ -35,6 +35,7 @@ def test_extractive_summarization_cnndm_transformers(notebooks, tmp):
     assert pytest.approx(result["rouge_2_f_score"], 0.1, abs=ABS_TOL)
 
 
+@pytest.mark.skip(reason="no need to test")
 @pytest.mark.gpu
 @pytest.mark.integration
 def test_extractive_summarization_cnndm_transformers_processed(notebooks, tmp):

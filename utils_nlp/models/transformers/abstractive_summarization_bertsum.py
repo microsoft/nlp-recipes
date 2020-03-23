@@ -518,8 +518,8 @@ class BertSumAbs(Transformer):
                 gradients on between each model parameter update. Defaults to 1.
             report_every (int, optional): The interval by steps to print out the
                 training log. Defaults to 10.
-            save_every (int, optional): The interval by steps to save the finetuned model.
-                Defaults to 100.
+            save_every (int, optional): The interval by steps to save the finetuned 
+                model. Defaults to 100.
             verbose (bool, optional): Whether to print out the training log.
                 Defaults to True.
             seed (int, optional): Random seed used to improve reproducibility.
@@ -649,17 +649,17 @@ class BertSumAbs(Transformer):
             amp=self.amp,
             validation_function=validation_function,
         )
-        
-         # release GPU memories
+
+        # release GPU memories
         self.model.cpu()
         torch.cuda.empty_cache()
-        
+
         self.save_model(max_steps)
 
     def predict(
         self,
         test_dataset,
-        num_gpus=1,
+        num_gpus=None,
         gpu_ids=None,
         local_rank=-1,
         batch_size=16,
@@ -714,7 +714,7 @@ class BertSumAbs(Transformer):
         if fp16:
             self.model = self.model.half()
 
-        self.model = this_model_move_callback(self.model, device)
+        self.model = move_model_to_device(self.model, device)
         self.model.eval()
 
         predictor = build_predictor(
@@ -727,6 +727,13 @@ class BertSumAbs(Transformer):
             max_length=max_length,
         )
         predictor = this_model_move_callback(predictor, device)
+        self.model = parallelize_model(
+            self.model,
+            device,
+            num_gpus=num_gpus,
+            gpu_ids=gpu_ids,
+            local_rank=local_rank,
+        )
 
         test_sampler = SequentialSampler(test_dataset)
 
@@ -788,11 +795,11 @@ class BertSumAbs(Transformer):
             translations_text = generate_summary_from_tokenid(translations, scores)
             summaries = [format_summary(t) for t in translations_text]
             generated_summaries.extend(summaries)
-            
-         # release GPU memories
+
+        # release GPU memories
         self.model.cpu()
         torch.cuda.empty_cache()
-        
+
         return generated_summaries
 
     def save_model(self, global_step=None, full_name=None):
@@ -819,7 +826,7 @@ class BertSumAbs(Transformer):
             path, filename = os.path.split(full_name)
             print(path)
             os.makedirs(path, exist_ok=True)
-            
+
         checkpoint = {
             "optimizers": [self.optim_bert.state_dict(), self.optim_dec.state_dict()],
             "model": model_to_save.state_dict(),

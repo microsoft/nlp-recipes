@@ -32,8 +32,10 @@ def move_model_to_device(model, device):
         raise ValueError("device must be of type torch.device.")
 
     # unwrap model
-    if isinstance(model, torch.nn.DataParallel):
-        model = model.module
+    # if isinstance(model, torch.nn.DataParallel):
+    model = (
+        model.module if hasattr(model, "module") else model
+    )  # Take care of distributed/parallel training
 
     # move to device
     return model.to(device)
@@ -65,12 +67,10 @@ def parallelize_model(model, device, num_gpus=None, gpu_ids=None, local_rank=-1)
     if not isinstance(device, torch.device):
         raise ValueError("device must be of type torch.device.")
 
-    # unwrap model
-    if isinstance(model, torch.nn.DataParallel):
-        model_module = model.module
-    else:
-        model_module = model
-    # wrap in DataParallel or DistributedDataParallel
+    model_module = (
+        model.module if hasattr(model, "module") else model
+    )  # Take care of distributed/parallel training
+
     if local_rank != -1:
         model = torch.nn.parallel.DistributedDataParallel(
             model_module,

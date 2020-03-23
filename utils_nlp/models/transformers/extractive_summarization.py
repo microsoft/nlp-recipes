@@ -4,20 +4,16 @@
 # This script reuses some code from https://github.com/nlpyang/BertSum
 
 import functools
-import gc
 import itertools
 import logging
 import os
 import pickle
-import random
 from multiprocessing import Pool, cpu_count
 
 import numpy as np
 import torch
 from torch.utils.data import (
     DataLoader,
-    Dataset,
-    IterableDataset,
     SequentialSampler,
     RandomSampler,
 )
@@ -26,7 +22,15 @@ from transformers import BertModel, DistilBertModel
 
 
 from utils_nlp.models.transformers.bertsum import model_builder
-from utils_nlp.models.transformers.bertsum.data_loader import Batch, DataIterator
+from utils_nlp.models.transformers.bertsum.data_loader import (
+    Batch,
+    ChunkDataLoader,
+    IterableDistributedSampler,
+)
+from utils_nlp.models.transformers.bertsum.dataset import (
+    ExtSumProcessedDataset,
+    ExtSumProcessedIterableDataset,
+)
 from utils_nlp.models.transformers.bertsum.model_builder import BertSumExt
 from utils_nlp.common.pytorch_utils import (
     compute_training_steps,
@@ -36,7 +40,6 @@ from utils_nlp.common.pytorch_utils import (
 )
 from utils_nlp.dataset.sentence_selection import combination_selection, greedy_selection
 from utils_nlp.models.transformers.common import TOKENIZER_CLASS, Transformer
-
 from utils_nlp.models.transformers.abstractive_summarization_bertsum import (
     fit_to_block_size,
 )
@@ -49,79 +52,6 @@ MODEL_CLASS = {
 logger = logging.getLogger(__name__)
 
 
-# https://pytorch.org/docs/1.1.0/_modules/torch/utils/data/dataloader.html
-class IterableDistributedSampler(object):
-    """ Distributed sampler for iterable dataset.
-
-    Args:
-        world_size (int): Total number of GPUs that will be used. Defaults to 1.
-        rank (int): Rank of the current GPU. Defaults to -1.
-
-    """
-
-    def __init__(self, world_size=1, rank=-1):
-        self.world_size = world_size
-        self.rank = rank
-
-    def iter(self, iterable):
-        if self.rank != -1:
-            return itertools.islice(iterable, self.rank, None, self.world_size)
-        else:
-            return iterable
-
-
-class ChunkDataLoader(object):
-    """ Data Loader for Chunked Dataset.
-
-    Args:
-        datasets (list): list of data item list.
-        batch_size (int): Number of tokens per batch.
-        shuffle (bool): Whether the data is shuffled.
-        is_labeled (bool): Whether the data is labeled.
-        sampler (obj): Data sampler.
-
-    """
-
-    def __init__(self, datasets, batch_size, shuffle, is_labeled, sampler):
-        self.datasets = datasets
-        self.batch_size = batch_size
-        self.shuffle = shuffle
-        self.is_labeled = is_labeled
-        self.cur_iter = self._next_dataset_iterator(datasets)
-        assert self.cur_iter is not None
-        self.sampler = sampler
-
-    def eachiter(self):
-        dataset_iter = (d for d in self.datasets)
-        while self.cur_iter is not None:
-            for batch in self.cur_iter:
-                yield batch
-            self.cur_iter = self._next_dataset_iterator(dataset_iter)
-
-    def __iter__(self):
-        return self.sampler.iter(self.eachiter())
-
-    def _next_dataset_iterator(self, dataset_iter):
-        try:
-            # Drop the current dataset for decreasing memory
-            if hasattr(self, "cur_dataset"):
-                self.cur_dataset = None
-                gc.collect()
-                del self.cur_dataset
-                gc.collect()
-
-            self.cur_dataset = next(dataset_iter)
-        except StopIteration:
-            return None
-
-        return DataIterator(
-            dataset=self.cur_dataset,
-            batch_size=self.batch_size,
-            shuffle=self.shuffle,
-            is_labeled=self.is_labeled,
-        )
-
-
 class Bunch(object):
     """ Class which convert a dictionary to an object """
 
@@ -130,7 +60,13 @@ class Bunch(object):
 
 
 def get_dataloader(
-    data_iter, shuffle=True, is_labeled=False, batch_size=3000, world_size=1, rank=-1
+    data_iter,
+    shuffle=True,
+    is_labeled=False,
+    batch_size=3000,
+    world_size=1,
+    rank=0,
+    local_rank=-1,
 ):
     """
     Function to get data iterator over a list of data objects.
@@ -147,74 +83,10 @@ def get_dataloader(
     Returns:
         DataIterator
     """
-    sampler = IterableDistributedSampler(world_size, rank)
+    sampler = IterableDistributedSampler(world_size, rank, local_rank)
     return ChunkDataLoader(
         data_iter, batch_size, shuffle=shuffle, is_labeled=is_labeled, sampler=sampler
     )
-
-
-def get_dataset(file):
-    yield torch.load(file)
-
-
-class ExtSumProcessedIterableDataset(IterableDataset):
-    """Iterable dataset for extractive summarization preprocessed data
-    """
-
-    def __init__(self, file_list, is_shuffle=False):
-        """ Initiation function for iterable dataset for extractive summarization
-            preprocessed data.
-
-        Args:
-            file_list (list of strings): List of files that the dataset is loaded from.
-            is_shuffle (bool, optional): A boolean value specifies whether the list of
-                files is shuffled when the dataset is loaded. Defaults to False.
-        """
-
-        self.file_list = file_list
-        self.is_shuffle = is_shuffle
-
-    def get_stream(self):
-        """ get a stream of cycled data from the dataset"""
-
-        if self.is_shuffle:
-            return itertools.chain.from_iterable(
-                map(get_dataset, itertools.cycle(self.file_list))
-            )
-        else:
-            return itertools.chain.from_iterable(
-                map(get_dataset, itertools.cycle(random.shuffle(self.file_list)))
-            )
-
-    def __iter__(self):
-        return self.get_stream()
-
-
-class ExtSumProcessedDataset(Dataset):
-    """Dataset for extractive summarization preprocessed data
-    """
-
-    def __init__(self, file_list, is_shuffle=False):
-        """ Initiation function for dataset for extractive summarization preprocessed data.
-
-        Args:
-            file_list (list of strings): List of files that the dataset is loaded from.
-            is_shuffle (bool, optional): A boolean value specifies whether the list of
-                files is shuffled when the dataset is loaded. Defaults to False.
-        """
-
-        self.file_list = sorted(file_list)
-        if is_shuffle:
-            random.shuffle(self.file_list)
-        self.data = []
-        for f in self.file_list:
-            self.data.extend(torch.load(f))
-
-    def __len__(self):
-        return len(self.data)
-
-    def __getitem__(self, idx):
-        return self.data[idx]
 
 
 def get_pred(
@@ -268,13 +140,10 @@ def get_pred(
     # selected_ids = np.argsort(-sent_scores, 1)
     if cal_lead:
         selected_ids = range(len(example["clss"]))
+
     pred = []
-    # target = []
-    # for i, idx in enumerate(selected_ids):
     _pred = []
     final_selections = []
-    if len(example["src_txt"]) == 0:
-        pred.append("")
     for j in selected_ids[: len(example["src_txt"])]:
         if j >= len(example["src_txt"]):
             continue
@@ -291,18 +160,13 @@ def get_pred(
         if len(_pred) == top_n:
             break
 
-    # _pred = '<q>'.join(_pred)
-    # _pred = sentence_separator.join(_pred)
     sorted_selections = sorted(final_selections)
-    # if sorted_selections != final_selections:
-    #    print(final_selections, sorted_selections)
     _pred = []
     for i in sorted_selections:
         _pred.append(example["src_txt"][i].strip())
     _pred = sentence_separator.join(_pred)
     pred.append(_pred.strip())
-    # target.append(example['tgt_txt'])
-    return pred  # , target
+    return pred
 
 
 class ExtSumProcessedData:
@@ -548,7 +412,16 @@ class ExtSumProcessor:
                     "labels": batch.labels,
                 }
             else:
-                # batch = Bunch(batch)
+                batch = batch.to(device)
+                return {
+                    "x": batch.src,
+                    "segs": batch.segs,
+                    "clss": batch.clss,
+                    "mask": batch.mask,
+                    "mask_cls": batch.mask_cls,
+                    # "labels": batch.labels,
+                }
+                """
                 return {
                     "x": batch.src.to(device),
                     "segs": batch.segs.to(device),
@@ -556,6 +429,7 @@ class ExtSumProcessor:
                     "mask": batch.mask.to(device),
                     "mask_cls": batch.mask_cls.to(device),
                 }
+                """
         else:
             raise ValueError("Model not supported: {}".format(model_name))
 
@@ -579,7 +453,7 @@ class ExtSumProcessor:
         )
         return parallel_preprocess(input_data_list, preprocess)
 
-    def collate(self, data, block_size, train_mode=True):
+    def collate(self, data, block_size, device, train_mode=True):
         """ Collcate function for pytorch data loaders.
             Args:
                 data (list): A list of samples from SummarizationDataset.
@@ -609,7 +483,7 @@ class ExtSumProcessor:
                 # if len(filtered_list) != len(data):
                 #    raise ValueError("no test data shouldn't be skipped")
                 batch = Batch(filtered_list)
-            return batch
+            return batch.to(device)
 
     def encode_single(self, d, block_size, train_mode=True):
         """ Enocde a single sample.
@@ -844,7 +718,6 @@ class ExtractiveSummarizer(Transformer):
             decay_method,
             warmup_steps,
         )
-
         self.model = parallelize_model(
             model=self.model,
             device=device,
@@ -861,6 +734,7 @@ class ExtractiveSummarizer(Transformer):
                 batch_size=batch_size,
                 world_size=world_size,
                 rank=rank,
+                local_rank=local_rank,
             )
         else:
             if local_rank == -1:
@@ -871,7 +745,9 @@ class ExtractiveSummarizer(Transformer):
                 )
 
             def collate_fn(data):
-                return self.processor.collate(data, block_size=self.max_pos_length)
+                return self.processor.collate(
+                    data, block_size=self.max_pos_length, device=device
+                )
 
             train_dataloader = DataLoader(
                 train_dataset,
@@ -907,7 +783,7 @@ class ExtractiveSummarizer(Transformer):
     def predict(
         self,
         test_dataset,
-        num_gpus=1,
+        num_gpus=None,
         gpu_ids=None,
         batch_size=16,
         sentence_separator="<q>",
@@ -915,6 +791,7 @@ class ExtractiveSummarizer(Transformer):
         block_trigram=True,
         cal_lead=False,
         verbose=True,
+        local_rank=-1,
     ):
         """
         Predict the summarization for the input data iterator.
@@ -945,6 +822,10 @@ class ExtractiveSummarizer(Transformer):
 
         """
 
+        device, num_gpus = get_device(
+            num_gpus=num_gpus, gpu_ids=gpu_ids, local_rank=local_rank
+        )
+
         def collate_processed_data(dict_list):
             # tuple_batch =  [list(col) for col in zip(*[d.values() for d in dict_list]
             if dict_list is None or len(dict_list) <= 0:
@@ -953,19 +834,11 @@ class ExtractiveSummarizer(Transformer):
             # generate mask and mask_cls, and only select tensors for the model input
             # the labels was never used in prediction, set is_labeled as False
             batch = Batch(tuple_batch, is_labeled=False)
-            return Bunch(
-                {
-                    "src": batch.src,
-                    "segs": batch.segs,
-                    "clss": batch.clss,
-                    "mask": batch.mask,
-                    "mask_cls": batch.mask_cls,
-                }
-            )
+            return batch
 
         def collate(data):
             return self.processor.collate(
-                data, block_size=self.max_pos_length, train_mode=False
+                data, block_size=self.max_pos_length, train_mode=False, device=device
             )
 
         if len(test_dataset) == 0:
