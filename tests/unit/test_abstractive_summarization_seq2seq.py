@@ -4,7 +4,11 @@
 import os
 import pytest
 
-from utils_nlp.models import S2SAbsSumProcessor, S2SAbstractiveSummarizer, S2SConfig
+from utils_nlp.models.transformers.abstractive_summarization_seq2seq import (
+    S2SAbsSumProcessor, 
+    S2SAbstractiveSummarizer, 
+    S2SConfig
+)
 
 from utils_nlp.models.transformers.datasets import (
     IterableSummarizationDataset,

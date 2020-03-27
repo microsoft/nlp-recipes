@@ -96,6 +96,9 @@ PIP_BASE = {
     "methodtools": "methodtools",
     "s2s-ft": "-e git+https://github.com/microsoft/unilm.git"
     "@s2s-ft.v0.0#egg=s2s-ft&subdirectory=s2s-ft",
+    "requests": "requests==2.22.0",
+    "requests-oauthlib": "requests-oauthlib==1.2.0",
+    "regex": "regex==2020.2.20",
 }
 
 PIP_GPU = {}

@@ -4,7 +4,11 @@ import jsonlines
 
 import torch
 
-from utils_nlp.models import S2SAbsSumProcessor, S2SAbstractiveSummarizer
+from utils_nlp.models.transformers.abstractive_summarization_seq2seq import (
+     S2SAbsSumProcessor, 
+     S2SAbstractiveSummarizer
+)
+
 from utils_nlp.eval import compute_rouge_python
 
 parser = argparse.ArgumentParser()
