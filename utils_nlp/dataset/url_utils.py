@@ -13,8 +13,9 @@ from tempfile import TemporaryDirectory
 
 import requests
 from tqdm import tqdm
+from google_drive_downloader import GoogleDriveDownloader as gdd
 
-log = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def maybe_download(url, filename=None, work_directory=".", expected_bytes=None):
@@ -42,11 +43,45 @@ def maybe_download(url, filename=None, work_directory=".", expected_bytes=None):
 
         with open(filepath, "wb") as file:
             for data in tqdm(
-                r.iter_content(block_size), total=num_iterables, unit="KB", unit_scale=True
+                r.iter_content(block_size),
+                total=num_iterables,
+                unit="KB",
+                unit_scale=True,
             ):
                 file.write(data)
     else:
-        log.debug("File {} already downloaded".format(filepath))
+        logger.info("File {} already downloaded".format(filepath))
+    if expected_bytes is not None:
+        statinfo = os.stat(filepath)
+        if statinfo.st_size != expected_bytes:
+            os.remove(filepath)
+            raise IOError("Failed to verify {}".format(filepath))
+
+    return filepath
+
+
+def maybe_download_googledrive(
+    google_file_id, file_name, work_directory=".", expected_bytes=None
+):
+    """Download a file from google drive if it is not already downloaded.
+
+    Args:
+        google_file_id (str): The ID of the google file which can be found in
+            the file link, e.g. https://drive.google.com/file/d/{google_file_id}/view
+        file_name (str): Name of the downloaded file.
+        work_directory (str, optional): Directory to download the file to.
+            Defaults to ".".
+        expected_bytes (int, optional): Expected file size in bytes.
+    Returns:
+        str: File path of the file downloaded.
+    """
+
+    os.makedirs(work_directory, exist_ok=True)
+    filepath = os.path.join(work_directory, file_name)
+    if not os.path.exists(filepath):
+        gdd.download_file_from_google_drive(file_id=google_file_id, dest_path=filepath)
+    else:
+        logger.info("File {} already downloaded".format(filepath))
     if expected_bytes is not None:
         statinfo = os.stat(filepath)
         if statinfo.st_size != expected_bytes:

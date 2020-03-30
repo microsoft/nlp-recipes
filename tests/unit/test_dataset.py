@@ -12,6 +12,11 @@ from utils_nlp.dataset import snli
 from utils_nlp.dataset import Split
 from utils_nlp.dataset import squad
 from utils_nlp.dataset.ner_utils import preprocess_conll
+from utils_nlp.dataset.cnndm import CNNDMSummarizationDatasetOrg
+from utils_nlp.models.transformers.datasets import (
+    SummarizationDataset,
+    IterableSummarizationDataset,
+)
 
 
 @pytest.fixture
@@ -96,7 +101,9 @@ def test_wikigold(tmp_path):
     downloaded_file = os.path.join(tmp_path, "wikigold.conll.txt")
     assert not os.path.exists(downloaded_file)
 
-    train_df, test_df = wikigold.load_train_test_dfs(tmp_path, test_fraction=wg_test_fraction)
+    train_df, test_df = wikigold.load_train_test_dfs(
+        tmp_path, test_fraction=wg_test_fraction
+    )
 
     assert os.path.exists(downloaded_file)
 
@@ -145,3 +152,41 @@ def test_squad(tmp_path):
         local_cache_path=tmp_path, squad_version="v2.0", file_split="dev"
     )
     assert v2_dev_df.shape == (11873, 6)
+
+
+def test_CNNDMSummarizationDatasetOrg(tmp):
+    expected_train_ds_length = 287113
+    expected_test_ds_length = 11490
+    expected_dev_ds_length = 13368
+
+    top_n = 100
+
+    train_sum_ds, test_sum_ds, dev_sum_ds = CNNDMSummarizationDatasetOrg(
+        local_path=tmp, top_n=-1, return_iterable=False, return_dev_data=True
+    )
+
+    assert isinstance(train_sum_ds, SummarizationDataset)
+    assert isinstance(test_sum_ds, SummarizationDataset)
+    assert isinstance(dev_sum_ds, SummarizationDataset)
+    assert len(train_sum_ds) == expected_train_ds_length
+    assert len(test_sum_ds) == expected_test_ds_length
+    assert len(dev_sum_ds) == expected_dev_ds_length
+
+    train_sum_ds_top_n, test_sum_ds_top_n = CNNDMSummarizationDatasetOrg(
+        local_path=tmp, top_n=top_n, return_iterable=False, return_dev_data=False
+    )
+
+    assert len(train_sum_ds_top_n) == top_n
+    assert len(test_sum_ds_top_n) == top_n
+
+    (
+        train_iterable_sum_ds,
+        test_iterable_sum_ds,
+        dev_iterable_sum_ds,
+    ) = CNNDMSummarizationDatasetOrg(
+        local_path=tmp, top_n=100, return_iterable=True, return_dev_data=True
+    )
+
+    assert isinstance(train_iterable_sum_ds, IterableSummarizationDataset)
+    assert isinstance(test_iterable_sum_ds, IterableSummarizationDataset)
+    assert isinstance(dev_iterable_sum_ds, IterableSummarizationDataset)

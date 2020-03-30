@@ -58,30 +58,83 @@ You can specify the environment name as well with the flag `-n`.
 Click on the following menus to see how to install the Python GPU environment:
 
 <details>
-<summary><strong><em>Python GPU environment on Linux, MacOS</em></strong></summary>
+<summary><strong><em>Python GPU environment</em></strong></summary>
 
-Assuming that you have a GPU machine, to install the Python GPU environment, which by default installs the CPU environment:
+Assuming that you have a GPU machine, to install the Python GPU environment, 
+1. Check the CUDA **driver** version on your machine by running
 
-    cd nlp-recipes
-    python tools/generate_conda_file.py --gpu
-    conda env create -n nlp_gpu -f nlp_gpu.yaml
+        nvidia-smi
+    The top of the output shows the CUDA **driver** version, which is 10.0 in the example below.   
+    +-----------------------------------------------------------------------------+  
+    | NVIDIA-SMI 410.79 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;Driver Version: 410. &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;CUDA Version: 10.0     |  
+    |-------------------------------+----------------------+----------------------+
+2. Decide which cuda **runtime** version you should install.   
+The cuda **runtime** version is the version of the cudatoolkit that will be installed in the conda environment in the next step, which should be <= the CUDA **driver** version found in step 1.  
+Currently, this repo uses PyTorch 1.4.0 which is compatible with cuda 9.2 and cuda 10.1. The conda environment file generated in step 3 installs cudatoolkit 10.1 by default. If your CUDA **driver** version is < 10.1, you should add additional argument "--cuda_version 9.2" when calling generate_conda_files.py.   
 
-</details>
-
-<details>
-<summary><strong><em>Python GPU environment on Windows</em></strong></summary>
-
-Assuming that you have an Azure GPU DSVM machine, here are the steps to setup the Python GPU environment:
-1. Make sure you have CUDA Toolkit version 9.0 above installed on your Windows machine. You can run the command below in your terminal to check.
-
-         nvcc --version
-    If you don't have CUDA Toolkit or don't have the right version, please download it from here: [CUDA Toolkit](https://developer.nvidia.com/cuda-toolkit)
-
-2. Install the GPU environment.
+3. Install the GPU environment:  
+If CUDA **driver** version >= 10.1
 
         cd nlp-recipes
         python tools/generate_conda_file.py --gpu
         conda env create -n nlp_gpu -f nlp_gpu.yaml
+
+    If CUDA **driver** version < 10.1
+
+        cd nlp-recipes
+        python tools/generate_conda_file.py --gpu --cuda_version 9.2
+        conda env create -n nlp_gpu -f nlp_gpu.yaml
+
+4. Enable mixed precision training (optional)  
+Mixed precision training is particularly useful if your model takes a long time to train. It usually reduces the training time by 50% and produces the same model quality. To enable mixed precision training, run the following command 
+
+        conda activate nlp_gpu
+        git clone https://github.com/NVIDIA/apex.git
+        cd apex
+        pip install -v --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" ./
+
+    **Troubleshooting**:  
+    If you run into an error message "RuntimeError: Cuda extensions are being compiled with a version of Cuda that does not match the version used to compile Pytorch binaries.", you need to make sure your NVIDIA Cuda compiler driver (nvcc) version and your cuda **runtime** version are exactly the same. To check the nvcc version, run   
+
+        nvcc -V
+
+    If the nvcc version is 10.0, it's recommended to upgrade to 10.1 and re-create your conda environment with cudatoolkit=10.1.
+    
+    **Steps to upgrade CUDA **driver** version and nvcc version**  
+    We have tested the following steps. Alternatively, you can follow the official instructions [here](https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html)  
+    a. Update apt-get and reboot your machine
+
+        sudo apt-get update
+        sudo apt-get upgrade --fix-missing
+        sudo reboot
+    b. Download the CUDA toolkit .run file from https://developer.nvidia.com/cuda-10.1-download-archive-base based on your target platform. For example, on a Linux machine with Ubuntu 16.04, run   
+
+        wget https://developer.nvidia.com/compute/cuda/10.1/Prod/local_installers/cuda_10.1.105_418.39_linux.run  
+
+    c. Upgrade CUDA driver by running  
+
+        sudo sh cuda_10.1.105_418.39_linux.run
+    First, accept the user agreement.  
+    ![](https://nlpbp.blob.core.windows.net/images/upgrade_cuda_driver/1agree_to_user_agreement.PNG)  
+    Next, choose the components to install.  
+    It's possible that you already have NVIDIA driver 418.39 and CUDA 10.1, but nvcc 10.0. In this case, you can uncheck the "DRIVER" box and upgrade nvcc by re-installing CUDA toolkit only.   
+    ![](https://nlpbp.blob.core.windows.net/images/upgrade_cuda_driver/2install_cuda_only.PNG)  
+
+    If you choose to install all components, follow the instructions on the screen to uninstall existing NVIDIA driver and CUDA toolkit first.  
+    ![](https://nlpbp.blob.core.windows.net/images/upgrade_cuda_driver/3install_all.PNG)   
+    Then re-run   
+
+        sudo sh cuda_10.1.105_418.39_linux.run
+    Select "Yes" to update the cuda symlink.   
+    ![](https://nlpbp.blob.core.windows.net/images/upgrade_cuda_driver/4Upgrade_symlink.PNG)  
+
+    d. Run the following commands again to make sure you have NVIDIA driver 418.39, CUDA driver 10.1 and nvcc 10.1
+
+        nvidia-smi
+        nvcc -V
+
+    e. Repeat steps 3 & 4 to recreate your conda environment with cudatoolkit **runtime** 10.1 and apex installed for mixed precision training. 
+
 
 </details>
 

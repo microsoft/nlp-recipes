@@ -18,7 +18,18 @@
         }
       },
       "license": "Apache-2.0"
+   },
+   {
+      "component": { 
+      "type": "git", 
+      "git": { 
+        "repositoryUrl": "https://github.com/nlpyang/PreSumm", 
+        "commitHash": "2df3312582a3a014aacbc1be810841705c67d06e" 
+        }
+      },
+      "license": "MIT License"
    }
+
  ],
  "Version": 1
 }

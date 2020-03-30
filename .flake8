@@ -11,6 +11,8 @@
 # E402  module level import not at top of file
 # E731  do not assign a lambda expression, use a def
 # F821  undefined name 'get_ipython' --> from generated python files using nbconvert
+# E722: do not use bare except
+# E231: missing white space after "," --> black generates autoformat [,] which fails flake8
+ignore = E203, E266, W503, F403, F405, E402, E731, F821, E722, E231
 
-ignore = E203, E266, W503, F403, F405, E402, E731, F821
 max-line-length = 88

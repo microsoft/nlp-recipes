@@ -32,8 +32,10 @@ def move_model_to_device(model, device):
         raise ValueError("device must be of type torch.device.")
 
     # unwrap model
-    if isinstance(model, torch.nn.DataParallel):
-        model = model.module
+    # if isinstance(model, torch.nn.DataParallel):
+    model = (
+        model.module if hasattr(model, "module") else model
+    )  # Take care of distributed/parallel training
 
     # move to device
     return model.to(device)
@@ -50,7 +52,9 @@ def parallelize_model(model, device, num_gpus=None, gpu_ids=None, local_rank=-1)
             Defaults to None.
         gpu_ids (list): List of GPU IDs to be used.
             If None, the first num_gpus GPUs will be used.
-            If not None, overrides num_gpus.
+            If not None, overrides num_gpus. if gpu_ids is an empty list
+            or there is no valid gpu devices are specified,
+            and device is "cuda", model will not be moved or parallelized.
             Defaults to None.
         local_rank (int): Local GPU ID within a node. Used in distributed environments.
             If not -1, num_gpus and gpu_ids are ignored.
@@ -58,18 +62,18 @@ def parallelize_model(model, device, num_gpus=None, gpu_ids=None, local_rank=-1)
     Returns:
         Module, DataParallel, DistributedDataParallel: A PyTorch Module or
             a DataParallel/DistributedDataParallel wrapper,
-            when multiple gpus are used.
+            when one or multiple gpus are used.
     """
     if not isinstance(device, torch.device):
         raise ValueError("device must be of type torch.device.")
 
-    # unwrap model
-    if isinstance(model, torch.nn.DataParallel):
-        model = model.module
-    # wrap in DataParallel or DistributedDataParallel
+    model_module = (
+        model.module if hasattr(model, "module") else model
+    )  # Take care of distributed/parallel training
+
     if local_rank != -1:
         model = torch.nn.parallel.DistributedDataParallel(
-            model,
+            model_module,
             device_ids=[local_rank],
             output_device=local_rank,
             find_unused_parameters=True,
@@ -89,8 +93,10 @@ def parallelize_model(model, device, num_gpus=None, gpu_ids=None, local_rank=-1)
                     else min(num_gpus, num_cuda_devices)
                 )
                 gpu_ids = list(range(num_gpus))
-            if len(gpu_ids) > 1:
-                model = torch.nn.DataParallel(model, device_ids=gpu_ids)
+            else:
+                gpu_ids = list(set(list(range(num_cuda_devices))).intersection(gpu_ids))
+            if len(gpu_ids) > 0:
+                model = torch.nn.DataParallel(model_module, device_ids=gpu_ids)
     return model
 
 
@@ -160,9 +166,9 @@ def compute_training_steps(
 
 def get_amp(fp16):
     """This function ensures that fp16 execution of torch.einsum is enabled
-        if args.fp16 is set. Otherwise, it'll default to "promote" mode,
+        if fp16 is set. Otherwise, it'll default to "promote" mode,
         where the operations are in fp32.
-        Note that running `--fp16_opt_level="O2"` will remove the need for this code.
+        Note that setting `fp16_opt_level="O2"` will remove the need for this code.
     """
     # Before we do anything with models, we want to
     if fp16:
