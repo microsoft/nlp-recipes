@@ -19,6 +19,7 @@ from utils_nlp.common.pytorch_utils import (
     move_model_to_device,
     parallelize_model,
 )
+import s2s_ft
 from s2s_ft.utils import (
     Seq2seqDatasetForBert,
     batch_list_to_batch_tensors,
@@ -512,6 +513,8 @@ class S2SAbstractiveSummarizer(Transformer):
             model_config = config_class.from_pretrained(
                 self._model_name, cache_dir=cache_dir
             )
+        
+        self.model_config = model_config
 
         # Convert regular model config to sequence to sequence config
         config = BertForSeq2SeqConfig.from_exist_config(
@@ -521,7 +524,7 @@ class S2SAbstractiveSummarizer(Transformer):
             + self.max_target_seq_length,
         )
         logger.info("Model config for seq2seq: %s", str(config))
-
+    
         self.model = model_class.from_pretrained(
             model_to_load,
             config=config,
@@ -829,13 +832,15 @@ class S2SAbstractiveSummarizer(Transformer):
                 self.tokenizer.convert_tokens_to_ids,
                 self.max_seq_length,
                 max_tgt_length=max_tgt_length,
-                new_segment_ids=new_segment_ids,
+                # new_segment_ids=new_segment_ids,
                 mode=s2s_config.mode,
-                num_qkv=s2s_config.num_qkv,
-                s2s_special_token=s2s_config.s2s_special_token,
-                s2s_add_segment=s2s_config.s2s_add_segment,
-                s2s_share_segment=s2s_config.s2s_share_segment,
+                # num_qkv=s2s_config.num_qkv,
+                # s2s_special_token=s2s_config.s2s_special_token,
+                # s2s_add_segment=s2s_config.s2s_add_segment,
+                # s2s_share_segment=s2s_config.s2s_share_segment,
                 pos_shift=s2s_config.pos_shift,
+                source_type_id=self.model_config.source_type_id,
+                target_type_id=self.model_config.target_type_id,
                 cls_token=cls_token,
                 sep_token=sep_token,
                 pad_token=pad_token,
@@ -881,14 +886,26 @@ class S2SAbstractiveSummarizer(Transformer):
         else:
             state_dict = self.model.state_dict()
 
+        bert_config = s2s_ft.modeling_decoding.BertConfig(
+                len(list(vocab.keys())) if not is_roberta else 50265, 
+                type_vocab_size=type_vocab_size,
+                max_position_embeddings=self.max_seq_length,
+                ffn_type=s2s_config.ffn_type,
+                num_qkv=s2s_config.num_qkv,
+                seg_emb=s2s_config.seg_emb,
+                is_roberta=is_roberta,
+                no_segment_embedding=no_segment_embedding
+            )
+        # print(self._bert_model_name)
+        # print(type(bert_config))
         model = BertForSeq2SeqDecoder.from_pretrained(
             self._bert_model_name,
+            bert_config,
             state_dict=state_dict,
+            cache_dir=self.cache_dir,
+            mask_word_id=mask_word_id,
             num_labels=cls_num_labels,
             num_rel=pair_num_relation,
-            type_vocab_size=type_vocab_size,
-            task_idx=3,
-            mask_word_id=mask_word_id,
             search_beam_size=beam_size,
             length_penalty=length_penalty,
             eos_id=eos_word_ids,
@@ -898,13 +915,7 @@ class S2SAbstractiveSummarizer(Transformer):
             ngram_size=s2s_config.forbid_ngram_size,
             min_len=s2s_config.min_len,
             mode=s2s_config.mode,
-            max_position_embeddings=self.max_seq_length,
-            ffn_type=s2s_config.ffn_type,
-            num_qkv=s2s_config.num_qkv,
-            seg_emb=s2s_config.seg_emb,
             pos_shift=s2s_config.pos_shift,
-            is_roberta=is_roberta,
-            no_segment_embedding=no_segment_embedding,
         )
 
         del state_dict
@@ -944,6 +955,7 @@ class S2SAbstractiveSummarizer(Transformer):
             batch_size=batch_size,
             collate_fn=collate_fn,
         )
+        print(device)
         for batch, buf_id in tqdm(
             test_dataloader, desc="Evaluating", disable=not verbose
         ):
