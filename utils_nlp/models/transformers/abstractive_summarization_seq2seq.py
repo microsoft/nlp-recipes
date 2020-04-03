@@ -524,7 +524,7 @@ class S2SAbstractiveSummarizer(Transformer):
             + self.max_target_seq_length,
         )
         logger.info("Model config for seq2seq: %s", str(config))
-    
+
         self.model = model_class.from_pretrained(
             model_to_load,
             config=config,
@@ -732,11 +732,12 @@ class S2SAbstractiveSummarizer(Transformer):
         )
 
         if save_model_to_dir is not None and local_rank in [-1, 0]:
-            self.save_model(save_model_to_dir, global_step, fp16)
+            self.save_model(save_model_to_dir, global_step - 1, fp16)
 
         # release GPU memories
         self.model.cpu()
         torch.cuda.empty_cache()
+        return global_step - 1
 
     def predict(
         self,
@@ -896,8 +897,7 @@ class S2SAbstractiveSummarizer(Transformer):
                 is_roberta=is_roberta,
                 no_segment_embedding=no_segment_embedding
             )
-        # print(self._bert_model_name)
-        # print(type(bert_config))
+
         model = BertForSeq2SeqDecoder.from_pretrained(
             self._bert_model_name,
             bert_config,
@@ -955,7 +955,6 @@ class S2SAbstractiveSummarizer(Transformer):
             batch_size=batch_size,
             collate_fn=collate_fn,
         )
-        print(device)
         for batch, buf_id in tqdm(
             test_dataloader, desc="Evaluating", disable=not verbose
         ):
