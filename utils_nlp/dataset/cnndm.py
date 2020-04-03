@@ -245,7 +245,7 @@ def CNNDMSummarizationDatasetOrg(
     ):
         extract_zip(
             file_path=os.path.join(local_path, FILE_NAME),
-            dest_path=os.path.join(local_path, output_dir),
+            dest_path=output_dir,
         )
 
     train_source_file = os.path.join(org_data_dir, "training.article")
