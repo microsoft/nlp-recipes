@@ -732,12 +732,12 @@ class S2SAbstractiveSummarizer(Transformer):
         )
 
         if save_model_to_dir is not None and local_rank in [-1, 0]:
-            self.save_model(save_model_to_dir, global_step - 1, fp16)
+            self.save_model(save_model_to_dir, global_step, fp16)
 
         # release GPU memories
         self.model.cpu()
         torch.cuda.empty_cache()
-        return global_step - 1
+        return global_step
 
     def predict(
         self,

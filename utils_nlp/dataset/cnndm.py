@@ -165,7 +165,7 @@ class CNNDMBertSumProcessedData:
         return output_dir
 
 
-def _detokenize(line):
+def detokenize(line):
     """
     Detokenizes the processed CNN/DM dataset to recover the original dataset,
     e.g. converts "-LRB-" back to "(" and "-RRB-" back to ")".
@@ -255,8 +255,8 @@ def CNNDMSummarizationDatasetOrg(
     dev_source_file = os.path.join(org_data_dir, "dev.article")
     dev_target_file = os.path.join(org_data_dir, "dev.summary")
 
-    source_preprocessing = [_detokenize]
-    target_preprocessing = [_detokenize]
+    source_preprocessing = [detokenize]
+    target_preprocessing = [detokenize]
 
     if return_iterable:
         train_dataset = IterableSummarizationDataset(
