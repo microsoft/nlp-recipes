@@ -4,7 +4,11 @@
 import os
 import pytest
 
-from utils_nlp.models import S2SAbsSumProcessor, S2SAbstractiveSummarizer, S2SConfig
+from utils_nlp.models.transformers.abstractive_summarization_seq2seq import (
+    S2SAbsSumProcessor, 
+    S2SAbstractiveSummarizer, 
+    S2SConfig
+)
 
 from utils_nlp.models.transformers.datasets import (
     IterableSummarizationDataset,
@@ -80,7 +84,9 @@ def s2s_test_data():
 
 @pytest.mark.gpu
 def test_S2SAbstractiveSummarizer(s2s_test_data, tmp):
-    processor = S2SAbsSumProcessor(cache_dir=tmp)
+    cache_dir = tmp
+    model_dir = tmp
+    processor = S2SAbsSumProcessor(cache_dir=cache_dir)
     train_dataset = processor.s2s_dataset_from_json_or_file(
         s2s_test_data["train_ds"], train_mode=True
     )
@@ -91,14 +97,14 @@ def test_S2SAbstractiveSummarizer(s2s_test_data, tmp):
         max_seq_length=MAX_SEQ_LENGTH,
         max_source_seq_length=MAX_SOURCE_SEQ_LENGTH,
         max_target_seq_length=MAX_TARGET_SEQ_LENGTH,
-        cache_dir=tmp,
+        cache_dir=cache_dir,
     )
 
     # test fit and predict
-    abs_summarizer.fit(
+    global_step = abs_summarizer.fit(
         train_dataset,
         per_gpu_batch_size=TRAIN_PER_GPU_BATCH_SIZE,
-        save_model_to_dir=tmp,
+        save_model_to_dir=model_dir,
     )
     abs_summarizer.predict(
         test_dataset,
@@ -108,12 +114,12 @@ def test_S2SAbstractiveSummarizer(s2s_test_data, tmp):
 
     # test load model from local disk
     abs_summarizer_loaded = S2SAbstractiveSummarizer(
-        load_model_from_dir=tmp,
-        model_file_name="model.1.bin",
+        load_model_from_dir=model_dir,
+        model_file_name="model.{}.bin".format(global_step),
         max_seq_length=MAX_SEQ_LENGTH,
         max_source_seq_length=MAX_SOURCE_SEQ_LENGTH,
         max_target_seq_length=MAX_TARGET_SEQ_LENGTH,
-        cache_dir=tmp,
+        cache_dir=cache_dir,
     )
 
     abs_summarizer_loaded.predict(
@@ -126,10 +132,10 @@ def test_S2SAbstractiveSummarizer(s2s_test_data, tmp):
     abs_summarizer.fit(
         train_dataset,
         per_gpu_batch_size=TRAIN_PER_GPU_BATCH_SIZE,
-        save_model_to_dir=tmp,
-        recover_step=1,
-        recover_dir=tmp,
-        max_steps=4,
+        save_model_to_dir=model_dir,
+        recover_step=global_step,
+        recover_dir=model_dir,
+        max_steps=global_step + 3,
     )
 
     abs_summarizer.predict(

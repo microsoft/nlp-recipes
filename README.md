@@ -24,7 +24,7 @@ Note that for certain kind of NLP problems, you may not need to build your own m
 ## Target Audience
 For this repository our target audience includes data scientists and machine learning engineers with varying levels of NLP knowledge as our content is source-only and targets custom machine learning modelling. The utilities and examples provided are intended to be solution accelerators for real-world NLP problems.
 
-## Focus areas
+## Focus Areas
 The repository aims to expand NLP capabilities along three separate dimensions
 
 ### Scenarios
@@ -60,7 +60,7 @@ The following is a summary of the commonly used NLP scenarios covered in the rep
 While solving NLP problems, it is always good to start with the prebuilt [Cognitive Services](https://azure.microsoft.com/en-us/services/cognitive-services/directory/lang/). When the needs are beyond the bounds of the prebuilt cognitive service and when you want to search for custom machine learning methods,  you will find this repository  very useful. To get started, navigate to the [Setup Guide](SETUP.md), which lists instructions on how to setup your environment and dependencies.
 
 
-## Azure Machine Learning service
+## Azure Machine Learning Service
 [Azure Machine Learning service](https://azure.microsoft.com/en-us/services/machine-learning-service/) is a cloud service used to train, deploy, automate, and manage machine learning models, all at the broad scale that the cloud provides. AzureML is presented in notebooks across different scenarios to enhance the efficiency of developing Natural Language systems at scale and for various AI model development related tasks like:
   * [**Accessing Datastores**](https://docs.microsoft.com/en-us/azure/machine-learning/service/how-to-access-data) to easily read and write your data in Azure storage services such as blob storage or file share.
   * Scaling up and out on [**Azure Machine Learning Compute**](https://docs.microsoft.com/en-us/azure/machine-learning/service/how-to-set-up-training-targets#amlcompute).
@@ -75,6 +75,16 @@ To successfully run these notebooks, you will need an [**Azure subscription**](h
 
 ## Contributing
 We hope that the open source community would contribute to the content and bring in the latest SOTA algorithm. This project welcomes contributions and suggestions. Before contributing, please see our [contribution guidelines](CONTRIBUTING.md).
+
+## Blog Posts
+
+- [Bootstrap Your Text Summarization Solution with the Latest Release from NLP-Recipes](https://techcommunity.microsoft.com/t5/ai-customer-engineering-team/bootstrap-your-text-summarization-solution-with-the-latest/ba-p/1268809)
+
+- [Text Annotation made easy with Doccano](https://techcommunity.microsoft.com/t5/ai-customer-engineering-team/text-annotation-made-easy-with-doccano/ba-p/1242612)
+
+- [Jumpstart Analyzing your Hindi Text Data using the NLP Repository](https://techcommunity.microsoft.com/t5/ai-customer-engineering-team/jumpstart-analyzing-your-hindi-text-data-using-the-nlp/ba-p/1087851)
+
+- [Speeding up the Development of Natural Language Processing Solutions with Azure Machine Learning](https://techcommunity.microsoft.com/t5/ai-customer-engineering-team/speeding-up-the-development-of-natural-language-processing/ba-p/1042577)
 
 ## References
 The following is a list of related repositories that we like and think are useful for NLP tasks.
