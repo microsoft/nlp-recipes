@@ -131,7 +131,8 @@ class S2SAbsSumProcessor:
     def __init__(
         self, model_name="unilm-base-cased", to_lower=False, cache_dir=".",
     ):
-
+        if "uncased" in model_name:
+            to_lower = True
         self.tokenizer = TOKENIZER_CLASS[model_name].from_pretrained(
             model_name, do_lower_case=to_lower, cache_dir=cache_dir
         )
@@ -490,6 +491,8 @@ class S2SAbstractiveSummarizer(Transformer):
 
         self._model_name = model_name
         self._model_type = _get_model_type(self._model_name)
+        if "uncased" in model_name:
+            to_lower = True
 
         # self._bert_model_name is needed for BertForSeq2SeqDecoder
         if self._model_type != "bert":
@@ -906,23 +909,24 @@ class S2SAbstractiveSummarizer(Transformer):
             state_dict = self.model.state_dict()
         
         hidden_size = 768
+        bert_config = None
         if self._model_type == "minilm":
-            hidden_size = 384
-        bert_config = s2s_ft.modeling_decoding.BertConfig(
-                #num_hidden_layers=12,
-                #num_attention_heads=12,
-                #intermediate_size=3072,
-                len(list(vocab.keys())) if not is_roberta else 50265, 
-                hidden_size=hidden_size,
-                type_vocab_size=type_vocab_size,
-                max_position_embeddings=self.max_seq_length,
-                ffn_type=s2s_config.ffn_type,
-                num_qkv=s2s_config.num_qkv,
-                seg_emb=s2s_config.seg_emb,
-                is_roberta=is_roberta,
-                no_segment_embedding=no_segment_embedding
-            )
+            bert_config = s2s_ft.modeling_decoding.BertConfig(
+                    30522,
+                    type_vocab_size=type_vocab_size,
+                    hidden_size=384,
+                    intermediate_size=1536, 
+                    max_position_embeddings=self.max_seq_length,)
 
+        elif self._model_type == "unilm":
+            bert_config = s2s_ft.modeling_decoding.BertConfig(
+                    len(list(vocab.keys())) if not is_roberta else 50265,
+                    type_vocab_size=type_vocab_size,
+                    max_position_embeddings=self.max_seq_length,)
+            #UnilmConfig()
+
+        # ??? # customize this for Robertta
+       
         model = BertForSeq2SeqDecoder.from_pretrained(
             self._bert_model_name,
             bert_config,
