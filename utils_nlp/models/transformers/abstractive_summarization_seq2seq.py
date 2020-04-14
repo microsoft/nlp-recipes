@@ -166,6 +166,7 @@ class S2SAbsSumProcessor:
         output_dir,
         local_rank=-1,
         cached_features_file=None,
+        top_n=-1,
     ):
         """
         Creates S2SAbsSumDataset from input file or list of dictionaries.
@@ -215,6 +216,8 @@ class S2SAbsSumProcessor:
             cached_features_file = os.path.join(output_dir, cached_features_file_name)
             if os.path.exists(cached_features_file):
                 os.remove(cached_features_file)
+        else:
+            print("use cached feature file {}".format(cached_features_file))
 
         features = load_and_cache_examples(
             input_examples=examples,
@@ -223,6 +226,7 @@ class S2SAbsSumProcessor:
             shuffle=shuffle_flag,
             local_rank=local_rank,
             train_mode=train_mode,
+            top_n=top_n,
         )
 
         if not train_mode:
@@ -235,7 +239,7 @@ class S2SAbsSumProcessor:
         return S2SAbsSumDataset(features)
 
     def s2s_dataset_from_iterable_sum_ds(
-        self, sum_ds, train_mode, cached_features_file=None, local_rank=-1
+        self, sum_ds, train_mode, cached_features_file=None, local_rank=-1, top_n=-1,
     ):
         """
         Converts IterableSummarizationDataset to S2SAbsSumDataset.
@@ -271,12 +275,13 @@ class S2SAbsSumProcessor:
             output_dir=self.cache_dir,
             local_rank=local_rank,
             cached_features_file=cached_features_file,
+            top_n=top_n,
         )
 
         return s2s_dataset
 
     def s2s_dataset_from_sum_ds(
-        self, sum_ds, train_mode, cached_features_file=None, local_rank=-1
+        self, sum_ds, train_mode, cached_features_file=None, local_rank=-1, top_n=-1
     ):
 
         """
@@ -308,12 +313,13 @@ class S2SAbsSumProcessor:
             output_dir=self.cache_dir,
             local_rank=local_rank,
             cached_features_file=cached_features_file,
+            top_n=top_n,
         )
 
         return s2s_dataset
 
     def s2s_dataset_from_json_or_file(
-        self, input_data, train_mode, cached_features_file=None, local_rank=-1
+        self, input_data, train_mode, cached_features_file=None, local_rank=-1, top_n=-1
     ):
         """
         Converts input file or list of dictionaries to S2SAbsSumDataset.
@@ -350,6 +356,7 @@ class S2SAbsSumProcessor:
             output_dir=self.cache_dir,
             local_rank=local_rank,
             cached_features_file=cached_features_file,
+            top_n=top_n,
         )
 
         return s2s_dataset
@@ -839,15 +846,16 @@ class S2SAbstractiveSummarizer(Transformer):
         mask_token = "<mask>" if is_roberta else "[MASK]"
 
         max_src_length = self.max_seq_length - 2 - max_tgt_length
+        tokenizer = self.tokenizer
         bi_uni_pipeline = []
         bi_uni_pipeline.append(
             seq2seq_loader.Preprocess4Seq2seqDecoder(
                 list(vocab.keys()),
-                self.tokenizer.convert_tokens_to_ids,
+                tokenizer.convert_tokens_to_ids,
                 self.max_seq_length,
                 max_tgt_length=max_tgt_length,
                 # new_segment_ids=new_segment_ids,
-                mode=s2s_config.mode,
+                # mode=s2s_config.mode,
                 # num_qkv=s2s_config.num_qkv,
                 # s2s_special_token=s2s_config.s2s_special_token,
                 # s2s_add_segment=s2s_config.s2s_add_segment,
@@ -855,11 +863,13 @@ class S2SAbstractiveSummarizer(Transformer):
                 pos_shift=s2s_config.pos_shift,
                 source_type_id=self.model_config.source_type_id,
                 target_type_id=self.model_config.target_type_id,
-                cls_token=cls_token,
-                sep_token=sep_token,
-                pad_token=pad_token,
+                cls_token=tokenizer.cls_token,
+                sep_token=tokenizer.sep_token,
+                pad_token=tokenizer.pad_token,
             )
         )
+        mask_word_id, eos_word_ids, sos_word_id = tokenizer.convert_tokens_to_ids(
+        [tokenizer.mask_token, tokenizer.sep_token, tokenizer.sep_token])
 
         def collate_fn(input_batch):
             buf_id = [x[0] for x in input_batch]
@@ -880,11 +890,6 @@ class S2SAbstractiveSummarizer(Transformer):
         type_vocab_size = (
             6 + (1 if s2s_config.s2s_add_segment else 0) if new_segment_ids else 2
         )
-        (
-            mask_word_id,
-            eos_word_ids,
-            sos_word_id,
-        ) = self.tokenizer.convert_tokens_to_ids([mask_token, sep_token, sep_token])
         forbid_ignore_set = None
         if forbid_ignore_word:
             w_list = []
@@ -899,9 +904,16 @@ class S2SAbstractiveSummarizer(Transformer):
             state_dict = self.model.module.state_dict()
         else:
             state_dict = self.model.state_dict()
-
+        
+        hidden_size = 768
+        if self._model_type == "minilm":
+            hidden_size = 384
         bert_config = s2s_ft.modeling_decoding.BertConfig(
+                #num_hidden_layers=12,
+                #num_attention_heads=12,
+                #intermediate_size=3072,
                 len(list(vocab.keys())) if not is_roberta else 50265, 
+                hidden_size=hidden_size,
                 type_vocab_size=type_vocab_size,
                 max_position_embeddings=self.max_seq_length,
                 ffn_type=s2s_config.ffn_type,
@@ -917,8 +929,6 @@ class S2SAbstractiveSummarizer(Transformer):
             state_dict=state_dict,
             cache_dir=self.cache_dir,
             mask_word_id=mask_word_id,
-            num_labels=cls_num_labels,
-            num_rel=pair_num_relation,
             search_beam_size=beam_size,
             length_penalty=length_penalty,
             eos_id=eos_word_ids,
@@ -928,7 +938,10 @@ class S2SAbstractiveSummarizer(Transformer):
             ngram_size=s2s_config.forbid_ngram_size,
             min_len=s2s_config.min_len,
             mode=s2s_config.mode,
+            max_position_embeddings=self.max_seq_length,
             pos_shift=s2s_config.pos_shift,
+            #num_labels=cls_num_labels,
+            #num_rel=pair_num_relation,
         )
 
         del state_dict
@@ -1059,6 +1072,7 @@ def load_and_cache_examples(
     train_mode=True,
     cached_features_file=None,
     shuffle=True,
+    top_n=-1,
 ):
     # Make sure only the first process in distributed training process the dataset,
     # and the others will use the cache
@@ -1077,6 +1091,9 @@ def load_and_cache_examples(
                     examples.append(json.loads(line))
         else:
             examples = input_examples
+
+        if top_n != -1:
+            examples = examples[0:top_n]
 
         features = []
         if train_mode:
