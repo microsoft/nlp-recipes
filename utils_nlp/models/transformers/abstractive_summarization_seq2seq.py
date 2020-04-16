@@ -218,7 +218,8 @@ class S2SAbsSumProcessor:
             if os.path.exists(cached_features_file):
                 os.remove(cached_features_file)
         else:
-            print("use cached feature file {}".format(cached_features_file))
+            if os.path.exists(cached_features_file):
+                print("use cached feature file {}".format(cached_features_file))
 
         features = load_and_cache_examples(
             input_examples=examples,
