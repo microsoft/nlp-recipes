@@ -198,6 +198,9 @@ class S2SAbsSumProcessor:
                 saved to this file.
                 If not provided, processed features are saved to `output_dir`.
                 Defaults to None.
+            top_n (int, optional): The number which specifies how many examples in the
+                beginning that will be used to create the dataset. Defaults to -1,
+                which means the whole lists of examples should be used.
 
         Returns:
             S2SAbsSumDataset
@@ -257,6 +260,9 @@ class S2SAbsSumProcessor:
                 Defaults to None.
             local_rank (int, optional): Local rank of the device in distributed
                 training. Defaults to -1, which means non-distributed training.
+            top_n (int, optional): The number which specifies how many examples in the
+                beginning of the input dataset that will be used to create the dataset.
+                Defaults to -1, which means the whole dataset should be procsssed.
 
         Returns:
             S2SAbsSumDataset
@@ -300,6 +306,9 @@ class S2SAbsSumProcessor:
                 Defaults to None.
             local_rank (int, optional): Local rank of the device in distributed
                 training. Defaults to -1, which means non-distributed training.
+            top_n (int, optional): The number which specifies how many examples in the
+                beginning of the input dataset that will be used to create the dataset.
+                Defaults to -1, which means the whole dataset should be procsssed.
 
         Returns:
             S2SAbsSumDataset
@@ -346,6 +355,10 @@ class S2SAbsSumProcessor:
                 Defaults to None.
             local_rank (int, optional): Local rank of the device in distributed
                 training. Defaults to -1, which means non-distributed training.
+            top_n (int, optional): The number which specifies how many examples in the
+                beginning of the input dataset that will be used to create the dataset.
+                Defaults to -1, which means the whole input data should be procsssed.
+
 
         Returns:
             S2SAbsSumDataset
@@ -858,12 +871,6 @@ class S2SAbstractiveSummarizer(Transformer):
                 tokenizer.convert_tokens_to_ids,
                 self.max_seq_length,
                 max_tgt_length=max_tgt_length,
-                # new_segment_ids=new_segment_ids,
-                # mode=s2s_config.mode,
-                # num_qkv=s2s_config.num_qkv,
-                # s2s_special_token=s2s_config.s2s_special_token,
-                # s2s_add_segment=s2s_config.s2s_add_segment,
-                # s2s_share_segment=s2s_config.s2s_share_segment,
                 pos_shift=s2s_config.pos_shift,
                 source_type_id=self.model_config.source_type_id,
                 target_type_id=self.model_config.target_type_id,
@@ -909,7 +916,6 @@ class S2SAbstractiveSummarizer(Transformer):
         else:
             state_dict = self.model.state_dict()
         
-        hidden_size = 768
         bert_config = None
         if self._model_type == "minilm":
             bert_config = s2s_ft.modeling_decoding.BertConfig(
@@ -919,14 +925,12 @@ class S2SAbstractiveSummarizer(Transformer):
                     intermediate_size=1536, 
                     max_position_embeddings=self.max_seq_length,)
 
-        elif self._model_type == "unilm":
+        else: # self._model_type == "unilm":
             bert_config = s2s_ft.modeling_decoding.BertConfig(
                     len(list(vocab.keys())) if not is_roberta else 50265,
                     type_vocab_size=type_vocab_size,
                     max_position_embeddings=self.max_seq_length,)
-            #UnilmConfig()
 
-        # ??? # customize this for Robertta
        
         model = BertForSeq2SeqDecoder.from_pretrained(
             self._bert_model_name,
@@ -945,8 +949,6 @@ class S2SAbstractiveSummarizer(Transformer):
             mode=s2s_config.mode,
             max_position_embeddings=self.max_seq_length,
             pos_shift=s2s_config.pos_shift,
-            #num_labels=cls_num_labels,
-            #num_rel=pair_num_relation,
         )
 
         del state_dict
