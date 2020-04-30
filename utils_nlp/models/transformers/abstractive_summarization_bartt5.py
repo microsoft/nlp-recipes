@@ -33,7 +33,11 @@ from utils_nlp.common.pytorch_utils import (
     parallelize_model,
 )
 from utils_nlp.eval import compute_rouge_python
-from utils_nlp.models.transformers.common import TOKENIZER_CLASS, Transformer
+from utils_nlp.models.transformers.common import Transformer
+# from utils_nlp.models.transformers.common import TOKENIZER_CLASS
+
+
+
 
 #from transformers.modeling_bart import BART_PRETRAINED_MODEL_ARCHIVE_MAP
 
@@ -48,41 +52,37 @@ MODEL_MODES = {
     "language-modeling": AutoModelWithLMHead,
 }
 
+from transformers import BartForConditionalGeneration, BartTokenizer
+from transformers import T5ForConditionalGeneration, T5Tokenizer
+
+MODEL_CLASS = {
+    "bart-large-cnn": BartForConditionalGeneration,
+    "t5-large":T5ForConditionalGeneration
+}
+TOKENIZER_CLASS = {
+    "bart-large-cnn": BartTokenizer,
+    "t5-large":  T5Tokenizer
+}
+
 logger = logging.getLogger(__name__)
 
 
 import os
-
 import torch
 from torch.utils.data import Dataset
 
 from transformers.tokenization_utils import trim_batch
 
-
-def encode_file(tokenizer, data_path, max_length, pad_to_max_length=True, return_tensors="pt"):
-    examples = []
-    with open(data_path, "r") as f:
-        for text in f.readlines():
-            tokenized = tokenizer.batch_encode_plus(
-                [text], max_length=max_length, pad_to_max_length=pad_to_max_length, return_tensors=return_tensors,
-            )
-            examples.append(tokenized)
-    return examples
-
-def encode_example(example, tokenizer=None, max_source_length=None, max_target_length=None, pad_to_max_length=True, return_tensors="pt"):
-    #examples = []
-    #with open(data_path, "r") as f:
-    #    for text in f.readlines():
-    #for text in text_lines:
+def encode_example(example, tokenizer=None, prefix="", max_source_length=None, max_target_length=None, pad_to_max_length=True, return_tensors="pt"):
     ## add to the dataset
     tokenized_source = tokenizer.batch_encode_plus(
-        [example['src']], max_length=max_source_length, pad_to_max_length=pad_to_max_length, return_tensors=return_tensors,
+        [prefix + example['src']], max_length=max_source_length, pad_to_max_length=pad_to_max_length, return_tensors=return_tensors,
     )
 
     source_ids = tokenized_source["input_ids"].squeeze()
     src_mask = tokenized_source["attention_mask"].squeeze()
     example["source_ids"] = source_ids
-    example["src_mask"] = src_mask
+    example["source_mask"] = src_mask
     if 'tgt' in example: 
         tokenized_target = tokenizer.batch_encode_plus(
         [example['tgt']], max_length=max_target_length, pad_to_max_length=pad_to_max_length, return_tensors=return_tensors,
@@ -127,13 +127,27 @@ def parallel_preprocess(input_data, preprocess, num_pool=-1):
 class SummarizationProcessor:
     def __init__(
         self,
-        tokenizer,
-        #with_target=False,
+        model_name,
+        cache_dir="./",
         max_source_length=1024,
         max_target_length=56,
     ):
         #super().__init__()
-        self.tokenizer = tokenizer
+        self.tokenizer = TOKENIZER_CLASS[model_name].from_pretrained(model_name, cache_dir=cache_dir) # b
+        config = AutoConfig.from_pretrained(
+            model_name,
+            #self.hparams.config_name if self.hparams.config_name else self.hparams.model_name_or_path,
+            #**({"num_labels": num_labels} if num_labels is not None else {}),
+            cache_dir=cache_dir,
+            #**config_kwargs,
+        )
+        if model_name.startswith("t5"):
+        # update config with summarization specific params
+            task_specific_params = config.task_specific_params
+            if task_specific_params is not None:
+                config.update(task_specific_params.get("summarization", {}))
+
+        self.prefix = config.prefix
         #self.source = source_examples #encode_file(tokenizer, os.path.join(data_dir, type_path + ".source"), max_source_length)
         self.with_target = False
         self.max_source_length = max_source_length
@@ -144,7 +158,7 @@ class SummarizationProcessor:
 
     def preprocess(self, input_data_list):
         preprocess = functools.partial(
-            encode_example, tokenizer=self.tokenizer,  max_source_length=self.max_source_length, max_target_length=self.max_target_length
+            encode_example, tokenizer=self.tokenizer, prefix=self.prefix,  max_source_length=self.max_source_length, max_target_length=self.max_target_length
         )
         
         return parallel_preprocess(input_data_list, preprocess, num_pool=-1)
@@ -155,17 +169,17 @@ class SummarizationProcessor:
         source_ids, source_mask = trim_batch(batch["source_ids"], pad_token_id, attention_mask=batch["source_mask"])
         return source_ids, source_mask, y
 
-    def collate_fn(self, batch, with_target=False):
+    def collate_fn(self, batch, device, train_mode=False):
         input_ids = torch.stack([x["source_ids"] for x in batch])
         masks = torch.stack([x["source_mask"] for x in batch])
         pad_token_id = self.tokenizer.pad_token_id
         source_ids, source_mask = trim_batch(input_ids, pad_token_id, attention_mask=masks)
-        if with_target:
+        if train_mode:
             target_ids = torch.stack([x["target_ids"] for x in batch])
             y = trim_batch(target_ids, pad_token_id)
-            return {"source_ids": source_ids, "source_mask": source_mask, "target_ids": y}
+            return {"source_ids": source_ids.to(device), "source_mask": source_mask.to(device), "target_ids": y.to(device)}
         else:
-            return {"source_ids": source_ids, "source_mask": source_mask}
+            return {"source_ids": source_ids.to(device), "source_mask": source_mask.to(device)}
 
 
 class AbstractiveSummarizer(Transformer):
@@ -174,7 +188,8 @@ class AbstractiveSummarizer(Transformer):
 
     def __init__(
         self,
-        model_name="bert-base-uncased",
+        processor,
+        model_name="bart-large-cnn",
         cache_dir=".",
         max_source_length=1024,
         max_target_length=240
@@ -190,12 +205,13 @@ class AbstractiveSummarizer(Transformer):
                 input. Defaults to 768.
         """
 
-        super().__init__(
+        """super().__init__(
             model_class=AutoModelWithLMHead,
             model_name=model_name,
             num_labels=0,
             cache_dir=cache_dir,
         )
+        """
         """
         if model_name not in self.list_supported_models():
             raise ValueError(
@@ -204,6 +220,7 @@ class AbstractiveSummarizer(Transformer):
                 "names.".format(value)
             )
         """
+        self.processor = processor
         self.config = AutoConfig.from_pretrained(
             model_name,
             #self.hparams.config_name if self.hparams.config_name else self.hparams.model_name_or_path,
@@ -218,7 +235,8 @@ class AbstractiveSummarizer(Transformer):
             cache_dir=cache_dir,
         )
 
-        self.model = MODEL_MODES[mode].from_pretrained(
+        self._model_name = model_name
+        self.model = MODEL_MODES["language-modeling"].from_pretrained(
             self.model_name,
             #from_tf=bool(".ckpt" in self.hparams.model_name_or_path),
             config=self.config,
@@ -230,9 +248,10 @@ class AbstractiveSummarizer(Transformer):
         self.max_source_length = max_source_length
         self.max_target_length = max_target_length
 
+
     @staticmethod
     def list_supported_models():
-        return list(MODEL_CLASS.keys())
+        return list(MODEL_CLASS)
 
     def fit(
         self,
@@ -459,29 +478,12 @@ class AbstractiveSummarizer(Transformer):
             num_gpus=num_gpus, gpu_ids=gpu_ids, local_rank=local_rank
         )
 
-        # move model to devices
-        def this_model_move_callback(model, device):
-            model = move_model_to_device(model, device)
-            return parallelize_model(
-                model, device, num_gpus=num_gpus, gpu_ids=gpu_ids, local_rank=local_rank
-            )
-
         if fp16:
             self.model = self.model.half()
 
         self.model = move_model_to_device(self.model, device)
         self.model.eval()
 
-        predictor = build_predictor(
-            self.processor.tokenizer,
-            self.processor.symbols,
-            self.model,
-            alpha=alpha,
-            beam_size=beam_size,
-            min_length=min_length,
-            max_length=max_length,
-        )
-        predictor = this_model_move_callback(predictor, device)
         self.model = parallelize_model(
             self.model,
             device,
@@ -493,8 +495,8 @@ class AbstractiveSummarizer(Transformer):
         test_sampler = SequentialSampler(test_dataset)
 
         def collate_fn(data):
-            return self.processor.collate(
-                data, self.max_pos_length, device, train_mode=False
+            return self.processor.collate_fn(
+                data, device, train_mode=False
             )
 
         test_dataloader = DataLoader(
@@ -504,52 +506,23 @@ class AbstractiveSummarizer(Transformer):
             collate_fn=collate_fn,
         )
         print("dataset length is {}".format(len(test_dataset)))
-
-        def format_summary(translation):
-            """ Transforms the output of the `from_batch` function
-            into nicely formatted summaries.
-            """
-            raw_summary = translation
-            summary = (
-                raw_summary.replace("[unused0]", "")
-                .replace("[unused3]", "")
-                .replace("[CLS]", "")
-                .replace("[SEP]", "")
-                .replace("[PAD]", "")
-                .replace("[unused1]", "")
-                .replace(r" +", " ")
-                .replace(" [unused2] ", ".")
-                .replace("[unused2]", "")
-                .strip()
-            )
-
-            return summary
-
-        def generate_summary_from_tokenid(preds, pred_score):
-            batch_size = preds.size()[0]  # batch.batch_size
-            translations = []
-            for b in range(batch_size):
-                if len(preds[b]) < 1:
-                    pred_sents = ""
-                else:
-                    pred_sents = self.processor.tokenizer.convert_ids_to_tokens(
-                        [int(n) for n in preds[b] if int(n) != 0]
-                    )
-                    pred_sents = " ".join(pred_sents).replace(" ##", "")
-                translations.append(pred_sents)
-            return translations
-
         generated_summaries = []
 
         for batch in tqdm(
             test_dataloader, desc="Generating summary", disable=not verbose
         ):
-            input = self.processor.get_inputs(batch, device, "bert", train_mode=False)
-            translations, scores = predictor(**input)
-
-            translations_text = generate_summary_from_tokenid(translations, scores)
-            summaries = [format_summary(t) for t in translations_text]
-            generated_summaries.extend(summaries)
+            #if self.model_name.startswith("t5"):
+            #    batch = [self.model.config.prefix + text for text in batch]
+            #dct = self.tokenizer.batch_encode_plus(batch, max_length=1024, return_tensors="pt", pad_to_max_length=True)
+            print(batch)
+            summaries = self.model.module.generate(
+                input_ids=batch["source_ids"],
+                attention_mask=batch["source_mask"],
+                min_length=min_length,
+                max_length=max_length
+            )
+            decoded_summaries = [self.tokenizer.decode(g, skip_special_tokens=True, clean_up_tokenization_spaces=False) for g in summaries]
+            generated_summaries.extend(decoded_summaries)
 
         # release GPU memories
         self.model.cpu()
