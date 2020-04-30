@@ -302,7 +302,7 @@ def parallel_preprocess(input_data, preprocess, num_pool=-1):
     p = Pool(num_pool)
 
     results = p.map(
-        preprocess, input_data, chunksize=min(1, int(len(input_data) / num_pool)),
+        preprocess, input_data, chunksize=max(1, int(len(input_data) / num_pool)),
     )
     p.close()
     p.join()
