@@ -21,6 +21,7 @@ from torch.utils.data import (
 )
 import torch.multiprocessing
 torch.multiprocessing.set_sharing_strategy('file_system')
+from torch import nn
 
 from torch.utils.data.distributed import DistributedSampler
 from transformers import BertModel
@@ -123,6 +124,30 @@ def parallel_preprocess(input_data, preprocess, num_pool=-1):
 
     return results
 
+class Predictor(nn.Module):
+    def __init__(
+        self,
+        model,
+        tokenizer,
+        min_length,
+        max_length):
+        super(Translator, self).__init__()
+        self.model = model.module if hasattr(model, "module") else model
+        self.tokenizer = tokenizer
+        self.min_length = min_length
+        self.max_length = max_length
+        
+    def forward(self, src, src_mask):
+        device = src.device
+        with torch.no_grad():
+            summaries = self.model.generate(
+                input_ids=src,
+                attention_mask=src_mask,
+                min_length=min_length,
+                max_length=max_length
+            )
+            decoded_summaries = [self.tokenizer.decode(g, skip_special_tokens=True, clean_up_tokenization_spaces=False) for g in summaries]
+            return decoded_summaries
 
 class SummarizationProcessor:
     def __init__(
@@ -506,6 +531,16 @@ class AbstractiveSummarizer(Transformer):
             collate_fn=collate_fn,
         )
         print("dataset length is {}".format(len(test_dataset)))
+
+        predictor = Predictor(self.model, self.tokenizer, min_length, max_length)
+        # move model to devices
+        def this_model_move_callback(model, device):
+            model = move_model_to_device(model, device)
+            return parallelize_model(
+                model, device, num_gpus=num_gpus, gpu_ids=gpu_ids, local_rank=local_rank
+            )
+        predictor = this_model_move_callback(predictor, device)
+
         generated_summaries = []
 
         for batch in tqdm(
@@ -515,6 +550,8 @@ class AbstractiveSummarizer(Transformer):
             #    batch = [self.model.config.prefix + text for text in batch]
             #dct = self.tokenizer.batch_encode_plus(batch, max_length=1024, return_tensors="pt", pad_to_max_length=True)
             print(batch)
+            decoded_summaries = predictor(batch["source_ids"], batch["source_mask"])
+            """
             summaries = self.model.module.generate(
                 input_ids=batch["source_ids"],
                 attention_mask=batch["source_mask"],
@@ -522,6 +559,7 @@ class AbstractiveSummarizer(Transformer):
                 max_length=max_length
             )
             decoded_summaries = [self.tokenizer.decode(g, skip_special_tokens=True, clean_up_tokenization_spaces=False) for g in summaries]
+            """
             generated_summaries.extend(decoded_summaries)
 
         # release GPU memories
