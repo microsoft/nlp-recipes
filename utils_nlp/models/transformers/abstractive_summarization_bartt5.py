@@ -131,7 +131,7 @@ class Predictor(nn.Module):
         tokenizer,
         min_length,
         max_length):
-        super(Translator, self).__init__()
+        super(Predictor, self).__init__()
         self.model = model.module if hasattr(model, "module") else model
         self.tokenizer = tokenizer
         self.min_length = min_length
@@ -143,11 +143,23 @@ class Predictor(nn.Module):
             summaries = self.model.generate(
                 input_ids=src,
                 attention_mask=src_mask,
-                min_length=min_length,
-                max_length=max_length
+                min_length=self.min_length,
+                max_length=self.max_length
             )
-            decoded_summaries = [self.tokenizer.decode(g, skip_special_tokens=True, clean_up_tokenization_spaces=False) for g in summaries]
-            return decoded_summaries
+            print(summaries)
+            predictions = torch.tensor(
+            [
+                i.tolist()[0 : self.max_length]
+                + [0] * (self.max_length - i.size()[0])
+                for i in summaries
+            ],
+            device=device,
+        )
+
+            return predictions
+            #decoded_summaries = [self.tokenizer.decode(g, skip_special_tokens=True, clean_up_tokenization_spaces=False) for g in summaries]
+            #print(decoded_summaries)
+            #return decoded_summaries
 
 class SummarizationProcessor:
     def __init__(
@@ -549,8 +561,8 @@ class AbstractiveSummarizer(Transformer):
             #if self.model_name.startswith("t5"):
             #    batch = [self.model.config.prefix + text for text in batch]
             #dct = self.tokenizer.batch_encode_plus(batch, max_length=1024, return_tensors="pt", pad_to_max_length=True)
-            print(batch)
-            decoded_summaries = predictor(batch["source_ids"], batch["source_mask"])
+            # print(batch)
+            summaries = predictor(batch["source_ids"], batch["source_mask"])
             """
             summaries = self.model.module.generate(
                 input_ids=batch["source_ids"],
@@ -558,8 +570,9 @@ class AbstractiveSummarizer(Transformer):
                 min_length=min_length,
                 max_length=max_length
             )
-            decoded_summaries = [self.tokenizer.decode(g, skip_special_tokens=True, clean_up_tokenization_spaces=False) for g in summaries]
             """
+            decoded_summaries = [self.tokenizer.decode(g, skip_special_tokens=True, clean_up_tokenization_spaces=False) for g in summaries]
+            
             generated_summaries.extend(decoded_summaries)
 
         # release GPU memories
