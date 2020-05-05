@@ -7,15 +7,16 @@ from collections import Iterable
 import numpy as np
 import torch
 from torch.utils.data import TensorDataset
-from transformers.modeling_bert import (
+from transformers import (
     BERT_PRETRAINED_MODEL_ARCHIVE_MAP,
-    BertForTokenClassification,
-)
-from transformers.modeling_distilbert import (
     DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP,
+    ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP,
+    XLM_ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP,
+    BertForTokenClassification,
     DistilBertForTokenClassification,
+    RobertaForTokenClassification,
+    XLMRobertaForTokenClassification,
 )
-
 from utils_nlp.common.pytorch_utils import compute_training_steps
 from utils_nlp.models.transformers.common import (
     MAX_SEQ_LEN,
@@ -31,6 +32,15 @@ TC_MODEL_CLASS.update(
     {
         k: DistilBertForTokenClassification
         for k in DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP
+    }
+)
+TC_MODEL_CLASS.update(
+    {k: RobertaForTokenClassification for k in ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP}
+)
+TC_MODEL_CLASS.update(
+    {
+        k: XLMRobertaForTokenClassification
+        for k in XLM_ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP
     }
 )
 
@@ -77,7 +87,7 @@ class TokenClassificationProcessor:
                 Labels are only returned when train_mode is True.
         """
         batch = tuple(t.to(device) for t in batch)
-        if model_name.split("-")[0] in ["bert", "distilbert"]:
+        if model_name in list(TC_MODEL_CLASS):
             if train_mode:
                 inputs = {
                     "input_ids": batch[0],
@@ -110,14 +120,12 @@ class TokenClassificationProcessor:
             dict: A dictionary object to map a label (str) to an ID (int).
         """
 
-        label_set = set()
-        for labels in label_lists:
-            label_set.update(labels)
+        unique_labels = sorted(set([x for y in label_lists for x in y]))
+        label_map = {label: i for i, label in enumerate(unique_labels)}
 
-        label_map = {label: i for i, label in enumerate(label_set)}
+        if trailing_piece_tag not in unique_labels:
+            label_map[trailing_piece_tag] = len(unique_labels)
 
-        if trailing_piece_tag not in label_set:
-            label_map[trailing_piece_tag] = len(label_set)
         return label_map
 
     def preprocess_for_bert(
@@ -187,6 +195,10 @@ class TokenClassificationProcessor:
             )
             max_len = MAX_SEQ_LEN
 
+        logging.warn(
+            "Token lists with length > {} will be truncated".format(MAX_SEQ_LEN)
+        )
+
         if not _is_iterable_but_not_string(text):
             # The input text must be an non-string Iterable
             raise ValueError("Input text must be an iterable and not a string.")
@@ -233,11 +245,6 @@ class TokenClassificationProcessor:
                     new_tokens.append(sub_word)
 
             if len(new_tokens) > max_len:
-                logging.warn(
-                    "Text after tokenization with length {} has been truncated".format(
-                        len(new_tokens)
-                    )
-                )
                 new_tokens = new_tokens[:max_len]
                 new_labels = new_labels[:max_len]
             input_ids = self.tokenizer.convert_tokens_to_ids(new_tokens)
@@ -398,7 +405,9 @@ class TokenClassifier(Transformer):
 
         # init scheduler
         scheduler = Transformer.get_default_scheduler(
-            optimizer=self.optimizer, warmup_steps=warmup_steps, num_training_steps=max_steps
+            optimizer=self.optimizer,
+            warmup_steps=warmup_steps,
+            num_training_steps=max_steps,
         )
 
         # fine tune

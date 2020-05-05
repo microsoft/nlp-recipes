@@ -13,20 +13,33 @@ import time
 import numpy as np
 import torch
 from tqdm import tqdm
-from transformers import AdamW, get_linear_schedule_with_warmup
-from transformers.modeling_bert import BERT_PRETRAINED_MODEL_ARCHIVE_MAP
-from transformers.modeling_distilbert import DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP
-from transformers.modeling_roberta import ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP
-from transformers.modeling_xlnet import XLNET_PRETRAINED_MODEL_ARCHIVE_MAP
-from transformers.tokenization_bert import BertTokenizer
-from transformers.tokenization_distilbert import DistilBertTokenizer
-from transformers.tokenization_roberta import RobertaTokenizer
-from transformers.tokenization_xlnet import XLNetTokenizer
+from transformers import (
+    ALBERT_PRETRAINED_MODEL_ARCHIVE_MAP,
+    BART_PRETRAINED_MODEL_ARCHIVE_MAP,
+    BERT_PRETRAINED_MODEL_ARCHIVE_MAP,
+    CAMEMBERT_PRETRAINED_MODEL_ARCHIVE_MAP,
+    DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP,
+    ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP,
+    XLM_PRETRAINED_MODEL_ARCHIVE_MAP,
+    XLM_ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP,
+    XLNET_PRETRAINED_MODEL_ARCHIVE_MAP,
+    AdamW,
+    AlbertTokenizer,
+    BartTokenizer,
+    BertTokenizer,
+    CamembertTokenizer,
+    DistilBertTokenizer,
+    RobertaTokenizer,
+    XLMRobertaTokenizer,
+    XLMTokenizer,
+    XLNetTokenizer,
+    get_linear_schedule_with_warmup,
+)
 
 from utils_nlp.common.pytorch_utils import (
+    get_amp,
     get_device,
     move_model_to_device,
-    get_amp,
     parallelize_model,
 )
 
@@ -39,6 +52,18 @@ TOKENIZER_CLASS.update({k: XLNetTokenizer for k in XLNET_PRETRAINED_MODEL_ARCHIV
 TOKENIZER_CLASS.update(
     {k: DistilBertTokenizer for k in DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP}
 )
+TOKENIZER_CLASS.update({k: BartTokenizer for k in BART_PRETRAINED_MODEL_ARCHIVE_MAP})
+TOKENIZER_CLASS.update({k: XLMTokenizer for k in XLM_PRETRAINED_MODEL_ARCHIVE_MAP})
+TOKENIZER_CLASS.update(
+    {k: AlbertTokenizer for k in ALBERT_PRETRAINED_MODEL_ARCHIVE_MAP}
+)
+TOKENIZER_CLASS.update(
+    {k: XLMRobertaTokenizer for k in XLM_ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP}
+)
+TOKENIZER_CLASS.update(
+    {k: CamembertTokenizer for k in CAMEMBERT_PRETRAINED_MODEL_ARCHIVE_MAP}
+)
+
 
 MAX_SEQ_LEN = 512
 
@@ -54,7 +79,6 @@ class Transformer:
         cache_dir=".",
         load_model_from_dir=None,
     ):
-
         if model_name not in self.list_supported_models():
             raise ValueError(
                 "Model name {0} is not supported by {1}. "
@@ -241,7 +265,8 @@ class Transformer:
                 if isinstance(outputs, tuple):
                     loss = outputs[0]
                 else:
-                    # Accomondate models based on older versions of Transformers, e.g. UniLM
+                    # Accomondate models based on older versions of Transformers,
+                    # e.g. UniLM
                     loss = outputs
 
                 if num_gpus > 1:
@@ -327,7 +352,7 @@ class Transformer:
                     break
         if fp16 and amp:
             self.amp_state_dict = amp.state_dict()
-        
+
         # release GPU memories
         self.model.cpu()
         torch.cuda.empty_cache()
