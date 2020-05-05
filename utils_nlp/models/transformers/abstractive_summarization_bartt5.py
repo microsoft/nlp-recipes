@@ -53,17 +53,18 @@ MODEL_MODES = {
     "language-modeling": AutoModelWithLMHead,
 }
 
-from transformers import BartForConditionalGeneration, BartTokenizer
-from transformers import T5ForConditionalGeneration, T5Tokenizer
+from transformers import BartForConditionalGeneration, BartTokenizer, BART_PRETRAINED_MODEL_ARCHIVE_MAP 
+from transformers import T5ForConditionalGeneration, T5Tokenizer, T5_PRETRAINED_MODEL_ARCHIVE_MAP 
 
-MODEL_CLASS = {
-    "bart-large-cnn": BartForConditionalGeneration,
-    "t5-large":T5ForConditionalGeneration
-}
-TOKENIZER_CLASS = {
-    "bart-large-cnn": BartTokenizer,
-    "t5-large":  T5Tokenizer
-}
+MODEL_CLASS = {}
+MODEL_CLASS.update({k: BartForConditionalGeneration for k in BART_PRETRAINED_MODEL_ARCHIVE_MAP})
+MODEL_CLASS.update({k: T5ForConditionalGeneration for k in T5_PRETRAINED_MODEL_ARCHIVE_MAP})
+
+"""
+TOKENIZER_CLASS = {}
+TOKENIZER_CLASS.update({k: BartTokenizer for k in BART_PRETRAINED_MODEL_ARCHIVE_MAP })
+TOKENIZER_CLASS.update({k: T5Tokenizer for k in T5_PRETRAINED_MODEL_ARCHIVE_MAP})
+"""
 
 logger = logging.getLogger(__name__)
 
@@ -137,7 +138,13 @@ class SummarizationProcessor:
         max_target_length=56,
     ):
         #super().__init__()
-        self.tokenizer = TOKENIZER_CLASS[model_name].from_pretrained(model_name, cache_dir=cache_dir) # b
+        self.tokenizer =  AutoTokenizer.from_pretrained(
+            model_name,
+            #self.hparams.tokenizer_name if self.hparams.tokenizer_name else self.hparams.model_name_or_path,
+            cache_dir=cache_dir,
+        )
+        
+        #TOKENIZER_CLASS[model_name].from_pretrained(model_name, cache_dir=cache_dir) # b
         config = AutoConfig.from_pretrained(
             model_name,
             #self.hparams.config_name if self.hparams.config_name else self.hparams.model_name_or_path,
@@ -152,13 +159,9 @@ class SummarizationProcessor:
                 config.update(task_specific_params.get("summarization", {}))
 
         self.prefix = config.prefix
-        #self.source = source_examples #encode_file(tokenizer, os.path.join(data_dir, type_path + ".source"), max_source_length)
         self.with_target = False
         self.max_source_length = max_source_length
         self.max_target_length = max_target_length
-        #if with_target:
-        #    self.with_target = True
-        #    self.target = source_examples #encode_file(tokenizer, os.path.join(data_dir, type_path + ".target"), max_target_length)
 
     def preprocess(self, input_data_list):
         result = []
@@ -166,13 +169,26 @@ class SummarizationProcessor:
             result.append(encode_example(i, tokenizer=self.tokenizer, prefix=self.prefix,  
             max_source_length=self.max_source_length, max_target_length=self.max_target_length ))
         return result
-               
-
+    
     @staticmethod
-    def trim_seq2seq_batch(batch, pad_token_id):
-        y = trim_batch(batch["target_ids"], pad_token_id)
-        source_ids, source_mask = trim_batch(batch["source_ids"], pad_token_id, attention_mask=batch["source_mask"])
-        return source_ids, source_mask, y
+    def get_inputs(batch, device, model_name, tokenizer=None, train_mode=True):
+        pad_token_id = tokenizer.pad_token_id
+        source_ids, source_mask, y = batch["source_ids"], batch["source_mask"], batch["target_ids"]
+        y_ids = y[:, :-1].contiguous()
+        lm_labels = y[:, 1:].clone()
+        lm_labels[y[:, 1:] == pad_token_id] = -100
+        #outputs = self(source_ids, attention_mask=source_mask, decoder_input_ids=y_ids, lm_labels=lm_labels,)
+
+        if train_mode:
+            return {"input_ids": source_ids, 
+                    "attention_mask": source_mask, 
+                    "decoder_input_ids": y_ids,
+                    "lm_labels": lm_labels
+            }
+        else:
+            return {"input_ids": source_ids, 
+                    "attention_mask": source_mask,
+            }
 
     def collate_fn(self, batch, device, train_mode=False):
         input_ids = torch.stack([x["source_ids"] for x in batch])
@@ -193,8 +209,8 @@ class AbstractiveSummarizer(Transformer):
 
     def __init__(
         self,
-        processor,
-        model_name="bart-large-cnn",
+        #processor,
+        model_name="bart-large",
         cache_dir=".",
         max_source_length=1024,
         max_target_length=240
@@ -225,7 +241,7 @@ class AbstractiveSummarizer(Transformer):
                 "names.".format(value)
             )
         """
-        self.processor = processor
+        self.processor = SummarizationProcessor(model_name, cache_dir, max_source_length, max_target_length)
         self.config = AutoConfig.from_pretrained(
             model_name,
             #self.hparams.config_name if self.hparams.config_name else self.hparams.model_name_or_path,
@@ -253,6 +269,9 @@ class AbstractiveSummarizer(Transformer):
         self.max_source_length = max_source_length
         self.max_target_length = max_target_length
 
+        self.amp = None
+        self.optimizer = None
+        self.scheduler = None
 
     @staticmethod
     def list_supported_models():
@@ -351,7 +370,7 @@ class AbstractiveSummarizer(Transformer):
         """
 
         # move model to devices
-        print("device is {}".format(device))
+        checkpoint_state_dict = None
         if checkpoint:
             # checkpoint should have "model", "optimizer", "amp"
             checkpoint_state_dict = torch.load(checkpoint, map_location="cpu") 
@@ -366,11 +385,13 @@ class AbstractiveSummarizer(Transformer):
             weight_decay=weight_decay,
             learning_rate=learning_rate,
             adam_epsilon=adam_epsilon,
-            checkpoint_state_dict=checkpoint_state_dict,
+            # checkpoint_state_dict=checkpoint_state_dict,
         )
+
+        self.amp = amp
        
         global_step = 0
-        if "global_step" in checkpoint_state_dict and checkpoint_state_dict["global_step"]:
+        if checkpoint_state_dict and "global_step" in checkpoint_state_dict and checkpoint_state_dict["global_step"]:
             global_step = checkpoint_state_dict["global_step"] / world_size
             print("global_step is {}".format(global_step))
 
@@ -389,10 +410,12 @@ class AbstractiveSummarizer(Transformer):
                 train_dataset, num_replicas=world_size, rank=rank
             )
 
+
         def collate_fn(data):
-            return self.processor.collate(
-                data, block_size=self.max_pos_length, device=device
+            return self.processor.collate_fn(
+                data, device, train_mode=True
             )
+
 
         train_dataloader = DataLoader(
             train_dataset,
@@ -407,10 +430,11 @@ class AbstractiveSummarizer(Transformer):
             max_steps=max_steps,
             gradient_accumulation_steps=gradient_accumulation_steps,
         )
-
+        import functools
+        get_inputs = functools.partial(self.processor.get_inputs, tokenizer=self.processor.tokenizer)
         super().fine_tune(
             train_dataloader=train_dataloader,
-            get_inputs=xxxx.get_inputs,
+            get_inputs=get_inputs,
             device=device,
             num_gpus=num_gpus,
             max_steps=max_steps,
@@ -421,12 +445,11 @@ class AbstractiveSummarizer(Transformer):
             seed=seed,
             report_every=report_every,
             save_every=save_every,
-            clip_grad_norm=False,
-            optimizer=optimizers,
-            scheduler=None,
+            optimizer=self.optimizer,
+            scheduler=self.scheduler,
             fp16=fp16,
-            amp=self.amp,
-            validation_function=validation_function,
+            amp=amp,
+            validation_function=None,
         )
 
         # release GPU memories
@@ -572,18 +595,20 @@ class AbstractiveSummarizer(Transformer):
             output_model_dir = os.path.join(self.cache_dir, "fine_tuned")
             os.makedirs(self.cache_dir, exist_ok=True)
             os.makedirs(output_model_dir, exist_ok=True)
-            full_name = os.path.join(output_model_dir, "bertsumabs.pt")
+            full_name = os.path.join(output_model_dir, "abssum_{}.pt".format(self.model_name))
         else:
             path, filename = os.path.split(full_name)
             print(path)
             os.makedirs(path, exist_ok=True)
 
         checkpoint = {
-            "optimizers": [self.optim_bert.state_dict(), self.optim_dec.state_dict()],
+            "optimizer": self.optimizer.state_dict(),
+            "lr_scheduler": self.scheduler.state_dict(),
             "model": model_to_save.state_dict(),
             "amp": self.amp.state_dict() if self.amp else None,
             "global_step": global_step,
-            "max_pos_length": self.max_pos_length,
+            "max_source_length": self.max_source_length,
+            "max_target_length": self.max_target_length,
         }
 
         logger.info("Saving model checkpoint to %s", full_name)
