@@ -74,7 +74,8 @@ from torch.utils.data import Dataset
 
 from transformers.tokenization_utils import trim_batch
 
-def encode_example(example, tokenizer=None, prefix="", max_source_length=None, max_target_length=None, pad_to_max_length=True, return_tensors="pt"):
+from tempfile import TemporaryDirectory
+def encode_example(example, tokenizer, prefix="", max_source_length=None, max_target_length=None, pad_to_max_length=True, return_tensors="pt"):
     ## add to the dataset
     tokenized_source = tokenizer.batch_encode_plus(
         [prefix + example['src']], max_length=max_source_length, pad_to_max_length=pad_to_max_length, return_tensors=return_tensors,
@@ -92,50 +93,19 @@ def encode_example(example, tokenizer=None, prefix="", max_source_length=None, m
         example["target_ids"] = target_ids
     return example
 
-def parallel_preprocess(input_data, preprocess, num_pool=-1):
-    """
-    Process data in parallel using multiple GPUs.
-
-    Args:
-        input_data (list): List if input strings to process.
-        preprocess (function): function to apply on the input data.
-        word_tokenize (func, optional): A tokenization function used to tokenize
-            the results from preprocess_pipeline.
-        num_pool (int, optional): Number of CPUs to use. Defaults to -1 and all
-            available CPUs are used.
-
-    Returns:
-        list: list of processed text strings.
-
-    """
-    if num_pool == -1:
-        num_pool = cpu_count()
-
-    num_pool = min(num_pool, len(input_data))
-
-    result = None
-    with Pool(num_pool) as p:
-        results = p.map(
-        preprocess, input_data, chunksize=max(1, int(len(input_data) / num_pool)),
-        )
-    
-    p.close()
-    #p.join()
-
-    return results
 
 class Predictor(nn.Module):
     def __init__(
         self,
         model,
-        tokenizer,
         min_length,
-        max_length):
+        max_length,
+        **kwargs):
         super(Predictor, self).__init__()
         self.model = model.module if hasattr(model, "module") else model
-        self.tokenizer = tokenizer
         self.min_length = min_length
         self.max_length = max_length
+        self.config = kwargs
         
     def forward(self, src, src_mask):
         device = src.device
@@ -144,9 +114,9 @@ class Predictor(nn.Module):
                 input_ids=src,
                 attention_mask=src_mask,
                 min_length=self.min_length,
-                max_length=self.max_length
+                max_length=self.max_length,
+                **self.config
             )
-            print(summaries)
             predictions = torch.tensor(
             [
                 i.tolist()[0 : self.max_length]
@@ -157,9 +127,6 @@ class Predictor(nn.Module):
         )
 
             return predictions
-            #decoded_summaries = [self.tokenizer.decode(g, skip_special_tokens=True, clean_up_tokenization_spaces=False) for g in summaries]
-            #print(decoded_summaries)
-            #return decoded_summaries
 
 class SummarizationProcessor:
     def __init__(
@@ -194,11 +161,12 @@ class SummarizationProcessor:
         #    self.target = source_examples #encode_file(tokenizer, os.path.join(data_dir, type_path + ".target"), max_target_length)
 
     def preprocess(self, input_data_list):
-        preprocess = functools.partial(
-            encode_example, tokenizer=self.tokenizer, prefix=self.prefix,  max_source_length=self.max_source_length, max_target_length=self.max_target_length
-        )
-        
-        return parallel_preprocess(input_data_list, preprocess, num_pool=-1)
+        result = []
+        for i in input_data_list:
+            result.append(encode_example(i, tokenizer=self.tokenizer, prefix=self.prefix,  
+            max_source_length=self.max_source_length, max_target_length=self.max_target_length ))
+        return result
+               
 
     @staticmethod
     def trim_seq2seq_batch(batch, pad_token_id):
@@ -474,10 +442,13 @@ class AbstractiveSummarizer(Transformer):
         gpu_ids=None,
         local_rank=-1,
         batch_size=16,
-        alpha=0.6,
-        beam_size=5,
-        min_length=15,
-        max_length=150,
+        length_penalty=0.95,
+        beam_size=4,
+        min_length=50,
+        max_length=200,
+        no_repeat_ngram_size=3,
+        early_stopping=True,
+        
         fp16=False,
         verbose=True,
     ):
@@ -544,7 +515,7 @@ class AbstractiveSummarizer(Transformer):
         )
         print("dataset length is {}".format(len(test_dataset)))
 
-        predictor = Predictor(self.model, self.tokenizer, min_length, max_length)
+        predictor = Predictor(self.model, min_length, max_length)
         # move model to devices
         def this_model_move_callback(model, device):
             model = move_model_to_device(model, device)
@@ -577,6 +548,7 @@ class AbstractiveSummarizer(Transformer):
 
         # release GPU memories
         self.model.cpu()
+        del batch
         torch.cuda.empty_cache()
 
         return generated_summaries
