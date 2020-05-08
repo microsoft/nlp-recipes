@@ -8,41 +8,20 @@ import numpy as np
 import torch
 from torch.utils.data import TensorDataset
 from transformers import (
-    BERT_PRETRAINED_MODEL_ARCHIVE_MAP,
-    DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP,
-    ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP,
-    XLM_ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP,
-    BertForTokenClassification,
-    DistilBertForTokenClassification,
-    RobertaForTokenClassification,
-    XLMRobertaForTokenClassification,
-)
-from utils_nlp.common.pytorch_utils import compute_training_steps
-from utils_nlp.models.transformers.common import (
-    MAX_SEQ_LEN,
-    TOKENIZER_CLASS,
-    Transformer,
+    MODEL_FOR_TOKEN_CLASSIFICATION_MAPPING,
+    AutoConfig,
+    AutoModelForTokenClassification,
+    AutoTokenizer,
 )
 
-TC_MODEL_CLASS = {}
-TC_MODEL_CLASS.update(
-    {k: BertForTokenClassification for k in BERT_PRETRAINED_MODEL_ARCHIVE_MAP}
-)
-TC_MODEL_CLASS.update(
-    {
-        k: DistilBertForTokenClassification
-        for k in DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP
-    }
-)
-TC_MODEL_CLASS.update(
-    {k: RobertaForTokenClassification for k in ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP}
-)
-TC_MODEL_CLASS.update(
-    {
-        k: XLMRobertaForTokenClassification
-        for k in XLM_ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP
-    }
-)
+from utils_nlp.common.pytorch_utils import compute_training_steps
+from utils_nlp.models.transformers.common import MAX_SEQ_LEN, Transformer
+
+supported_models = [
+    list(x.pretrained_config_archive_map)
+    for x in MODEL_FOR_TOKEN_CLASSIFICATION_MAPPING
+]
+supported_models = sorted([x for y in supported_models for x in y])
 
 
 class TokenClassificationProcessor:
@@ -62,7 +41,7 @@ class TokenClassificationProcessor:
         self.model_name = model_name
         self.to_lower = to_lower
         self.cache_dir = cache_dir
-        self.tokenizer = TOKENIZER_CLASS[model_name].from_pretrained(
+        self.tokenizer = AutoTokenizer.from_pretrained(
             model_name,
             do_lower_case=to_lower,
             cache_dir=cache_dir,
@@ -78,7 +57,7 @@ class TokenClassificationProcessor:
             batch (tuple): A tuple containing input ids, attention mask,
                 segment ids, and labels tensors.
             device (torch.device): A PyTorch device.
-            model_name (bool, optional): Model name used to format the inputs.
+            model_name (bool): Model name used to format the inputs.
             train_mode (bool, optional): Training mode flag.
                 Defaults to True.
 
@@ -87,7 +66,7 @@ class TokenClassificationProcessor:
                 Labels are only returned when train_mode is True.
         """
         batch = tuple(t.to(device) for t in batch)
-        if model_name in list(TC_MODEL_CLASS):
+        if model_name in supported_models:
             if train_mode:
                 inputs = {
                     "input_ids": batch[0],
@@ -128,7 +107,7 @@ class TokenClassificationProcessor:
 
         return label_map
 
-    def preprocess_for_bert(
+    def preprocess(
         self,
         text,
         max_len=MAX_SEQ_LEN,
@@ -276,16 +255,16 @@ class TokenClassificationProcessor:
 
         if label_available:
             td = TensorDataset(
-                torch.tensor(input_ids_all, dtype=torch.long),
-                torch.tensor(input_mask_all, dtype=torch.long),
-                torch.tensor(trailing_token_mask_all, dtype=torch.long),
-                torch.tensor(label_ids_all, dtype=torch.long),
+                torch.LongTensor(input_ids_all),
+                torch.LongTensor(input_mask_all),
+                torch.LongTensor(trailing_token_mask_all),
+                torch.LongTensor(label_ids_all),
             )
         else:
             td = TensorDataset(
-                torch.tensor(input_ids_all, dtype=torch.long),
-                torch.tensor(input_mask_all, dtype=torch.long),
-                torch.tensor(trailing_token_mask_all, dtype=torch.long),
+                torch.LongTensor(input_ids_all),
+                torch.LongTensor(input_mask_all),
+                torch.LongTensor(trailing_token_mask_all),
             )
         return td
 
@@ -304,16 +283,17 @@ class TokenClassifier(Transformer):
     """
 
     def __init__(self, model_name="bert-base-cased", num_labels=2, cache_dir="."):
-        super().__init__(
-            model_class=TC_MODEL_CLASS,
-            model_name=model_name,
-            num_labels=num_labels,
-            cache_dir=cache_dir,
+        config = AutoConfig.from_pretrained(
+            model_name, num_labels=num_labels, cache_dir=cache_dir
         )
+        model = AutoModelForTokenClassification.from_pretrained(
+            model_name, cache_dir=cache_dir, config=config, output_loading_info=False
+        )
+        super().__init__(model_name=model_name, model=model)
 
     @staticmethod
     def list_supported_models():
-        return list(TC_MODEL_CLASS)
+        return supported_models
 
     def fit(
         self,
