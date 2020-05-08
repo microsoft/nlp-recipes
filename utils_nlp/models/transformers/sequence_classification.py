@@ -215,7 +215,7 @@ class SequenceClassifier(Transformer):
         model = AutoModelForSequenceClassification.from_pretrained(
             model_name, cache_dir=cache_dir, config=config, output_loading_info=False
         )
-        super().__init__(model_name=model_name, model=model)
+        super().__init__(model_name=model_name, model=model, cache_dir=cache_dir)
 
     @staticmethod
     def list_supported_models():

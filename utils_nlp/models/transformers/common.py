@@ -13,28 +13,7 @@ import time
 import numpy as np
 import torch
 from tqdm import tqdm
-from transformers import (
-    ALBERT_PRETRAINED_MODEL_ARCHIVE_MAP,
-    BART_PRETRAINED_MODEL_ARCHIVE_MAP,
-    BERT_PRETRAINED_MODEL_ARCHIVE_MAP,
-    CAMEMBERT_PRETRAINED_MODEL_ARCHIVE_MAP,
-    DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP,
-    ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP,
-    XLM_PRETRAINED_MODEL_ARCHIVE_MAP,
-    XLM_ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP,
-    XLNET_PRETRAINED_MODEL_ARCHIVE_MAP,
-    AdamW,
-    AlbertTokenizer,
-    BartTokenizer,
-    BertTokenizer,
-    CamembertTokenizer,
-    DistilBertTokenizer,
-    RobertaTokenizer,
-    XLMRobertaTokenizer,
-    XLMTokenizer,
-    XLNetTokenizer,
-    get_linear_schedule_with_warmup,
-)
+from transformers import AdamW, get_linear_schedule_with_warmup
 
 from utils_nlp.common.pytorch_utils import (
     get_amp,
@@ -42,28 +21,6 @@ from utils_nlp.common.pytorch_utils import (
     move_model_to_device,
     parallelize_model,
 )
-
-TOKENIZER_CLASS = {}
-TOKENIZER_CLASS.update({k: BertTokenizer for k in BERT_PRETRAINED_MODEL_ARCHIVE_MAP})
-TOKENIZER_CLASS.update(
-    {k: RobertaTokenizer for k in ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP}
-)
-TOKENIZER_CLASS.update({k: XLNetTokenizer for k in XLNET_PRETRAINED_MODEL_ARCHIVE_MAP})
-TOKENIZER_CLASS.update(
-    {k: DistilBertTokenizer for k in DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP}
-)
-TOKENIZER_CLASS.update({k: BartTokenizer for k in BART_PRETRAINED_MODEL_ARCHIVE_MAP})
-TOKENIZER_CLASS.update({k: XLMTokenizer for k in XLM_PRETRAINED_MODEL_ARCHIVE_MAP})
-TOKENIZER_CLASS.update(
-    {k: AlbertTokenizer for k in ALBERT_PRETRAINED_MODEL_ARCHIVE_MAP}
-)
-TOKENIZER_CLASS.update(
-    {k: XLMRobertaTokenizer for k in XLM_ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP}
-)
-TOKENIZER_CLASS.update(
-    {k: CamembertTokenizer for k in CAMEMBERT_PRETRAINED_MODEL_ARCHIVE_MAP}
-)
-
 
 MAX_SEQ_LEN = 512
 
@@ -73,34 +30,14 @@ logger = logging.getLogger(__name__)
 class Transformer:
     def __init__(
         self,
-        model_class,
-        model_name="bert-base-cased",
-        num_labels=2,
-        cache_dir=".",
-        load_model_from_dir=None,
+        model_name,
+        model,
+        cache_dir,
     ):
-        if model_name not in self.list_supported_models():
-            raise ValueError(
-                "Model name {0} is not supported by {1}. "
-                "Call '{1}.list_supported_models()' to get all supported model "
-                "names.".format(model_name, self.__class__.__name__)
-            )
         self._model_name = model_name
         self._model_type = model_name.split("-")[0]
+        self.model = model
         self.cache_dir = cache_dir
-        self.load_model_from_dir = load_model_from_dir
-        if load_model_from_dir is None:
-            self.model = model_class[model_name].from_pretrained(
-                model_name,
-                cache_dir=cache_dir,
-                num_labels=num_labels,
-                output_loading_info=False,
-            )
-        else:
-            logger.info("Loading cached model from {}".format(load_model_from_dir))
-            self.model = model_class[model_name].from_pretrained(
-                load_model_from_dir, num_labels=num_labels, output_loading_info=False
-            )
 
     @property
     def model_name(self):
@@ -342,7 +279,7 @@ class Transformer:
                         saved_model_path = os.path.join(
                             self.cache_dir, f"{self.model_name}_step_{global_step}.pt"
                         )
-                        self.save_model(global_step, saved_model_path)
+                        self.save_model(saved_model_path)
                         if validation_function:
                             validation_log = validation_function(self)
                             logger.info(validation_log)
