@@ -12,14 +12,20 @@ from multiprocessing import Pool, cpu_count
 
 import numpy as np
 import torch
-from torch.utils.data import (
-    DataLoader,
-    SequentialSampler,
-    RandomSampler,
-)
+from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
 from torch.utils.data.distributed import DistributedSampler
-from transformers import BertModel, DistilBertModel
+from transformers import AutoTokenizer, BertModel, DistilBertModel
 
+from utils_nlp.common.pytorch_utils import (
+    compute_training_steps,
+    get_device,
+    move_model_to_device,
+    parallelize_model,
+)
+from utils_nlp.dataset.sentence_selection import combination_selection, greedy_selection
+from utils_nlp.models.transformers.abstractive_summarization_bertsum import (
+    fit_to_block_size,
+)
 
 from utils_nlp.models.transformers.bertsum import model_builder
 from utils_nlp.models.transformers.bertsum.data_loader import (
@@ -32,17 +38,7 @@ from utils_nlp.models.transformers.bertsum.dataset import (
     ExtSumProcessedIterableDataset,
 )
 from utils_nlp.models.transformers.bertsum.model_builder import BertSumExt
-from utils_nlp.common.pytorch_utils import (
-    compute_training_steps,
-    get_device,
-    move_model_to_device,
-    parallelize_model,
-)
-from utils_nlp.dataset.sentence_selection import combination_selection, greedy_selection
-from utils_nlp.models.transformers.common import TOKENIZER_CLASS, Transformer
-from utils_nlp.models.transformers.abstractive_summarization_bertsum import (
-    fit_to_block_size,
-)
+from utils_nlp.models.transformers.common import Transformer
 
 MODEL_CLASS = {
     "bert-base-uncased": BertModel,
@@ -302,7 +298,7 @@ def parallel_preprocess(input_data, preprocess, num_pool=-1):
     p = Pool(num_pool)
 
     results = p.map(
-        preprocess, input_data, chunksize=min(1, int(len(input_data) / num_pool)),
+        preprocess, input_data, chunksize=min(1, int(len(input_data) / num_pool))
     )
     p.close()
     p.join()
@@ -347,8 +343,11 @@ class ExtSumProcessor:
 
         """
         self.model_name = model_name
-        self.tokenizer = TOKENIZER_CLASS[self.model_name].from_pretrained(
-            self.model_name, do_lower_case=to_lower, cache_dir=cache_dir
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            model_name,
+            do_lower_case=to_lower,
+            cache_dir=cache_dir,
+            output_loading_info=False,
         )
         self.sep_vid = self.tokenizer.vocab["[SEP]"]
         self.cls_vid = self.tokenizer.vocab["[CLS]"]
@@ -361,7 +360,7 @@ class ExtSumProcessor:
 
     @staticmethod
     def list_supported_models():
-        return list(TOKENIZER_CLASS.keys())
+        return list(MODEL_CLASS)
 
     @property
     def model_name(self):
@@ -389,7 +388,7 @@ class ExtSumProcessor:
                 text. If train_model is True, it also contains the labels and target
                 text.
             device (torch.device): A PyTorch device.
-            model_name (bool, optional): Model name used to format the inputs.
+            model_name (bool): Model name used to format the inputs.
             train_mode (bool, optional): Training mode flag.
                 Defaults to True.
 
@@ -500,7 +499,6 @@ class ExtSumProcessor:
 
         if len(src) == 0:
             raise ValueError("source doesn't have any sentences")
-            return None
 
         original_src_txt = [" ".join(s) for s in src]
         # no filtering for prediction
@@ -588,12 +586,11 @@ class ExtractiveSummarizer(Transformer):
                 Defaults to ".".
         """
 
-        super().__init__(
-            model_class=MODEL_CLASS,
-            model_name=model_name,
-            num_labels=0,
-            cache_dir=cache_dir,
+        model = MODEL_CLASS[model_name].from_pretrained(
+            model_name, cache_dir=cache_dir, num_labels=0, output_loading_info=False
         )
+        super().__init__(model_name=model_name, model=model, cache_dir=cache_dir)
+
         if model_name not in self.list_supported_models():
             raise ValueError(
                 "Model name {} is not supported by ExtractiveSummarizer. "
@@ -621,7 +618,7 @@ class ExtractiveSummarizer(Transformer):
 
     @staticmethod
     def list_supported_models():
-        return list(MODEL_CLASS.keys())
+        return list(MODEL_CLASS)
 
     def fit(
         self,

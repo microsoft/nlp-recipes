@@ -1,36 +1,34 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
-import os
 import json
 import logging
-from tqdm import tqdm
+import os
 import random
 
 import torch
-from torch.utils.data import DataLoader, SequentialSampler, Dataset
+from torch.utils.data import DataLoader, Dataset, SequentialSampler
 from torch.utils.data.distributed import DistributedSampler
+from tqdm import tqdm
+from transformers import BertConfig, RobertaConfig
 
-from transformers import RobertaConfig, BertConfig
-
-from utils_nlp.models.transformers.common import TOKENIZER_CLASS, Transformer
+import s2s_ft
+import s2s_ft.s2s_loader as seq2seq_loader
+from s2s_ft.config import BertForSeq2SeqConfig
+from s2s_ft.configuration_unilm import UNILM_PRETRAINED_CONFIG_ARCHIVE_MAP, UnilmConfig
+from s2s_ft.modeling import (
+    UNILM_PRETRAINED_MODEL_ARCHIVE_MAP,
+    BertForSequenceToSequence,
+)
+from s2s_ft.modeling_decoding import BertForSeq2SeqDecoder
+from s2s_ft.tokenization_unilm import UnilmTokenizer
+from s2s_ft.utils import Seq2seqDatasetForBert, batch_list_to_batch_tensors
 from utils_nlp.common.pytorch_utils import (
     get_device,
     move_model_to_device,
     parallelize_model,
 )
-import s2s_ft
-from s2s_ft.utils import (
-    Seq2seqDatasetForBert,
-    batch_list_to_batch_tensors,
-)
-from s2s_ft.modeling import BertForSequenceToSequence
-from s2s_ft.modeling import UNILM_PRETRAINED_MODEL_ARCHIVE_MAP
-from s2s_ft.tokenization_unilm import UnilmTokenizer
-from s2s_ft.configuration_unilm import UnilmConfig, UNILM_PRETRAINED_CONFIG_ARCHIVE_MAP
-from s2s_ft.config import BertForSeq2SeqConfig
-import s2s_ft.s2s_loader as seq2seq_loader
-from s2s_ft.modeling_decoding import BertForSeq2SeqDecoder
+from utils_nlp.models.transformers.common import TOKENIZER_CLASS, Transformer
 
 SUPPORTED_BERT_MODELS = ["bert-large-uncased", "bert-base-cased", "bert-large-cased"]
 SUPPORTED_ROBERTA_MODELS = ["roberta-base", "roberta-large"]
@@ -115,9 +113,7 @@ class S2SAbsSumProcessor:
             Defaults to ".".
     """
 
-    def __init__(
-        self, model_name="unilm-base-cased", to_lower=False, cache_dir=".",
-    ):
+    def __init__(self, model_name="unilm-base-cased", to_lower=False, cache_dir="."):
 
         self.tokenizer = TOKENIZER_CLASS[model_name].from_pretrained(
             model_name, do_lower_case=to_lower, cache_dir=cache_dir
@@ -513,7 +509,7 @@ class S2SAbstractiveSummarizer(Transformer):
             model_config = config_class.from_pretrained(
                 self._model_name, cache_dir=cache_dir
             )
-        
+
         self.model_config = model_config
 
         # Convert regular model config to sequence to sequence config
@@ -888,15 +884,15 @@ class S2SAbstractiveSummarizer(Transformer):
             state_dict = self.model.state_dict()
 
         bert_config = s2s_ft.modeling_decoding.BertConfig(
-                len(list(vocab.keys())) if not is_roberta else 50265, 
-                type_vocab_size=type_vocab_size,
-                max_position_embeddings=self.max_seq_length,
-                ffn_type=s2s_config.ffn_type,
-                num_qkv=s2s_config.num_qkv,
-                seg_emb=s2s_config.seg_emb,
-                is_roberta=is_roberta,
-                no_segment_embedding=no_segment_embedding
-            )
+            len(list(vocab.keys())) if not is_roberta else 50265,
+            type_vocab_size=type_vocab_size,
+            max_position_embeddings=self.max_seq_length,
+            ffn_type=s2s_config.ffn_type,
+            num_qkv=s2s_config.num_qkv,
+            seg_emb=s2s_config.seg_emb,
+            is_roberta=is_roberta,
+            no_segment_embedding=no_segment_embedding,
+        )
 
         model = BertForSeq2SeqDecoder.from_pretrained(
             self._bert_model_name,
@@ -1035,7 +1031,7 @@ class S2SAbstractiveSummarizer(Transformer):
         if fp16:
             optim_to_save["amp"] = self.amp_state_dict
         torch.save(
-            optim_to_save, os.path.join(output_dir, "optim.{}.bin".format(global_step)),
+            optim_to_save, os.path.join(output_dir, "optim.{}.bin".format(global_step))
         )
 
 
@@ -1087,7 +1083,7 @@ def load_and_cache_examples(
                 else:
                     source_tokens = tokenizer.tokenize(example["src"])
                 features.append(
-                    {"source_ids": tokenizer.convert_tokens_to_ids(source_tokens),}
+                    {"source_ids": tokenizer.convert_tokens_to_ids(source_tokens)}
                 )
 
         if shuffle:
