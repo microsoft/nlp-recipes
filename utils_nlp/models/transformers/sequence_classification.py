@@ -2,54 +2,22 @@
 # Licensed under the MIT License.
 
 import numpy as np
-from transformers.modeling_albert import (
-    ALBERT_PRETRAINED_MODEL_ARCHIVE_MAP,
-    AlbertForSequenceClassification,
-)
-from transformers.modeling_bert import (
-    BERT_PRETRAINED_MODEL_ARCHIVE_MAP,
-    BertForSequenceClassification,
-)
-from transformers.modeling_distilbert import (
-    DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP,
-    DistilBertForSequenceClassification,
-)
-from transformers.modeling_roberta import (
-    ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP,
-    RobertaForSequenceClassification,
-)
-from transformers.modeling_xlnet import (
-    XLNET_PRETRAINED_MODEL_ARCHIVE_MAP,
-    XLNetForSequenceClassification,
+from transformers import (
+    MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING,
+    AutoConfig,
+    AutoModelForSequenceClassification,
+    AutoTokenizer,
 )
 
 from utils_nlp.common.pytorch_utils import compute_training_steps
-from utils_nlp.models.transformers.common import (
-    MAX_SEQ_LEN,
-    TOKENIZER_CLASS,
-    Transformer,
-)
+from utils_nlp.models.transformers.common import MAX_SEQ_LEN, Transformer
 from utils_nlp.models.transformers.datasets import SCDataSet, SPCDataSet
 
-MODEL_CLASS = {}
-MODEL_CLASS.update(
-    {k: BertForSequenceClassification for k in BERT_PRETRAINED_MODEL_ARCHIVE_MAP}
-)
-MODEL_CLASS.update(
-    {k: RobertaForSequenceClassification for k in ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP}
-)
-MODEL_CLASS.update(
-    {k: XLNetForSequenceClassification for k in XLNET_PRETRAINED_MODEL_ARCHIVE_MAP}
-)
-MODEL_CLASS.update(
-    {
-        k: DistilBertForSequenceClassification
-        for k in DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP
-    }
-)
-MODEL_CLASS.update(
-    {k: AlbertForSequenceClassification for k in ALBERT_PRETRAINED_MODEL_ARCHIVE_MAP}
-)
+supported_models = [
+    list(x.pretrained_config_archive_map)
+    for x in MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING
+]
+supported_models = sorted([x for y in supported_models for x in y])
 
 
 class Processor:
@@ -68,7 +36,10 @@ class Processor:
     """
 
     def __init__(self, model_name="bert-base-cased", to_lower=False, cache_dir="."):
-        self.tokenizer = TOKENIZER_CLASS[model_name].from_pretrained(
+        self.model_name = model_name
+        self.to_lower = to_lower
+        self.cache_dir = cache_dir
+        self.tokenizer = AutoTokenizer.from_pretrained(
             model_name,
             do_lower_case=to_lower,
             cache_dir=cache_dir,
@@ -84,7 +55,7 @@ class Processor:
             batch (tuple): A tuple containing input ids, attention mask,
                 segment ids, and labels tensors.
             device (torch.device): A PyTorch device.
-            model_name (bool, optional): Model name used to format the inputs.
+            model_name (bool): Model name used to format the inputs.
             train_mode (bool, optional): Training mode flag.
                 Defaults to True.
 
@@ -93,13 +64,7 @@ class Processor:
                 Labels are only returned when train_mode is True.
         """
         batch = tuple(t.to(device) for t in batch)
-        if model_name.split("-")[0] in [
-            "bert",
-            "xlnet",
-            "roberta",
-            "distilbert",
-            "albert",
-        ]:
+        if model_name in supported_models:
             if train_mode:
                 inputs = {
                     "input_ids": batch[0],
@@ -109,8 +74,8 @@ class Processor:
             else:
                 inputs = {"input_ids": batch[0], "attention_mask": batch[1]}
 
-            # distilbert doesn't support segment ids
-            if model_name.split("-")[0] not in ["distilbert"]:
+            # distilbert, bart don't support segment ids
+            if model_name.split("-")[0] not in ["distilbert", "bart"]:
                 inputs["token_type_ids"] = batch[2]
 
             return inputs
@@ -244,16 +209,17 @@ class Processor:
 
 class SequenceClassifier(Transformer):
     def __init__(self, model_name="bert-base-cased", num_labels=2, cache_dir="."):
-        super().__init__(
-            model_class=MODEL_CLASS,
-            model_name=model_name,
-            num_labels=num_labels,
-            cache_dir=cache_dir,
+        config = AutoConfig.from_pretrained(
+            model_name, num_labels=num_labels, cache_dir=cache_dir
         )
+        model = AutoModelForSequenceClassification.from_pretrained(
+            model_name, cache_dir=cache_dir, config=config, output_loading_info=False
+        )
+        super().__init__(model_name=model_name, model=model)
 
     @staticmethod
     def list_supported_models():
-        return list(MODEL_CLASS)
+        return supported_models
 
     def fit(
         self,
@@ -345,7 +311,9 @@ class SequenceClassifier(Transformer):
 
         # init scheduler
         scheduler = Transformer.get_default_scheduler(
-            optimizer=self.optimizer, warmup_steps=warmup_steps, num_training_steps=max_steps
+            optimizer=self.optimizer,
+            warmup_steps=warmup_steps,
+            num_training_steps=max_steps,
         )
 
         # fine tune
