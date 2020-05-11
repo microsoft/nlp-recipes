@@ -56,6 +56,13 @@ def _remove_ttags(line):
     line = re.sub(r"</t>", "<q>", line)
     return line
 
+def _remove_tags(line):
+    line = re.sub(r"<t>", "", line)
+    # change </t> to <q>
+    # pyrouge test requires <q> as sentence splitter
+    line = re.sub(r"</t>", "", line)
+    return line
+
 
 def _target_sentence_tokenization(line):
     return line.split("<q>")
@@ -91,10 +98,20 @@ def CNNDMSummarizationDataset(*args, **kwargs):
                 SummarizationDataset(
                     train_source_file,
                     target_file=train_target_file,
+                    source_preprocessing=[_clean,],
+                    target_preprocessing=[
+                        _clean,
+                        _remove_tags,
+                    ],
                     top_n=top_n
                 ),
                 SummarizationDataset(
                     test_source_file,
+                    source_preprocessing=[_clean,],
+                    target_preprocessing=[
+                        _clean,
+                        _remove_tags,
+                    ],
                     target_file=test_target_file,
                     top_n=top_n
                 ),

@@ -37,11 +37,6 @@ from utils_nlp.eval import compute_rouge_python
 from utils_nlp.models.transformers.common import Transformer
 # from utils_nlp.models.transformers.common import TOKENIZER_CLASS
 
-
-
-
-#from transformers.modeling_bart import BART_PRETRAINED_MODEL_ARCHIVE_MAP
-
 from transformers import (
     AutoConfig,
     AutoModel,
@@ -76,6 +71,17 @@ from torch.utils.data import Dataset
 from transformers.tokenization_utils import trim_batch
 
 from tempfile import TemporaryDirectory
+
+def trim_batch(
+    input_ids, pad_token_id, attention_mask=None,
+):
+    """Remove columns that are populated exclusively by pad_token_id"""
+    keep_column_mask = input_ids.ne(pad_token_id).any(dim=0)
+    if attention_mask is None:
+        return input_ids[:, keep_column_mask]
+    else:
+        return (input_ids[:, keep_column_mask], attention_mask[:, keep_column_mask])
+
 def encode_example(example, tokenizer, prefix="", max_source_length=None, max_target_length=None, pad_to_max_length=True, return_tensors="pt"):
     ## add to the dataset
     tokenized_source = tokenizer.batch_encode_plus(
@@ -96,11 +102,17 @@ def encode_example(example, tokenizer, prefix="", max_source_length=None, max_ta
 
 
 class Predictor(nn.Module):
+    """
+    Predictor which can run on multi-GPUs.
+
+    Args:
+        model ():  
+    """
     def __init__(
         self,
         model,
-        min_length,
-        max_length,
+        min_length=55,
+        max_length=140,
         **kwargs):
         super(Predictor, self).__init__()
         self.model = model.module if hasattr(model, "module") else model
@@ -116,6 +128,13 @@ class Predictor(nn.Module):
                 attention_mask=src_mask,
                 min_length=self.min_length,
                 max_length=self.max_length,
+                # todo
+                num_beams=1,
+                repetition_penalty=2.5,
+                length_penalty=1.0,
+                early_stopping=True,
+                no_repeat_ngram_size=3,
+                #use_cache=True,
                 **self.config
             )
             predictions = torch.tensor(
@@ -129,39 +148,84 @@ class Predictor(nn.Module):
 
             return predictions
 
+def validate(summarizer, validate_dataset, num_gpus=1, TOP_N=2):
+    """ validation function to be used optionally in fine tuning.
+
+    Args:
+        summarizer(BertSumAbs): The summarizer under fine tuning.
+        validate_dataset (SummarizationDataset): dataset for validation.
+
+    Returns:
+        string: A string which contains the rouge score on a subset of
+            the validation dataset.
+
+    """
+    #TOP_N = 2
+    shortened_dataset = validate_dataset[0:TOP_N]
+    a = summarizer.processor.collate_fn(shortened_dataset, "cuda:0", True)
+    c = summarizer.processor.get_inputs(a, "cuda:0", summarizer.model_name, summarizer.tokenizer, True)
+
+    # reference_summaries = []
+    # for i in shortened_dataset:
+    #    reference_summaries.append(i['tgt'].replace("<t>","").replace("</t>", "").replace("\n", "")) 
+    output = summarizer.model(**c) 
+    generated_summaries = summarizer.predict(
+        shortened_dataset, num_gpus=num_gpus, batch_size=TOP_N
+    )
+    #assert len(generated_summaries) == len(reference_summaries)
+    #print("###################")
+    print("validation loss is {}".format(output[0]))
+    print("prediction is {}".format(generated_summaries[0]))
+    #print("reference is {}".format(reference_summaries[0]))
+
+    #rouge_score = compute_rouge_python(
+    #    cand=generated_summaries, ref=reference_summaries
+    #)
+    #return "rouge score: {}".format(rouge_score)
+
 class SummarizationProcessor:
     def __init__(
         self,
-        model_name,
-        cache_dir="./",
+        tokenizer,
+        config,
+        #model_name,
+        #cache_dir="./",
         max_source_length=1024,
-        max_target_length=56,
+        max_target_length=140,
     ):
         #super().__init__()
-        self.tokenizer =  AutoTokenizer.from_pretrained(
-            model_name,
+        # self.tokenizer =  AutoTokenizer.from_pretrained(
+        #    model_name,
             #self.hparams.tokenizer_name if self.hparams.tokenizer_name else self.hparams.model_name_or_path,
-            cache_dir=cache_dir,
-        )
+        #    cache_dir=cache_dir,
+        #)
         
         #TOKENIZER_CLASS[model_name].from_pretrained(model_name, cache_dir=cache_dir) # b
-        config = AutoConfig.from_pretrained(
-            model_name,
-            #self.hparams.config_name if self.hparams.config_name else self.hparams.model_name_or_path,
+        #config = AutoConfig.from_pretrained(
+        #    model_name,
+        #    #self.hparams.config_name if self.hparams.config_name else self.hparams.model_name_or_path,
             #**({"num_labels": num_labels} if num_labels is not None else {}),
-            cache_dir=cache_dir,
+        #    cache_dir=cache_dir,
             #**config_kwargs,
-        )
-        if model_name.startswith("t5"):
+        #)
+        # if model_name.startswith("t5"):
         # update config with summarization specific params
-            task_specific_params = config.task_specific_params
-            if task_specific_params is not None:
-                config.update(task_specific_params.get("summarization", {}))
+        # task_specific_params = config.task_specific_params
+        # if task_specific_params is not None:
+        #    config.update(task_specific_params.get("summarization", {}))
+        self.tokenizer = tokenizer
+        self.config = config
 
         self.prefix = config.prefix
         self.with_target = False
         self.max_source_length = max_source_length
         self.max_target_length = max_target_length
+
+    @staticmethod
+    def trim_seq2seq_batch(batch, pad_token_id):
+        y = trim_batch(batch["target_ids"], pad_token_id)
+        source_ids, source_mask = trim_batch(batch["source_ids"], pad_token_id, attention_mask=batch["source_mask"])
+        return source_ids, source_mask, y
 
     def preprocess(self, input_data_list):
         result = []
@@ -173,7 +237,10 @@ class SummarizationProcessor:
     @staticmethod
     def get_inputs(batch, device, model_name, tokenizer=None, train_mode=True):
         pad_token_id = tokenizer.pad_token_id
-        source_ids, source_mask, y = batch["source_ids"], batch["source_mask"], batch["target_ids"]
+        if not train_mode:
+            source_ids, source_mask = batch["source_ids"], batch["source_mask"]
+        else:
+            source_ids, source_mask, y = SummarizationProcessor.trim_seq2seq_batch(batch, pad_token_id)
         y_ids = y[:, :-1].contiguous()
         lm_labels = y[:, 1:].clone()
         lm_labels[y[:, 1:] == pad_token_id] = -100
@@ -218,30 +285,20 @@ class AbstractiveSummarizer(Transformer):
         """Initialize an object of BertSumAbs.
 
         Args:
-            model_name (str, optional:) Name of the pretrained model which is used
-                to initialize the encoder of the BertSumAbs model.
-                check MODEL_CLASS for supported models. Defaults to "bert-base-uncased".
+            model_name (str, optional:) Name of the pretrained model which is used .
+                `S2SAbsSumProcessor.list_supported_models()` to see all supported model names.. Defaults to "bart-large".
             cache_dir (str, optional): Directory to cache the tokenizer. Defaults to ".".
             max_pos_length (int, optional): maximum postional embedding length for the
                 input. Defaults to 768.
         """
 
-        """super().__init__(
-            model_class=AutoModelWithLMHead,
-            model_name=model_name,
-            num_labels=0,
-            cache_dir=cache_dir,
-        )
-        """
-        """
         if model_name not in self.list_supported_models():
             raise ValueError(
-                "Model name {} is not supported by BertSumAbs. "
-                "Call 'BertSumAbs.list_supported_models()' to get all supported model "
+                "Model name {} is not supported by AbstractiveSummarizer. "
+                "Call 'AbstractiveSummarizer.list_supported_models()' to get all supported model "
                 "names.".format(value)
             )
-        """
-        self.processor = SummarizationProcessor(model_name, cache_dir, max_source_length, max_target_length)
+
         self.config = AutoConfig.from_pretrained(
             model_name,
             #self.hparams.config_name if self.hparams.config_name else self.hparams.model_name_or_path,
@@ -249,6 +306,12 @@ class AbstractiveSummarizer(Transformer):
             cache_dir=cache_dir,
             #**config_kwargs,
         )
+        task_specific_params = self.config.task_specific_params
+        if task_specific_params is not None:
+            self.config.update(task_specific_params.get("summarization", {}))
+        #self.config.update({"vocab_size": 50264})
+        self.config.update({"max_length": max_target_length})
+        self.config.update({"attention_dropout": 0.1})
 
         self.tokenizer = AutoTokenizer.from_pretrained(
             model_name,
@@ -256,8 +319,11 @@ class AbstractiveSummarizer(Transformer):
             cache_dir=cache_dir,
         )
 
+        self.processor = SummarizationProcessor(self.tokenizer, self.config, max_source_length, max_target_length)
+        
         self._model_name = model_name
-        self.model = MODEL_MODES["language-modeling"].from_pretrained(
+        # self.model = MODEL_CLASS[model_name].from_pretrained(
+        self.model =  MODEL_MODES["language-modeling"].from_pretrained(
             self.model_name,
             #from_tf=bool(".ckpt" in self.hparams.model_name_or_path),
             config=self.config,
@@ -385,7 +451,7 @@ class AbstractiveSummarizer(Transformer):
             weight_decay=weight_decay,
             learning_rate=learning_rate,
             adam_epsilon=adam_epsilon,
-            # checkpoint_state_dict=checkpoint_state_dict,
+            checkpoint_state_dict=checkpoint_state_dict,
         )
 
         self.amp = amp
@@ -449,14 +515,14 @@ class AbstractiveSummarizer(Transformer):
             scheduler=self.scheduler,
             fp16=fp16,
             amp=amp,
-            validation_function=None,
+            validation_function=validation_function,
         )
 
         # release GPU memories
         self.model.cpu()
         torch.cuda.empty_cache()
 
-        self.save_model(max_steps)
+        #self.save_model(max_steps)
 
     def predict(
         self,
@@ -467,13 +533,13 @@ class AbstractiveSummarizer(Transformer):
         batch_size=16,
         length_penalty=0.95,
         beam_size=4,
-        min_length=50,
-        max_length=200,
+        min_length=56,
+        max_length=140,
         no_repeat_ngram_size=3,
         early_stopping=True,
-        
         fp16=False,
         verbose=True,
+        checkpoint=None,
     ):
         """
         Predict the summarization for the input data iterator.
@@ -505,23 +571,32 @@ class AbstractiveSummarizer(Transformer):
             List of strings which are the summaries
 
         """
+       
         device, num_gpus = get_device(
             num_gpus=num_gpus, gpu_ids=gpu_ids, local_rank=local_rank
         )
+        model = move_model_to_device(self.model, device)
+        
+        checkpoint_state_dict = None
+        if checkpoint:
+            # checkpoint should have "model", "optimizer", "amp"
+            checkpoint_state_dict = torch.load(checkpoint, map_location="cpu") 
+            model.load_state_dict(checkpoint_state_dict["model"])
 
-        if fp16:
-            self.model = self.model.half()
 
-        self.model = move_model_to_device(self.model, device)
-        self.model.eval()
+        model.eval()
 
-        self.model = parallelize_model(
-            self.model,
+        model = parallelize_model(
+            model,
             device,
             num_gpus=num_gpus,
             gpu_ids=gpu_ids,
             local_rank=local_rank,
         )
+        
+        
+        if fp16:
+            model = model.half()
 
         test_sampler = SequentialSampler(test_dataset)
 
@@ -538,7 +613,7 @@ class AbstractiveSummarizer(Transformer):
         )
         print("dataset length is {}".format(len(test_dataset)))
 
-        predictor = Predictor(self.model, min_length, max_length)
+        predictor = Predictor(model, min_length, max_length)
         # move model to devices
         def this_model_move_callback(model, device):
             model = move_model_to_device(model, device)
@@ -550,13 +625,14 @@ class AbstractiveSummarizer(Transformer):
         generated_summaries = []
 
         for batch in tqdm(
-            test_dataloader, desc="Generating summary", disable=not verbose
+            test_dataloader, desc="Generating summary", disable=True #not verbose
         ):
             #if self.model_name.startswith("t5"):
             #    batch = [self.model.config.prefix + text for text in batch]
             #dct = self.tokenizer.batch_encode_plus(batch, max_length=1024, return_tensors="pt", pad_to_max_length=True)
             # print(batch)
-            summaries = predictor(batch["source_ids"], batch["source_mask"])
+            input_ids, masks = trim_batch(batch["source_ids"], self.tokenizer.pad_token_id, attention_mask=batch["source_mask"])
+            summaries = predictor(input_ids, masks)
             """
             summaries = self.model.module.generate(
                 input_ids=batch["source_ids"],
@@ -565,12 +641,12 @@ class AbstractiveSummarizer(Transformer):
                 max_length=max_length
             )
             """
-            decoded_summaries = [self.tokenizer.decode(g, skip_special_tokens=True, clean_up_tokenization_spaces=False) for g in summaries]
+            decoded_summaries = [self.tokenizer.decode(g, skip_special_tokens=True, clean_up_tokenization_spaces=True) for g in summaries]
             
             generated_summaries.extend(decoded_summaries)
 
         # release GPU memories
-        self.model.cpu()
+        # self.model.cpu()
         del batch
         torch.cuda.empty_cache()
 
@@ -602,8 +678,8 @@ class AbstractiveSummarizer(Transformer):
             os.makedirs(path, exist_ok=True)
 
         checkpoint = {
-            "optimizer": self.optimizer.state_dict(),
-            "lr_scheduler": self.scheduler.state_dict(),
+            "optimizer": self.optimizer.state_dict() if self.optimizer else None,
+            "lr_scheduler": self.scheduler.state_dict() if self.scheduler else None,
             "model": model_to_save.state_dict(),
             "amp": self.amp.state_dict() if self.amp else None,
             "global_step": global_step,
