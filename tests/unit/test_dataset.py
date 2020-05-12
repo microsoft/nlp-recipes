@@ -112,7 +112,7 @@ def test_wikigold(tmp_path):
 
 
 def test_ner_utils(ner_utils_test_data):
-    output = preprocess_conll(ner_utils_test_data["input"])
+    output = preprocess_conll(ner_utils_test_data["input"], sep=" ")
     assert output == ner_utils_test_data["expected_output"]
 
 
