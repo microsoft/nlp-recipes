@@ -83,10 +83,11 @@ def s2s_test_data():
 
 
 @pytest.mark.gpu
-def test_S2SAbstractiveSummarizer(s2s_test_data, tmp):
+@pytest.mark.parametrize("model_name", ["unilm-base-cased", "minilm-l12-h384-uncased"])
+def test_S2SAbstractiveSummarizer(s2s_test_data, tmp, model_name):
     cache_dir = tmp
     model_dir = tmp
-    processor = S2SAbsSumProcessor(cache_dir=cache_dir)
+    processor = S2SAbsSumProcessor(model_name=model_name, cache_dir=cache_dir)
     train_dataset = processor.s2s_dataset_from_json_or_file(
         s2s_test_data["train_ds"], train_mode=True
     )
@@ -94,6 +95,7 @@ def test_S2SAbstractiveSummarizer(s2s_test_data, tmp):
         s2s_test_data["test_ds"], train_mode=False
     )
     abs_summarizer = S2SAbstractiveSummarizer(
+        model_name=model_name,
         max_seq_length=MAX_SEQ_LENGTH,
         max_source_seq_length=MAX_SOURCE_SEQ_LENGTH,
         max_target_seq_length=MAX_TARGET_SEQ_LENGTH,
@@ -114,6 +116,7 @@ def test_S2SAbstractiveSummarizer(s2s_test_data, tmp):
 
     # test load model from local disk
     abs_summarizer_loaded = S2SAbstractiveSummarizer(
+        model_name=model_name,
         load_model_from_dir=model_dir,
         model_file_name="model.{}.bin".format(global_step),
         max_seq_length=MAX_SEQ_LENGTH,
