@@ -18,7 +18,9 @@ from utils_nlp.common.pytorch_utils import dataloader_from_dataset
 from utils_nlp.dataset.ner_utils import preprocess_conll
 from utils_nlp.dataset.url_utils import maybe_download
 from utils_nlp.models.transformers.common import MAX_SEQ_LEN
-from utils_nlp.models.transformers.named_entity_recognition import TokenClassificationProcessor
+from utils_nlp.models.transformers.named_entity_recognition import (
+    TokenClassificationProcessor,
+)
 
 URL = (
     "https://raw.githubusercontent.com/juand-r/entity-recognition-datasets"
@@ -68,7 +70,9 @@ def load_train_test_dfs(local_cache_path="./", test_fraction=0.5, random_seed=No
     train_sentence_list = sentence_list[test_sentence_count:]
     train_labels_list = labels_list[test_sentence_count:]
 
-    train_df = pd.DataFrame({"sentence": train_sentence_list, "labels": train_labels_list})
+    train_df = pd.DataFrame(
+        {"sentence": train_sentence_list, "labels": train_labels_list}
+    )
 
     test_df = pd.DataFrame({"sentence": test_sentence_list, "labels": test_labels_list})
 
@@ -152,7 +156,9 @@ def load_dataset(
     """
 
     train_df, test_df = load_train_test_dfs(
-        local_cache_path=local_path, test_fraction=test_fraction, random_seed=random_seed
+        local_cache_path=local_path,
+        test_fraction=test_fraction,
+        random_seed=random_seed,
     )
 
     if train_sample_ratio > 1.0:
@@ -160,7 +166,9 @@ def load_dataset(
         logging.warning("Setting the training sample ratio to 1.0")
     elif train_sample_ratio < 0:
         logging.error("Invalid training sample ration: {}".format(train_sample_ratio))
-        raise ValueError("Invalid training sample ration: {}".format(train_sample_ratio))
+        raise ValueError(
+            "Invalid training sample ration: {}".format(train_sample_ratio)
+        )
 
     if test_sample_ratio > 1.0:
         test_sample_ratio = 1.0
@@ -174,7 +182,9 @@ def load_dataset(
     if test_sample_ratio < 1.0:
         test_df = test_df.sample(frac=test_sample_ratio).reset_index(drop=True)
 
-    processor = TokenClassificationProcessor(model_name=model_name, to_lower=to_lower, cache_dir=cache_dir)
+    processor = TokenClassificationProcessor(
+        model_name=model_name, to_lower=to_lower, cache_dir=cache_dir
+    )
 
     label_map = TokenClassificationProcessor.create_label_map(
         label_lists=train_df["labels"], trailing_piece_tag=trailing_piece_tag
@@ -197,11 +207,19 @@ def load_dataset(
     )
 
     train_dataloader = dataloader_from_dataset(
-        train_dataset, batch_size=batch_size, num_gpus=num_gpus, shuffle=True, distributed=False
+        train_dataset,
+        batch_size=batch_size,
+        num_gpus=num_gpus,
+        shuffle=True,
+        distributed=False,
     )
 
     test_dataloader = dataloader_from_dataset(
-        test_dataset, batch_size=batch_size, num_gpus=num_gpus, shuffle=False, distributed=False
+        test_dataset,
+        batch_size=batch_size,
+        num_gpus=num_gpus,
+        shuffle=False,
+        distributed=False,
     )
 
     return (train_dataloader, test_dataloader, label_map, test_dataset)

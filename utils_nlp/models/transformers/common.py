@@ -14,30 +14,12 @@ import numpy as np
 import torch
 from tqdm import tqdm
 from transformers import AdamW, get_linear_schedule_with_warmup
-from transformers.modeling_bert import BERT_PRETRAINED_MODEL_ARCHIVE_MAP
-from transformers.modeling_distilbert import DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP
-from transformers.modeling_roberta import ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP
-from transformers.modeling_xlnet import XLNET_PRETRAINED_MODEL_ARCHIVE_MAP
-from transformers.tokenization_bert import BertTokenizer
-from transformers.tokenization_distilbert import DistilBertTokenizer
-from transformers.tokenization_roberta import RobertaTokenizer
-from transformers.tokenization_xlnet import XLNetTokenizer
 
 from utils_nlp.common.pytorch_utils import (
+    get_amp,
     get_device,
     move_model_to_device,
-    get_amp,
     parallelize_model,
-)
-
-TOKENIZER_CLASS = {}
-TOKENIZER_CLASS.update({k: BertTokenizer for k in BERT_PRETRAINED_MODEL_ARCHIVE_MAP})
-TOKENIZER_CLASS.update(
-    {k: RobertaTokenizer for k in ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP}
-)
-TOKENIZER_CLASS.update({k: XLNetTokenizer for k in XLNET_PRETRAINED_MODEL_ARCHIVE_MAP})
-TOKENIZER_CLASS.update(
-    {k: DistilBertTokenizer for k in DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP}
 )
 
 MAX_SEQ_LEN = 512
@@ -48,35 +30,14 @@ logger = logging.getLogger(__name__)
 class Transformer:
     def __init__(
         self,
-        model_class,
-        model_name="bert-base-cased",
-        num_labels=2,
-        cache_dir=".",
-        load_model_from_dir=None,
+        model_name,
+        model,
+        cache_dir,
     ):
-
-        if model_name not in self.list_supported_models():
-            raise ValueError(
-                "Model name {0} is not supported by {1}. "
-                "Call '{1}.list_supported_models()' to get all supported model "
-                "names.".format(model_name, self.__class__.__name__)
-            )
         self._model_name = model_name
         self._model_type = model_name.split("-")[0]
+        self.model = model
         self.cache_dir = cache_dir
-        self.load_model_from_dir = load_model_from_dir
-        if load_model_from_dir is None:
-            self.model = model_class[model_name].from_pretrained(
-                model_name,
-                cache_dir=cache_dir,
-                num_labels=num_labels,
-                output_loading_info=False,
-            )
-        else:
-            logger.info("Loading cached model from {}".format(load_model_from_dir))
-            self.model = model_class[model_name].from_pretrained(
-                load_model_from_dir, num_labels=num_labels, output_loading_info=False
-            )
 
     @property
     def model_name(self):
@@ -241,7 +202,8 @@ class Transformer:
                 if isinstance(outputs, tuple):
                     loss = outputs[0]
                 else:
-                    # Accomondate models based on older versions of Transformers, e.g. UniLM
+                    # Accomondate models based on older versions of Transformers,
+                    # e.g. UniLM
                     loss = outputs
 
                 if num_gpus > 1:
@@ -317,7 +279,7 @@ class Transformer:
                         saved_model_path = os.path.join(
                             self.cache_dir, f"{self.model_name}_step_{global_step}.pt"
                         )
-                        self.save_model(global_step, saved_model_path)
+                        self.save_model(saved_model_path)
                         if validation_function:
                             validation_log = validation_function(self)
                             logger.info(validation_log)
@@ -327,7 +289,7 @@ class Transformer:
                     break
         if fp16 and amp:
             self.amp_state_dict = amp.state_dict()
-        
+
         # release GPU memories
         self.model.cpu()
         torch.cuda.empty_cache()

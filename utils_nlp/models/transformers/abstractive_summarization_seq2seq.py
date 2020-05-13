@@ -13,7 +13,7 @@ from torch.utils.data.distributed import DistributedSampler
 
 from transformers import RobertaConfig, BertConfig
 
-from utils_nlp.models.transformers.common import TOKENIZER_CLASS, Transformer
+from utils_nlp.models.transformers.common import Transformer
 from utils_nlp.common.pytorch_utils import (
     get_device,
     move_model_to_device,
@@ -52,8 +52,7 @@ MODEL_CLASS.update(
     {k: BertForSequenceToSequence for k in MINILM_PRETRAINED_MODEL_ARCHIVE_MAP}
 )
 
-
-
+TOKENIZER_CLASS = {}
 TOKENIZER_CLASS.update({k: UnilmTokenizer for k in UNILM_PRETRAINED_CONFIG_ARCHIVE_MAP})
 TOKENIZER_CLASS.update({k: MinilmTokenizer for k in MINILM_PRETRAINED_CONFIG_ARCHIVE_MAP})
 
