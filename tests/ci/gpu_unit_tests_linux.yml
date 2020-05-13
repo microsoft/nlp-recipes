@@ -13,7 +13,7 @@ trigger:
 
 jobs:
 - job: gpu_unit_tests_linux
-  timeoutInMinutes: 10 # how long to run the job before automatically cancelling
+  timeoutInMinutes: 20 # how long to run the job before automatically cancelling
   pool:
     name: nlpagentpool
 
