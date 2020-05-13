@@ -89,9 +89,9 @@ We hope that the open source community would contribute to the content and bring
 ## References
 The following is a list of related repositories that we like and think are useful for NLP tasks.
 
-|||
+|Repository|Description|
 |---|---|
-|[transformers](https://github.com/huggingface/transformers)|A great PyTorch library from Hugging Face with implementations of popular transformer-based models. We've been using their package extensively in this repo and greatly appreciate their effort.|
+|[Transformers](https://github.com/huggingface/transformers)|A great PyTorch library from Hugging Face with implementations of popular transformer-based models. We've been using their package extensively in this repo and greatly appreciate their effort.|
 |[Azure Machine Learning Notebooks](https://github.com/Azure/MachineLearningNotebooks/)|ML and deep learning examples with Azure Machine Learning.|
 |[AzureML-BERT](https://github.com/Microsoft/AzureML-BERT)|End-to-end recipes for pre-training and fine-tuning BERT using Azure Machine Learning service.|
 |[MASS](https://github.com/microsoft/MASS)|MASS: Masked Sequence to Sequence Pre-training for Language Generation.|
