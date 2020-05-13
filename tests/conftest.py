@@ -128,6 +128,11 @@ def notebooks():
             "text_summarization",
             "abstractive_summarization_unilm_cnndm.ipynb",
         ),
+        "minilm_abstractive_summarization": os.path.join(
+            folder_notebooks,
+            "text_summarization",
+            "abstractive_summarization_minilm_cnndm.ipynb",
+        ),
         "abstractive_summarization_bertsumabs_cnndm": os.path.join(
             folder_notebooks,
             "text_summarization",
