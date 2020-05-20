@@ -28,12 +28,7 @@ logger = logging.getLogger(__name__)
 
 
 class Transformer:
-    def __init__(
-        self,
-        model_name,
-        model,
-        cache_dir,
-    ):
+    def __init__(self, model_name, model, cache_dir):
         self._model_name = model_name
         self._model_type = model_name.split("-")[0]
         self.model = model
@@ -321,12 +316,12 @@ class Transformer:
                 logits = outputs[0]
             yield logits.detach().cpu().numpy()
 
-    def save_model(self, full_name=None):
+    def save_model(self, file_name=None):
         """
-        save the trained model.
+        Saves the underlying PyTorch module's state.
 
         Args:
-            full_name (str, optional): File name to save the model's `state_dict()`
+            file_name (str, optional): File name to save the model's `state_dict()`
                 that can be loaded by torch.load().
                 If None, the trained model, configuration and tokenizer are saved
                 using `save_pretrained()`; and the file is going to be saved under
@@ -340,9 +335,9 @@ class Transformer:
             self.model.module if hasattr(self.model, "module") else self.model
         )  # Take care of distributed/parallel training
 
-        if full_name:
-            logger.info("Saving model checkpoint to %s", full_name)
-            torch.save(model_to_save.state_dict(), full_name)
+        if file_name:
+            logger.info("Saving model checkpoint to %s", file_name)
+            torch.save(model_to_save.state_dict(), file_name)
         else:
             output_model_dir = os.path.join(self.cache_dir, "fine_tuned")
 
@@ -351,3 +346,18 @@ class Transformer:
 
             logger.info("Saving model checkpoint to %s", output_model_dir)
             model_to_save.save_pretrained(output_model_dir)
+
+    def load_model(self, file_name):
+        """
+        Loads a PyTorch module's state.
+
+        Args:
+            file_name (str): File name of saved the model's `state_dict()`
+        """
+
+        model_to_load = (
+            self.model.module if hasattr(self.model, "module") else self.model
+        )  # Take care of distributed/parallel training
+
+        model_to_load.load_state_dict(torch.load(file_name))
+        logger.info("Model checkpoint loaded from %s", file_name)
