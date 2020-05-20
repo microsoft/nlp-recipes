@@ -56,53 +56,6 @@ MODEL_CLASS.update(
 logger = logging.getLogger(__name__)
 
 
-
-def encode_example(
-    example,
-    tokenizer,
-    prefix="",
-    max_source_length=None,
-    max_target_length=None,
-    pad_to_max_length=True,
-    return_tensors="pt",
-):
-    """
-    Encode a single example with the specified tokenizer.
-
-    Args:
-        example:
-        tokenizer
-        prefix
-        max_source_length
-        max_target_length:
-        pad_to_max_length:
-        return_tensors:
-
-    """
-
-    tokenized_source = tokenizer.batch_encode_plus(
-        [prefix + example["src"]],
-        max_length=max_source_length,
-        pad_to_max_length=pad_to_max_length,
-        return_tensors=return_tensors,
-    )
-
-    source_ids = tokenized_source["input_ids"].squeeze()
-    src_mask = tokenized_source["attention_mask"].squeeze()
-    example["source_ids"] = source_ids
-    example["source_mask"] = src_mask
-    if "tgt" in example:
-        tokenized_target = tokenizer.batch_encode_plus(
-            [example["tgt"]],
-            max_length=max_target_length,
-            pad_to_max_length=pad_to_max_length,
-            return_tensors=return_tensors,
-        )
-        target_ids = tokenized_target["input_ids"].squeeze()
-        example["target_ids"] = target_ids
-    return example
-
-
 class Predictor(nn.Module):
     """
     Predictor which can run on multi-GPUs.
@@ -212,20 +165,53 @@ class SummarizationProcessor:
         self.max_source_length = max_source_length
         self.max_target_length = max_target_length
 
-    @staticmethod
-    def trim_seq2seq_batch(batch, pad_token_id):
-
-        y = trim_batch(batch["target_ids"], pad_token_id)
-        source_ids, source_mask = trim_batch(
-            batch["source_ids"], pad_token_id, attention_mask=batch["source_mask"]
-        )
-        return source_ids, source_mask, y
-
     def preprocess(self, input_data_list):
+        """ preprocess the data for abstractive summarization.
+            
+        Args:
+            input_data_list (list of dictionary): input list where each item is
+                an dictionary with fields "src" and "tgt" and both fields are string.
+
+        Returns:
+            list of dictionary with addtional fields "source_ids", 
+                "source_mask" and "target_ids".
+        """
+        def _encode_example(
+            example,
+            tokenizer,
+            prefix="",
+            max_source_length=None,
+            max_target_length=None,
+            pad_to_max_length=True,
+            return_tensors="pt",
+        ):
+
+            tokenized_source = tokenizer.batch_encode_plus(
+                [prefix + example["src"]],
+                max_length=max_source_length,
+                pad_to_max_length=pad_to_max_length,
+                return_tensors=return_tensors,
+            )
+
+            source_ids = tokenized_source["input_ids"].squeeze()
+            src_mask = tokenized_source["attention_mask"].squeeze()
+            example["source_ids"] = source_ids
+            example["source_mask"] = src_mask
+            if "tgt" in example:
+                tokenized_target = tokenizer.batch_encode_plus(
+                    [example["tgt"]],
+                    max_length=max_target_length,
+                    pad_to_max_length=pad_to_max_length,
+                    return_tensors=return_tensors,
+                )
+                target_ids = tokenized_target["input_ids"].squeeze()
+                example["target_ids"] = target_ids
+            return example
+
         result = []
         for i in input_data_list:
             result.append(
-                encode_example(
+                _encode_example(
                     i,
                     tokenizer=self.tokenizer,
                     prefix=self.prefix,
@@ -237,31 +223,66 @@ class SummarizationProcessor:
 
     @staticmethod
     def get_inputs(batch, device, model_name, tokenizer=None, train_mode=True):
+        """
+        Creates an input dictionary given a model name.
+
+        Args:
+            batch (object): A Batch containing lists of  source ids, source_mask.
+            If train_mode is True, it also contains the list of target ids.
+            device (torch.device): A PyTorch device.
+            model_name (bool, optional): Model name used to format the inputs.
+            tokenizer (AutoTokenizer, optional): tokenizer whose pad_token_id 
+                will be used for processing. 
+            train_mode (bool, optional): Training mode flag.
+                Defaults to True.
+
+        Returns:
+            dict: Dictionary containing source ids, attention masks.
+            Decoder input ids and LM labels are only returned when
+            train_mode is True.
+        """
+
+
         pad_token_id = tokenizer.pad_token_id
         if not train_mode:
             source_ids, source_mask = batch["source_ids"], batch["source_mask"]
-        else:
-            source_ids, source_mask, y = SummarizationProcessor.trim_seq2seq_batch(
-                batch, pad_token_id
-            )
-        y_ids = y[:, :-1].contiguous()
-        lm_labels = y[:, 1:].clone()
-        lm_labels[y[:, 1:] == pad_token_id] = -100
+            return {
+                "input_ids": source_ids,
+                "attention_mask": source_mask,
+            }
 
-        if train_mode:
+        else:
+            y = trim_batch(batch["target_ids"], pad_token_id)
+            source_ids, source_mask = trim_batch(
+                batch["source_ids"], pad_token_id, attention_mask=batch["source_mask"]
+            )
+            y_ids = y[:, :-1].contiguous()
+            lm_labels = y[:, 1:].clone()
+            lm_labels[y[:, 1:] == pad_token_id] = -100
+
             return {
                 "input_ids": source_ids,
                 "attention_mask": source_mask,
                 "decoder_input_ids": y_ids,
                 "lm_labels": lm_labels,
             }
-        else:
-            return {
-                "input_ids": source_ids,
-                "attention_mask": source_mask,
-            }
-
+     
     def collate_fn(self, batch, device, train_mode=False):
+        """ Collate formats the data passed to the data loader.
+        In particular we tokenize the data batch after batch to avoid keeping them
+        all in memory.
+
+        Args:
+            batch (list of dictionary): input data to be loaded.
+            device (torch.device): A PyTorch device.
+            train_mode (bool, optional): Training mode flag.
+                Defaults to True.
+
+        Returns:
+            namedtuple: a nametuple containing source ids, source mask.
+            If train_mode is True, it also contains the target ids.
+        """
+
         input_ids = torch.stack([x["source_ids"] for x in batch])
         masks = torch.stack([x["source_mask"] for x in batch])
         pad_token_id = self.tokenizer.pad_token_id

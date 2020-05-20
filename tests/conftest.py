@@ -138,6 +138,12 @@ def notebooks():
             "text_summarization",
             "abstractive_summarization_bertsumabs_cnndm.ipynb",
         ),
+        "abstractive_summarization_bartt5_cnndm": os.path.join(
+            folder_notebooks,
+            "text_summarization",
+            "abstractive_summarization_bartt5_cnndm.ipynb",
+        ),
+
     }
     return paths
 
