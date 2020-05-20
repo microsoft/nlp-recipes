@@ -165,17 +165,17 @@ def load_dataset(
         train_sample_ratio = 1.0
         logging.warning("Setting the training sample ratio to 1.0")
     elif train_sample_ratio < 0:
-        logging.error("Invalid training sample ration: {}".format(train_sample_ratio))
+        logging.error("Invalid training sample ratio: {}".format(train_sample_ratio))
         raise ValueError(
-            "Invalid training sample ration: {}".format(train_sample_ratio)
+            "Invalid training sample ratio: {}".format(train_sample_ratio)
         )
 
     if test_sample_ratio > 1.0:
         test_sample_ratio = 1.0
         logging.warning("Setting the testing sample ratio to 1.0")
     elif test_sample_ratio < 0:
-        logging.error("Invalid testing sample ration: {}".format(test_sample_ratio))
-        raise ValueError("Invalid testing sample ration: {}".format(test_sample_ratio))
+        logging.error("Invalid testing sample ratio: {}".format(test_sample_ratio))
+        raise ValueError("Invalid testing sample ratio: {}".format(test_sample_ratio))
 
     if train_sample_ratio < 1.0:
         train_df = train_df.sample(frac=train_sample_ratio).reset_index(drop=True)

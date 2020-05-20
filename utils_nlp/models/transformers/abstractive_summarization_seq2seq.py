@@ -261,7 +261,7 @@ class S2SAbsSumProcessor:
                 training. Defaults to -1, which means non-distributed training.
             top_n (int, optional): The number which specifies how many examples in the
                 beginning of the input dataset that will be used to create the dataset.
-                Defaults to -1, which means the whole dataset should be procsssed.
+                Defaults to -1, which means the whole dataset should be processsed.
 
         Returns:
             S2SAbsSumDataset
@@ -307,7 +307,7 @@ class S2SAbsSumProcessor:
                 training. Defaults to -1, which means non-distributed training.
             top_n (int, optional): The number which specifies how many examples in the
                 beginning of the input dataset that will be used to create the dataset.
-                Defaults to -1, which means the whole dataset should be procsssed.
+                Defaults to -1, which means the whole dataset should be processsed.
 
         Returns:
             S2SAbsSumDataset
@@ -356,7 +356,7 @@ class S2SAbsSumProcessor:
                 training. Defaults to -1, which means non-distributed training.
             top_n (int, optional): The number which specifies how many examples in the
                 beginning of the input dataset that will be used to create the dataset.
-                Defaults to -1, which means the whole input data should be procsssed.
+                Defaults to -1, which means the whole input data should be processsed.
 
 
         Returns:
