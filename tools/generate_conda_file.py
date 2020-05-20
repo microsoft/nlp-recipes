@@ -81,7 +81,7 @@ PIP_BASE = {
         "https://github.com/explosion/spacy-models/releases/download/"
         "en_core_web_sm-2.1.0/en_core_web_sm-2.1.0.tar.gz"
     ),
-    "transformers": "transformers==2.5.0",
+    "transformers": "transformers==2.9.0",
     "gensim": "gensim>=3.7.0",
     "nltk": "nltk>=3.4",
     "seqeval": "seqeval>=0.0.12",

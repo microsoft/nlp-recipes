@@ -85,7 +85,9 @@ def qa_test_data(qa_test_df, tmp_module):
     )
 
     # xlnet
-    qa_processor_xlnet = QAProcessor(model_name="xlnet-base-cased", cache_dir=tmp_module)
+    qa_processor_xlnet = QAProcessor(
+        model_name="xlnet-base-cased", cache_dir=tmp_module
+    )
     train_features_xlnet = qa_processor_xlnet.preprocess(
         train_dataset,
         is_training=True,
@@ -148,13 +150,19 @@ def test_QAProcessor(qa_test_data, tmp_module):
     ]:
         qa_processor = QAProcessor(model_name=model_name, cache_dir=tmp_module)
         qa_processor.preprocess(
-            qa_test_data["train_dataset"], is_training=True, feature_cache_dir=tmp_module,
+            qa_test_data["train_dataset"],
+            is_training=True,
+            feature_cache_dir=tmp_module,
         )
         qa_processor.preprocess(
-            qa_test_data["train_dataset_list"], is_training=True, feature_cache_dir=tmp_module,
+            qa_test_data["train_dataset_list"],
+            is_training=True,
+            feature_cache_dir=tmp_module,
         )
         qa_processor.preprocess(
-            qa_test_data["test_dataset"], is_training=False, feature_cache_dir=tmp_module,
+            qa_test_data["test_dataset"],
+            is_training=False,
+            feature_cache_dir=tmp_module,
         )
 
     # test unsupported model type
@@ -188,7 +196,9 @@ def test_AnswerExtractor(qa_test_data, tmp_module):
     # bert
     qa_extractor_bert = AnswerExtractor(cache_dir=tmp_module)
     train_loader_bert = dataloader_from_dataset(qa_test_data["train_features_bert"])
-    test_loader_bert = dataloader_from_dataset(qa_test_data["test_features_bert"], shuffle=False)
+    test_loader_bert = dataloader_from_dataset(
+        qa_test_data["test_features_bert"], shuffle=False
+    )
     qa_extractor_bert.fit(train_loader_bert, verbose=False, cache_model=True)
 
     # test saving fine-tuned model
@@ -203,13 +213,19 @@ def test_AnswerExtractor(qa_test_data, tmp_module):
 
     # xlnet
     train_loader_xlnet = dataloader_from_dataset(qa_test_data["train_features_xlnet"])
-    test_loader_xlnet = dataloader_from_dataset(qa_test_data["test_features_xlnet"], shuffle=False)
-    qa_extractor_xlnet = AnswerExtractor(model_name="xlnet-base-cased", cache_dir=tmp_module)
+    test_loader_xlnet = dataloader_from_dataset(
+        qa_test_data["test_features_xlnet"], shuffle=False
+    )
+    qa_extractor_xlnet = AnswerExtractor(
+        model_name="xlnet-base-cased", cache_dir=tmp_module
+    )
     qa_extractor_xlnet.fit(train_loader_xlnet, verbose=False, cache_model=False)
     qa_extractor_xlnet.predict(test_loader_xlnet, verbose=False)
 
     # distilbert
-    train_loader_xlnet = dataloader_from_dataset(qa_test_data["train_features_distilbert"])
+    train_loader_xlnet = dataloader_from_dataset(
+        qa_test_data["train_features_distilbert"]
+    )
     test_loader_xlnet = dataloader_from_dataset(
         qa_test_data["test_features_distilbert"], shuffle=False
     )

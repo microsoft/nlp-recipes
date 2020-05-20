@@ -5,34 +5,29 @@
 # This script reuses some code from https://github.com/huggingface/transformers/
 # Add to noticefile
 
-from collections import namedtuple
 import logging
 import os
 import pickle
-from tqdm import tqdm
+from collections import namedtuple
 
 import torch
-from torch.utils.data import (
-    DataLoader,
-    SequentialSampler,
-    RandomSampler,
-)
-
+from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
 from torch.utils.data.distributed import DistributedSampler
-from transformers import BertModel
+from tqdm import tqdm
+from transformers import AutoTokenizer, BertModel
 
 from utils_nlp.common.pytorch_utils import (
     compute_training_steps,
-    get_device,
     get_amp,
+    get_device,
     move_model_to_device,
     parallelize_model,
 )
 from utils_nlp.eval import compute_rouge_python
-from utils_nlp.models.transformers.common import TOKENIZER_CLASS, Transformer
 from utils_nlp.models.transformers.bertsum import model_builder
 from utils_nlp.models.transformers.bertsum.model_builder import AbsSummarizer
 from utils_nlp.models.transformers.bertsum.predictor import build_predictor
+from utils_nlp.models.transformers.common import Transformer
 
 MODEL_CLASS = {"bert-base-uncased": BertModel}
 
@@ -134,8 +129,11 @@ class BertSumAbsProcessor:
 
         """
         self.model_name = model_name
-        self.tokenizer = TOKENIZER_CLASS[self.model_name].from_pretrained(
-            self.model_name, do_lower_case=to_lower, cache_dir=cache_dir
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            model_name,
+            do_lower_case=to_lower,
+            cache_dir=cache_dir,
+            output_loading_info=False,
         )
 
         self.symbols = {
@@ -156,7 +154,7 @@ class BertSumAbsProcessor:
 
     @staticmethod
     def list_supported_models():
-        return list(MODEL_CLASS.keys())
+        return list(MODEL_CLASS)
 
     @property
     def model_name(self):
@@ -184,7 +182,7 @@ class BertSumAbsProcessor:
                 also contains the target ids and the number of tokens
                 in the target and target text.
             device (torch.device): A PyTorch device.
-            model_name (bool, optional): Model name used to format the inputs.
+            model_name (bool): Model name used to format the inputs.
             train_mode (bool, optional): Training mode flag.
                 Defaults to True.
 
@@ -403,7 +401,8 @@ class BertSumAbs(Transformer):
                 check MODEL_CLASS for supported models. Defaults to "bert-base-uncased".
             finetune_bert (bool, option): Whether the bert model in the encoder is
                 finetune or not. Defaults to True.
-            cache_dir (str, optional): Directory to cache the tokenizer. Defaults to ".".
+            cache_dir (str, optional): Directory to cache the tokenizer.
+                Defaults to ".".
             label_smoothing (float, optional): The amount of label smoothing.
                 Value range is [0, 1]. Defaults to 0.1.
             test (bool, optional): Whether the class is initiated for test or not.
@@ -412,13 +411,11 @@ class BertSumAbs(Transformer):
             max_pos_length (int, optional): maximum postional embedding length for the
                 input. Defaults to 768.
         """
-
-        super().__init__(
-            model_class=MODEL_CLASS,
-            model_name=model_name,
-            num_labels=0,
-            cache_dir=cache_dir,
+        model = MODEL_CLASS[model_name].from_pretrained(
+            model_name, cache_dir=cache_dir, num_labels=0, output_loading_info=False
         )
+        super().__init__(model_name=model_name, model=model, cache_dir=cache_dir)
+
         if model_name not in self.list_supported_models():
             raise ValueError(
                 "Model name {} is not supported by BertSumAbs. "
@@ -616,10 +613,7 @@ class BertSumAbs(Transformer):
             )
 
         train_dataloader = DataLoader(
-            train_dataset,
-            sampler=sampler,
-            batch_size=batch_size,
-            collate_fn=collate_fn,
+            train_dataset, sampler=sampler, batch_size=batch_size, collate_fn=collate_fn
         )
 
         # compute the max number of training steps

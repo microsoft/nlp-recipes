@@ -50,7 +50,7 @@ The following is a summary of the commonly used NLP scenarios covered in the rep
 |-------------------------|  ------------------- |-------|---|
 |Text Classification                     |BERT, XLNet, RoBERTa| Text classification is a supervised learning method of learning and predicting the category or the class of a document given its text content. |English, Hindi, Arabic|
 |Named Entity Recognition                |BERT| Named entity recognition (NER) is the task of classifying words or key phrases of a text into predefined entities of interest. |English|
-|Text Summarization|BERTSumExt <br> BERTSumAbs <br> UniLM (s2s-ft)|Text summarization is a language generation task of summarizing the input text into a shorter paragraph of text.|English
+|Text Summarization|BERTSumExt <br> BERTSumAbs <br> UniLM (s2s-ft) <br> MiniLM |Text summarization is a language generation task of summarizing the input text into a shorter paragraph of text.|English
 |Entailment                              |BERT, XLNet, RoBERTa| Textual entailment is the task of classifying the binary relation between two natural-language texts,  *text* and *hypothesis*, to determine if the *text* agrees with the *hypothesis* or not. |English|
 |Question Answering                      |BiDAF, BERT, XLNet| Question answering (QA) is the task of retrieving or generating a valid answer for a given query in natural language, provided with a passage related to the query. |English|
 |Sentence Similarity                     |BERT, GenSen| Sentence similarity is the process of computing a similarity score given a pair of text documents. |English|
@@ -89,9 +89,9 @@ We hope that the open source community would contribute to the content and bring
 ## References
 The following is a list of related repositories that we like and think are useful for NLP tasks.
 
-|||
+|Repository|Description|
 |---|---|
-|[transformers](https://github.com/huggingface/transformers)|A great PyTorch library from Hugging Face with implementations of popular transformer-based models. We've been using their package extensively in this repo and greatly appreciate their effort.|
+|[Transformers](https://github.com/huggingface/transformers)|A great PyTorch library from Hugging Face with implementations of popular transformer-based models. We've been using their package extensively in this repo and greatly appreciate their effort.|
 |[Azure Machine Learning Notebooks](https://github.com/Azure/MachineLearningNotebooks/)|ML and deep learning examples with Azure Machine Learning.|
 |[AzureML-BERT](https://github.com/Microsoft/AzureML-BERT)|End-to-end recipes for pre-training and fine-tuning BERT using Azure Machine Learning service.|
 |[MASS](https://github.com/microsoft/MASS)|MASS: Masked Sequence to Sequence Pre-training for Language Generation.|

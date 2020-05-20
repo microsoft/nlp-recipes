@@ -27,6 +27,8 @@ import jsonlines
 import torch
 from torch.utils.data import TensorDataset
 from tqdm import tqdm
+
+from transformers import AutoTokenizer
 from transformers.modeling_albert import (
     ALBERT_PRETRAINED_MODEL_ARCHIVE_MAP,
     AlbertForQuestionAnswering,
@@ -51,19 +53,21 @@ from utils_nlp.common.pytorch_utils import (
     move_model_to_device,
     parallelize_model,
 )
-from utils_nlp.models.transformers.common import (
-    MAX_SEQ_LEN,
-    TOKENIZER_CLASS,
-    Transformer,
-)
+from utils_nlp.models.transformers.common import MAX_SEQ_LEN, Transformer
 
 MODEL_CLASS = {}
-MODEL_CLASS.update({k: BertForQuestionAnswering for k in BERT_PRETRAINED_MODEL_ARCHIVE_MAP})
-MODEL_CLASS.update({k: XLNetForQuestionAnswering for k in XLNET_PRETRAINED_MODEL_ARCHIVE_MAP})
+MODEL_CLASS.update(
+    {k: BertForQuestionAnswering for k in BERT_PRETRAINED_MODEL_ARCHIVE_MAP}
+)
+MODEL_CLASS.update(
+    {k: XLNetForQuestionAnswering for k in XLNET_PRETRAINED_MODEL_ARCHIVE_MAP}
+)
 MODEL_CLASS.update(
     {k: DistilBertForQuestionAnswering for k in DISTILBERT_PRETRAINED_MODEL_ARCHIVE_MAP}
 )
-MODEL_CLASS.update({k: AlbertForQuestionAnswering for k in ALBERT_PRETRAINED_MODEL_ARCHIVE_MAP})
+MODEL_CLASS.update(
+    {k: AlbertForQuestionAnswering for k in ALBERT_PRETRAINED_MODEL_ARCHIVE_MAP}
+)
 
 # cached files during preprocessing
 # these are used in postprocessing to generate the final answer texts
@@ -103,11 +107,18 @@ class QAProcessor:
     """
 
     def __init__(
-        self, model_name="bert-base-cased", to_lower=False, custom_tokenize=None, cache_dir=".",
+        self,
+        model_name="bert-base-cased",
+        to_lower=False,
+        custom_tokenize=None,
+        cache_dir=".",
     ):
         self.model_name = model_name
-        self.tokenizer = TOKENIZER_CLASS[model_name].from_pretrained(
-            model_name, do_lower_case=to_lower, cache_dir=cache_dir, output_loading_info=False,
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            model_name,
+            do_lower_case=to_lower,
+            cache_dir=cache_dir,
+            output_loading_info=False,
         )
         self.do_lower_case = to_lower
         self.custom_tokenize = custom_tokenize
@@ -218,7 +229,9 @@ class QAProcessor:
             os.makedirs(feature_cache_dir)
 
         if is_training and not qa_dataset.actual_answer_available:
-            raise Exception("answer_start and answer_text must be provided for training data.")
+            raise Exception(
+                "answer_start and answer_text must be provided for training data."
+            )
 
         if is_training:
             examples_file = os.path.join(feature_cache_dir, CACHED_EXAMPLES_TRAIN_FILE)
@@ -245,7 +258,10 @@ class QAProcessor:
                 qa_examples.append(qa_example_cur)
 
                 qa_examples_json.append(
-                    {"qa_id": qa_example_cur.qa_id, "doc_tokens": qa_example_cur.doc_tokens}
+                    {
+                        "qa_id": qa_example_cur.qa_id,
+                        "doc_tokens": qa_example_cur.doc_tokens,
+                    }
                 )
 
                 features_cur = _create_qa_features(
@@ -289,8 +305,12 @@ class QAProcessor:
         p_mask = torch.tensor([f.p_mask for f in features], dtype=torch.long)
 
         if is_training:
-            start_positions = torch.tensor([f.start_position for f in features], dtype=torch.long)
-            end_positions = torch.tensor([f.end_position for f in features], dtype=torch.long)
+            start_positions = torch.tensor(
+                [f.start_position for f in features], dtype=torch.long
+            )
+            end_positions = torch.tensor(
+                [f.end_position for f in features], dtype=torch.long
+            )
             qa_dataset = TensorDataset(
                 input_ids,
                 input_mask,
@@ -421,7 +441,9 @@ class QAProcessor:
         return final_answers, answer_probs, nbest_answers
 
 
-QAResult_ = collections.namedtuple("QAResult", ["unique_id", "start_logits", "end_logits"])
+QAResult_ = collections.namedtuple(
+    "QAResult", ["unique_id", "start_logits", "end_logits"]
+)
 
 
 # create a wrapper class so that we can add docstrings
@@ -503,15 +525,15 @@ class AnswerExtractor(Transformer):
 
     """
 
-    def __init__(self, model_name="bert-base-cased", cache_dir=".", load_model_from_dir=None):
-
-        super().__init__(
-            model_class=MODEL_CLASS,
-            model_name=model_name,
-            num_labels=2,
+    def __init__(
+        self, model_name="bert-base-cased", cache_dir=".", load_model_from_dir=None
+    ):
+        model = MODEL_CLASS[model_name].from_pretrained(
+            model_name if load_model_from_dir is None else load_model_from_dir,
             cache_dir=cache_dir,
-            load_model_from_dir=load_model_from_dir,
+            output_loading_info=False,
         )
+        super().__init__(model_name=model_name, model=model, cache_dir=cache_dir)
 
     @staticmethod
     def list_supported_models():
@@ -613,7 +635,9 @@ class AnswerExtractor(Transformer):
 
         # inin scheduler
         scheduler = Transformer.get_default_scheduler(
-            optimizer=self.optimizer, warmup_steps=warmup_steps, num_training_steps=max_steps
+            optimizer=self.optimizer,
+            warmup_steps=warmup_steps,
+            num_training_steps=max_steps,
         )
 
         # fine tune
@@ -668,13 +692,19 @@ class AnswerExtractor(Transformer):
 
         # parallelize model
         self.model = parallelize_model(
-            model=self.model, device=device, num_gpus=num_gpus, gpu_ids=gpu_ids, local_rank=-1,
+            model=self.model,
+            device=device,
+            num_gpus=num_gpus,
+            gpu_ids=gpu_ids,
+            local_rank=-1,
         )
 
         all_results = []
         for batch in tqdm(test_dataloader, desc="Evaluating", disable=not verbose):
             with torch.no_grad():
-                inputs = QAProcessor.get_inputs(batch, device, self.model_name, train_mode=False)
+                inputs = QAProcessor.get_inputs(
+                    batch, device, self.model_name, train_mode=False
+                )
                 outputs = self.model(**inputs)
                 unique_id_tensor = batch[5]
 
@@ -865,7 +895,9 @@ def postprocess_bert_answer(
         # Sort by the sum of the start and end logits in ascending order,
         # so that the first element is the most probable answer
         prelim_predictions = sorted(
-            prelim_predictions, key=lambda x: (x.start_logit + x.end_logit), reverse=True,
+            prelim_predictions,
+            key=lambda x: (x.start_logit + x.end_logit),
+            reverse=True,
         )
 
         seen_predictions = {}
@@ -890,7 +922,9 @@ def postprocess_bert_answer(
                 tok_text = " ".join(tok_text.split())
                 orig_text = " ".join(orig_tokens)
 
-                final_text = _get_final_text(tok_text, orig_text, do_lower_case, verbose_logging)
+                final_text = _get_final_text(
+                    tok_text, orig_text, do_lower_case, verbose_logging
+                )
                 if final_text in seen_predictions:
                     continue
 
@@ -901,7 +935,9 @@ def postprocess_bert_answer(
 
             nbest.append(
                 _NbestPrediction(
-                    text=final_text, start_logit=pred.start_logit, end_logit=pred.end_logit,
+                    text=final_text,
+                    start_logit=pred.start_logit,
+                    end_logit=pred.end_logit,
                 )
             )
         # if we didn't include the empty option in the n-best, include it
@@ -916,7 +952,9 @@ def postprocess_bert_answer(
             # In very rare edge cases we could only have single null prediction.
             # So we just create a nonce prediction in this case to avoid failure.
             if len(nbest) == 1:
-                nbest.insert(0, _NbestPrediction(text="empty", start_logit=0.0, end_logit=0.0))
+                nbest.insert(
+                    0, _NbestPrediction(text="empty", start_logit=0.0, end_logit=0.0)
+                )
 
         # In very rare edge cases we could have no valid predictions. So we
         # just create a nonce prediction in this case to avoid failure.
@@ -956,7 +994,9 @@ def postprocess_bert_answer(
         else:
             # predict "" iff the null score - the score of best non-null > threshold
             score_diff = (
-                score_null - best_non_null_entry.start_logit - (best_non_null_entry.end_logit)
+                score_null
+                - best_non_null_entry.start_logit
+                - (best_non_null_entry.end_logit)
             )
             scores_diff_json[example["qa_id"]] = score_diff
             if score_diff > null_score_diff_threshold:
@@ -1129,7 +1169,9 @@ def postprocess_xlnet_answer(
                     )
 
         prelim_predictions = sorted(
-            prelim_predictions, key=lambda x: (x.start_logit + x.end_logit), reverse=True,
+            prelim_predictions,
+            key=lambda x: (x.start_logit + x.end_logit),
+            reverse=True,
         )
 
         seen_predictions = {}
@@ -1172,7 +1214,9 @@ def postprocess_xlnet_answer(
 
             nbest.append(
                 _NbestPrediction(
-                    text=final_text, start_logit=pred.start_logit, end_logit=pred.end_logit,
+                    text=final_text,
+                    start_logit=pred.start_logit,
+                    end_logit=pred.end_logit,
                 )
             )
 
@@ -1300,7 +1344,9 @@ def _create_qa_example(qa_input, is_training):
 
     if _is_iterable_but_not_string(a_start):
         if not _is_iterable_but_not_string(a_text):
-            raise Exception("The answer text must be a list when answer start is a list.")
+            raise Exception(
+                "The answer text must be a list when answer start is a list."
+            )
         if len(a_start) != 1 and is_training and not impossible:
             raise Exception("For training, each question should have exactly 1 answer.")
         a_start = a_start[0]
@@ -1323,7 +1369,9 @@ def _create_qa_example(qa_input, is_training):
             cleaned_answer_text = " ".join(whitespace_tokenize(a_text))
             if actual_text.find(cleaned_answer_text) == -1:
                 logger.warning(
-                    "Could not find answer: '%s' vs. '%s'", actual_text, cleaned_answer_text,
+                    "Could not find answer: '%s' vs. '%s'",
+                    actual_text,
+                    cleaned_answer_text,
                 )
                 return
         else:
@@ -1549,7 +1597,10 @@ def _create_qa_features(
         else:
             tok_end_position = len(all_doc_tokens) - 1
         (tok_start_position, tok_end_position) = _improve_answer_span(
-            all_doc_tokens, tok_start_position, tok_end_position, example.orig_answer_text,
+            all_doc_tokens,
+            tok_start_position,
+            tok_end_position,
+            example.orig_answer_text,
         )
 
     # The -3 accounts for [CLS], [SEP] and [SEP]
@@ -1583,7 +1634,8 @@ def _create_qa_features(
 
         # p_mask: mask with 1 for token than cannot be in the answer
         # (0 for token which can be in an answer)
-        # Original TF implem also keep the classification token (set to 0) (not sure why...)
+        # Original TF implem also keep the classification token (set to 0)
+        # (not sure why...)
         # TODO: Should we set p_mask = 1 for cls token?
         p_mask = []
 
@@ -1612,9 +1664,11 @@ def _create_qa_features(
             split_token_index = doc_span.start + i
             token_to_orig_map[len(tokens)] = tok_to_orig_index[split_token_index]
 
-            ## TODO: maybe this can be improved to compute
+            # TODO: maybe this can be improved to compute
             # is_max_context for each token only once.
-            is_max_context = _check_is_max_context(doc_spans, doc_span_index, split_token_index)
+            is_max_context = _check_is_max_context(
+                doc_spans, doc_span_index, split_token_index
+            )
             token_is_max_context[len(tokens)] = is_max_context
             tokens.append(all_doc_tokens[split_token_index])
             if model_type == "xlnet":
@@ -1720,10 +1774,13 @@ def _create_qa_features(
 # -------------------------------------------------------------------------------------------------
 # Post processing helper functions
 _PrelimPrediction = collections.namedtuple(
-    "PrelimPrediction", ["feature_index", "start_index", "end_index", "start_logit", "end_logit"],
+    "PrelimPrediction",
+    ["feature_index", "start_index", "end_index", "start_logit", "end_logit"],
 )
 
-_NbestPrediction = collections.namedtuple("NbestPrediction", ["text", "start_logit", "end_logit"])
+_NbestPrediction = collections.namedtuple(
+    "NbestPrediction", ["text", "start_logit", "end_logit"]
+)
 
 
 def _get_final_text(pred_text, orig_text, do_lower_case, verbose_logging=False):
@@ -1786,7 +1843,9 @@ def _get_final_text(pred_text, orig_text, do_lower_case, verbose_logging=False):
     if len(orig_ns_text) != len(tok_ns_text):
         if verbose_logging:
             logger.info(
-                "Length not equal after stripping spaces: '%s' vs '%s'", orig_ns_text, tok_ns_text,
+                "Length not equal after stripping spaces: '%s' vs '%s'",
+                orig_ns_text,
+                tok_ns_text,
             )
         return orig_text
 

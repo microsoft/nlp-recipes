@@ -4,10 +4,9 @@
 """Common helper functions for preprocessing Named Entity Recognition (NER) datasets."""
 
 
-def preprocess_conll(text, data_type=""):
+def preprocess_conll(text, sep="\t"):
     """
-    Helper function converting data in conll format to word lists
-    and token label lists.
+    Converts data in CoNLL format to word and label lists.
 
     Args:
         text (str): Text string in conll format, e.g.
@@ -20,8 +19,8 @@ def preprocess_conll(text, data_type=""):
              of I-ORG
              Minnesota I-ORG
              . O"
-        data_type (str, optional): String that briefly describes the data,
-            e.g. "train"
+        sep (str, optional): Column separator
+            Defaults to \t
     Returns:
         tuple:
             (list of word lists, list of token label lists)
@@ -37,11 +36,29 @@ def preprocess_conll(text, data_type=""):
         # split each sentence string into "word label" pairs
         s_split = s.split("\n")
         # split "word label" pairs
-        s_split_split = [t.split() for t in s_split]
+        s_split_split = [t.split(sep) for t in s_split]
         sentence_list.append([t[0] for t in s_split_split if len(t) > 1])
         labels_list.append([t[1] for t in s_split_split if len(t) > 1])
 
         if len(s_split_split) > max_seq_len:
             max_seq_len = len(s_split_split)
-    print("Maximum sequence length in the {0} data is: {1}".format(data_type, max_seq_len))
+    print("Maximum sequence length is: {0}".format(max_seq_len))
     return sentence_list, labels_list
+
+
+def read_conll_file(file_path, sep="\t", encoding=None):
+    """
+    Reads a data file in CoNLL format and returns word and label lists.
+
+    Args:
+        file_path (str): Data file path.
+        sep (str, optional): Column separator. Defaults to "\t".
+        encoding (str): File encoding used when reading the file.
+            Defaults to None.
+
+    Returns:
+        (list, list): A tuple of word and label lists (list of lists).
+    """
+    with open(file_path, encoding=encoding) as f:
+        data = f.read()
+    return preprocess_conll(data, sep=sep)

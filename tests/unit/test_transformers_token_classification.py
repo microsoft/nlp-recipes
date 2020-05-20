@@ -23,7 +23,7 @@ def test_token_classifier_fit_predict(tmpdir, ner_test_data):
     )
 
     # test fit, no warmup
-    train_dataset = processor.preprocess_for_bert(
+    train_dataset = processor.preprocess(
         text=ner_test_data["INPUT_TEXT"],
         max_len=max_seq_len,
         labels=ner_test_data["INPUT_LABELS"],

@@ -13,7 +13,7 @@ from torch.utils.data.distributed import DistributedSampler
 
 from transformers import RobertaConfig, BertConfig
 
-from utils_nlp.models.transformers.common import TOKENIZER_CLASS, Transformer
+from utils_nlp.models.transformers.common import Transformer
 from utils_nlp.common.pytorch_utils import (
     get_device,
     move_model_to_device,
@@ -25,9 +25,14 @@ from s2s_ft.utils import (
     batch_list_to_batch_tensors,
 )
 from s2s_ft.modeling import BertForSequenceToSequence
+from s2s_ft.modeling import MINILM_PRETRAINED_MODEL_ARCHIVE_MAP
 from s2s_ft.modeling import UNILM_PRETRAINED_MODEL_ARCHIVE_MAP
+
+from s2s_ft.tokenization_minilm import MinilmTokenizer
+from s2s_ft.configuration_minilm import MinilmConfig, MINILM_PRETRAINED_CONFIG_ARCHIVE_MAP 
 from s2s_ft.tokenization_unilm import UnilmTokenizer
 from s2s_ft.configuration_unilm import UnilmConfig, UNILM_PRETRAINED_CONFIG_ARCHIVE_MAP
+
 from s2s_ft.config import BertForSeq2SeqConfig
 import s2s_ft.s2s_loader as seq2seq_loader
 from s2s_ft.modeling_decoding import BertForSeq2SeqDecoder
@@ -43,14 +48,19 @@ MODEL_CLASS.update({k: BertForSequenceToSequence for k in SUPPORTED_ROBERTA_MODE
 MODEL_CLASS.update(
     {k: BertForSequenceToSequence for k in UNILM_PRETRAINED_MODEL_ARCHIVE_MAP}
 )
+MODEL_CLASS.update(
+    {k: BertForSequenceToSequence for k in MINILM_PRETRAINED_MODEL_ARCHIVE_MAP}
+)
 
-
+TOKENIZER_CLASS = {}
 TOKENIZER_CLASS.update({k: UnilmTokenizer for k in UNILM_PRETRAINED_CONFIG_ARCHIVE_MAP})
+TOKENIZER_CLASS.update({k: MinilmTokenizer for k in MINILM_PRETRAINED_CONFIG_ARCHIVE_MAP})
 
 CONFIG_CLASS = {}
 CONFIG_CLASS.update({k: BertConfig for k in SUPPORTED_BERT_MODELS})
 CONFIG_CLASS.update({k: RobertaConfig for k in SUPPORTED_ROBERTA_MODELS})
 CONFIG_CLASS.update({k: UnilmConfig for k in UNILM_PRETRAINED_CONFIG_ARCHIVE_MAP})
+CONFIG_CLASS.update({k: MinilmConfig for k in MINILM_PRETRAINED_CONFIG_ARCHIVE_MAP})
 
 # XLM_ROBERTA is for multilingual and is WIP in s2s-ft.
 # We can add it when it's finished and validated
@@ -69,6 +79,8 @@ def _get_model_type(model_name):
         return "xlm-roberta"
     elif model_name.startswith("unilm"):
         return "unilm"
+    elif model_name.startswith("minilm"):
+        return "minilm"
     else:
         return model_name.split("-")[0]
 
@@ -118,7 +130,8 @@ class S2SAbsSumProcessor:
     def __init__(
         self, model_name="unilm-base-cased", to_lower=False, cache_dir=".",
     ):
-
+        if "uncased" in model_name:
+            to_lower = True
         self.tokenizer = TOKENIZER_CLASS[model_name].from_pretrained(
             model_name, do_lower_case=to_lower, cache_dir=cache_dir
         )
@@ -153,6 +166,7 @@ class S2SAbsSumProcessor:
         output_dir,
         local_rank=-1,
         cached_features_file=None,
+        top_n=-1,
     ):
         """
         Creates S2SAbsSumDataset from input file or list of dictionaries.
@@ -183,6 +197,9 @@ class S2SAbsSumProcessor:
                 saved to this file.
                 If not provided, processed features are saved to `output_dir`.
                 Defaults to None.
+            top_n (int, optional): The number which specifies how many examples in the
+                beginning that will be used to create the dataset. Defaults to -1,
+                which means the whole lists of examples should be used.
 
         Returns:
             S2SAbsSumDataset
@@ -202,6 +219,9 @@ class S2SAbsSumProcessor:
             cached_features_file = os.path.join(output_dir, cached_features_file_name)
             if os.path.exists(cached_features_file):
                 os.remove(cached_features_file)
+        else:
+            if os.path.exists(cached_features_file):
+                print("use cached feature file {}".format(cached_features_file))
 
         features = load_and_cache_examples(
             input_examples=examples,
@@ -210,6 +230,7 @@ class S2SAbsSumProcessor:
             shuffle=shuffle_flag,
             local_rank=local_rank,
             train_mode=train_mode,
+            top_n=top_n,
         )
 
         if not train_mode:
@@ -222,7 +243,7 @@ class S2SAbsSumProcessor:
         return S2SAbsSumDataset(features)
 
     def s2s_dataset_from_iterable_sum_ds(
-        self, sum_ds, train_mode, cached_features_file=None, local_rank=-1
+        self, sum_ds, train_mode, cached_features_file=None, local_rank=-1, top_n=-1,
     ):
         """
         Converts IterableSummarizationDataset to S2SAbsSumDataset.
@@ -238,6 +259,9 @@ class S2SAbsSumProcessor:
                 Defaults to None.
             local_rank (int, optional): Local rank of the device in distributed
                 training. Defaults to -1, which means non-distributed training.
+            top_n (int, optional): The number which specifies how many examples in the
+                beginning of the input dataset that will be used to create the dataset.
+                Defaults to -1, which means the whole dataset should be processsed.
 
         Returns:
             S2SAbsSumDataset
@@ -258,12 +282,13 @@ class S2SAbsSumProcessor:
             output_dir=self.cache_dir,
             local_rank=local_rank,
             cached_features_file=cached_features_file,
+            top_n=top_n,
         )
 
         return s2s_dataset
 
     def s2s_dataset_from_sum_ds(
-        self, sum_ds, train_mode, cached_features_file=None, local_rank=-1
+        self, sum_ds, train_mode, cached_features_file=None, local_rank=-1, top_n=-1
     ):
 
         """
@@ -280,6 +305,9 @@ class S2SAbsSumProcessor:
                 Defaults to None.
             local_rank (int, optional): Local rank of the device in distributed
                 training. Defaults to -1, which means non-distributed training.
+            top_n (int, optional): The number which specifies how many examples in the
+                beginning of the input dataset that will be used to create the dataset.
+                Defaults to -1, which means the whole dataset should be processsed.
 
         Returns:
             S2SAbsSumDataset
@@ -295,12 +323,13 @@ class S2SAbsSumProcessor:
             output_dir=self.cache_dir,
             local_rank=local_rank,
             cached_features_file=cached_features_file,
+            top_n=top_n,
         )
 
         return s2s_dataset
 
     def s2s_dataset_from_json_or_file(
-        self, input_data, train_mode, cached_features_file=None, local_rank=-1
+        self, input_data, train_mode, cached_features_file=None, local_rank=-1, top_n=-1
     ):
         """
         Converts input file or list of dictionaries to S2SAbsSumDataset.
@@ -325,6 +354,10 @@ class S2SAbsSumProcessor:
                 Defaults to None.
             local_rank (int, optional): Local rank of the device in distributed
                 training. Defaults to -1, which means non-distributed training.
+            top_n (int, optional): The number which specifies how many examples in the
+                beginning of the input dataset that will be used to create the dataset.
+                Defaults to -1, which means the whole input data should be processsed.
+
 
         Returns:
             S2SAbsSumDataset
@@ -337,6 +370,7 @@ class S2SAbsSumProcessor:
             output_dir=self.cache_dir,
             local_rank=local_rank,
             cached_features_file=cached_features_file,
+            top_n=top_n,
         )
 
         return s2s_dataset
@@ -470,6 +504,8 @@ class S2SAbstractiveSummarizer(Transformer):
 
         self._model_name = model_name
         self._model_type = _get_model_type(self._model_name)
+        if "uncased" in model_name:
+            to_lower = True
 
         # self._bert_model_name is needed for BertForSeq2SeqDecoder
         if self._model_type != "bert":
@@ -826,27 +862,24 @@ class S2SAbstractiveSummarizer(Transformer):
         mask_token = "<mask>" if is_roberta else "[MASK]"
 
         max_src_length = self.max_seq_length - 2 - max_tgt_length
+        tokenizer = self.tokenizer
         bi_uni_pipeline = []
         bi_uni_pipeline.append(
             seq2seq_loader.Preprocess4Seq2seqDecoder(
                 list(vocab.keys()),
-                self.tokenizer.convert_tokens_to_ids,
+                tokenizer.convert_tokens_to_ids,
                 self.max_seq_length,
                 max_tgt_length=max_tgt_length,
-                # new_segment_ids=new_segment_ids,
-                mode=s2s_config.mode,
-                # num_qkv=s2s_config.num_qkv,
-                # s2s_special_token=s2s_config.s2s_special_token,
-                # s2s_add_segment=s2s_config.s2s_add_segment,
-                # s2s_share_segment=s2s_config.s2s_share_segment,
                 pos_shift=s2s_config.pos_shift,
                 source_type_id=self.model_config.source_type_id,
                 target_type_id=self.model_config.target_type_id,
-                cls_token=cls_token,
-                sep_token=sep_token,
-                pad_token=pad_token,
+                cls_token=tokenizer.cls_token,
+                sep_token=tokenizer.sep_token,
+                pad_token=tokenizer.pad_token,
             )
         )
+        mask_word_id, eos_word_ids, sos_word_id = tokenizer.convert_tokens_to_ids(
+        [tokenizer.mask_token, tokenizer.sep_token, tokenizer.sep_token])
 
         def collate_fn(input_batch):
             buf_id = [x[0] for x in input_batch]
@@ -867,11 +900,6 @@ class S2SAbstractiveSummarizer(Transformer):
         type_vocab_size = (
             6 + (1 if s2s_config.s2s_add_segment else 0) if new_segment_ids else 2
         )
-        (
-            mask_word_id,
-            eos_word_ids,
-            sos_word_id,
-        ) = self.tokenizer.convert_tokens_to_ids([mask_token, sep_token, sep_token])
         forbid_ignore_set = None
         if forbid_ignore_word:
             w_list = []
@@ -886,26 +914,29 @@ class S2SAbstractiveSummarizer(Transformer):
             state_dict = self.model.module.state_dict()
         else:
             state_dict = self.model.state_dict()
+        
+        bert_config = None
+        if self._model_type == "minilm":
+            bert_config = s2s_ft.modeling_decoding.BertConfig(
+                    30522,
+                    type_vocab_size=type_vocab_size,
+                    hidden_size=384,
+                    intermediate_size=1536, 
+                    max_position_embeddings=self.max_seq_length,)
 
-        bert_config = s2s_ft.modeling_decoding.BertConfig(
-                len(list(vocab.keys())) if not is_roberta else 50265, 
-                type_vocab_size=type_vocab_size,
-                max_position_embeddings=self.max_seq_length,
-                ffn_type=s2s_config.ffn_type,
-                num_qkv=s2s_config.num_qkv,
-                seg_emb=s2s_config.seg_emb,
-                is_roberta=is_roberta,
-                no_segment_embedding=no_segment_embedding
-            )
+        else: # self._model_type == "unilm":
+            bert_config = s2s_ft.modeling_decoding.BertConfig(
+                    len(list(vocab.keys())) if not is_roberta else 50265,
+                    type_vocab_size=type_vocab_size,
+                    max_position_embeddings=self.max_seq_length,)
 
+       
         model = BertForSeq2SeqDecoder.from_pretrained(
             self._bert_model_name,
             bert_config,
             state_dict=state_dict,
             cache_dir=self.cache_dir,
             mask_word_id=mask_word_id,
-            num_labels=cls_num_labels,
-            num_rel=pair_num_relation,
             search_beam_size=beam_size,
             length_penalty=length_penalty,
             eos_id=eos_word_ids,
@@ -915,6 +946,7 @@ class S2SAbstractiveSummarizer(Transformer):
             ngram_size=s2s_config.forbid_ngram_size,
             min_len=s2s_config.min_len,
             mode=s2s_config.mode,
+            max_position_embeddings=self.max_seq_length,
             pos_shift=s2s_config.pos_shift,
         )
 
@@ -1046,6 +1078,7 @@ def load_and_cache_examples(
     train_mode=True,
     cached_features_file=None,
     shuffle=True,
+    top_n=-1,
 ):
     # Make sure only the first process in distributed training process the dataset,
     # and the others will use the cache
@@ -1064,6 +1097,9 @@ def load_and_cache_examples(
                     examples.append(json.loads(line))
         else:
             examples = input_examples
+
+        if top_n != -1:
+            examples = examples[0:top_n]
 
         features = []
         if train_mode:
