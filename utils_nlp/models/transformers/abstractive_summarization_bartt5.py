@@ -19,6 +19,7 @@ from torch.utils.data.distributed import DistributedSampler
 import torch.multiprocessing
 from torch import nn
 
+
 torch.multiprocessing.set_sharing_strategy("file_system")
 
 from transformers import (
@@ -61,7 +62,7 @@ class Predictor(nn.Module):
     Predictor which can run on multi-GPUs.
 
     Args:
-        model (AbstractiveSummarizer): the summarizer model which will 
+        model (AbstractiveSummarizer): the summarizer model which will
             be used for prediction.
         min_length (int): the minimum generated summary length.
         max_length (int): the maximum generated summary length.
@@ -81,7 +82,7 @@ class Predictor(nn.Module):
     def forward(self, src, src_mask):
         """ Generate sequences for models with a LM head.
 
-        Args: 
+        Args:
             src: (`optional`) `torch.LongTensor` of shape `(batch_size, sequence_length)`
                 The sequence used as a prompt for the generation. If `None` the
                 method initializes it as an empty `torch.LongTensor` of shape `(1,)`.
@@ -142,7 +143,7 @@ def validate(summarizer, validate_dataset, num_gpus=1, TOP_N=2):
 
 
 class SummarizationProcessor:
-    """ Class for preprocessing abstractive summarization data for BART/T5 models. 
+    """ Class for preprocessing abstractive summarization data for BART/T5 models.
 
     Args:
         tokenizer(AutoTokenizer): tokenizer for the model used for preprocessing.
@@ -153,6 +154,7 @@ class SummarizationProcessor:
                 as in target. Defaults to 140.
 
     """
+
     def __init__(
         self, tokenizer, config, max_source_length=1024, max_target_length=140,
     ):
@@ -165,60 +167,70 @@ class SummarizationProcessor:
         self.max_source_length = max_source_length
         self.max_target_length = max_target_length
 
+    def initializer(self):
+        global tokenizer
+        tokenizer = self.tokenizer
+
+    def encode_example(
+        self, example,
+    ):
+        """ preprocess a single data example for abstractive summarization.
+
+         Args:
+            example (dict): a data item with fields "src" and "tgt" and both
+                fields are string.
+
+        Returns:
+            a dictionary with fields "source_ids",
+                "source_mask" and "target_ids".
+
+        """
+
+        global tokenizer
+        result = {}
+        prefix = self.prefix
+        max_source_length = self.max_source_length
+        max_target_length = self.max_target_length
+        pad_to_max_length = True
+        return_tensors = "pt"
+
+        tokenized_source = tokenizer.batch_encode_plus(
+            [prefix + example["src"]],
+            max_length=max_source_length,
+            pad_to_max_length=pad_to_max_length,
+            return_tensors=return_tensors,
+        )
+
+        source_ids = tokenized_source["input_ids"].squeeze()
+        src_mask = tokenized_source["attention_mask"].squeeze()
+        result["source_ids"] = source_ids
+        result["source_mask"] = src_mask
+        if "tgt" in example:
+            tokenized_target = tokenizer.batch_encode_plus(
+                [example["tgt"]],
+                max_length=max_target_length,
+                pad_to_max_length=pad_to_max_length,
+                return_tensors=return_tensors,
+            )
+            target_ids = tokenized_target["input_ids"].squeeze()
+            result["target_ids"] = target_ids
+        return result
+
     def preprocess(self, input_data_list):
-        """ preprocess the data for abstractive summarization.
-            
+        """ preprocess a list of  data for abstractive summarization.
+
         Args:
             input_data_list (list of dictionary): input list where each item is
                 an dictionary with fields "src" and "tgt" and both fields are string.
 
         Returns:
-            list of dictionary with addtional fields "source_ids", 
+            list of dictionary with fields "source_ids",
                 "source_mask" and "target_ids".
         """
-        def _encode_example(
-            example,
-            tokenizer,
-            prefix="",
-            max_source_length=None,
-            max_target_length=None,
-            pad_to_max_length=True,
-            return_tensors="pt",
-        ):
-
-            tokenized_source = tokenizer.batch_encode_plus(
-                [prefix + example["src"]],
-                max_length=max_source_length,
-                pad_to_max_length=pad_to_max_length,
-                return_tensors=return_tensors,
-            )
-
-            source_ids = tokenized_source["input_ids"].squeeze()
-            src_mask = tokenized_source["attention_mask"].squeeze()
-            example["source_ids"] = source_ids
-            example["source_mask"] = src_mask
-            if "tgt" in example:
-                tokenized_target = tokenizer.batch_encode_plus(
-                    [example["tgt"]],
-                    max_length=max_target_length,
-                    pad_to_max_length=pad_to_max_length,
-                    return_tensors=return_tensors,
-                )
-                target_ids = tokenized_target["input_ids"].squeeze()
-                example["target_ids"] = target_ids
-            return example
 
         result = []
         for i in input_data_list:
-            result.append(
-                _encode_example(
-                    i,
-                    tokenizer=self.tokenizer,
-                    prefix=self.prefix,
-                    max_source_length=self.max_source_length,
-                    max_target_length=self.max_target_length,
-                )
-            )
+            result.append(self.encode_example(i))
         return result
 
     @staticmethod
@@ -231,8 +243,8 @@ class SummarizationProcessor:
             If train_mode is True, it also contains the list of target ids.
             device (torch.device): A PyTorch device.
             model_name (bool, optional): Model name used to format the inputs.
-            tokenizer (AutoTokenizer, optional): tokenizer whose pad_token_id 
-                will be used for processing. 
+            tokenizer (AutoTokenizer, optional): tokenizer whose pad_token_id
+                will be used for processing.
             train_mode (bool, optional): Training mode flag.
                 Defaults to True.
 
@@ -241,7 +253,6 @@ class SummarizationProcessor:
             Decoder input ids and LM labels are only returned when
             train_mode is True.
         """
-
 
         pad_token_id = tokenizer.pad_token_id
         if not train_mode:
@@ -266,7 +277,7 @@ class SummarizationProcessor:
                 "decoder_input_ids": y_ids,
                 "lm_labels": lm_labels,
             }
-     
+
     def collate_fn(self, batch, device, train_mode=False):
         """ Collate formats the data passed to the data loader.
         In particular we tokenize the data batch after batch to avoid keeping them
@@ -558,7 +569,7 @@ class AbstractiveSummarizer(Transformer):
         fp16=False,
         verbose=True,
         checkpoint=None,
-        **predictor_kwargs
+        **predictor_kwargs,
     ):
         """
         Predict the summarization for the input data iterator.
@@ -586,14 +597,15 @@ class AbstractiveSummarizer(Transformer):
                 `no_repeat_ngram_size` can only occur once in the generated summary.
                 Defaults to 3.
             early_stopping (bool, optional): If set to `True` beam search is stopped
-                when at least `num_beams` sentences finished per batch. Defautls to True. 
+                when at least `num_beams` sentences finished per batch.
+                Defautls to True.
             fp16 (bool, optional): Whether to use half-precision model for prediction.
                 Defaults to False.
             verbose (bool, optional): Whether to print out the training log.
                 Defaults to True.
             checkpoint (str, optional):
             predictor_kwargs (dict, optional): Additional kwargs that will be forwarded
-                to `Predictor`. Please consult the arguments in function 
+                to `Predictor`. Please consult the arguments in function
                 `PreTrainedModel::generate`.
 
         Returns:
@@ -634,7 +646,6 @@ class AbstractiveSummarizer(Transformer):
         )
         print("dataset length is {}".format(len(test_dataset)))
 
-        
         predictor = Predictor(
             model,
             min_length,
@@ -643,7 +654,7 @@ class AbstractiveSummarizer(Transformer):
             length_penalty=length_penalty,
             no_repeat_ngram_size=no_repeat_ngram_size,
             early_stopping=early_stopping,
-            **predictor_kwargs
+            **predictor_kwargs,
         )
 
         # move model to devices
@@ -658,7 +669,7 @@ class AbstractiveSummarizer(Transformer):
         generated_summaries = []
 
         for batch in tqdm(
-            test_dataloader, desc="Generating summary", disable=True  # not verbose
+            test_dataloader, desc="Generating summary", disable=not verbose
         ):
             input_ids, masks = trim_batch(
                 batch["source_ids"],
