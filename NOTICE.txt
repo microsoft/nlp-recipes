@@ -16,6 +16,7 @@ Notwithstanding any other terms, you may reverse engineer this software to the
 extent required to debug changes to any libraries licensed under the GNU Lesser
 General Public License.
 
+This software requires you to access or provide third party code that may contain restrictions on how such third party code can be used. You are solely responsible for reviewing any licenses applicable to such code and determining whether your use is permitted by such license
 --
 
 https://github.com/huggingface/transformers
