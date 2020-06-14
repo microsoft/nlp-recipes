@@ -2,7 +2,7 @@
 
 This document describes how to setup all the dependencies to run the notebooks in this repository.
 
-The recommended environment to run these notebooks is the [Azure Data Science Virtual Machine (DSVM)](https://azure.microsoft.com/en-us/services/virtual-machines/data-science-virtual-machines/). Since a considerable number of the algorithms rely on deep learning, it is recommended to use a GPU DSVM.
+The recommended environment to run these notebooks is the [Azure Data Science Virtual Machine (DSVM)](https://azure.microsoft.com/en-us/services/virtual-machines/data-science-virtual-machines/). Since a considerable number of the algorithms rely on deep learning, it is recommended to use a [GPU optimimized VM](https://docs.microsoft.com/en-us/azure/virtual-machines/sizes-gpu).
 
 For training at scale, operationalization or hyperparameter tuning, it is recommended to use [Azure ML](https://docs.microsoft.com/en-us/azure/machine-learning/service/).
 
@@ -24,7 +24,7 @@ Depending on the type of NLP system and the notebook that needs to be run, there
 
 ## Create a cloud-based workstation (Optional)
 
-[Azure Machine Learning service](https://azure.microsoft.com/en-us/services/machine-learning-service/)’s Notebook Virtual Machine (VM), is a cloud-based workstation created specifically for data scientists. Notebook VM based authoring is directly integrated into Azure Machine Learning service, providing a code-first experience for Python developers to conveniently build and deploy models in the workspace. Developers and data scientists can perform every operation supported by the Azure Machine Learning Python SDK using a familiar Jupyter notebook in a secure, enterprise-ready environment. Notebook VM is secure and easy-to-use, preconfigured for machine learning, and fully customizable. 
+Azure Machine Learning service’s [compute instance](https://docs.microsoft.com/en-us/azure/machine-learning/concept-compute-instance), is a cloud-based workstation created specifically for data scientists. Notebook VM based authoring is directly integrated into Azure Machine Learning service, providing a code-first experience for Python developers to conveniently build and deploy models in the workspace. Developers and data scientists can perform every operation supported by the Azure Machine Learning Python SDK using a familiar Jupyter notebook in a secure, enterprise-ready environment. Notebook VM is secure and easy-to-use, preconfigured for machine learning, and fully customizable. 
 
 You can learn how to create a Notebook VM [here](https://docs.microsoft.com/en-us/azure/machine-learning/service/tutorial-1st-experiment-sdk-setup#azure) and then follow the same setup as in the [Setup guide for Local or DSVM](#setup-guide-for-local-or-dsvm-machines) directly using the terminal in the Notebook VM.
 
