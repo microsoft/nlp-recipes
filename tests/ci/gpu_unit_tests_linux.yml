@@ -15,7 +15,7 @@ jobs:
 - job: gpu_unit_tests_linux
   timeoutInMinutes: 30 # how long to run the job before automatically cancelling
   pool:
-    name: nlpagentpool
+    name: nlpagentpool-vmss
 
   steps:
   - bash: |

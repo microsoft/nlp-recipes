@@ -15,7 +15,7 @@ jobs:
 - job: notebooks_cpu_unit_tests_linux
   timeoutInMinutes: 10 # how long to run the job before automatically cancelling
   pool:
-    name: nlpagentpool
+    name: nlpagentpool-vmss
 
   steps:
   - bash: |
