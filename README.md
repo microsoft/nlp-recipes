@@ -95,7 +95,7 @@ The following is a list of related repositories that we like and think are usefu
 |[Azure Machine Learning Notebooks](https://github.com/Azure/MachineLearningNotebooks/)|ML and deep learning examples with Azure Machine Learning.|
 |[AzureML-BERT](https://github.com/Microsoft/AzureML-BERT)|End-to-end recipes for pre-training and fine-tuning BERT using Azure Machine Learning service.|
 |[MASS](https://github.com/microsoft/MASS)|MASS: Masked Sequence to Sequence Pre-training for Language Generation.|
-|[MT-DNN](https://github.com/namisan/mt-dnn)|Multi-Task Deep Neural Networks for Natural Language Understanding.|
+|[MT-DNN](https://github.com/microsoft/mt-dnn)|Multi-Task Deep Neural Networks for Natural Language Understanding.|
 |[UniLM](https://github.com/microsoft/unilm)|Unified Language Model Pre-training.|
 |[DialoGPT](https://github.com/microsoft/DialoGPT)|DialoGPT: Large-Scale Generative Pre-training for Conversational Response Generation|
 
