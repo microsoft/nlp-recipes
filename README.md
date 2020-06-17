@@ -48,7 +48,7 @@ The following is a summary of the commonly used NLP scenarios covered in the rep
 
 | Scenario                              |  Models | Description|Languages|
 |-------------------------|  ------------------- |-------|---|
-|Text Classification                     |BERT, XLNet, RoBERTa| Text classification is a supervised learning method of learning and predicting the category or the class of a document given its text content. |English, Hindi, Arabic|
+|Text Classification                     |BERT, DistillBERT, XLNet, RoBERTa, ALBERT, XLM| Text classification is a supervised learning method of learning and predicting the category or the class of a document given its text content. |English, Chinese, Hindi, Arabic, German, French, Japanese, Spanish, Dutch|
 |Named Entity Recognition                |BERT| Named entity recognition (NER) is the task of classifying words or key phrases of a text into predefined entities of interest. |English|
 |Text Summarization|BERTSumExt <br> BERTSumAbs <br> UniLM (s2s-ft) <br> MiniLM |Text summarization is a language generation task of summarizing the input text into a shorter paragraph of text.|English
 |Entailment                              |BERT, XLNet, RoBERTa| Textual entailment is the task of classifying the binary relation between two natural-language texts,  *text* and *hypothesis*, to determine if the *text* agrees with the *hypothesis* or not. |English|
