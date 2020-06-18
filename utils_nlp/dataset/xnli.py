@@ -14,8 +14,8 @@ import pandas as pd
 from utils_nlp.dataset.url_utils import extract_zip, maybe_download
 from utils_nlp.dataset.preprocess import convert_to_unicode
 
-URL_XNLI = "https://www.nyu.edu/projects/bowman/xnli/XNLI-1.0.zip"
-URL_XNLI_MT = "https://www.nyu.edu/projects/bowman/xnli/XNLI-MT-1.0.zip"
+URL_XNLI = "https://cims.nyu.edu/~sbowman/xnli/XNLI-1.0.zip"
+URL_XNLI_MT = "https://cims.nyu.edu/~sbowman/xnli/XNLI-MT-1.0.zip"
 
 
 def load_pandas_df(local_cache_path=".", file_split="dev", language="zh"):
