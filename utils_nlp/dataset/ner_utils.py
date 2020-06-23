@@ -4,7 +4,7 @@
 """Common helper functions for preprocessing Named Entity Recognition (NER) datasets."""
 
 
-def preprocess_conll(text, sep="\t "):
+def preprocess_conll(text, sep="\t"):
     """
     Converts data in CoNLL format to word and label lists.
 
@@ -36,7 +36,7 @@ def preprocess_conll(text, sep="\t "):
         # split each sentence string into "word label" pairs
         s_split = s.split("\n")
         # split "word label" pairs
-        s_split_split = [t.split() for t in s_split]
+        s_split_split = [t.split(sep) for t in s_split]
         sentence_list.append([t[0] for t in s_split_split if len(t) > 1])
         labels_list.append([t[1] for t in s_split_split if len(t) > 1])
         if len(s_split_split) > max_seq_len:
