@@ -39,7 +39,6 @@ def preprocess_conll(text, sep="\t"):
         s_split_split = [t.split(sep) for t in s_split]
         sentence_list.append([t[0] for t in s_split_split if len(t) > 1])
         labels_list.append([t[1] for t in s_split_split if len(t) > 1])
-
         if len(s_split_split) > max_seq_len:
             max_seq_len = len(s_split_split)
     print("Maximum sequence length is: {0}".format(max_seq_len))

@@ -189,8 +189,7 @@ def load_dataset(
     label_map = TokenClassificationProcessor.create_label_map(
         label_lists=train_df["labels"], trailing_piece_tag=trailing_piece_tag
     )
-
-    train_dataset = processor.preprocess_for_bert(
+    train_dataset = processor.preprocess(
         text=train_df["sentence"],
         max_len=max_len,
         labels=train_df["labels"],
@@ -198,7 +197,7 @@ def load_dataset(
         trailing_piece_tag=trailing_piece_tag,
     )
 
-    test_dataset = processor.preprocess_for_bert(
+    test_dataset = processor.preprocess(
         text=test_df["sentence"],
         max_len=max_len,
         labels=test_df["labels"],
