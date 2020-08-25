@@ -157,13 +157,13 @@ A setup.py file is provided in order to simplify the installation of this utilit
     
 To install the package, please run the command below (from directory root)
 
-    pip install -e . 
+    pip install . 
 
 Running the command tells pip to install the `utils_nlp` package from source in [development mode](https://setuptools.readthedocs.io/en/latest/setuptools.html#development-mode). This just means that any updates to `utils_nlp` source directory will immediately be reflected in the installed package without needing to reinstall; a very useful practice for a package with constant updates.   
 
 > It is also possible to install directly from Github, which is the best way to utilize the `utils_nlp` package in external projects (while still reflecting updates to the source as it's installed as an editable `'-e'` package). 
 
->   `pip install -e  git+git@github.com:microsoft/nlp-recipes.git@master#egg=utils_nlp`  
+>   `pip install git+git@github.com:microsoft/nlp-recipes.git@master#egg=utils_nlp`  
 
 Either command, from above, makes `utils_nlp` available in your conda virtual environment. You can verify it was properly installed by running:  
 
