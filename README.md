@@ -48,7 +48,7 @@ The following is a summary of the commonly used NLP scenarios covered in the rep
 
 | Scenario                              |  Models | Description|Languages|
 |-------------------------|  ------------------- |-------|---|
-|Text Classification                     |BERT, XLNet, RoBERTa| Text classification is a supervised learning method of learning and predicting the category or the class of a document given its text content. |English, Hindi, Arabic|
+|Text Classification                     |BERT, DistillBERT, XLNet, RoBERTa, ALBERT, XLM| Text classification is a supervised learning method of learning and predicting the category or the class of a document given its text content. |English, Chinese, Hindi, Arabic, German, French, Japanese, Spanish, Dutch|
 |Named Entity Recognition                |BERT| Named entity recognition (NER) is the task of classifying words or key phrases of a text into predefined entities of interest. |English|
 |Text Summarization|BERTSumExt <br> BERTSumAbs <br> UniLM (s2s-ft) <br> MiniLM |Text summarization is a language generation task of summarizing the input text into a shorter paragraph of text.|English
 |Entailment                              |BERT, XLNet, RoBERTa| Textual entailment is the task of classifying the binary relation between two natural-language texts,  *text* and *hypothesis*, to determine if the *text* agrees with the *hypothesis* or not. |English|
@@ -95,7 +95,7 @@ The following is a list of related repositories that we like and think are usefu
 |[Azure Machine Learning Notebooks](https://github.com/Azure/MachineLearningNotebooks/)|ML and deep learning examples with Azure Machine Learning.|
 |[AzureML-BERT](https://github.com/Microsoft/AzureML-BERT)|End-to-end recipes for pre-training and fine-tuning BERT using Azure Machine Learning service.|
 |[MASS](https://github.com/microsoft/MASS)|MASS: Masked Sequence to Sequence Pre-training for Language Generation.|
-|[MT-DNN](https://github.com/namisan/mt-dnn)|Multi-Task Deep Neural Networks for Natural Language Understanding.|
+|[MT-DNN](https://github.com/microsoft/mt-dnn)|Multi-Task Deep Neural Networks for Natural Language Understanding.|
 |[UniLM](https://github.com/microsoft/unilm)|Unified Language Model Pre-training.|
 |[DialoGPT](https://github.com/microsoft/DialoGPT)|DialoGPT: Large-Scale Generative Pre-training for Conversational Response Generation|
 

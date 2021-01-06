@@ -117,6 +117,7 @@ output.ipynb
 *.data
 *.dat
 *.csv
+*.tsv
 *.zip
 .vscode/
 tools/repo_metrics/config.py
