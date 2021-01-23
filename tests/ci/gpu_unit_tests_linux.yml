@@ -26,7 +26,8 @@ jobs:
       # Conda creation can take around 10min
       - bash: |
           python tools/generate_conda_file.py --gpu
-          conda env create -n nlp_gpu -f nlp_gpu.yaml
+          conda update conda
+          conda env create --force -n nlp_gpu -f nlp_gpu.yaml
         displayName: "Creating Conda Environment with dependencies"
 
       - bash: |
