@@ -13,7 +13,7 @@ trigger:
 
 jobs:
   - job: cpu_unit_tests_linux
-    timeoutInMinutes: 12 # how long to run the job before automatically cancelling
+    timeoutInMinutes: 60 # how long to run the job before automatically cancelling
     pool:
       # vmImage: 'ubuntu-16.04' # hosted machine
       name: nlpagentpool
