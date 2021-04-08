@@ -256,7 +256,7 @@ class Translator(nn.Module):
             topk_log_probs = topk_scores * length_penalty
 
             # Resolve beam origin and true word ids.
-            topk_beam_index = topk_ids.div(vocab_size)
+            topk_beam_index = topk_ids.true_divide(vocab_size)
             topk_ids = topk_ids.fmod(vocab_size)
 
             # Map beam_index to batch_index in the flat representation.
@@ -267,7 +267,7 @@ class Translator(nn.Module):
 
             # Append last prediction.
             alive_seq = torch.cat(
-                [alive_seq.index_select(0, select_indices), topk_ids.view(-1, 1)], -1
+                [alive_seq.index_select(0, select_indices.view(-1).long()), topk_ids.view(-1, 1)],  -1
             )
 
             is_finished = topk_ids.eq(self.end_token)
@@ -310,9 +310,9 @@ class Translator(nn.Module):
                 )
             # Reorder states.
             select_indices = batch_index.view(-1)
-            src_features = src_features.index_select(0, select_indices)
+            src_features = src_features.index_select(0, select_indices.view(-1).long())
             dec_states.map_batch_fn(
-                lambda state, dim: state.index_select(dim, select_indices)
+                lambda state, dim: state.index_select(dim, select_indices.view(-1).long())
             )
 
         empty_output = [len(results["predictions"][b]) <= 0 for b in batch_offset]
