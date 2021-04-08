@@ -318,7 +318,7 @@ class BertSumAbsProcessor:
                 if len(line) <= 0:
                     continue
                 story_lines_token_ids.append(
-                    self.tokenizer.encode(line, max_length=self.max_src_len)
+                    self.tokenizer.encode(line, truncation=True, max_length=self.max_src_len)
                 )
             except:
                 print(line)
@@ -333,7 +333,7 @@ class BertSumAbsProcessor:
                     if len(line) <= 0:
                         continue
                     summary_lines_token_ids.append(
-                        self.tokenizer.encode(line, max_length=self.max_tgt_len)
+                        self.tokenizer.encode(line, truncation=True, max_length=self.max_tgt_len)
                     )
                 except:
                     print(line)
