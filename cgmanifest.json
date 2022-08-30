@@ -1,45 +1,46 @@
 {
-    "Registrations": [
-        {
-            "component": {
-                "type": "git",
-                "git": {
-                    "repositoryUrl": "https://github.com/facebookresearch/XLM",
-                    "commitHash": ""
-                }
-            },
-            "license": "CC BY-NC 4.0"
-        },
-        {
-            "component": {
-                "type": "git",
-                "git": {
-                    "repositoryUrl": "https://github.com/allenai/bi-att-flow",
-                    "commitHash": "e444acf13892cf62189b9eac3c7654bd83baf848"
-                }
-            },
-            "license": "Apache-2.0"
-        },
-        {
-            "component": {
-                "type": "git",
-                "git": {
-                    "repositoryUrl": "https://github.com/stanfordnlp/glove",
-                    "commitHash": "26f6e18eb117ca7b080d01acb453fd1c9742418d"
-                }
-            },
-            "license": "Apache-2.0"
-        },
-        {
-            "component": {
-                "type": "git",
-                "git": {
-                    "repositoryUrl": "https://github.com/nlpyang/PreSumm",
-                    "commitHash": "2df3312582a3a014aacbc1be810841705c67d06e"
-                }
-            },
-            "license": "MIT License"
+  "$schema": "https://json.schemastore.org/component-detection-manifest.json",
+  "Registrations": [
+    {
+      "component": {
+        "type": "git",
+        "git": {
+          "repositoryUrl": "https://github.com/facebookresearch/XLM",
+          "commitHash": ""
         }
-    ],
-    "Version": 1
+      },
+      "license": "CC BY-NC 4.0"
+    },
+    {
+      "component": {
+        "type": "git",
+        "git": {
+          "repositoryUrl": "https://github.com/allenai/bi-att-flow",
+          "commitHash": "e444acf13892cf62189b9eac3c7654bd83baf848"
+        }
+      },
+      "license": "Apache-2.0"
+    },
+    {
+      "component": {
+        "type": "git",
+        "git": {
+          "repositoryUrl": "https://github.com/stanfordnlp/glove",
+          "commitHash": "26f6e18eb117ca7b080d01acb453fd1c9742418d"
+        }
+      },
+      "license": "Apache-2.0"
+    },
+    {
+      "component": {
+        "type": "git",
+        "git": {
+          "repositoryUrl": "https://github.com/nlpyang/PreSumm",
+          "commitHash": "2df3312582a3a014aacbc1be810841705c67d06e"
+        }
+      },
+      "license": "MIT License"
+    }
+  ],
+  "Version": 1
 }
